@@ -1,0 +1,11 @@
+.DS_Store
+*.wav
+*.pyc
+*.out
+*.log
+*.npy
+*.png
+__pycache__
+blstm_ctc_example.py
+lstm_ctc_example.py
+.dropbox.attr
