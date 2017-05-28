@@ -33,12 +33,12 @@ class TestCTC(unittest.TestCase):
     def check_training(self, model_type, label_type):
         tf.reset_default_graph()
         with tf.Graph().as_default():
-            # load batch data
+            # Load batch data
             inputs, labels, seq_len = generate_data(label_type=label_type,
                                                     model='ctc')
             indices, values, dense_shape = list2sparsetensor(labels)
 
-            # define model
+            # Define model
             output_size = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
             network = model(batch_size=1,
@@ -59,19 +59,19 @@ class TestCTC(unittest.TestCase):
                                      learning_rate_init=learning_rate,
                                      is_scheduled=False)
 
-            # decode_op = network.greedy_decoder()
+            # Decode_op = network.greedy_decoder()
             decode_op = network.beam_search_decoder(beam_width=20)
             # posteriors_op = network.posteriors(decode_op)
             ler_op = network.ler(decode_op)
 
-            # add the variable initializer operation
+            # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
 
             with tf.Session() as sess:
-                # initialize parameters
+                # Initialize parameters
                 sess.run(init_op)
 
-                # train model
+                # Train model
                 max_steps = 400
                 start_time_global = time.time()
                 start_time_step = time.time()
@@ -90,21 +90,21 @@ class TestCTC(unittest.TestCase):
                         network.lr_pl: learning_rate
                     }
 
-                    # compute loss
+                    # Compute loss
                     _, loss_train = sess.run(
                         [train_op, loss_op], feed_dict=feed_dict)
 
-                    # gradient check
+                    # Gradient check
                     # grads = sess.run(network.clipped_grads, feed_dict=feed_dict)
                     # for grad in grads:
                     #     print(np.max(grad))
 
                     if (step + 1) % 10 == 0:
-                        # change feed dict for evaluation
+                        # Change feed dict for evaluation
                         feed_dict[network.keep_prob_input_pl] = 1.0
                         feed_dict[network.keep_prob_hidden_pl] = 1.0
 
-                        # compute accuracy
+                        # Compute accuracy
                         ler_train = sess.run(ler_op, feed_dict=feed_dict)
 
                         duration_step = time.time() - start_time_step
@@ -112,7 +112,7 @@ class TestCTC(unittest.TestCase):
                               (step + 1, loss_train, ler_train, duration_step))
                         start_time_step = time.time()
 
-                        # visualize
+                        # Visualize
                         labels_st = sess.run(decode_op, feed_dict=feed_dict)
                         labels_pred = sparsetensor2list(
                             labels_st, batch_size=1)

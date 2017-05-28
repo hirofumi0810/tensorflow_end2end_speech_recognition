@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import time
 import unittest
 import tensorflow as tf
 
@@ -13,7 +12,7 @@ from util import measure_time
 from data import generate_data, num2alpha, num2phone
 
 
-class TestCTC(unittest.TestCase):
+class TestAttentionEncoder(unittest.TestCase):
 
     @measure_time
     def test_attention_encoder(self):
@@ -27,11 +26,11 @@ class TestCTC(unittest.TestCase):
     def check_encode(self, model_type, label_type):
         tf.reset_default_graph()
         with tf.Graph().as_default():
-            # load batch data
+            # Load batch data
             inputs, _, seq_len = generate_data(label_type=label_type,
                                                model='attention')
 
-            # define model
+            # Define model
             frame_num = inputs[0].shape[0]
             input_size = inputs[0].shape[1]
             inputs_pl = tf.placeholder(tf.float32,
@@ -58,11 +57,11 @@ class TestCTC(unittest.TestCase):
                 encoder.keep_prob_hidden_pl: 1.0
             }
 
-            # add the variable initializer operation
+            # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
 
             with tf.Session() as sess:
-                # initialize parameters
+                # Initialize parameters
                 sess.run(init_op)
                 encoder_outputs = sess.run([encode_op], feed_dict=feed_dict)
                 outputs = encoder_outputs[0].outputs

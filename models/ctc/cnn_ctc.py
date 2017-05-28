@@ -46,15 +46,15 @@ class CNN_CTC(ctcBase):
                  num_proj=None):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                        output_size, parameter_init, clip_grad, clip_activation,
-                        dropout_ratio_input, dropout_ratio_hidden)
+                         output_size, parameter_init, clip_grad, clip_activation,
+                         dropout_ratio_input, dropout_ratio_hidden)
 
         self.num_proj = None
         self.splice = 0
 
     def define(self):
         """Construct network."""
-        # generate placeholders
+        # Generate placeholders
         self._generate_pl()
 
         # (batch_size, max_timesteps, input_size_splice)
@@ -68,14 +68,14 @@ class CNN_CTC(ctcBase):
         # b: [FilterNum (OutputChannel)]
         ######################################################
         with tf.name_scope('conv1'):
-            # reshape to [batch, 40fbank + 1energy, timesteps, 3(current +
+            # Reshape to [batch, 40fbank + 1energy, timesteps, 3(current +
             # delta + deltadelta)]
             input_drop_rs = tf.reshape(self.inputs_pl,
                                        # shape=[batch_size, self.input_size,
                                        # max_timesteps, 1])
                                        shape=[batch_size, int(self.input_size / 3), max_timesteps, 3])
 
-            # affine
+            # Affine
             conv1_shape = [3, 5, 3, 128]  # (FH, FW, InputChannel, FilterNum)
             W_conv1 = tf.Variable(tf.truncated_normal(
                 shape=conv1_shape, stddev=self.parameter_init))
@@ -85,13 +85,13 @@ class CNN_CTC(ctcBase):
                                                   padding='SAME'),
                                      b_conv1)
 
-            # weight decay
+            # Weight decay
             # self._weight_decay(W_conv1)
 
-            # batch normalization
+            # Batch normalization
             # outputs = self._batch_norm(outputs)
 
-            # activation
+            # Activation
             outputs = tf.nn.relu(outputs)
 
         #########################
@@ -100,7 +100,7 @@ class CNN_CTC(ctcBase):
         with tf.name_scope('pool1'):
             outputs = pool(outputs, shape=[3, 1], pool_type='max')
 
-            # dropout
+            # Dropout
             outputs = tf.nn.dropout(outputs, self.keep_prob_hidden_pl)
 
         ############################
@@ -109,7 +109,7 @@ class CNN_CTC(ctcBase):
         ############################
         for i_layer in range(2, 5, 1):
             with tf.name_scope('conv' + str(i_layer)):
-                # affine
+                # Affine
                 if i_layer != 4:
                     # (FH, FW, InputChannel, FilterNum)
                     conv2_shape = [3, 5, 128, 128]
@@ -124,16 +124,16 @@ class CNN_CTC(ctcBase):
                                                       padding='SAME'),
                                          b_conv2)
 
-                # weight decay
+                # Weight decay
                 # self._weight_decay(W_conv2)
 
-                # batch normalization
+                # Batch normalization
                 # output_conv2 = self._batch_norm(outputs)
 
-                # activation
+                # Activation
                 outputs = tf.nn.relu(outputs)
 
-                # dropout
+                # Dropout
                 outputs = tf.nn.dropout(outputs, self.keep_prob_hidden_pl)
 
         ###########################
@@ -142,7 +142,7 @@ class CNN_CTC(ctcBase):
         ###########################
         for i_layer in range(5, 11, 1):
             with tf.name_scope('conv' + str(i_layer)):
-                # affine
+                # Affine
                 # (FH, FW, InputChannel, FilterNum)
                 conv5_shape = [3, 5, 256, 256]
                 W_conv5 = tf.Variable(tf.truncated_normal(
@@ -153,19 +153,19 @@ class CNN_CTC(ctcBase):
                                                       padding='SAME'),
                                          b_conv5)
 
-                # weight decay
+                # Weight decay
                 # self._weight_decay(W_conv5)
 
-                # batch normalization
+                # Batch normalization
                 # outputs_conv5 = self._batch_norm(outputs)
 
-                # activation
+                # Activation
                 outputs = tf.nn.relu(outputs)
 
-                # dropout
+                # Dropout
                 outputs = tf.nn.dropout(outputs, self.keep_prob_hidden_pl)
 
-        # reshape for fully-connected layer
+        # Reshape for fully-connected layer
         outputs = tf.reshape(outputs, shape=[-1, 14 * 256])
 
         ##############
@@ -184,23 +184,23 @@ class CNN_CTC(ctcBase):
                 b_fc11 = tf.Variable(tf.zeros([fc_shape[1]]))
                 outputs = tf.matmul(outputs, W_fc11) + b_fc11
 
-                # weight decay
+                # Weight decay
                 # self._weight_decay(W_fc11)
 
-                # batch normalization
+                # Batch normalization
                 # output = self._batch_norm(outputs)
 
-                # activation
+                # Activation
                 outputs = tf.nn.relu(outputs)
 
-                # dropout
+                # Dropout
                 if i_layer != 13:
                     outputs = tf.nn.dropout(outputs, self.keep_prob_hidden_pl)
 
-        # reshape back to the original shape (batch_size, max_timesteps,
+        # Reshape back to the original shape (batch_size, max_timesteps,
         # num_classes)
         outputs_3d = tf.reshape(
             outputs, shape=[batch_size, max_timesteps, self.num_classes])
 
-        # convert to (max_timesteps, batch_size, num_classes)
+        # Convert to (max_timesteps, batch_size, num_classes)
         self.logits = tf.transpose(outputs_3d, (1, 0, 2))

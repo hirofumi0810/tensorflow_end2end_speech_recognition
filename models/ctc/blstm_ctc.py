@@ -44,15 +44,15 @@ class BLSTM_CTC(ctcBase):
 
     def define(self):
         """Construct Bidirectional LSTM layers."""
-        # generate placeholders
+        # Generate placeholders
         self._generate_pl()
 
-        # input dropout
+        # Input dropout
         input_drop = tf.nn.dropout(self.inputs_pl,
                                    self.keep_prob_input_pl,
                                    name='dropout_input')
 
-        # hidden layers
+        # Hidden layers
         outputs = input_drop
         for i_layer in range(self.num_layers):
             with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
@@ -75,7 +75,7 @@ class BLSTM_CTC(ctcBase):
                                                   forget_bias=1.0,
                                                   state_is_tuple=True)
 
-                # dropout (output)
+                # Dropout (output)
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(lstm_fw,
                                                         output_keep_prob=self.keep_prob_hidden_pl)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(lstm_bw,
@@ -86,7 +86,7 @@ class BLSTM_CTC(ctcBase):
                 # initial_state_fw=_init_state_fw,
                 # initial_state_bw=_init_state_bw,
 
-                # ignore 2nd return (the last state)
+                # Ignore 2nd return (the last state)
                 (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
@@ -99,7 +99,7 @@ class BLSTM_CTC(ctcBase):
 
         with tf.name_scope('output'):
 
-            # reshape to apply the same weights over the timesteps
+            # Reshape to apply the same weights over the timesteps
             if self.num_proj is None:
                 output_node = self.num_cell * 2
             else:
@@ -110,16 +110,16 @@ class BLSTM_CTC(ctcBase):
             inputs_shape = tf.shape(self.inputs_pl)
             batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
 
-            # affine
+            # Affine
             W_output = tf.Variable(tf.truncated_normal(shape=[output_node, self.num_classes],
                                                        stddev=0.1, name='W_output'))
             b_output = tf.Variable(
                 tf.zeros(shape=[self.num_classes], name='b_output'))
             logits_2d = tf.matmul(outputs, W_output) + b_output
 
-            # reshape back to the original shape
+            # Reshape back to the original shape
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # convert to (max_timesteps, batch_size, num_classes)
+            # Convert to (max_timesteps, batch_size, num_classes)
             self.logits = tf.transpose(logits_3d, (1, 0, 2))

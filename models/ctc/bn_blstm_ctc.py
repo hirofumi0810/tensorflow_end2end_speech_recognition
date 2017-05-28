@@ -3,11 +3,6 @@
 
 """Batch Normalized Bidirectional LSTM-CTC model."""
 
-import os
-import sys
-sys.path.append('../')
-sys.path.append('../../')
-sys.path.append('../../../')
 import tensorflow as tf
 from .ctc_base import ctcBase
 
@@ -45,22 +40,22 @@ class BN_BLSTM_CTC(ctcBase):
                  is_training=True):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                        output_size, parameter_init, clip_grad, clip_activation,
-                        dropout_ratio_input, dropout_ratio_hidden)
+                         output_size, parameter_init, clip_grad, clip_activation,
+                         dropout_ratio_input, dropout_ratio_hidden)
 
         self._is_training = is_training
 
     def define(self):
         """Construct network."""
-        # generate placeholders
+        # Generate placeholders
         self._generate_pl()
         self.is_training_pl = tf.placeholder(tf.bool)
 
-        # input dropout
+        # Input dropout
         input_drop = tf.nn.dropout(
             self.inputs_pl, self.keep_prob_input_pl, name='dropout_input')
 
-        # hidden layers
+        # Hidden layers
         outputs = input_drop
         for i_layer in range(self.num_layers):
             with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
@@ -86,7 +81,7 @@ class BN_BLSTM_CTC(ctcBase):
                                             is_training=self.is_training_pl)
                 # num_proj=int(self.num_cell / 2),
 
-                # dropout (output)
+                # Dropout (output)
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(lstm_fw,
                                                         output_keep_prob=self.keep_prob_hidden_pl)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(lstm_bw,
@@ -97,7 +92,7 @@ class BN_BLSTM_CTC(ctcBase):
                 # initial_state_fw=_init_state_fw,
                 # initial_state_bw=_init_state_bw,
 
-                # ignore 2nd return (the last state)
+                # Ignore 2nd return (the last state)
                 (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
@@ -113,19 +108,19 @@ class BN_BLSTM_CTC(ctcBase):
             inputs_shape = tf.shape(self.inputs_pl)
             batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
 
-            # reshape to apply the same weights over the timesteps
+            # Reshape to apply the same weights over the timesteps
             outputs = tf.reshape(outputs, shape=[-1, self.num_cell])
 
-            # affine
+            # Affine
             W_output = tf.Variable(tf.truncated_normal(shape=[self.num_cell, self.num_classes],
                                                        stddev=0.1, name='W_output'))
             b_output = tf.Variable(
                 tf.zeros(shape=[self.num_classes], name='b_output'))
             logits_2d = tf.matmul(outputs, W_output) + b_output
 
-            # reshape back to the original shape
+            # Reshape back to the original shape
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # convert to (max_timesteps, batch_size, num_classes)
+            # Convert to (max_timesteps, batch_size, num_classes)
             self.logits = tf.transpose(logits_3d, (1, 0, 2))

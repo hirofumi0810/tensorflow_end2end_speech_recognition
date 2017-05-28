@@ -33,7 +33,7 @@ class ctcBase(object):
                  dropout_ratio_input,
                  dropout_ratio_hidden):
 
-        # network size
+        # Network size
         self.batch_size = batch_size
         self.input_size = input_size
         self.output_size = output_size
@@ -41,12 +41,12 @@ class ctcBase(object):
         self.num_layers = num_layers
         self.num_classes = output_size + 1  # plus blank label
 
-        # network settings
+        # Network settings
         self.parameter_init = parameter_init
         self.clip_grad = clip_grad
         self.clip_activation = clip_activation
 
-        # dropout
+        # Dropout
         if dropout_ratio_input == 1.0 and dropout_ratio_hidden == 1.0:
             self.dropout = False
         else:
@@ -54,7 +54,7 @@ class ctcBase(object):
         self.dropout_ratio_input = dropout_ratio_input
         self.dropout_ratio_hidden = dropout_ratio_hidden
 
-        # summaries for TensorBoard
+        # Summaries for TensorBoard
         self.summaries_train = []
         self.summaries_dev = []
 
@@ -78,13 +78,13 @@ class ctcBase(object):
                                          shape=[None],
                                          name='seq_len')
 
-        # for dropout
+        # For dropout
         self.keep_prob_input_pl = tf.placeholder(tf.float32,
                                                  name='keep_prob_input')
         self.keep_prob_hidden_pl = tf.placeholder(tf.float32,
                                                   name='keep_prob_hidden')
 
-        # learning rate
+        # Learning rate
         self.lr_pl = tf.placeholder(tf.float32, name='learning_rate')
 
     def loss(self):
@@ -118,7 +118,7 @@ class ctcBase(object):
             raise ValueError(
                 'Optimizer is "adam" "adadelta" or "rmsprop" or "sgd" or "momentum".')
 
-        # select parameter update method
+        # Select parameter update method
         if is_scheduled:
             learning_rate = self.lr_pl
         else:
@@ -140,16 +140,16 @@ class ctcBase(object):
         # Create a variable to track the global step
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        # gradient clipping
+        # Gradient clipping
         if self.clip_grad is not None:
             tvars = tf.trainable_variables()
             grads = tf.gradients(self.loss, tvars)
 
-            # clip by absolute values
+            # Clip by absolute values
             self.clipped_grads = [tf.clip_by_value(g,
                                                    clip_value_min=-self.clip_grad,
                                                    clip_value_max=self.clip_grad) for g in grads]
-            # clip by norm
+            # Clip by norm
             # self.clipped_grads = [tf.clip_by_norm(g, clip_norm=self.clip_grad) for g in grads]
 
             train_op = optimizer.apply_gradients(
@@ -178,7 +178,6 @@ class ctcBase(object):
         Return:
             decode_op: operation for decoding
         """
-        # decode
         decoded, _ = tf.nn.ctc_beam_search_decoder(self.logits, tf.cast(self.seq_len_pl, tf.int32),
                                                    beam_width=beam_width)
         decode_op = tf.to_int32(decoded[0])
@@ -203,12 +202,12 @@ class ctcBase(object):
         Return:
             ler_op: operation for computing label error rate
         """
-        # compute phone error rate (normalize by label length)
+        # Compute label error rate (normalize by label length)
         ler_op = tf.reduce_mean(tf.edit_distance(
             decode_op, self.labels_pl, normalize=True))
-        # TODO: ここでの編集距離は数字だから，文字に変換しないと正しい結果は得られない
+        # TODO: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
 
-        # add a scalar summary for the snapshot of ler
+        # Add a scalar summary for the snapshot of ler
         self.summaries_train.append(tf.summary.scalar(
             'LER (train)', ler_op))
         self.summaries_dev.append(tf.summary.scalar(

@@ -44,10 +44,10 @@ class GRU_CTC(ctcBase):
 
     def define(self):
         """Construct network."""
-        # generate placeholders
+        # Generate placeholders
         self._generate_pl()
 
-        # input dropout
+        # Input dropout
         input_drop = tf.nn.dropout(self.inputs_pl,
                                    self.keep_prob_input_pl,
                                    name='dropout_input')
@@ -59,15 +59,15 @@ class GRU_CTC(ctcBase):
             with tf.variable_scope('GRU', initializer=initializer):
                 gru = tf.contrib.rnn.GRUCell(self.num_cell)
 
-            # dropout (output)
+            # Dropout (output)
             gru = tf.contrib.rnn.DropoutWrapper(
                 gru, output_keep_prob=self.keep_prob_hidden_pl)
 
-            # stack multiple cells
+            # Stack multiple cells
             stacked_gru = tf.contrib.rnn.MultiRNNCell(
                 [gru] * self.num_layers, state_is_tuple=True)
 
-            # ignore 2nd return (the last state)
+            # Ignore 2nd return (the last state)
             outputs, _ = tf.nn.dynamic_rnn(cell=stacked_gru,
                                            inputs=input_drop,
                                            sequence_length=self.seq_len_pl,
@@ -78,19 +78,19 @@ class GRU_CTC(ctcBase):
             inputs_shape = tf.shape(self.inputs_pl)
             batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
 
-            # reshape to apply the same weights over the timesteps
+            # Reshape to apply the same weights over the timesteps
             outputs = tf.reshape(outputs, shape=[-1, self.num_cell])
 
-            # affine
+            # Affine
             W_output = tf.Variable(tf.truncated_normal(shape=[self.num_cell, self.num_classes],
                                                        stddev=0.1, name='W_output'))
             b_output = tf.Variable(
                 tf.zeros(shape=[self.num_classes], name='b_output'))
             logits_2d = tf.matmul(outputs, W_output) + b_output
 
-            # reshape back to the original shape
+            # Reshape back to the original shape
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # convert to (max_timesteps, batch_size, num_classes)
+            # Convert to (max_timesteps, batch_size, num_classes)
             self.logits = tf.transpose(logits_3d, (1, 0, 2))

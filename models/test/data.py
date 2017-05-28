@@ -15,7 +15,7 @@ def read_wav(wav_path, feature_type='logmelfbank'):
         inputs:
         seq_len:
     """
-    # load wav file
+    # Load wav file
     fs, audio = scipy.io.wavfile.read(wav_path)
 
     if feature_type == 'mfcc':
@@ -31,11 +31,11 @@ def read_wav(wav_path, feature_type='logmelfbank'):
     delta2 = delta(delta1, N=2)
     inputs = np.c_[features, delta1, delta2]
 
-    # transform to 3D array
+    # Transform to 3D array
     inputs = np.asarray(inputs[np.newaxis, :])  # (1, 291, 39) or (1, 291, 123)
     seq_len = [inputs.shape[1]]  # [291]
 
-    # normalization
+    # Normalization
     inputs = (inputs - np.mean(inputs)) / np.std(inputs)
 
     return inputs, seq_len
@@ -69,7 +69,7 @@ def read_text(text_path):
     Returns:
         transcript: a text of transcript
     """
-    # read ground truth labels
+    # Read ground truth labels
     with open(text_path, 'r') as f:
         line = f.readlines()[-1]
         transcript = ' '.join(line.strip().lower().split(' ')[2:])
@@ -83,7 +83,7 @@ def read_phone(text_path):
     Returns:
         transcript: a text of transcript
     """
-    # read ground truth labels
+    # Read ground truth labels
     phone_list = []
     with open(text_path, 'r') as f:
         for line in f:
@@ -99,7 +99,7 @@ def generate_data(label_type, model):
         label_type: character or phone
         model: ctc or attention
     """
-    # make input data
+    # Make input data
     inputs, seq_len = read_wav('./sample/LDC93S1.wav',
                                feature_type='logmelfbank')
     # inputs, seq_len = read_wav('../sample/LDC93S1.wav',
@@ -132,7 +132,7 @@ def phone2num(transcript):
     """
     phone_list = transcript.split(' ')
 
-    # read mapping file from phone to number
+    # Read mapping file from phone to number
     phone_dict = {}
     with open('../../experiments/timit/evaluation/mapping_files/ctc/phone2num_61.txt') as f:
         for line in f:
@@ -141,7 +141,7 @@ def phone2num(transcript):
         phone_dict['<'] = 61
         phone_dict['>'] = 62
 
-    # convert from phone to the corresponding number
+    # Convert from phone to the corresponding number
     index_list = []
     for i in range(len(phone_list)):
         if phone_list[i] in phone_dict.keys():
@@ -156,7 +156,7 @@ def num2phone(index_list):
     Returns:
         transcript: sequence of phones (string)
     """
-    # read a phone mapping file
+    # Read a phone mapping file
     phone_dict = {}
     with open('../../experiments/timit/evaluation/mapping_files/ctc/phone2num_61.txt') as f:
         for line in f:
@@ -165,7 +165,7 @@ def num2phone(index_list):
         phone_dict[61] = '<'
         phone_dict[62] = '>'
 
-    # convert from num to the corresponding phone
+    # Convert from num to the corresponding phone
     phone_list = []
     for i in range(len(index_list)):
         phone_list.append(phone_dict[index_list[i]])

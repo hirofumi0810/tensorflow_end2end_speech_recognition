@@ -37,17 +37,17 @@ class LSTM_CTC(ctcBase):
                  num_proj=None):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                        output_size, parameter_init, clip_grad, clip_activation,
-                        dropout_ratio_input, dropout_ratio_hidden)
+                         output_size, parameter_init, clip_grad, clip_activation,
+                         dropout_ratio_input, dropout_ratio_hidden)
 
         self.num_proj = None if num_proj == 0 else num_proj
 
     def define(self):
         """Construct network."""
-        # generate placeholders
+        # Generate placeholders
         self._generate_pl()
 
-        # input dropout
+        # Input dropout
         input_drop = tf.nn.dropout(self.inputs_pl,
                                    self.keep_prob_input_pl,
                                    name='dropout_input')
@@ -64,15 +64,15 @@ class LSTM_CTC(ctcBase):
                                            forget_bias=1.0,
                                            state_is_tuple=True)
 
-            # dropout (output)
+            # Dropout (output)
             lstm = tf.contrib.rnn.DropoutWrapper(
                 lstm, output_keep_prob=self.keep_prob_hidden_pl)
 
-            # stack multiple cells
+            # Stack multiple cells
             stacked_lstm = tf.contrib.rnn.MultiRNNCell(
                 [lstm] * self.num_layers, state_is_tuple=True)
 
-            # ignore 2nd return (the last state)
+            # Ignore 2nd return (the last state)
             outputs, _ = tf.nn.dynamic_rnn(cell=stacked_lstm,
                                            inputs=input_drop,
                                            sequence_length=self.seq_len_pl,
@@ -80,7 +80,7 @@ class LSTM_CTC(ctcBase):
 
         with tf.name_scope('output'):
 
-            # reshape to apply the same weights over the timesteps
+            # Reshape to apply the same weights over the timesteps
             if self.num_proj is None:
                 output_node = self.num_cell
             else:
@@ -91,16 +91,16 @@ class LSTM_CTC(ctcBase):
             inputs_shape = tf.shape(self.inputs_pl)
             batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
 
-            # affine
+            # Affine
             W_output = tf.Variable(tf.truncated_normal(shape=[output_node, self.num_classes],
                                                        stddev=0.1, name='W_output'))
             b_output = tf.Variable(
                 tf.zeros(shape=[self.num_classes], name='b_output'))
             logits_2d = tf.matmul(outputs, W_output) + b_output
 
-            # reshape back to the original shape
+            # Reshape back to the original shape
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # convert to (max_timesteps, batch_size, num_classes)
+            # Convert to (max_timesteps, batch_size, num_classes)
             self.logits = tf.transpose(logits_3d, (1, 0, 2))
