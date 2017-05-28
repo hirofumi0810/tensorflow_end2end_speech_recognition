@@ -74,11 +74,15 @@ class ctcNet(object):
                                          self.label_shape_pl)
         # [batch_size]
         # self.seq_len_pl = tf.placeholder(tf.int32, shape=[None], name='seq_len')
-        self.seq_len_pl = tf.placeholder(tf.int64, shape=[None], name='seq_len')
+        self.seq_len_pl = tf.placeholder(tf.int64,
+                                         shape=[None],
+                                         name='seq_len')
 
         # for dropout
-        self.keep_prob_input_pl = tf.placeholder(tf.float32, name='keep_prob_input')
-        self.keep_prob_hidden_pl = tf.placeholder(tf.float32, name='keep_prob_hidden')
+        self.keep_prob_input_pl = tf.placeholder(tf.float32,
+                                                 name='keep_prob_input')
+        self.keep_prob_hidden_pl = tf.placeholder(tf.float32,
+                                                  name='keep_prob_hidden')
 
         # learning rate
         self.lr_pl = tf.placeholder(tf.float32, name='learning_rate')
@@ -89,8 +93,15 @@ class ctcNet(object):
             loss: operation for computing ctc loss
         """
         with tf.name_scope("ctc_loss"):
-            loss = tf.nn.ctc_loss(self.labels_pl, self.logits, tf.cast(self.seq_len_pl, tf.int32))
+            loss = tf.nn.ctc_loss(
+                self.labels_pl, self.logits, tf.cast(self.seq_len_pl, tf.int32))
             self.loss = tf.reduce_mean(loss, name='ctc_loss_mean')
+
+            # Add a scalar summary for the snapshot of loss
+            self.summaries_train.append(
+                tf.summary.scalar('loss (train)', self.loss))
+            self.summaries_dev.append(
+                tf.summary.scalar('loss (dev)', self.loss))
 
             return self.loss
 
@@ -105,11 +116,7 @@ class ctcNet(object):
         """
         if optimizer not in ['adam', 'adadelta', 'rmsprop', 'sgd', 'momentum']:
             raise ValueError(
-                'Error: optimizer is "adam" "adadelta" or "rmsprop" or "sgd" or "momentum".')
-
-        # Add a scalar summary for the snapshot loss
-        self.summaries_train.append(tf.summary.scalar('loss (train)', self.loss))
-        self.summaries_dev.append(tf.summary.scalar('loss (dev)', self.loss))
+                'Optimizer is "adam" "adadelta" or "rmsprop" or "sgd" or "momentum".')
 
         # select parameter update method
         if is_scheduled:
@@ -123,9 +130,11 @@ class ctcNet(object):
         elif optimizer == 'rmsprop':
             optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
         elif optimizer == 'sgd':
-            optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+            optimizer = tf.train.GradientDescentOptimizer(
+                learning_rate=learning_rate)
         elif optimizer == 'momentum':
-            optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
+            optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
+                                                   momentum=0.9)
         self.optimizer = optimizer
 
         # Create a variable to track the global step
@@ -136,11 +145,11 @@ class ctcNet(object):
             tvars = tf.trainable_variables()
             grads = tf.gradients(self.loss, tvars)
 
-            # clip by norm
+            # clip by absolute values
             self.clipped_grads = [tf.clip_by_value(g,
                                                    clip_value_min=-self.clip_grad,
                                                    clip_value_max=self.clip_grad) for g in grads]
-            # clip by absolute values
+            # clip by norm
             # self.clipped_grads = [tf.clip_by_norm(g, clip_norm=self.clip_grad) for g in grads]
 
             train_op = optimizer.apply_gradients(
@@ -157,7 +166,8 @@ class ctcNet(object):
         Return:
             decode_op: operation for decoding
         """
-        decoded, _ = tf.nn.ctc_greedy_decoder(self.logits, tf.cast(self.seq_len_pl, tf.int32))
+        decoded, _ = tf.nn.ctc_greedy_decoder(
+            self.logits, tf.cast(self.seq_len_pl, tf.int32))
         decode_op = tf.to_int32(decoded[0])
         return decode_op
 
@@ -194,10 +204,13 @@ class ctcNet(object):
             ler_op: operation for computing label error rate
         """
         # compute phone error rate (normalize by label length)
-        ler_op = tf.reduce_mean(tf.edit_distance(decode_op, self.labels_pl, normalize=True))
+        ler_op = tf.reduce_mean(tf.edit_distance(
+            decode_op, self.labels_pl, normalize=True))
         # TODO: ここでの編集距離は数字だから，文字に変換しないと正しい結果は得られない
 
-        # add a scalar summary for the snapshot ler
-        self.summaries_train.append(tf.summary.scalar('Label Error Rate (train)', ler_op))
-        self.summaries_dev.append(tf.summary.scalar('Label Error Rate (dev)', ler_op))
+        # add a scalar summary for the snapshot of ler
+        self.summaries_train.append(tf.summary.scalar(
+            'LER (train)', ler_op))
+        self.summaries_dev.append(tf.summary.scalar(
+            'LER (dev)', ler_op))
         return ler_op

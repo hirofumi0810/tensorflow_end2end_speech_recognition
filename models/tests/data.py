@@ -129,14 +129,16 @@ def phone2num(transcript):
     Returns:
         index_list: list of indices of phone (int)
     """
-    phone_list = list(transcript)
+    phone_list = transcript.split(' ')
 
     # read mapping file from phone to number
     phone_dict = {}
-    with open('../../experiments/timit/evaluation/mapping_files/ctc/phone2num_39.txt') as f:
+    with open('../../experiments/timit/evaluation/mapping_files/ctc/phone2num_61.txt') as f:
         for line in f:
             line = line.strip().split()
             phone_dict[line[0]] = int(line[1])
+        phone_dict['<'] = 61
+        phone_dict['>'] = 62
 
     # convert from phone to the corresponding number
     index_list = []
@@ -155,10 +157,12 @@ def num2phone(index_list):
     """
     # read a phone mapping file
     phone_dict = {}
-    with open('../../experiments/timit/evaluation/mapping_files/ctc/phone2num_39.txt') as f:
+    with open('../../experiments/timit/evaluation/mapping_files/ctc/phone2num_61.txt') as f:
         for line in f:
             line = line.strip().split()
             phone_dict[int(line[1])] = line[0]
+        phone_dict[61] = '<'
+        phone_dict[62] = '>'
 
     # convert from num to the corresponding phone
     phone_list = []
@@ -180,8 +184,16 @@ def alpha2num(transcript):
     # 0 is reserved for space
     space_index = 0
     first_index = ord('a') - 1
-    index_list = [space_index if char == ' ' else ord(
-        char) - first_index for char in char_list]
+    index_list = []
+    for char in char_list:
+        if char == ' ':
+            index_list.append(space_index)
+        elif char == '<':
+            index_list.append(first_index + 26)  # 27
+        elif char == '>':
+            index_list.append(first_index + 26 + 1)  # 28
+        else:
+            index_list.append(ord(char) - first_index)
     return index_list
 
 
@@ -194,7 +206,15 @@ def num2alpha(index_list):
     """
     # 0 is reserved to space
     first_index = ord('a') - 1
-    char_list = [' ' if num == 0 else chr(
-        num + first_index) for num in index_list]
+    char_list = []
+    for num in index_list:
+        if num == 0:
+            char_list.append(' ')
+        elif num == 27:
+            char_list.append('<')
+        elif num == 28:
+            char_list.append('>')
+        else:
+            char_list.append(chr(num + first_index))
     transcript = ''.join(char_list)
     return transcript

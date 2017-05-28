@@ -39,13 +39,14 @@ class TestCTC(unittest.TestCase):
             indices, values, dense_shape = list2sparsetensor(labels)
 
             # define model
-            output_size = 26 if label_type == 'character' else 39
+            output_size = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
             network = model(batch_size=1,
                             input_size=inputs[0].shape[1],
                             num_cell=256,
                             num_layers=2,
                             output_size=output_size,
+                            parameter_init=0.1,
                             clip_grad=5.0,
                             clip_activation=50,
                             dropout_ratio_input=1.0,
