@@ -30,4 +30,4 @@ def load(model_type):
         return CNN_CTC
     else:
         raise ValueError(
-            'Error: model is "lstm_ctc" or "blstm_ctc" or "gru_ctc" or "bgru_ctc" or "cnn_ctc".')
+            'Model is "lstm_ctc" or "blstm_ctc" or "gru_ctc" or "bgru_ctc" or "cnn_ctc".')
