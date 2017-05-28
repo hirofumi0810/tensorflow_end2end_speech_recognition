@@ -4,10 +4,10 @@
 """LSTM-CTC model."""
 
 import tensorflow as tf
-from .ctc_net import ctcNet
+from .ctc_base import ctcBase
 
 
-class LSTM_CTC(ctcNet):
+class LSTM_CTC(ctcBase):
     """LSTM-CTC model.
     Args:
         batch_size: int, batch size of mini batch
@@ -36,7 +36,7 @@ class LSTM_CTC(ctcNet):
                  dropout_ratio_hidden=1.0,
                  num_proj=None):
 
-        ctcNet.__init__(self, batch_size, input_size, num_cell, num_layers,
+        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
                         output_size, parameter_init, clip_grad, clip_activation,
                         dropout_ratio_input, dropout_ratio_hidden)
 

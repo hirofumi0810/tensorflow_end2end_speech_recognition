@@ -6,7 +6,7 @@
 import tensorflow as tf
 
 
-class ctcNet(object):
+class ctcBase(object):
     """Connectionist Temporal Classification (CTC) network.
     Args:
         batch_size: int, batch size of mini batch

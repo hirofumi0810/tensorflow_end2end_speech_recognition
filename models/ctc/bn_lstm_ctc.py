@@ -1,14 +1,22 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""GRU-CTC model."""
+"""Batch Normalized LSTM-CTC model."""
 
+import os
+import sys
+sys.path.append('../')
+sys.path.append('../../')
+sys.path.append('../../../')
 import tensorflow as tf
 from .ctc_base import ctcBase
 
+from recurrent.layers.bn_lstm import BatchNormLSTMCell
+from recurrent.initializer import orthogonal_initializer
 
-class GRU_CTC(ctcBase):
-    """GRU-CTC model.
+
+class BN_LSTM_CTC(ctcBase):
+    """Batch Normalized LSTM-CTC model.
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimension of input vectors
@@ -20,7 +28,7 @@ class GRU_CTC(ctcBase):
         clip_activation: A float value. Range of activation clipping (non-negative)
         dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
-        num_proj: int, the number of nodes in recurrent projection layer
+        is_training: bool, set True when training.
     """
 
     def __init__(self,
@@ -34,41 +42,47 @@ class GRU_CTC(ctcBase):
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
-                 num_proj=None):
+                 is_training=True):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                         output_size, parameter_init, clip_grad, clip_activation,
-                         dropout_ratio_input, dropout_ratio_hidden)
+                        output_size, parameter_init, clip_grad, clip_activation,
+                        dropout_ratio_input, dropout_ratio_hidden)
 
-        self.num_proj = None
+        self._is_training = is_training
 
     def define(self):
         """Construct network."""
         # generate placeholders
         self._generate_pl()
+        self.is_training_pl = tf.placeholder(tf.bool)
 
         # input dropout
-        input_drop = tf.nn.dropout(self.inputs_pl,
-                                   self.keep_prob_input_pl,
-                                   name='dropout_input')
+        input_drop = tf.nn.dropout(
+            self.inputs_pl, self.keep_prob_input_pl, name='dropout_input')
 
-        with tf.name_scope('Multi_GRU'):
-            initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
-                                                        maxval=self.parameter_init)
+        initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
+                                                    maxval=self.parameter_init)
+        # initializer = orthogonal_initializer()
 
-            with tf.variable_scope('GRU', initializer=initializer):
-                gru = tf.contrib.rnn.GRUCell(self.num_cell)
+        with tf.name_scope('LSTM'):
+            lstm = BatchNormLSTMCell(self.num_cell,
+                                     use_peepholes=True,
+                                     cell_clip=self.clip_activation,
+                                     initializer=initializer,
+                                     forget_bias=1.0,
+                                     state_is_tuple=True,
+                                     is_training=self.is_training_pl)
 
             # dropout (output)
-            gru = tf.contrib.rnn.DropoutWrapper(
-                gru, output_keep_prob=self.keep_prob_hidden_pl)
+            lstm = tf.contrib.rnn.DropoutWrapper(
+                lstm, output_keep_prob=self.keep_prob_hidden_pl)
 
             # stack multiple cells
-            stacked_gru = tf.contrib.rnn.MultiRNNCell(
-                [gru] * self.num_layers, state_is_tuple=True)
+            stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+                [lstm] * self.num_layers, state_is_tuple=True)
 
             # ignore 2nd return (the last state)
-            outputs, _ = tf.nn.dynamic_rnn(cell=stacked_gru,
+            outputs, _ = tf.nn.dynamic_rnn(cell=stacked_lstm,
                                            inputs=input_drop,
                                            sequence_length=self.seq_len_pl,
                                            dtype=tf.float32)

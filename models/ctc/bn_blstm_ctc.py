@@ -1,14 +1,22 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Bidirectional LSTM-CTC model."""
+"""Batch Normalized Bidirectional LSTM-CTC model."""
 
+import os
+import sys
+sys.path.append('../')
+sys.path.append('../../')
+sys.path.append('../../../')
 import tensorflow as tf
 from .ctc_base import ctcBase
 
+from recurrent.layers.bn_lstm import BatchNormLSTMCell
+from recurrent.initializer import orthogonal_initializer
 
-class BLSTM_CTC(ctcBase):
-    """Bidirectional LSTM-CTC model.
+
+class BN_BLSTM_CTC(ctcBase):
+    """Batch Normalized Bidirectional LSTM-CTC model.
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimension of input vectors
@@ -20,7 +28,7 @@ class BLSTM_CTC(ctcBase):
         clip_activation: A float value. Range of activation clipping (non-negative)
         dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
-        num_proj: int, the number of nodes in recurrent projection layer
+        is_training: bool, set True when training.
     """
 
     def __init__(self,
@@ -34,46 +42,49 @@ class BLSTM_CTC(ctcBase):
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
-                 num_proj=None):
+                 is_training=True):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                         output_size, parameter_init, clip_grad, clip_activation,
-                         dropout_ratio_input, dropout_ratio_hidden)
+                        output_size, parameter_init, clip_grad, clip_activation,
+                        dropout_ratio_input, dropout_ratio_hidden)
 
-        self.num_proj = None if num_proj == 0 else num_proj
+        self._is_training = is_training
 
     def define(self):
-        """Construct Bidirectional LSTM layers."""
+        """Construct network."""
         # generate placeholders
         self._generate_pl()
+        self.is_training_pl = tf.placeholder(tf.bool)
 
         # input dropout
-        input_drop = tf.nn.dropout(self.inputs_pl,
-                                   self.keep_prob_input_pl,
-                                   name='dropout_input')
+        input_drop = tf.nn.dropout(
+            self.inputs_pl, self.keep_prob_input_pl, name='dropout_input')
 
         # hidden layers
         outputs = input_drop
         for i_layer in range(self.num_layers):
             with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
 
-                initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
-                                                            maxval=self.parameter_init)
+                # initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
+                #                                             maxval=self.parameter_init)
+                initializer = orthogonal_initializer()
 
-                lstm_fw = tf.contrib.rnn.LSTMCell(self.num_cell,
-                                                  use_peepholes=True,
-                                                  cell_clip=self.clip_activation,
-                                                  initializer=initializer,
-                                                  num_proj=self.num_proj,
-                                                  forget_bias=1.0,
-                                                  state_is_tuple=True)
-                lstm_bw = tf.contrib.rnn.LSTMCell(self.num_cell,
-                                                  use_peepholes=True,
-                                                  cell_clip=self.clip_activation,
-                                                  initializer=initializer,
-                                                  num_proj=self.num_proj,
-                                                  forget_bias=1.0,
-                                                  state_is_tuple=True)
+                lstm_fw = BatchNormLSTMCell(self.num_cell,
+                                            use_peepholes=True,
+                                            cell_clip=self.clip_activation,
+                                            initializer=initializer,
+                                            forget_bias=1.0,
+                                            state_is_tuple=True,
+                                            is_training=self.is_training_pl)
+
+                lstm_bw = BatchNormLSTMCell(self.num_cell,
+                                            use_peepholes=True,
+                                            cell_clip=self.clip_activation,
+                                            initializer=initializer,
+                                            forget_bias=1.0,
+                                            state_is_tuple=True,
+                                            is_training=self.is_training_pl)
+                # num_proj=int(self.num_cell / 2),
 
                 # dropout (output)
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(lstm_fw,
@@ -98,20 +109,15 @@ class BLSTM_CTC(ctcBase):
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
         with tf.name_scope('output'):
-
-            # reshape to apply the same weights over the timesteps
-            if self.num_proj is None:
-                output_node = self.num_cell * 2
-            else:
-                output_node = self.num_proj * 2
-            outputs = tf.reshape(outputs, shape=[-1, output_node])
-
             # (batch_size, max_timesteps, input_size_splice)
             inputs_shape = tf.shape(self.inputs_pl)
             batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
 
+            # reshape to apply the same weights over the timesteps
+            outputs = tf.reshape(outputs, shape=[-1, self.num_cell])
+
             # affine
-            W_output = tf.Variable(tf.truncated_normal(shape=[output_node, self.num_classes],
+            W_output = tf.Variable(tf.truncated_normal(shape=[self.num_cell, self.num_classes],
                                                        stddev=0.1, name='W_output'))
             b_output = tf.Variable(
                 tf.zeros(shape=[self.num_classes], name='b_output'))
