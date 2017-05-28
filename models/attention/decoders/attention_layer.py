@@ -1,13 +1,10 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from collections import namedtuple
-import tensorflow as tf
 
-# template
-AttentionDecoderOutput = namedtuple(
-    "DecoderOutput",
-    "logits predicted_ids cell_output attention_scores attention_context")
+"""Attention layers for calculating attention weights."""
+
+import tensorflow as tf
 
 
 class AttentionLayer(object):
@@ -18,7 +15,7 @@ class AttentionLayer(object):
             arXiv preprint arXiv:1409.0473 (2014).
     Args:
         num_units: Number of units used in the attention layer
-        attention_type: bahdanau
+        attention_type: bahdanau or layer_dot
     Returns:
 
     """
@@ -46,8 +43,8 @@ class AttentionLayer(object):
             A tuple `(attention_weights, attention_context)`.
                 `attention_weights` is vector of length `time` where each element
                  is the normalized "score" of the corresponding `inputs` element.
-                    ex.) [α_{0,j}, α_{1,j}, ..., α_{T_i,j}]
-                        (T_i: input length, j: time index of output)
+                    ex.) [α_{0,i}, α_{1,i}, ..., α_{T_j,i}]
+                        (T_j: input length, j: time index of output)
                 `attention_context` is the final attention layer output
                     corresponding to the weighted inputs.
                     A tensor fo shape `[batch, encoder_num_units]`.
@@ -55,13 +52,13 @@ class AttentionLayer(object):
         """
         # Fully connected layers to transform both encoder_states and
         # current_decoder_state into a tensor with `num_units` units
-        # h_j (j: time index of output)
+        # h_j (j: time index of input)
         att_encoder_states = tf.contrib.layers.fully_connected(
             inputs=encoder_states,
             num_outputs=self.num_units,
             activation_fn=None,
             scope="att_encoder_states")
-        # s_{i-1} (time index of input)
+        # s_{i-1} (time index of output)
         att_decoder_state = tf.contrib.layers.fully_connected(
             inputs=current_decoder_state,
             num_outputs=self.num_units,
