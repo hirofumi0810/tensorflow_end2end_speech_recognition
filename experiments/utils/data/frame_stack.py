@@ -30,10 +30,7 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
     utt_num = len(input_paths)
 
     # setting for progressbar
-    if is_progressbar:
-        iterator = tqdm(range(utt_num))
-    else:
-        iterator = range(utt_num)
+    iterator = tqdm(range(utt_num)) if is_progressbar else range(utt_num)
 
     stacked_input_list = []
     for i_utt in iterator:
@@ -50,9 +47,9 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
         stack_count = 0  # counter for stacked_frames
         stack = []
         for i_frame, frame in enumerate(input_list[i_utt]):
-            ####################
-            # final stage
-            ####################
+            #####################
+            # final frame
+            #####################
             if i_frame == len(input_list[i_utt]) - 1:
                 # stack the final frame
                 stack.append(frame)
@@ -69,9 +66,9 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
                         if len(stack) != 0:
                             stack.pop(0)
 
-            #######################
-            # early & middle stage
-            #######################
+            ########################
+            # first & middle frames
+            ########################
             elif len(stack) < num_stack:
                 # stack some frames until stack is filled
                 stack.append(frame)

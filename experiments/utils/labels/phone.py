@@ -30,7 +30,7 @@ def num2phone(num_list, map_file_path):
         num_list: list of phone indices
         map_file_path: path to the mapping file
     Returns:
-        phone_list: list of phones
+        str_phone: string of phones
     """
     # read mapping file
     map_dict = {}
@@ -43,5 +43,6 @@ def num2phone(num_list, map_file_path):
     phone_list = []
     for i in range(len(num_list)):
         phone_list.append(map_dict[num_list[i]])
+    str_phone = '  '.join(phone_list)
 
-    return phone_list
+    return str_phone
