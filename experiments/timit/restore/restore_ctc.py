@@ -25,12 +25,12 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
         num_skip: int, the number of frames to skip
         epoch: epoch to restore
     """
-    # load dataset
+    # Load dataset
     test_data = DataSet(data_type='test', label_type=label_type,
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False, is_progressbar=True)
 
-    # add to the graph each operation
+    # Add to the graph each operation
     tf.reset_default_graph()
     network.define()
     # decode_op = network.greedy_decoder()
@@ -38,15 +38,15 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
     posteriors_op = network.posteriors(decode_op)
     per_op = network.ler(decode_op)
 
-    # create a saver for writing training checkpoints
+    # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
         ckpt = tf.train.get_checkpoint_state(network.model_dir)
 
-        # if check point exists
+        # If check point exists
         if ckpt:
-            # use last saved model
+            # Use last saved model
             model_path = ckpt.model_checkpoint_path
             if epoch is not None:
                 model_path = model_path.split('/')[:-1]
@@ -65,9 +65,9 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
                         network=network, dataset=test_data,
                         label_type=label_type, is_progressbar=True)
 
-        # test
-        # decode_test(session=sess, decode_op=decode_op, network=network,
-        #             dataset=test_data, label_type=label_type)
+        # Visualize
+        decode_test(session=sess, decode_op=decode_op, network=network,
+                    dataset=test_data, label_type=label_type)
         # posterior_test(session=sess, posteriors_op=posteriors_op,
         # network=network, dataset=test_data, label_type=label_type)
 
@@ -76,7 +76,7 @@ def main(model_path):
 
     epoch = None  # if None, restore the final epoch
 
-    # read config file
+    # Read config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
         corpus = config['corpus']
@@ -92,7 +92,7 @@ def main(model_path):
     elif corpus['label_type'] == 'character':
         output_size = 30
 
-    # load model
+    # Load model
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(batch_size=1,
                        input_size=feature['input_size'] * feature['num_stack'],

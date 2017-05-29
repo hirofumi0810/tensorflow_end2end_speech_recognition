@@ -35,7 +35,8 @@ def plot_probs_ctc_phone(probs, save_path, wav_index, data_type, label_type):
         TIMIT_PATH = '/n/sd8/inaguma/corpus/timit/original/test/'
 
     speaker_name, file_name = wav_index.split('.')[0].split('_')
-    region_paths = [os.path.join(TIMIT_PATH, region_name) for region_name in os.listdir(TIMIT_PATH)]
+    region_paths = [os.path.join(TIMIT_PATH, region_name)
+                    for region_name in os.listdir(TIMIT_PATH)]
     for region_path in region_paths:
         speaker_paths = [os.path.join(region_path, speaker_name)
                          for speaker_name in os.listdir(region_path)]
@@ -85,7 +86,8 @@ def plot_probs_ctc_phone(probs, save_path, wav_index, data_type, label_type):
     # phones
     ####################
     plt.subplot(212)
-    plt.plot(times_probs, probs[:, 0], label='silence', color='black', linewidth=2)
+    plt.plot(times_probs, probs[:, 0],
+             label='silence', color='black', linewidth=2)
     if label_type == 'phone39':
         blank_index = 39
     elif label_type == 'phone48':
@@ -94,7 +96,8 @@ def plot_probs_ctc_phone(probs, save_path, wav_index, data_type, label_type):
         blank_index = 61
     for i in range(1, blank_index, 1):
         plt.plot(times_probs, probs[:, i])
-    plt.plot(times_probs, probs[:, blank_index], ':', label='blank', color='grey')
+    plt.plot(times_probs, probs[:, blank_index],
+             ':', label='blank', color='grey')
     plt.xlabel('Time[sec]', fontsize=12)
     plt.ylabel('Phones', fontsize=12)
     plt.xlim([0, duration])
@@ -112,4 +115,5 @@ def pcm2float(short_ndary):
     """Convert from short to float."""
     float_ndary = np.array(short_ndary, dtype=np.float64)
     return float_ndary
-    # return np.where(float_ndary > 0.0, float_ndary / 32767.0, float_ndary / 32768.0)
+    # return np.where(float_ndary > 0.0, float_ndary / 32767.0, float_ndary /
+    # 32768.0)

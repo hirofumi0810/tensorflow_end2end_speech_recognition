@@ -43,13 +43,13 @@ class DataSet(object):
         self.dataset_path = os.path.join(
             '/n/sd8/inaguma/corpus/timit/dataset/ctc/', label_type, data_type)
 
-        # load the frame number dictionary
+        # Load the frame number dictionary
         self.frame_num_dict_path = os.path.join(
             self.dataset_path, 'frame_num.pickle')
         with open(self.frame_num_dict_path, 'rb') as f:
             self.frame_num_dict = pickle.load(f)
 
-        # sort paths to input & label by frame num
+        # Sort paths to input & label by frame num
         self.frame_num_tuple_sorted = sorted(
             self.frame_num_dict.items(), key=lambda x: x[1])
         input_paths, label_paths = [], []
@@ -62,11 +62,11 @@ class DataSet(object):
         self.label_paths = np.array(label_paths)
         self.data_num = len(self.input_paths)
 
-        # setting for progressbar
+        # Setting for progressbar
         iterator = tqdm(range(self.data_num)
                         ) if is_progressbar else range(self.data_num)
 
-        # load all dataset
+        # Load all dataset
         print('=> Loading ' + data_type + ' dataset (' + label_type + ')...')
         input_list, label_list = [], []
         for i in iterator:
@@ -75,7 +75,7 @@ class DataSet(object):
         self.input_list = np.array(input_list)
         self.label_list = np.array(label_list)
 
-        # frame stacking
+        # Frame stacking
         if (num_stack is not None) and (num_skip is not None):
             print('=> Stacking frames...')
             stacked_input_list = stack_frame(
@@ -109,20 +109,20 @@ class DataSet(object):
                 if self.data_type == 'train':
                     print('---Next epoch---')
 
-            # compute max frame num in mini batch
+            # Compute max frame num in mini batch
             max_frame_num = self.input_list[sorted_indices[-1]].shape[0]
 
-            # shuffle selected mini batch (0 ~ len(self.rest)-1)
+            # Shuffle selected mini batch (0 ~ len(self.rest)-1)
             random.shuffle(sorted_indices)
 
-            # initialization
+            # Initialization
             input_data = np.zeros(
                 (len(sorted_indices), max_frame_num, self.input_size))
             labels = [None] * len(sorted_indices)
             seq_len = np.empty((len(sorted_indices),))
             input_names = [None] * len(sorted_indices)
 
-            # set values of each data in mini batch
+            # Set values of each data in mini batch
             for i_batch, x in enumerate(sorted_indices):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
@@ -137,7 +137,7 @@ class DataSet(object):
         #########################
         else:
             if len(self.rest) > batch_size:
-                # randomly sample mini batch
+                # Randomly sample mini batch
                 random_indices = random.sample(list(self.rest), batch_size)
                 self.rest -= set(random_indices)
 
@@ -147,23 +147,23 @@ class DataSet(object):
                 if self.data_type == 'train':
                     print('---Next epoch---')
 
-                # shuffle selected mini batch (0 ~ len(self.rest)-1)
+                # Shuffle selected mini batch (0 ~ len(self.rest)-1)
                 random.shuffle(random_indices)
 
-            # compute max frame num in mini batch
+            # Compute max frame num in mini batch
             frame_num_list = []
             for data_i in self.input_list[random_indices]:
                 frame_num_list.append(data_i.shape[0])
             max_frame_num = max(frame_num_list)
 
-            # initialization
+            # Initialization
             input_data = np.zeros(
                 (len(random_indices), max_frame_num, self.input_size))
             labels = [None] * len(random_indices)
             seq_len = np.empty((len(random_indices),))
             input_names = [None] * len(random_indices)
 
-            # set values of each data in mini batch
+            # Set values of each data in mini batch
             for i_batch, x in enumerate(random_indices):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]

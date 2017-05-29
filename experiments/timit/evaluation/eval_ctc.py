@@ -47,7 +47,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         iteration += 1
     per_global = 0
 
-    # setting for progressbar
+    # Setting for progressbar
     iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
 
     p2n_map_file_path = '../evaluation/mapping_files/ctc/phone2num_' + \
@@ -55,7 +55,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     p2n39_map_file_path = '../evaluation/mapping_files/ctc/phone2num_39.txt'
     p2p_map_file_path = '../evaluation/mapping_files/phone2phone.txt'
     for step in iterator:
-        # create feed dictionary for next mini batch
+        # Create feed dictionary for next mini batch
         inputs, labels, seq_len, _ = dataset.next_batch(batch_size=batch_size)
         indices, values, dense_shape = list2sparsetensor(labels)
 
@@ -79,20 +79,20 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
             labels_st = session.run(decode_op, feed_dict=feed_dict)
             labels_pred = sparsetensor2list(labels_st, batch_size_each)
             for i_batch in range(batch_size_each):
-                # convert to phone (list of phone strings)
+                # Convert to phone (list of phone strings)
                 phone_pred_list = num2phone(
                     labels_pred[i_batch], p2n_map_file_path)
 
-                # mapping to 39 phones (list of phone strings)
+                # Mapping to 39 phones (list of phone strings)
                 phone_pred_list = map_to_39phone(
                     phone_pred_list, label_type, p2p_map_file_path)
 
-                # convert to num (list of phone indices)
+                # Convert to num (list of phone indices)
                 phone_pred_list = phone2num(
                     phone_pred_list, p2n39_map_file_path)
                 labels_pred[i_batch] = phone_pred_list
 
-            # compute edit distance
+            # Compute edit distance
             labels_true_st = list2sparsetensor(labels)
             labels_pred_st = list2sparsetensor(labels_pred)
             edit = compute_edit_distance(
@@ -100,7 +100,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
             per_global += edit * batch_size_each
 
     per_global /= dataset.data_num
-    print('  Phone Error Rate: %f' % per_global)
+    print('  Phone Error Rate: %f %%' % (per_global * 100))
 
     return per_global
 
@@ -128,12 +128,12 @@ def do_eval_cer(session, decode_op, network, dataset,
         iteration += 1
     cer_sum = 0
 
-    # setting for progressbar
+    # Setting for progressbar
     iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
 
     map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
     for step in iterator:
-        # create feed dictionary for next mini batch
+        # Create feed dictionary for next mini batch
         inputs, labels, seq_len, _ = dataset.next_batch(batch_size=batch_size)
         indices, values, dense_shape = list2sparsetensor(labels)
 
@@ -152,24 +152,24 @@ def do_eval_cer(session, decode_op, network, dataset,
         labels_pred = sparsetensor2list(labels_st, batch_size_each)
         for i_batch in range(batch_size_each):
 
-            # convert from list to string
+            # Convert from list to string
             str_pred = num2char(labels_pred[i_batch], map_file_path)
             str_true = num2char(labels[i_batch], map_file_path)
 
-            # remove silence(_) labels
+            # Remove silence(_) labels
             str_pred = re.sub(r'[_]+', "", str_pred)
             str_true = re.sub(r'[_]+', "", str_true)
             # print(str_pred)
             # print(str_true)
 
-            # compute edit distance
+            # Compute edit distance
             cer_each = Levenshtein.distance(
                 str_pred, str_true) / len(list(str_true))
             cer_sum += cer_each
             # print(cer_each)
 
     cer_mean = cer_sum / dataset.data_num
-    print('  Character Error Rate: %f' % cer_mean)
+    print('  Character Error Rate: %f %%' % (cer_mean * 100))
     return cer_mean
 
 
@@ -193,7 +193,7 @@ def decode_test(session, decode_op, network, dataset, label_type, rate=1.0):
         label_type[5:7] + '.txt'
     map_file_path_char = '../evaluation/mapping_files/ctc/char2num.txt'
     for step in range(iteration):
-        # create feed dictionary for next mini batch
+        # Create feed dictionary for next mini batch
         inputs, labels, seq_len, input_names = dataset.next_batch(
             batch_size=batch_size)
         indices, values, dense_shape = list2sparsetensor(labels)
@@ -208,27 +208,26 @@ def decode_test(session, decode_op, network, dataset, label_type, rate=1.0):
             network.keep_prob_hidden_pl: 1.0
         }
 
-        # visualize
+        # Visualize
         batch_size_each = len(labels)
         labels_st = session.run(decode_op, feed_dict=feed_dict)
         labels_pred = sparsetensor2list(labels_st, batch_size_each)
         for i_batch in range(batch_size_each):
             if label_type == 'character':
                 print('-----wav: %s-----' % input_names[i_batch])
-                print('Pred: ', end="")
-                print(
-                    ''.join(num2char(labels_pred[i_batch], map_file_path_char)))
-                print('True: ', end="")
-                print(''.join(num2char(labels[i_batch], map_file_path_char)))
+                print('True: %s' % num2char(
+                    labels[i_batch], map_file_path_char))
+                print('Pred: %s' % num2char(
+                    labels_pred[i_batch], map_file_path_char))
+
             else:
-                # decode test (39 phones)
+                # Decode test (39 phones)
                 print('-----wav: %s-----' % input_names[i_batch])
-                print('Pred: ', end="")
-                print(
-                    ' '.join(num2phone(labels_pred[i_batch], map_file_path_phone)))
-                print('True: ', end="")
-                print(
-                    ' '.join(num2phone(labels[i_batch], map_file_path_phone)))
+                print('True: %s' % num2phone(
+                    labels[i_batch], map_file_path_phone))
+
+                print('Pred: %s' % num2phone(
+                    labels_pred[i_batch], map_file_path_phone))
 
 
 def posterior_test(session, posteriors_op, network, dataset, label_type, rate=1.0):
@@ -249,7 +248,7 @@ def posterior_test(session, posteriors_op, network, dataset, label_type, rate=1.
         iteration += 1
 
     for step in range(iteration):
-        # create feed dictionary for next mini batch
+        # Create feed dictionary for next mini batch
         inputs, labels, seq_len, input_names = dataset.next_batch(
             batch_size=batch_size)
         indices, values, dense_shape = list2sparsetensor(labels)
@@ -264,7 +263,7 @@ def posterior_test(session, posteriors_op, network, dataset, label_type, rate=1.
             network.keep_prob_hidden_pl: 1.0
         }
 
-        # visualize
+        # Visualize
         batch_size_each = len(labels)
         max_frame_num = inputs.shape[1]
         posteriors = session.run(posteriors_op, feed_dict=feed_dict)

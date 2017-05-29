@@ -9,7 +9,8 @@ from tqdm import tqdm
 def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is_progressbar=False):
     """Stack & skip some frames. This implementation is based on
        https://arxiv.org/abs/1507.06947.
-           Sak, Haşim, et al. "Fast and accurate recurrent neural network acoustic models for speech recognition."
+           Sak, Haşim, et al.
+           "Fast and accurate recurrent neural network acoustic models for speech recognition."
            arXiv preprint arXiv:1507.06947 (2015).
     Args:
         input_list: list of input data
@@ -29,12 +30,12 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
     input_size = input_list[0].shape[1]
     utt_num = len(input_paths)
 
-    # setting for progressbar
+    # Setting for progressbar
     iterator = tqdm(range(utt_num)) if is_progressbar else range(utt_num)
 
     stacked_input_list = []
     for i_utt in iterator:
-        # per utterance
+        # Per utterance
         input_name = input_paths[i_utt].split('/')[-1].split('.')[0]
         frame_num = frame_num_dict[input_name]
         frame_num_decimated = frame_num / num_skip
@@ -51,17 +52,17 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
             # final frame
             #####################
             if i_frame == len(input_list[i_utt]) - 1:
-                # stack the final frame
+                # Stack the final frame
                 stack.append(frame)
 
                 while stack_count != int(frame_num_decimated):
-                    # concatenate stacked frames
+                    # Concatenate stacked frames
                     for i_stack in range(len(stack)):
                         stacked_frames[stack_count][input_size *
                                                     i_stack:input_size * (i_stack + 1)] = stack[i_stack]
                     stack_count += 1
 
-                    # delete some frames to skip
+                    # Delete some frames to skip
                     for _ in range(num_skip):
                         if len(stack) != 0:
                             stack.pop(0)
@@ -70,17 +71,17 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
             # first & middle frames
             ########################
             elif len(stack) < num_stack:
-                # stack some frames until stack is filled
+                # Stack some frames until stack is filled
                 stack.append(frame)
 
                 if len(stack) == num_stack:
-                    # concatenate stacked frames
+                    # Concatenate stacked frames
                     for i_stack in range(num_stack):
                         stacked_frames[stack_count][input_size *
                                                     i_stack:input_size * (i_stack + 1)] = stack[i_stack]
                     stack_count += 1
 
-                    # delete some frames to skip
+                    # Delete some frames to skip
                     for _ in range(num_skip):
                         stack.pop(0)
 

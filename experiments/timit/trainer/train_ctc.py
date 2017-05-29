@@ -18,7 +18,6 @@ from data.read_dataset_ctc import DataSet
 from models.ctc.load_model import load
 from evaluation.eval_ctc import do_eval_per, do_eval_cer
 from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
-from utils.labels.character import num2char
 from utils.util import mkdir, join
 from utils.parameter import count_total_parameters
 from utils.loss import save_loss
@@ -43,10 +42,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
     """
-    # tell TensorFlow that the model will be built into the default graph
+    # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
 
-        # read dataset
+        # Read dataset
         train_data = DataSet(data_type='train', label_type=label_type,
                              num_stack=num_stack, num_skip=num_skip,
                              is_sorted=True)
@@ -65,7 +64,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                                 num_stack=num_stack, num_skip=num_skip,
                                 is_sorted=False)
 
-        # add to the graph each operation
+        # Add to the graph each operation
         network.define()
         loss_op = network.loss()
         train_op = network.train(optimizer=optimizer,
@@ -75,18 +74,18 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
         decode_op = network.beam_search_decoder(beam_width=20)
         per_op = network.ler(decode_op)
 
-        # build the summary tensor based on the TensorFlow collection of
+        # Build the summary tensor based on the TensorFlow collection of
         # summaries
         summary_train = tf.summary.merge(network.summaries_train)
         summary_dev = tf.summary.merge(network.summaries_dev)
 
-        # add the variable initializer operation
+        # Add the variable initializer operation
         init_op = tf.global_variables_initializer()
 
-        # create a saver for writing training checkpoints
+        # Create a saver for writing training checkpoints
         saver = tf.train.Saver(max_to_keep=None)
 
-        # count total parameters
+        # Count total parameters
         parameters_dict, total_parameters = count_total_parameters(
             tf.trainable_variables())
         for parameter_name in sorted(parameters_dict.keys()):
@@ -98,17 +97,17 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
         csv_train_loss = []
         csv_dev_loss = []
 
-        # create a session for running operation on the graph
+        # Create a session for running operation on the graph
         with tf.Session() as sess:
 
-            # instantiate a SummaryWriter to output summaries and the graph
+            # Instantiate a SummaryWriter to output summaries and the graph
             summary_writer = tf.summary.FileWriter(
                 network.model_dir, sess.graph)
 
-            # initialize parameters
+            # Initialize parameters
             sess.run(init_op)
 
-            # train model
+            # Train model
             iter_per_epoch = int(train_data.data_num / batch_size)
             if (train_data.data_num / batch_size) != int(train_data.data_num / batch_size):
                 iter_per_epoch += 1
@@ -119,7 +118,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
             error_best = 1
             for step in range(max_steps):
 
-                # create feed dictionary for next mini batch (train)
+                # Create feed dictionary for next mini batch (train)
                 inputs, labels, seq_len, _ = train_data.next_batch(
                     batch_size=batch_size)
                 indices, values, dense_shape = list2sparsetensor(labels)
@@ -134,7 +133,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                     network.lr_pl: learning_rate
                 }
 
-                # create feed dictionary for next mini batch (dev)
+                # Create feed dictionary for next mini batch (dev)
                 inputs, labels, seq_len, _ = dev_data.next_batch(
                     batch_size=batch_size)
                 indices, values, dense_shape = list2sparsetensor(labels)
@@ -148,7 +147,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                     network.keep_prob_hidden_pl: network.dropout_ratio_hidden
                 }
 
-                # update parameters & compute loss
+                # Update parameters & compute loss
                 _, loss_train = sess.run(
                     [train_op, loss_op], feed_dict=feed_dict_train)
                 loss_dev = sess.run(loss_op, feed_dict=feed_dict_dev)
@@ -158,22 +157,22 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
 
                 if (step + 1) % 10 == 0:
 
-                    # change feed dict for evaluation
+                    # Change feed dict for evaluation
                     feed_dict_train[network.keep_prob_input_pl] = 1.0
                     feed_dict_train[network.keep_prob_hidden_pl] = 1.0
                     feed_dict_dev[network.keep_prob_input_pl] = 1.0
                     feed_dict_dev[network.keep_prob_hidden_pl] = 1.0
 
-                    # compute accuracy & update event file
-                    per_train, summary_str_train = sess.run([per_op, summary_train],
+                    # Compute accuracy & update event file
+                    ler_train, summary_str_train = sess.run([per_op, summary_train],
                                                             feed_dict=feed_dict_train)
-                    per_dev, summary_str_dev, labels_st = sess.run([per_op, summary_dev, decode_op],
+                    ler_dev, summary_str_dev, labels_st = sess.run([per_op, summary_dev, decode_op],
                                                                    feed_dict=feed_dict_dev)
                     summary_writer.add_summary(summary_str_train, step + 1)
                     summary_writer.add_summary(summary_str_dev, step + 1)
                     summary_writer.flush()
 
-                    # decode
+                    # Decode
                     try:
                         labels_pred = sparsetensor2list(labels_st, batch_size)
                     except:
@@ -182,24 +181,24 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                     duration_step = time.time() - start_time_step
                     if label_type == 'character':
                         print('Step %d: loss = %.3f (%.3f) / cer = %.4f (%.4f) (%.3f min)' %
-                              (step + 1, loss_train, loss_dev, per_train, per_dev, duration_step / 60))
+                              (step + 1, loss_train, loss_dev, ler_train, ler_dev, duration_step / 60))
                         map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
                         print('True: %s' % num2char(labels[-1], map_file_path))
                         print('Pred: %s' % num2char(
                             labels_pred[-1], map_file_path))
                     else:
                         print('Step %d: loss = %.3f (%.3f) / per = %.4f (%.4f) (%.3f min)' %
-                              (step + 1, loss_train, loss_dev, per_train, per_dev, duration_step / 60))
+                              (step + 1, loss_train, loss_dev, ler_train, ler_dev, duration_step / 60))
                         map_file_path = '../evaluation/mapping_files/ctc/phone2num_' + \
                             label_type[-2:] + '.txt'
                         print('True: %s' % num2char(labels[-1], map_file_path))
                         print('Pred: %s' % num2char(
                             labels_pred[-1], map_file_path))
-                    # sys.stdout.write
+
                     sys.stdout.flush()
                     start_time_step = time.time()
 
-                # save checkpoint and evaluate model per epoch
+                # Save checkpoint and evaluate model per epoch
                 if (step + 1) % iter_per_epoch == 0 or (step + 1) == max_steps:
                     duration_epoch = time.time() - start_time_epoch
                     epoch = (step + 1) // iter_per_epoch
@@ -207,7 +206,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                           (epoch, duration_epoch / 60))
 
                     if epoch >= 10:
-                        # save model (check point)
+                        # Save model (check point)
                         checkpoint_file = os.path.join(
                             network.model_dir, 'model.ckpt')
                         save_path = saver.save(
@@ -263,25 +262,25 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
 
-            # save train & dev loss
+            # Save train & dev loss
             save_loss(csv_steps, csv_train_loss, csv_dev_loss,
                       save_path=network.model_dir)
 
-            # training was finished correctly
+            # Training was finished correctly
             with open(os.path.join(network.model_dir, 'complete.txt'), 'w') as f:
                 f.write('')
 
 
 def main(config_path):
 
-    # read a config file (.yml)
+    # Read a config file (.yml)
     with open(config_path, "r") as f:
         config = yaml.load(f)
         corpus = config['corpus']
         feature = config['feature']
         param = config['param']
 
-    # TODO: solve conflict (batch_norm & layer norm)
+    # TODO: Solve conflict (batch_norm & layer norm)
     if corpus['label_type'] == 'phone61':
         output_size = 61
     elif corpus['label_type'] == 'phone48':
@@ -291,7 +290,7 @@ def main(config_path):
     elif corpus['label_type'] == 'character':
         output_size = 30
 
-    # load model
+    # Load model
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=feature['input_size'] * feature['num_stack'],
@@ -314,23 +313,23 @@ def main(config_path):
     if feature['num_stack'] != 1:
         network.model_name += '_stack' + str(feature['num_stack'])
 
-    # set save path
+    # Set save path
     network.model_dir = mkdir('/n/sd8/inaguma/result/timit/ctc/')
     network.model_dir = join(network.model_dir, corpus['label_type'])
     network.model_dir = join(network.model_dir, network.model_name)
 
-    # reset model directory
+    # Reset model directory
     if not os.path.isfile(os.path.join(network.model_dir, 'complete.txt')):
         tf.gfile.DeleteRecursively(network.model_dir)
         tf.gfile.MakeDirs(network.model_dir)
     else:
         raise ValueError('File exists.')
 
-    # set process name
+    # Set process name
     setproctitle('ctc_timit_' +
                  corpus['label_type'] + '_' + param['optimizer'])
 
-    # save config file
+    # Save config file
     shutil.copyfile(config_path, os.path.join(network.model_dir, 'config.yml'))
 
     sys.stdout = open(os.path.join(network.model_dir, 'train.log'), 'w')

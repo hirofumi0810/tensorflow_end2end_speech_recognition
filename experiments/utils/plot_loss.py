@@ -10,7 +10,7 @@ from utils.loss import plot_loss
 
 
 def main(model_path):
-    # load train & dev loss
+    # Load train & dev loss
     data = np.loadtxt(os.path.join(model_path, "loss.csv"),
                       delimiter=",")
     steps = data[:, 0]
