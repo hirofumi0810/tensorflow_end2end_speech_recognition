@@ -9,3 +9,19 @@ __pycache__
 blstm_ctc_example.py
 lstm_ctc_example.py
 .dropbox.attr
+
+# timit
+train_ctc_multigpu.py
+
+# csj
+train_ctc_dialog.py
+train_attention_dialog.py
+eval_ctc_dialog.py
+read_dataset_ctc_dialog.py
+test_read_dataset_ctc_dialog.py
+char2num_insert.txt
+char2num_insert2.txt
+char2num_insert3.txt
+phone2num_insert.txt
+phone2num_insert2.txt
+phone2num_insert3.txt

@@ -161,25 +161,28 @@ class ctcBase(object):
 
         return train_op
 
-    def greedy_decoder(self):
-        """Operation for greedy decoding.
-        Return:
-            decode_op: operation for decoding
-        """
-        decoded, _ = tf.nn.ctc_greedy_decoder(
-            self.logits, tf.cast(self.seq_len_pl, tf.int32))
-        decode_op = tf.to_int32(decoded[0])
-        return decode_op
-
-    def beam_search_decoder(self, beam_width):
-        """Operation for beam search decoding.
+    def decoder(self, decode_type, beam_width=None):
+        """Operation for decoding.
         Args:
+            decode_type: greedy or beam_search
             beam_width: beam width for beam search
         Return:
             decode_op: operation for decoding
         """
-        decoded, _ = tf.nn.ctc_beam_search_decoder(self.logits, tf.cast(self.seq_len_pl, tf.int32),
-                                                   beam_width=beam_width)
+        if decode_type not in ['greedy', 'beam_width']:
+            raise ValueError('decode_type is "greedy" or "beam_search".')
+
+        if decode_type == 'greedy':
+            decoded, _ = tf.nn.ctc_greedy_decoder(
+                self.logits, tf.cast(self.seq_len_pl, tf.int32))
+
+        elif decode_type == 'beam_search':
+            if beam_width is None:
+                raise ValueError('Set beam_width.')
+
+            decoded, _ = tf.nn.ctc_beam_search_decoder(self.logits, tf.cast(self.seq_len_pl, tf.int32),
+                                                       beam_width=beam_width)
+
         decode_op = tf.to_int32(decoded[0])
         return decode_op
 

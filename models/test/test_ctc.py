@@ -59,8 +59,8 @@ class TestCTC(unittest.TestCase):
                                      learning_rate_init=learning_rate,
                                      is_scheduled=False)
 
-            # Decode_op = network.greedy_decoder()
-            decode_op = network.beam_search_decoder(beam_width=20)
+            decode_op = network.beam_search_decoder(decode_type='beam_search',
+                                                    beam_width=20)
             # posteriors_op = network.posteriors(decode_op)
             ler_op = network.ler(decode_op)
 

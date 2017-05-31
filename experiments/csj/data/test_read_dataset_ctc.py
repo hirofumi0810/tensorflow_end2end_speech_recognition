@@ -3,7 +3,7 @@
 
 import sys
 import unittest
-import tqdm
+from tqdm import tqdm
 
 sys.path.append('../../')
 sys.path.append('../../../')
@@ -23,6 +23,7 @@ class TestReadDatasetCTC(unittest.TestCase):
         for i in tqdm(range(20000)):
             inputs, labels, seq_len, input_names = dataset.next_batch(
                 batch_size=64)
+            print(seq_len[0])
             indices, values, shape = list2sparsetensor(labels)
 
 

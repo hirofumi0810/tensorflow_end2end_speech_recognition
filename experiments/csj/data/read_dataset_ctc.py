@@ -10,7 +10,6 @@ import pickle
 import random
 import numpy as np
 from tqdm import tqdm
-import functools
 
 from utils.data.frame_stack import stack_frame
 
@@ -18,13 +17,14 @@ from utils.data.frame_stack import stack_frame
 class DataSet(object):
     """Read dataset."""
 
-    def __init__(self, data_type, train_data_size, label_type, num_stack=None, num_skip=None,
+    def __init__(self, data_type, train_data_size, label_type,
+                 num_stack=None, num_skip=None,
                  is_sorted=True, is_progressbar=False):
         """
         Args:
-            data_type: train or dev or eval1 or eval2 or eval3
+            data_type: train or or train_all dev or eval1 or eval2 or eval3
             train_data_size: default or large
-            label_type: phone or character
+            label_type: phone or character or kanji
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip
             is_sorted: if True, sort dataset by frame num
@@ -32,7 +32,7 @@ class DataSet(object):
         """
         if data_type not in ['train', 'dev', 'eval1', 'eval2', 'eval3']:
             raise ValueError(
-                'Error: data_type is "train" or "dev" or "eval1" or "eval2" or "eval3".')
+                'Data_type is "train" or "dev" or "eval1" or "eval2" or "eval3".')
         print('----- ' + data_type + ' -----')
 
         self.data_type = data_type
@@ -49,25 +49,17 @@ class DataSet(object):
             '/n/sd8/inaguma/corpus/csj/dataset/monolog/ctc/',
             label_type, train_data_size, data_type)
 
-        # load the frame number dictionary
+        # Load the frame number dictionary
         self.frame_num_dict_path = os.path.join(
             self.dataset_path, 'frame_num.pickle')
         with open(self.frame_num_dict_path, 'rb') as f:
             self.frame_num_dict = pickle.load(f)
-        if data_type == 'train_all':
-            self.frame_num_dict_plus_path = os.path.join(
-                self.dataset_plus_path, 'frame_num.pickle')
-            with open(self.frame_num_dict_plus_path, 'rb') as f:
-                self.frame_num_dict_plus = pickle.load(f)
-            # merge 2 frame num dictionaries
-            self.frame_num_dict = functools.reduce(lambda first, second: dict(first, **second),
-                                                   [self.frame_num_dict, self.frame_num_dict_plus])
 
-        # sort paths to input & label by frame num
+        # Sort paths to input & label by frame num
         print('=> loading paths to dataset...')
         self.frame_num_tuple_sorted = sorted(
             self.frame_num_dict.items(), key=lambda x: x[1])
-        self.data_num = len(self.frame_num_tuple_sorted)
+        self.data_num = len(self.frame_num_dict.keys())
         input_paths, label_paths = [], []
         iterator = tqdm(
             self.frame_num_tuple_sorted) if is_progressbar else self.frame_num_tuple_sorted
@@ -90,9 +82,9 @@ class DataSet(object):
         self.input_paths = np.array(input_paths)
         self.label_paths = np.array(label_paths)
 
-        # divide dataset into some clusters
+        # Divide dataset into some clusters
         # total: 384198 utterances (train)
-        # total: 896755 utterances (trian_all)
+        # total: 896755 utterances (train_all)
         self.num_cluster = 10
         if data_type in ['train', 'train_all']:
             self.rest_cluster = self.num_cluster - 1
@@ -106,12 +98,12 @@ class DataSet(object):
             self.input_paths_cluster = self.input_paths
             self.label_paths_cluster = self.label_paths
 
-        # load dataset in one cluster
+        # Load dataset in one cluster
         self.next_cluster()
         self.next_cluster_flag = False
 
     def next_cluster(self):
-        # load all dataset
+        # Load all dataset
         print('=> Loading next cluster...')
         self.input_list, self.label_list = [], []
         iterator = tqdm(range(self.data_num_cluster)
@@ -123,7 +115,7 @@ class DataSet(object):
         self.input_list = np.array(self.input_list)
         self.label_list = np.array(self.label_list)
 
-        # frame stacking
+        # Frame stacking
         if (self.num_stack is not None) and (self.num_skip is not None):
             print('=> Stacking frames...')
             stacked_input_list = stack_frame(self.input_list,
@@ -163,20 +155,20 @@ class DataSet(object):
                     self.rest = set(
                         [i for i in range(len(self.input_paths_cluster))])
 
-            # compute max frame num in mini batch
+            # Compute max frame num in mini batch
             max_frame_num = self.input_list[sorted_indices[-1]].shape[0]
 
-            # shuffle selected mini batch (0 ~ len(self.rest)-1)
+            # Shuffle selected mini batch (0 ~ len(self.rest)-1)
             random.shuffle(sorted_indices)
 
-            # initialization
+            # Initialization
             input_data = np.zeros(
                 (len(sorted_indices), max_frame_num, self.input_size))
             labels = [None] * len(sorted_indices)
             seq_len = np.empty((len(sorted_indices),))
             input_names = [None] * len(sorted_indices)
 
-            # set values of each data in mini batch
+            # Set values of each data in mini batch
             for i_batch, x in enumerate(sorted_indices):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
@@ -188,7 +180,7 @@ class DataSet(object):
 
             if self.next_cluster_flag:
                 if self.rest_cluster >= 1:
-                    # set fot the next clusters
+                    # Set fot the next clusters
                     frame_offset = (self.num_cluster -
                                     self.rest_cluster) * self.data_num_cluster
                     self.input_paths_cluster = self.input_paths[frame_offset:frame_offset +
@@ -197,14 +189,14 @@ class DataSet(object):
                                                                 self.data_num_cluster]
                     self.rest_cluster -= 1
                 else:
-                    # initialize clusters
+                    # Initialize clusters
                     if self.data_type == 'train':
                         self.rest_cluster = self.num_cluster - 1
                         self.input_paths_cluster = self.input_paths[0: self.data_num_cluster]
                         self.label_paths_cluster = self.label_paths[0: self.data_num_cluster]
                         print('---Next epoch---')
 
-                # load dataset in the next cluster
+                # Load dataset in the next cluster
                 self.next_cluster()
                 self.next_cluster_flag = False
 
@@ -213,7 +205,7 @@ class DataSet(object):
         #########################
         else:
             if len(self.rest) > batch_size:
-                # randomly sample mini batch
+                # Randomly sample mini batch
                 random_indices = random.sample(list(self.rest), batch_size)
                 self.rest -= set(random_indices)
 
@@ -224,23 +216,23 @@ class DataSet(object):
                 if self.data_type == 'train':
                     print('---Next epoch---')
 
-                # shuffle selected mini batch (0 ~ len(self.rest)-1)
+                # Shuffle selected mini batch (0 ~ len(self.rest)-1)
                 random.shuffle(random_indices)
 
-            # compute max frame num in mini batch
+            # Compute max frame num in mini batch
             frame_num_list = []
             for data_i in self.input_list[random_indices]:
                 frame_num_list.append(data_i.shape[0])
             max_frame_num = max(frame_num_list)
 
-            # initialization
+            # Initialization
             input_data = np.zeros(
                 (len(random_indices), max_frame_num, self.input_size))
             labels = [None] * len(random_indices)
             seq_len = np.empty((len(random_indices),))
             input_names = [None] * len(random_indices)
 
-            # set values of each data in mini batch
+            # Set values of each data in mini batch
             for i_batch, x in enumerate(random_indices):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
