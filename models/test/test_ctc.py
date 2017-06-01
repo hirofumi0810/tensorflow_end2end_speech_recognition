@@ -31,6 +31,7 @@ class TestCTC(unittest.TestCase):
         # self.check_training(model_type='cnn_ctc', label_type='phone')
 
     def check_training(self, model_type, label_type):
+        print('----- ' + model_type + ', ' + label_type + ' -----')
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
@@ -58,8 +59,7 @@ class TestCTC(unittest.TestCase):
             train_op = network.train(optimizer='adam',
                                      learning_rate_init=learning_rate,
                                      is_scheduled=False)
-
-            decode_op = network.beam_search_decoder(decode_type='beam_search',
+            decode_op = network.decoder(decode_type='beam_search',
                                                     beam_width=20)
             # posteriors_op = network.posteriors(decode_op)
             ler_op = network.ler(decode_op)

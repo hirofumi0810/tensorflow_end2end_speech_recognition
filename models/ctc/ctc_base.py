@@ -73,7 +73,8 @@ class ctcBase(object):
                                          self.label_values_pl,
                                          self.label_shape_pl)
         # [batch_size]
-        # self.seq_len_pl = tf.placeholder(tf.int32, shape=[None], name='seq_len')
+        # self.seq_len_pl = tf.placeholder(tf.int32, shape=[None],
+        # name='seq_len')
         self.seq_len_pl = tf.placeholder(tf.int64,
                                          shape=[None],
                                          name='seq_len')
@@ -99,9 +100,9 @@ class ctcBase(object):
 
             # Add a scalar summary for the snapshot of loss
             self.summaries_train.append(
-                tf.summary.scalar('loss (train)', self.loss))
+                tf.summary.scalar('loss_train', self.loss))
             self.summaries_dev.append(
-                tf.summary.scalar('loss (dev)', self.loss))
+                tf.summary.scalar('loss_dev', self.loss))
 
             return self.loss
 
@@ -150,7 +151,8 @@ class ctcBase(object):
                                                    clip_value_min=-self.clip_grad,
                                                    clip_value_max=self.clip_grad) for g in grads]
             # Clip by norm
-            # self.clipped_grads = [tf.clip_by_norm(g, clip_norm=self.clip_grad) for g in grads]
+            # self.clipped_grads = [tf.clip_by_norm(g,
+            # clip_norm=self.clip_grad) for g in grads]
 
             train_op = optimizer.apply_gradients(
                 zip(self.clipped_grads, tvars), global_step=global_step)
@@ -169,7 +171,7 @@ class ctcBase(object):
         Return:
             decode_op: operation for decoding
         """
-        if decode_type not in ['greedy', 'beam_width']:
+        if decode_type not in ['greedy', 'beam_search']:
             raise ValueError('decode_type is "greedy" or "beam_search".')
 
         if decode_type == 'greedy':
@@ -196,6 +198,7 @@ class ctcBase(object):
         # logits_3d : (max_timesteps, batch_size, num_classes)
         logits_2d = tf.reshape(self.logits, [-1, self.num_classes])
         posteriors_op = tf.nn.softmax(logits_2d)
+
         return posteriors_op
 
     def ler(self, decode_op):
@@ -211,8 +214,56 @@ class ctcBase(object):
         # TODO: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
 
         # Add a scalar summary for the snapshot of ler
-        self.summaries_train.append(tf.summary.scalar(
-            'LER (train)', ler_op))
-        self.summaries_dev.append(tf.summary.scalar(
-            'LER (dev)', ler_op))
+        with tf.name_scope("ler"):
+            self.summaries_train.append(tf.summary.scalar(
+                'ler_train', ler_op))
+            self.summaries_dev.append(tf.summary.scalar(
+                'ler_dev', ler_op))
+
         return ler_op
+
+    def tensorboard(self):
+        with tf.name_scope("train"):
+            for var in tf.trainable_variables():
+                self.summaries_train.append(
+                    tf.summary.histogram(var.name, var))
+        with tf.name_scope("dev"):
+            for var in tf.trainable_variables():
+                self.summaries_dev.append(
+                    tf.summary.histogram(var.name, var))
+
+        with tf.name_scope("mean_train"):
+            for var in tf.trainable_variables():
+                self.summaries_train.append(tf.summary.scalar(var.name,
+                                                              tf.reduce_mean(var)))
+        with tf.name_scope("mean_dev"):
+            for var in tf.trainable_variables():
+                self.summaries_dev.append(tf.summary.scalar(var.name,
+                                                            tf.reduce_mean(var)))
+
+        with tf.name_scope("stddev_train"):
+            for var in tf.trainable_variables():
+                self.summaries_train.append(tf.summary.scalar(var.name,
+                                                              tf.sqrt(tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
+        with tf.name_scope("stddev_dev"):
+            for var in tf.trainable_variables():
+                self.summaries_dev.append(tf.summary.scalar(var.name,
+                                                            tf.sqrt(tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
+
+        with tf.name_scope("max_train"):
+            for var in tf.trainable_variables():
+                self.summaries_train.append(tf.summary.scalar(var.name,
+                                                              tf.reduce_max(var)))
+        with tf.name_scope("max_dev"):
+            for var in tf.trainable_variables():
+                self.summaries_dev.append(
+                    tf.summary.scalar(var.name, tf.reduce_max(var)))
+
+        with tf.name_scope("min_train"):
+            for var in tf.trainable_variables():
+                self.summaries_train.append(tf.summary.scalar(var.name,
+                                                              tf.reduce_min(var)))
+        with tf.name_scope("min_dev"):
+            for var in tf.trainable_variables():
+                self.summaries_dev.append(tf.summary.scalar(var.name,
+                                                            tf.reduce_min(var)))

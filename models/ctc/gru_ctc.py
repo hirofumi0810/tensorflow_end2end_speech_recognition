@@ -52,28 +52,34 @@ class GRU_CTC(ctcBase):
                                    self.keep_prob_input_pl,
                                    name='dropout_input')
 
-        with tf.name_scope('Multi_GRU'):
-            initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
-                                                        maxval=self.parameter_init)
+        gru_list = []
+        for i_layer in range(self.num_layers):
+            with tf.name_scope('GRU_hidden' + str(i_layer + 1)):
 
-            with tf.variable_scope('GRU', initializer=initializer):
-                gru = tf.contrib.rnn.GRUCell(self.num_cell)
+                initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
+                                                            maxval=self.parameter_init)
 
-            # Dropout (output)
-            gru = tf.contrib.rnn.DropoutWrapper(
-                gru, output_keep_prob=self.keep_prob_hidden_pl)
+                with tf.variable_scope('GRU', initializer=initializer):
+                    gru = tf.contrib.rnn.GRUCell(self.num_cell)
 
-            # Stack multiple cells
-            stacked_gru = tf.contrib.rnn.MultiRNNCell(
-                [gru] * self.num_layers, state_is_tuple=True)
+                # Dropout (output)
+                gru = tf.contrib.rnn.DropoutWrapper(
+                    gru, output_keep_prob=self.keep_prob_hidden_pl)
 
-            # Ignore 2nd return (the last state)
-            outputs, _ = tf.nn.dynamic_rnn(cell=stacked_gru,
-                                           inputs=input_drop,
-                                           sequence_length=self.seq_len_pl,
-                                           dtype=tf.float32)
+                gru_list.append(gru)
+
+        # Stack multiple cells
+        stacked_gru = tf.contrib.rnn.MultiRNNCell(
+            gru_list, state_is_tuple=True)
+
+        # Ignore 2nd return (the last state)
+        outputs, _ = tf.nn.dynamic_rnn(cell=stacked_gru,
+                                       inputs=input_drop,
+                                       sequence_length=self.seq_len_pl,
+                                       dtype=tf.float32)
 
         with tf.name_scope('output'):
+
             # (batch_size, max_timesteps, input_size_splice)
             inputs_shape = tf.shape(self.inputs_pl)
             batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
