@@ -19,7 +19,7 @@ class BN_BLSTM_CTC(ctcBase):
         num_layers: int, the number of layers
         output_size: int, the number of nodes in softmax layer (except for blank class)
         parameter_init: A float value. Range of uniform distribution to initialize weight parameters
-        clip_grad: A float value. Range of gradient clipping (non-negative)
+        clip_gradients: A float value. Range of gradient clipping (non-negative)
         clip_activation: A float value. Range of activation clipping (non-negative)
         dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
@@ -33,14 +33,14 @@ class BN_BLSTM_CTC(ctcBase):
                  num_layers,
                  output_size,
                  parameter_init=0.1,
-                 clip_grad=None,
+                 clip_gradients=None,
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
                  is_training=True):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                         output_size, parameter_init, clip_grad, clip_activation,
+                         output_size, parameter_init, clip_gradients, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden)
 
         self._is_training = is_training

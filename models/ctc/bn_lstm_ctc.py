@@ -55,32 +55,35 @@ class BN_LSTM_CTC(ctcBase):
         input_drop = tf.nn.dropout(
             self.inputs_pl, self.keep_prob_input_pl, name='dropout_input')
 
-        initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
-                                                    maxval=self.parameter_init)
-        # initializer = orthogonal_initializer()
+        lstm_list = []
+        for i_layer in range(self.num_layers):
+            with tf.name_scope('LSTM_hidden' + str(i_layer + 1)):
 
-        with tf.name_scope('LSTM'):
-            lstm = BatchNormLSTMCell(self.num_cell,
-                                     use_peepholes=True,
-                                     cell_clip=self.clip_activation,
-                                     initializer=initializer,
-                                     forget_bias=1.0,
-                                     state_is_tuple=True,
-                                     is_training=self.is_training_pl)
+                initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
+                                                            maxval=self.parameter_init)
+                # initializer = orthogonal_initializer()
 
-            # Dropout (output)
-            lstm = tf.contrib.rnn.DropoutWrapper(
-                lstm, output_keep_prob=self.keep_prob_hidden_pl)
+                lstm = BatchNormLSTMCell(self.num_cell,
+                                         use_peepholes=True,
+                                         cell_clip=self.clip_activation,
+                                         initializer=initializer,
+                                         forget_bias=1.0,
+                                         state_is_tuple=True,
+                                         is_training=self.is_training_pl)
 
-            # Stack multiple cells
-            stacked_lstm = tf.contrib.rnn.MultiRNNCell(
-                [lstm] * self.num_layers, state_is_tuple=True)
+                # Dropout (output)
+                lstm = tf.contrib.rnn.DropoutWrapper(
+                    lstm, output_keep_prob=self.keep_prob_hidden_pl)
 
-            # Ignore 2nd return (the last state)
-            outputs, _ = tf.nn.dynamic_rnn(cell=stacked_lstm,
-                                           inputs=input_drop,
-                                           sequence_length=self.seq_len_pl,
-                                           dtype=tf.float32)
+        # Stack multiple cells
+        stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+            lstm_list, state_is_tuple=True)
+
+        # Ignore 2nd return (the last state)
+        outputs, _ = tf.nn.dynamic_rnn(cell=stacked_lstm,
+                                       inputs=input_drop,
+                                       sequence_length=self.seq_len_pl,
+                                       dtype=tf.float32)
 
         with tf.name_scope('output'):
             # (batch_size, max_timesteps, input_size_splice)

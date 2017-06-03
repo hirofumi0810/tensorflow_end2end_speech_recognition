@@ -6,6 +6,16 @@
 import tensorflow as tf
 
 
+OPTIMIZER_CLS_NAMES = {
+    "adagrad": tf.train.AdagradOptimizer,
+    "adadelta": tf.train.AdadeltaOptimizer,
+    "adam": tf.train.AdamOptimizer,
+    "momentum": tf.train.MomentumOptimizer,
+    "rmsprop": tf.train.RMSPropOptimizer,
+    "sgd": tf.train.GradientDescentOptimizer,
+}
+
+
 class ctcBase(object):
     """Connectionist Temporal Classification (CTC) network.
     Args:
@@ -15,7 +25,7 @@ class ctcBase(object):
         num_layers: int, the number of layers
         output_size: int, the number of nodes in softmax layer (except for blank class)
         parameter_init: A float value. Range of uniform distribution to initialize weight parameters
-        clip_grad: A float value. Range of gradient clipping (non-negative)
+        clip_gradients: A float value. Range of gradient clipping (non-negative)
         clip_activation: A float value. Range of activation clipping (non-negative)
         dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
@@ -28,7 +38,7 @@ class ctcBase(object):
                  num_layers,
                  output_size,
                  parameter_init,
-                 clip_grad,
+                 clip_gradients,
                  clip_activation,
                  dropout_ratio_input,
                  dropout_ratio_hidden):
@@ -41,12 +51,10 @@ class ctcBase(object):
         self.num_layers = num_layers
         self.num_classes = output_size + 1  # plus blank label
 
-        # Network settings
+        # Regularization
         self.parameter_init = parameter_init
-        self.clip_grad = clip_grad
+        self.clip_gradients = clip_gradients
         self.clip_activation = clip_activation
-
-        # Dropout
         if dropout_ratio_input == 1.0 and dropout_ratio_hidden == 1.0:
             self.dropout = False
         else:
@@ -73,11 +81,10 @@ class ctcBase(object):
                                          self.label_values_pl,
                                          self.label_shape_pl)
         # [batch_size]
-        # self.seq_len_pl = tf.placeholder(tf.int32, shape=[None],
-        # name='seq_len')
         self.seq_len_pl = tf.placeholder(tf.int64,
                                          shape=[None],
                                          name='seq_len')
+        # NOTE: change to tf.int64 if you use the bidirectional model
 
         # For dropout
         self.keep_prob_input_pl = tf.placeholder(tf.float32,
@@ -106,62 +113,74 @@ class ctcBase(object):
 
             return self.loss
 
-    def train(self, optimizer, learning_rate_init=None, is_scheduled=False):
+    def train(self, optimizer, learning_rate_init=None, clip_gradients_by_norm=None, is_scheduled=False):
         """Operation for training.
         Args:
-            optimizer: adam or adadelta or rmsprop or sgd or momentum
+            optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
             learning_rate_init: initial learning rate
+            clip_gradients_by_norm: if True, clip gradients by norm of the value of self.clip_gradients
             is_scheduled: if True, schedule learning rate at each epoch
         Returns:
             train_op: operation for training
         """
-        if optimizer not in ['adam', 'adadelta', 'rmsprop', 'sgd', 'momentum']:
+        optimizer = optimizer.lower()
+        if optimizer not in OPTIMIZER_CLS_NAMES:
             raise ValueError(
-                'Optimizer is "adam" "adadelta" or "rmsprop" or "sgd" or "momentum".')
+                "Optimizer name should be one of [%s], you provided %s." %
+                (", ".join(OPTIMIZER_CLS_NAMES), optimizer))
+        if learning_rate_init < 0.0:
+            raise ValueError("Invalid learning_rate %s.", learning_rate_init)
 
         # Select parameter update method
         if is_scheduled:
             learning_rate = self.lr_pl
         else:
             learning_rate = learning_rate_init
-        if optimizer == 'adam':
-            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        elif optimizer == 'adadelta':
-            optimizer = tf.train.AdadeltaOptimizer(learning_rate=learning_rate)
-        elif optimizer == 'rmsprop':
-            optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
-        elif optimizer == 'sgd':
-            optimizer = tf.train.GradientDescentOptimizer(
-                learning_rate=learning_rate)
-        elif optimizer == 'momentum':
-            optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
-                                                   momentum=0.9)
-        self.optimizer = optimizer
+
+        if optimizer == 'momentum':
+            self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](learning_rate=learning_rate,
+                                                            momentum=0.9)
+        else:
+            self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](learning_rate=learning_rate)
 
         # Create a variable to track the global step
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         # Gradient clipping
-        if self.clip_grad is not None:
-            tvars = tf.trainable_variables()
-            grads = tf.gradients(self.loss, tvars)
+        if self.clip_gradients is not None:
+            # Compute gradients
+            trainable_vars = tf.trainable_variables()
+            grads = tf.gradients(self.loss, trainable_vars)
 
-            # Clip by absolute values
-            self.clipped_grads = [tf.clip_by_value(g,
-                                                   clip_value_min=-self.clip_grad,
-                                                   clip_value_max=self.clip_grad) for g in grads]
-            # Clip by norm
-            # self.clipped_grads = [tf.clip_by_norm(g,
-            # clip_norm=self.clip_grad) for g in grads]
+            # TODO: Optionally add gradient noise
 
-            train_op = optimizer.apply_gradients(
-                zip(self.clipped_grads, tvars), global_step=global_step)
+            if clip_gradients_by_norm:
+                # Clip by norm
+                self.clipped_grads = [tf.clip_by_norm(g,
+                                                      clip_norm=self.clip_gradients) for g in grads]
+            else:
+                # Clip by absolute values
+                self.clipped_grads = [tf.clip_by_value(g,
+                                                       clip_value_min=-self.clip_gradients,
+                                                       clip_value_max=self.clip_gradients) for g in grads]
+
+            # TODO: Add histograms for variables, gradients (norms)
+
+            # Create gradient updates
+            train_op = self.optimizer.apply_gradients(
+                zip(self.clipped_grads, trainable_vars),
+                global_step=global_step,
+                name='train')
 
         # Use the optimizer to apply the gradients that minimize the loss
         # (and also increment the global step counter) as a single training step
-        train_op = optimizer.minimize(self.loss, global_step=global_step)
+        train_op = self.optimizer.minimize(self.loss, global_step=global_step)
 
         return train_op
+
+    def _add_scaled_noise_to_gradients(grads_and_vars, gradient_noise_scale):
+        """Adds scaled noise from a 0-mean normal distribution to gradients."""
+        raise NotImplementedError
 
     def decoder(self, decode_type, beam_width=None):
         """Operation for decoding.
@@ -223,6 +242,7 @@ class ctcBase(object):
         return ler_op
 
     def tensorboard(self):
+        """Compute statistics for TenforBoard plot."""
         with tf.name_scope("train"):
             for var in tf.trainable_variables():
                 self.summaries_train.append(

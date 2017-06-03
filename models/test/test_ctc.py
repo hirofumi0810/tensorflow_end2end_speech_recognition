@@ -48,7 +48,7 @@ class TestCTC(unittest.TestCase):
                             num_layers=2,
                             output_size=output_size,
                             parameter_init=0.1,
-                            clip_grad=5.0,
+                            clip_gradients=5.0,
                             clip_activation=50,
                             dropout_ratio_input=1.0,
                             dropout_ratio_hidden=1.0)

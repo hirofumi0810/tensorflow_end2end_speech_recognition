@@ -122,7 +122,7 @@ def main(model_path):
                        num_cell=param['num_cell'],
                        num_layers=param['num_layer'],
                        output_size=output_size,
-                       clip_grad=param['clip_grad'],
+                       clip_gradients=param['clip_grad'],
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
                        dropout_ratio_hidden=param['dropout_hidden'],

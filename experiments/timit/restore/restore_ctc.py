@@ -33,8 +33,8 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
     # Add to the graph each operation
     tf.reset_default_graph()
     network.define()
-    # decode_op = network.greedy_decoder()
-    decode_op = network.beam_search_decoder(beam_width=20)
+    decode_op = network.decoder(decode_type='beam_search',
+                                beam_width=20)
     posteriors_op = network.posteriors(decode_op)
     per_op = network.ler(decode_op)
 
@@ -99,7 +99,7 @@ def main(model_path):
                        num_cell=param['num_cell'],
                        num_layers=param['num_layer'],
                        output_size=output_size,
-                       clip_grad=param['clip_grad'],
+                       clip_gradients=param['clip_grad'],
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
                        dropout_ratio_hidden=param['dropout_hidden'],

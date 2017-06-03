@@ -70,9 +70,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
         train_op = network.train(optimizer=optimizer,
                                  learning_rate_init=learning_rate,
                                  is_scheduled=False)
-        # decode_op = network.greedy_decoder()
-        decode_op = network.beam_search_decoder(beam_width=20)
+        decode_op = network.decoder(decode_type='beam_search',
+                                    beam_width=20)
         per_op = network.ler(decode_op)
+        network.tensorboard()
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -297,7 +298,7 @@ def main(config_path):
                        num_cell=param['num_cell'],
                        num_layers=param['num_layer'],
                        output_size=output_size,
-                       clip_grad=param['clip_grad'],
+                       clip_gradients=param['clip_grad'],
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
                        dropout_ratio_hidden=param['dropout_hidden'],

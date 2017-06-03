@@ -171,10 +171,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     summary_writer.flush()
 
                     # Decode
-                    # try:
-                    #     labels_pred = sparsetensor2list(labels_st, batch_size)
-                    # except:
-                    #     labels_pred = [[0] * batch_size]
+                    try:
+                        labels_pred = sparsetensor2list(labels_st, batch_size)
+                    except:
+                        labels_pred = [[0] * batch_size]
 
                     duration_step = time.time() - start_time_step
                     print('Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) (%.3f min)' %
@@ -182,11 +182,11 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     # print('Step %d: loss = %.3f / ler = %.4f (%.3f min)' %
                     #       (step + 1, loss_train, ler_train, duration_step / 60))
 
-                    # if label_type == 'kanji':
-                    #     map_file_path = '../evaluation/mapping_files/ctc/kanji2num.txt'
-                    #     print('True: %s' % num2char(labels[-1], map_file_path))
-                    #     print('Pred: %s' % num2char(
-                    #         labels_pred[-1], map_file_path))
+                    if label_type == 'kanji':
+                        map_file_path = '../evaluation/mapping_files/ctc/kanji2num.txt'
+                        print('True: %s' % num2char(labels[-1], map_file_path))
+                        print('Pred: %s' % num2char(
+                            labels_pred[-1], map_file_path))
                     # elif label_type == 'character':
                     #     map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
                     #     print('True: %s' % num2char(labels[-1], map_file_path))
@@ -223,6 +223,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                                   decode_op=decode_op,
                                                   network=network,
                                                   dataset=dev_data,
+                                                  label_type=label_type,
                                                   eval_batch_size=batch_size)
 
                         if error_epoch < error_best:
@@ -234,18 +235,24 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                                     decode_op=decode_op,
                                                     network=network,
                                                     dataset=eval1_data,
+                                                    label_type=label_type,
+                                                    is_test=True,
                                                     eval_batch_size=batch_size)
                             print('■eval2 Evaluation:■')
                             cer_eval2 = do_eval_cer(session=sess,
                                                     decode_op=decode_op,
                                                     network=network,
                                                     dataset=eval2_data,
+                                                    label_type=label_type,
+                                                    is_test=-True,
                                                     eval_batch_size=batch_size)
                             print('■eval3 Evaluation:■')
                             cer_eval3 = do_eval_cer(session=sess,
                                                     decode_op=decode_op,
                                                     network=network,
                                                     dataset=eval3_data,
+                                                    label_type=label_type,
+                                                    is_test=True,
                                                     eval_batch_size=batch_size)
                             cer_mean = (cer_eval1 + cer_eval2 + cer_eval3) / 3.
                             print('■Mean:■')
@@ -318,7 +325,7 @@ def main(config_path):
     elif corpus['label_type'] == 'character':
         output_size = 147
     elif corpus['label_type'] == 'kanji':
-        output_size = 3385
+        output_size = 3386
 
     # Load model
     CTCModel = load(model_type=config['model_name'])
@@ -327,7 +334,7 @@ def main(config_path):
                        num_cell=param['num_cell'],
                        num_layers=param['num_layer'],
                        output_size=output_size,
-                       clip_grad=param['clip_grad'],
+                       clip_gradients=param['clip_grad'],
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
                        dropout_ratio_hidden=param['dropout_hidden'],
