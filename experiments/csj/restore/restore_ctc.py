@@ -120,6 +120,7 @@ def main(model_path):
                        input_size=feature['input_size'] * feature['num_stack'],
                        num_cell=param['num_cell'],
                        num_layers=param['num_layer'],
+                       bottleneck_dim=param['bottleneck_dim'],
                        output_size=output_size,
                        clip_gradients=param['clip_grad'],
                        clip_activation=param['clip_activation'],

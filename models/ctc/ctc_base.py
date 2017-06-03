@@ -20,7 +20,7 @@ class ctcBase(object):
     """Connectionist Temporal Classification (CTC) network.
     Args:
         batch_size: int, batch size of mini batch
-        input_size: int, the dimension of input vectors
+        input_size: int, the dimensions of input vectors
         num_cell: int, the number of memory cells in each layer
         num_layers: int, the number of layers
         output_size: int, the number of nodes in softmax layer (except for blank class)

@@ -19,6 +19,8 @@ class TestCTC(unittest.TestCase):
     @measure_time
     def test_ctc(self):
         print("CTC Working check.")
+        self.check_training(model_type='blstm_ctc_bottleneck', label_type='character')
+        self.check_training(model_type='blstm_ctc_bottleneck', label_type='phone')
         self.check_training(model_type='blstm_ctc', label_type='character')
         self.check_training(model_type='blstm_ctc', label_type='phone')
         self.check_training(model_type='lstm_ctc', label_type='character')
@@ -42,16 +44,29 @@ class TestCTC(unittest.TestCase):
             # Define model
             output_size = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
-            network = model(batch_size=1,
-                            input_size=inputs[0].shape[1],
-                            num_cell=256,
-                            num_layers=2,
-                            output_size=output_size,
-                            parameter_init=0.1,
-                            clip_gradients=5.0,
-                            clip_activation=50,
-                            dropout_ratio_input=1.0,
-                            dropout_ratio_hidden=1.0)
+            if model_type == 'blstm_ctc_bottleneck':
+                network = model(batch_size=1,
+                                input_size=inputs[0].shape[1],
+                                num_cell=256,
+                                num_layers=2,
+                                bottleneck_dim=128,
+                                output_size=output_size,
+                                parameter_init=0.1,
+                                clip_gradients=5.0,
+                                clip_activation=50,
+                                dropout_ratio_input=1.0,
+                                dropout_ratio_hidden=1.0)
+            else:
+                network = model(batch_size=1,
+                                input_size=inputs[0].shape[1],
+                                num_cell=256,
+                                num_layers=2,
+                                output_size=output_size,
+                                parameter_init=0.1,
+                                clip_gradients=5.0,
+                                clip_activation=50,
+                                dropout_ratio_input=1.0,
+                                dropout_ratio_hidden=1.0)
             loss_op = network.loss()
             learning_rate = 1e-3
             train_op = network.train(optimizer='adam',
@@ -59,7 +74,6 @@ class TestCTC(unittest.TestCase):
                                      is_scheduled=False)
             decode_op = network.decoder(decode_type='beam_search',
                                                     beam_width=20)
-            # posteriors_op = network.posteriors(decode_op)
             ler_op = network.ler(decode_op)
 
             # Add the variable initializer operation

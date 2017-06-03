@@ -1,8 +1,8 @@
 model_name: blstm_ctc
 corpus:
     name: csj
-    label_type: character
-    train_data_size: large
+    label_type: kanji
+    train_data_size: default
 feature:
     name: fbank
     input_size: 123

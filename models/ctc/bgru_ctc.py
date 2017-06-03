@@ -11,7 +11,7 @@ class BGRU_CTC(ctcBase):
     """Bidirectional GRU-CTC model.
     Args:
         batch_size: int, batch size of mini batch
-        input_size: int, the dimension of input vectors
+        input_size: int, the dimensions of input vectors
         num_cell: int, the number of memory cells in each layer
         num_layers: int, the number of layers
         output_size: int, the number of nodes in softmax layer (except for blank class)
@@ -21,6 +21,7 @@ class BGRU_CTC(ctcBase):
         dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
         num_proj: int, the number of nodes in recurrent projection layer
+        bottleneck_dim: not used
     """
 
     def __init__(self,
@@ -34,7 +35,8 @@ class BGRU_CTC(ctcBase):
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
-                 num_proj=None):
+                 num_proj=None,
+                 bottleneck_dim=None):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
                          output_size, parameter_init, clip_gradients, clip_activation,
