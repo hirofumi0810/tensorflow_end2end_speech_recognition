@@ -52,8 +52,6 @@ class TestCTC(unittest.TestCase):
                             clip_activation=50,
                             dropout_ratio_input=1.0,
                             dropout_ratio_hidden=1.0)
-
-            network.define()
             loss_op = network.loss()
             learning_rate = 1e-3
             train_op = network.train(optimizer='adam',

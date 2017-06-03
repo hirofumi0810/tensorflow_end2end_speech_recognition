@@ -42,16 +42,11 @@ class GRU_CTC(ctcBase):
 
         self.num_proj = None
 
-    def define(self):
+        # Define model graph
+        self._build()
+
+    def _build(self):
         """Construct network."""
-        # Generate placeholders
-        self._generate_pl()
-
-        # Input dropout
-        input_drop = tf.nn.dropout(self.inputs_pl,
-                                   self.keep_prob_input_pl,
-                                   name='dropout_input')
-
         gru_list = []
         for i_layer in range(self.num_layers):
             with tf.name_scope('GRU_hidden' + str(i_layer + 1)):
@@ -74,12 +69,11 @@ class GRU_CTC(ctcBase):
 
         # Ignore 2nd return (the last state)
         outputs, _ = tf.nn.dynamic_rnn(cell=stacked_gru,
-                                       inputs=input_drop,
+                                       inputs=self.inputs,
                                        sequence_length=self.seq_len_pl,
                                        dtype=tf.float32)
 
         with tf.name_scope('output'):
-
             # (batch_size, max_timesteps, input_size_splice)
             inputs_shape = tf.shape(self.inputs_pl)
             batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]

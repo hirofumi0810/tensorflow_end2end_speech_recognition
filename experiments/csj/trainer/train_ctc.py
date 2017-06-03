@@ -65,7 +65,6 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                              is_sorted=False)
 
         # Add to the graph each operation
-        network.define()
         loss_op = network.loss()
         train_op = network.train(optimizer=optimizer,
                                  learning_rate_init=learning_rate,
@@ -73,7 +72,6 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         decode_op = network.decoder(decode_type='beam_search',
                                     beam_width=20)
         per_op = network.ler(decode_op)
-        network.tensorboard()
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries

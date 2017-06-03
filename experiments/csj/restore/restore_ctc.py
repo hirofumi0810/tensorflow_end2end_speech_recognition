@@ -38,10 +38,9 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
                          is_sorted=False, is_progressbar=True)
 
     # Add to the graph each operation
-    tf.reset_default_graph()
-    network.define()
-    # decode_op = network.greedy_decoder()
-    decode_op = network.beam_search_decoder(beam_width=20)
+    # tf.reset_default_graph()
+    decode_op = network.decoder(decode_type='beam_search',
+                                beam_width=20)
     posteriors_op = network.posteriors(decode_op)
     per_op = network.ler(decode_op)
 

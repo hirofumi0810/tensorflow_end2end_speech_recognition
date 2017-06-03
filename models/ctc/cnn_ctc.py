@@ -3,11 +3,9 @@
 
 """CNN-CTC model."""
 
-import sys
 import tensorflow as tf
 from .ctc_base import ctcBase
 
-sys.path.append('../')
 # from ..feed_forward.layers.activation_func import maxout, prelu
 # from ..feed_forward.utils_cnn import pool
 
@@ -16,8 +14,9 @@ class CNN_CTC(ctcBase):
     """CNN-CTC model.
        This implementaion is based on
            https://arxiv.org/abs/1701.02720.
-           Zhang, Ying, et al. "Towards end-to-end speech recognition with deep convolutional neural networks."
-           arXiv preprint arXiv:1701.02720 (2017).
+               Zhang, Ying, et al.
+               "Towards end-to-end speech recognition with deep convolutional neural networks."
+               arXiv preprint arXiv:1701.02720 (2017).
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimension of input vectors
@@ -52,13 +51,13 @@ class CNN_CTC(ctcBase):
         self.num_proj = None
         self.splice = 0
 
-    def define(self):
-        """Construct network."""
-        # Generate placeholders
-        self._generate_pl()
+        # Define model graph
+        self._build()
 
+    def _build(self):
+        """Construct network."""
         # (batch_size, max_timesteps, input_size_splice)
-        inputs_shape = tf.shape(self.inputs_pl)
+        inputs_shape = tf.shape(self.inputs)
         batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
 
         ######################################################
@@ -70,7 +69,7 @@ class CNN_CTC(ctcBase):
         with tf.name_scope('conv1'):
             # Reshape to [batch, 40fbank + 1energy, timesteps, 3(current +
             # delta + deltadelta)]
-            input_drop_rs = tf.reshape(self.inputs_pl,
+            input_drop_rs = tf.reshape(self.inputs,
                                        # shape=[batch_size, self.input_size,
                                        # max_timesteps, 1])
                                        shape=[batch_size, int(self.input_size / 3), max_timesteps, 3])

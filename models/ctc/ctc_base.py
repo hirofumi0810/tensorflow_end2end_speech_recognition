@@ -66,6 +66,14 @@ class ctcBase(object):
         self.summaries_train = []
         self.summaries_dev = []
 
+        # Generate placeholders
+        self._generate_pl()
+
+        # Dropout for Input
+        self.inputs = tf.nn.dropout(self.inputs_pl,
+                                    self.keep_prob_input_pl,
+                                    name='dropout_input')
+
     def _generate_pl(self):
         """Generate placeholders."""
 
@@ -165,6 +173,7 @@ class ctcBase(object):
                                                        clip_value_max=self.clip_gradients) for g in grads]
 
             # TODO: Add histograms for variables, gradients (norms)
+            self._tensorboard_statistics(trainable_vars)
 
             # Create gradient updates
             train_op = self.optimizer.apply_gradients(
@@ -241,49 +250,49 @@ class ctcBase(object):
 
         return ler_op
 
-    def tensorboard(self):
-        """Compute statistics for TenforBoard plot."""
+    def _tensorboard_statistics(self, trainable_vars):
+        """Compute statistics for TensorBoard plot."""
         with tf.name_scope("train"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_train.append(
                     tf.summary.histogram(var.name, var))
         with tf.name_scope("dev"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_dev.append(
                     tf.summary.histogram(var.name, var))
 
         with tf.name_scope("mean_train"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_train.append(tf.summary.scalar(var.name,
                                                               tf.reduce_mean(var)))
         with tf.name_scope("mean_dev"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_dev.append(tf.summary.scalar(var.name,
                                                             tf.reduce_mean(var)))
 
         with tf.name_scope("stddev_train"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_train.append(tf.summary.scalar(var.name,
                                                               tf.sqrt(tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
         with tf.name_scope("stddev_dev"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_dev.append(tf.summary.scalar(var.name,
                                                             tf.sqrt(tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
 
         with tf.name_scope("max_train"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_train.append(tf.summary.scalar(var.name,
                                                               tf.reduce_max(var)))
         with tf.name_scope("max_dev"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_dev.append(
                     tf.summary.scalar(var.name, tf.reduce_max(var)))
 
         with tf.name_scope("min_train"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_train.append(tf.summary.scalar(var.name,
                                                               tf.reduce_min(var)))
         with tf.name_scope("min_dev"):
-            for var in tf.trainable_variables():
+            for var in trainable_vars:
                 self.summaries_dev.append(tf.summary.scalar(var.name,
                                                             tf.reduce_min(var)))

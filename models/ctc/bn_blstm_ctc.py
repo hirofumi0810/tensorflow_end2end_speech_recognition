@@ -45,18 +45,15 @@ class BN_BLSTM_CTC(ctcBase):
 
         self._is_training = is_training
 
-    def define(self):
+        # Define model graph
+        self._build()
+
+    def _build(self):
         """Construct network."""
-        # Generate placeholders
-        self._generate_pl()
         self.is_training_pl = tf.placeholder(tf.bool)
 
-        # Input dropout
-        input_drop = tf.nn.dropout(
-            self.inputs_pl, self.keep_prob_input_pl, name='dropout_input')
-
         # Hidden layers
-        outputs = input_drop
+        outputs = self.inputs
         for i_layer in range(self.num_layers):
             with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
 

@@ -42,16 +42,11 @@ class LSTM_CTC(ctcBase):
 
         self.num_proj = None if num_proj == 0 else num_proj
 
-    def define(self):
+        # Define model graph
+        self._build()
+
+    def _build(self):
         """Construct network."""
-        # Generate placeholders
-        self._generate_pl()
-
-        # Input dropout
-        input_drop = tf.nn.dropout(self.inputs_pl,
-                                   self.keep_prob_input_pl,
-                                   name='dropout_input')
-
         lstm_list = []
         for i_layer in range(self.num_layers):
             with tf.name_scope('LSTM_hidden' + str(i_layer + 1)):
@@ -79,12 +74,11 @@ class LSTM_CTC(ctcBase):
 
         # Ignore 2nd return (the last state)
         outputs, _ = tf.nn.dynamic_rnn(cell=stacked_lstm,
-                                       inputs=input_drop,
+                                       inputs=self.inputs,
                                        sequence_length=self.seq_len_pl,
                                        dtype=tf.float32)
 
         with tf.name_scope('output'):
-
             # Reshape to apply the same weights over the timesteps
             if self.num_proj is None:
                 output_node = self.num_cell

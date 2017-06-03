@@ -45,15 +45,12 @@ class BN_LSTM_CTC(ctcBase):
 
         self._is_training = is_training
 
-    def define(self):
-        """Construct network."""
-        # Generate placeholders
-        self._generate_pl()
-        self.is_training_pl = tf.placeholder(tf.bool)
+        # Define model graph
+        self._build()
 
-        # Input dropout
-        input_drop = tf.nn.dropout(
-            self.inputs_pl, self.keep_prob_input_pl, name='dropout_input')
+    def _build(self):
+        """Construct network."""
+        self.is_training_pl = tf.placeholder(tf.bool)
 
         lstm_list = []
         for i_layer in range(self.num_layers):
@@ -81,7 +78,7 @@ class BN_LSTM_CTC(ctcBase):
 
         # Ignore 2nd return (the last state)
         outputs, _ = tf.nn.dynamic_rnn(cell=stacked_lstm,
-                                       inputs=input_drop,
+                                       inputs=self.inputs,
                                        sequence_length=self.seq_len_pl,
                                        dtype=tf.float32)
 
