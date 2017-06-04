@@ -104,18 +104,18 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
+        # Reshape to apply the same weights over the timesteps
+        if self.num_proj is None:
+            output_node = self.num_cell * 2
+        else:
+            output_node = self.num_proj * 2
+        outputs = tf.reshape(outputs, shape=[-1, output_node])
+
+        # (batch_size, max_timesteps, input_size_splice)
+        inputs_shape = tf.shape(self.inputs_pl)
+        batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
+
         with tf.name_scope('bottleneck'):
-            # Reshape to apply the same weights over the timesteps
-            if self.num_proj is None:
-                output_node = self.num_cell * 2
-            else:
-                output_node = self.num_proj * 2
-            outputs = tf.reshape(outputs, shape=[-1, output_node])
-
-            # (batch_size, max_timesteps, input_size_splice)
-            inputs_shape = tf.shape(self.inputs_pl)
-            batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
-
             # Affine
             W_bottleneck = tf.Variable(tf.truncated_normal(shape=[output_node, self.bottleneck_dim],
                                                            stddev=0.1, name='W_bottleneck'))

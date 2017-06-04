@@ -91,14 +91,14 @@ class BN_LSTM_CTC(ctcBase):
                                        sequence_length=self.seq_len_pl,
                                        dtype=tf.float32)
 
+        # (batch_size, max_timesteps, input_size_splice)
+        inputs_shape = tf.shape(self.inputs_pl)
+        batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
+
+        # Reshape to apply the same weights over the timesteps
+        outputs = tf.reshape(outputs, shape=[-1, self.num_cell])
+
         with tf.name_scope('output'):
-            # (batch_size, max_timesteps, input_size_splice)
-            inputs_shape = tf.shape(self.inputs_pl)
-            batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
-
-            # Reshape to apply the same weights over the timesteps
-            outputs = tf.reshape(outputs, shape=[-1, self.num_cell])
-
             # Affine
             W_output = tf.Variable(tf.truncated_normal(shape=[self.num_cell, self.num_classes],
                                                        stddev=0.1, name='W_output'))

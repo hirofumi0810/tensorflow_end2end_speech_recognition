@@ -92,14 +92,14 @@ class BGRU_CTC(ctcBase):
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
+        # Reshape to apply the same weights over the timesteps
+        outputs = tf.reshape(outputs, shape=[-1, self.num_cell * 2])
+
+        # (batch_size, max_timesteps, input_size_splice)
+        inputs_shape = tf.shape(self.inputs_pl)
+        batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
+
         with tf.name_scope('output'):
-            # Reshape to apply the same weights over the timesteps
-            outputs = tf.reshape(outputs, shape=[-1, self.num_cell * 2])
-
-            # (batch_size, max_timesteps, input_size_splice)
-            inputs_shape = tf.shape(self.inputs_pl)
-            batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
-
             # Affine
             W_output = tf.Variable(tf.truncated_normal(shape=[self.num_cell * 2, self.num_classes],
                                                        stddev=0.1, name='W_output'))

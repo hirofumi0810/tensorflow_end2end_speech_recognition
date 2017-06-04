@@ -119,10 +119,11 @@ class ctcBase(object):
         self.loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
         # Add a scalar summary for the snapshot of loss
-        self.summaries_train.append(
-            tf.summary.scalar('loss_train', self.loss))
-        self.summaries_dev.append(
-            tf.summary.scalar('loss_dev', self.loss))
+        with tf.name_scope("total_loss"):
+            self.summaries_train.append(
+                tf.summary.scalar('loss_train', self.loss))
+            self.summaries_dev.append(
+                tf.summary.scalar('loss_dev', self.loss))
 
         return self.loss
 
