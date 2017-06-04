@@ -31,7 +31,7 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
                         is_sorted=False, is_progressbar=True)
 
     # Add to the graph each operation
-    # tf.reset_default_graph()
+    network._build()
     decode_op = network.decoder(decode_type='beam_search',
                                 beam_width=20)
     posteriors_op = network.posteriors(decode_op)
@@ -102,7 +102,8 @@ def main(model_path):
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
                        dropout_ratio_hidden=param['dropout_hidden'],
-                       num_proj=param['num_proj'])
+                       num_proj=param['num_proj'],
+                       weight_decay=param['weight_decay'])
     network.model_name = config['model_name']
     network.model_dir = model_path
 
