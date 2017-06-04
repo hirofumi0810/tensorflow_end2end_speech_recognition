@@ -22,6 +22,7 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
         dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
         num_proj: int, the number of nodes in recurrent projection layer
+        weight_decay: A float value. Regularization parameter for weight decay
     """
 
     def __init__(self,
@@ -36,11 +37,14 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
-                 num_proj=None):
+                 num_proj=None,
+                 weight_decay=0.0):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                         output_size, parameter_init, clip_gradients, clip_activation,
-                         dropout_ratio_input, dropout_ratio_hidden)
+                         output_size, parameter_init,
+                         clip_gradients, clip_activation,
+                         dropout_ratio_input, dropout_ratio_hidden,
+                         weight_decay)
 
         self.bottleneck_dim = bottleneck_dim
         self.num_proj = None if num_proj == 0 else num_proj
@@ -50,6 +54,14 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
 
     def _build(self):
         """Construct Bidirectional LSTM layers."""
+        # Generate placeholders
+        self._generate_pl()
+
+        # Dropout for Input
+        self.inputs = tf.nn.dropout(self.inputs_pl,
+                                    self.keep_prob_input_pl,
+                                    name='dropout_input')
+
         # Hidden layers
         outputs = self.inputs
         for i_layer in range(self.num_layers):

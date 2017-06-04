@@ -126,7 +126,8 @@ def main(model_path):
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
                        dropout_ratio_hidden=param['dropout_hidden'],
-                       num_proj=param['num_proj'])
+                       num_proj=param['num_proj'],
+                       weight_decay=param['weight_decay'])
     network.model_name = config['model_name']
     network.model_dir = model_path
 

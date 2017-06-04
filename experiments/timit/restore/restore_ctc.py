@@ -31,7 +31,6 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
                         is_sorted=False, is_progressbar=True)
 
     # Add to the graph each operation
-    network._build()
     decode_op = network.decoder(decode_type='beam_search',
                                 beam_width=20)
     posteriors_op = network.posteriors(decode_op)

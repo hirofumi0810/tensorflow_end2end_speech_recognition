@@ -19,8 +19,10 @@ class TestCTC(unittest.TestCase):
     @measure_time
     def test_ctc(self):
         print("CTC Working check.")
-        self.check_training(model_type='blstm_ctc_bottleneck', label_type='character')
-        self.check_training(model_type='blstm_ctc_bottleneck', label_type='phone')
+        self.check_training(
+            model_type='blstm_ctc_bottleneck', label_type='character')
+        self.check_training(
+            model_type='blstm_ctc_bottleneck', label_type='phone')
         self.check_training(model_type='blstm_ctc', label_type='character')
         self.check_training(model_type='blstm_ctc', label_type='phone')
         self.check_training(model_type='lstm_ctc', label_type='character')
@@ -55,7 +57,8 @@ class TestCTC(unittest.TestCase):
                                 clip_gradients=5.0,
                                 clip_activation=50,
                                 dropout_ratio_input=1.0,
-                                dropout_ratio_hidden=1.0)
+                                dropout_ratio_hidden=1.0,
+                                weight_decay=1e-6)
             else:
                 network = model(batch_size=1,
                                 input_size=inputs[0].shape[1],
@@ -66,7 +69,8 @@ class TestCTC(unittest.TestCase):
                                 clip_gradients=5.0,
                                 clip_activation=50,
                                 dropout_ratio_input=1.0,
-                                dropout_ratio_hidden=1.0)
+                                dropout_ratio_hidden=1.0,
+                                weight_decay=1e-6)
             loss_op = network.loss()
             learning_rate = 1e-3
             train_op = network.train(optimizer='adam',

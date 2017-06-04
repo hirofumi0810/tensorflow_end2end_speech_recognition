@@ -300,17 +300,20 @@ def main(config_path):
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
                        dropout_ratio_hidden=param['dropout_hidden'],
-                       num_proj=param['num_proj'])
+                       num_proj=param['num_proj'],
+                       weight_decay=param['weight_decay'])
 
     network.model_name = config['model_name'].upper()
     network.model_name += '_' + str(param['num_cell'])
     network.model_name += '_' + str(param['num_layer'])
     network.model_name += '_' + param['optimizer']
     network.model_name += '_lr' + str(param['learning_rate'])
-    if network.num_proj is not None:
+    if param['num_proj'] != 0:
         network.model_name += '_proj' + str(param['num_proj'])
     if feature['num_stack'] != 1:
         network.model_name += '_stack' + str(feature['num_stack'])
+    if param['weight_decay'] != 0:
+        network.model_name += '_weightdecay' + str(param['weight_decay'])
 
     # Set save path
     network.model_dir = mkdir('/n/sd8/inaguma/result/timit/ctc/')

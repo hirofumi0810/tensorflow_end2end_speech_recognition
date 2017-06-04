@@ -21,6 +21,7 @@ class GRU_CTC(ctcBase):
         dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
         num_proj: int, the number of nodes in recurrent projection layer
+        weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: not used
     """
 
@@ -36,11 +37,14 @@ class GRU_CTC(ctcBase):
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
                  num_proj=None,
+                 weight_decay=0.0,
                  bottleneck_dim=None):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                         output_size, parameter_init, clip_gradients, clip_activation,
-                         dropout_ratio_input, dropout_ratio_hidden)
+                         output_size, parameter_init,
+                         clip_gradients, clip_activation,
+                         dropout_ratio_input, dropout_ratio_hidden,
+                         weight_decay)
 
         self.num_proj = None
 
@@ -49,6 +53,14 @@ class GRU_CTC(ctcBase):
 
     def _build(self):
         """Construct network."""
+        # Generate placeholders
+        self._generate_pl()
+
+        # Dropout for Input
+        self.inputs = tf.nn.dropout(self.inputs_pl,
+                                    self.keep_prob_input_pl,
+                                    name='dropout_input')
+
         gru_list = []
         for i_layer in range(self.num_layers):
             with tf.name_scope('GRU_hidden' + str(i_layer + 1)):

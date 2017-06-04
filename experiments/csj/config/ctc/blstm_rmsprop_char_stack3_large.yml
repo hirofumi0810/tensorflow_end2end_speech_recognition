@@ -23,3 +23,5 @@ param:
     clip_activation: 50
     dropout_input: 1.0
     dropout_hidden: 0.8
+    weight_decay: 0.0
+    

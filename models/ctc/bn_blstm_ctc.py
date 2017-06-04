@@ -23,6 +23,7 @@ class BN_BLSTM_CTC(ctcBase):
         clip_activation: A float value. Range of activation clipping (non-negative)
         dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
+        weight_decay: A float value. Regularization parameter for weight decay
         is_training: bool, set True when training
     """
 
@@ -37,11 +38,14 @@ class BN_BLSTM_CTC(ctcBase):
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
+                 weight_decay=0.0,
                  is_training=True):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
-                         output_size, parameter_init, clip_gradients, clip_activation,
-                         dropout_ratio_input, dropout_ratio_hidden)
+                         output_size, parameter_init,
+                         clip_gradients, clip_activation,
+                         dropout_ratio_input, dropout_ratio_hidden,
+                         weight_decay)
 
         self._is_training = is_training
 
@@ -50,6 +54,14 @@ class BN_BLSTM_CTC(ctcBase):
 
     def _build(self):
         """Construct network."""
+        # Generate placeholders
+        self._generate_pl()
+
+        # Dropout for Input
+        self.inputs = tf.nn.dropout(self.inputs_pl,
+                                    self.keep_prob_input_pl,
+                                    name='dropout_input')
+
         self.is_training_pl = tf.placeholder(tf.bool)
 
         # Hidden layers
