@@ -42,27 +42,31 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
     """
+    # Load dataset
+    train_data = DataSet(data_type='train', label_type=label_type,
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=True)
+    if label_type == 'character':
+        dev_data = DataSet(data_type='dev', label_type='character',
+                           num_stack=num_stack, num_skip=num_skip,
+                           is_sorted=False)
+        test_data = DataSet(data_type='test', label_type='character',
+                            num_stack=num_stack, num_skip=num_skip,
+                            is_sorted=False)
+    else:
+        dev_data = DataSet(data_type='dev', label_type='phone39',
+                           num_stack=num_stack, num_skip=num_skip,
+                           is_sorted=False)
+        test_data = DataSet(data_type='test', label_type='phone39',
+                            num_stack=num_stack, num_skip=num_skip,
+                            is_sorted=False)
+
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
 
-        # Read dataset
-        train_data = DataSet(data_type='train', label_type=label_type,
-                             num_stack=num_stack, num_skip=num_skip,
-                             is_sorted=True)
-        if label_type == 'character':
-            dev_data = DataSet(data_type='dev', label_type='character',
-                               num_stack=num_stack, num_skip=num_skip,
-                               is_sorted=False)
-            test_data = DataSet(data_type='test', label_type='character',
-                                num_stack=num_stack, num_skip=num_skip,
-                                is_sorted=False)
-        else:
-            dev_data = DataSet(data_type='dev', label_type='phone39',
-                               num_stack=num_stack, num_skip=num_skip,
-                               is_sorted=False)
-            test_data = DataSet(data_type='test', label_type='phone39',
-                                num_stack=num_stack, num_skip=num_skip,
-                                is_sorted=False)
+        # Define model
+        network.define()
+        # NOTE: define model under tf.Graph()
 
         # Add to the graph each operation
         loss_op = network.loss()
@@ -95,7 +99,6 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
         csv_steps = []
         csv_train_loss = []
         csv_dev_loss = []
-
         # Create a session for running operation on the graph
         with tf.Session() as sess:
 
@@ -289,7 +292,7 @@ def main(config_path):
     elif corpus['label_type'] == 'character':
         output_size = 30
 
-    # Load model
+    # Model setting
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=feature['input_size'] * feature['num_stack'],

@@ -63,7 +63,7 @@ class ctcBase(object):
             self.dropout = True
         self.dropout_ratio_input = dropout_ratio_input
         self.dropout_ratio_hidden = dropout_ratio_hidden
-        self.weight_decay = weight_decay
+        self.weight_decay = float(weight_decay)
 
         # Summaries for TensorBoard
         self.summaries_train = []
@@ -103,31 +103,28 @@ class ctcBase(object):
             loss: operation for computing ctc loss
         """
         # Weight decay
-        # weight_sum = 0
-        # for var in tf.trainable_variables():
-        #     if 'bias' not in var.name.lower():
-        #         weight_sum += tf.nn.l2_loss(var)
-        # tf.add_to_collection('losses', weight_sum * self.weight_decay)
+        weight_sum = 0
+        for var in tf.trainable_variables():
+            if 'bias' not in var.name.lower():
+                weight_sum += tf.nn.l2_loss(var)
+        tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss"):
             ctc_loss = tf.nn.ctc_loss(
                 self.labels_pl, self.logits, tf.cast(self.seq_len_pl, tf.int32))
-            self.loss = tf.reduce_mean(ctc_loss, name='ctc_loss_mean')
-            # tf.add_to_collection('losses', ctc_loss_mean)
+            ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss_mean')
+            tf.add_to_collection('losses', ctc_loss_mean)
 
-            # print(ctc_loss_mean)
-            # Total loss
-            # self.loss = ctc_loss_mean + weight_decay * self.weight_decay
-            # self.loss = ctc_loss_mean
-            print(self.loss)
+        # Total loss
+        self.loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
-            # Add a scalar summary for the snapshot of loss
-            self.summaries_train.append(
-                tf.summary.scalar('loss_train', self.loss))
-            self.summaries_dev.append(
-                tf.summary.scalar('loss_dev', self.loss))
+        # Add a scalar summary for the snapshot of loss
+        self.summaries_train.append(
+            tf.summary.scalar('loss_train', self.loss))
+        self.summaries_dev.append(
+            tf.summary.scalar('loss_dev', self.loss))
 
-            return self.loss
+        return self.loss
 
     def train(self, optimizer, learning_rate_init=None, clip_gradients_by_norm=None, is_scheduled=False):
         """Operation for training.

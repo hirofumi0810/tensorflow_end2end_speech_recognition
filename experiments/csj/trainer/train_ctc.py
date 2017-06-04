@@ -39,30 +39,34 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         num_skip: int, the number of frames to skip
         train_data_size: default or large
     """
+    # Load dataset
+    train_data = DataSet(data_type='train', label_type=label_type,
+                         train_data_size=train_data_size,
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=True)
+    dev_data = DataSet(data_type='dev', label_type=label_type,
+                       train_data_size=train_data_size,
+                       num_stack=num_stack, num_skip=num_skip,
+                       is_sorted=False)
+    eval1_data = DataSet(data_type='eval1', label_type=label_type,
+                         train_data_size=train_data_size,
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=False)
+    eval2_data = DataSet(data_type='eval2', label_type=label_type,
+                         train_data_size=train_data_size,
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=False)
+    eval3_data = DataSet(data_type='eval3', label_type=label_type,
+                         train_data_size=train_data_size,
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=False)
+
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
 
-        # Read dataset
-        train_data = DataSet(data_type='train', label_type=label_type,
-                             train_data_size=train_data_size,
-                             num_stack=num_stack, num_skip=num_skip,
-                             is_sorted=True)
-        dev_data = DataSet(data_type='dev', label_type=label_type,
-                           train_data_size=train_data_size,
-                           num_stack=num_stack, num_skip=num_skip,
-                           is_sorted=False)
-        eval1_data = DataSet(data_type='eval1', label_type=label_type,
-                             train_data_size=train_data_size,
-                             num_stack=num_stack, num_skip=num_skip,
-                             is_sorted=False)
-        eval2_data = DataSet(data_type='eval2', label_type=label_type,
-                             train_data_size=train_data_size,
-                             num_stack=num_stack, num_skip=num_skip,
-                             is_sorted=False)
-        eval3_data = DataSet(data_type='eval3', label_type=label_type,
-                             train_data_size=train_data_size,
-                             num_stack=num_stack, num_skip=num_skip,
-                             is_sorted=False)
+        # Define model
+        network.define()
+        # NOTE: define model under tf.Graph()
 
         # Add to the graph each operation
         loss_op = network.loss()
@@ -95,7 +99,6 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         csv_steps = []
         csv_train_loss = []
         csv_dev_loss = []
-
         # Create a session for running operation on the graph
         with tf.Session() as sess:
             # Instantiate a SummaryWriter to output summaries and the graph
@@ -185,17 +188,17 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                         print('True: %s' % num2char(labels[-1], map_file_path))
                         print('Pred: %s' % num2char(
                             labels_pred[-1], map_file_path))
-                    # elif label_type == 'character':
-                    #     map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
-                    #     print('True: %s' % num2char(labels[-1], map_file_path))
-                    #     print('Pred: %s' % num2char(
-                    #         labels_pred[-1], map_file_path))
-                    # elif label_type == 'phone':
-                    #     map_file_path = '../evaluation/mapping_files/ctc/phone2num.txt'
-                    #     print('True: %s' % num2phone(
-                    #         labels[-1], map_file_path))
-                    #     print('Pred: %s' % num2phone(
-                    #         labels_pred[-1], map_file_path))
+                    elif label_type == 'character':
+                        map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
+                        print('True: %s' % num2char(labels[-1], map_file_path))
+                        print('Pred: %s' % num2char(
+                            labels_pred[-1], map_file_path))
+                    elif label_type == 'phone':
+                        map_file_path = '../evaluation/mapping_files/ctc/phone2num.txt'
+                        print('True: %s' % num2phone(
+                            labels[-1], map_file_path))
+                        print('Pred: %s' % num2phone(
+                            labels_pred[-1], map_file_path))
 
                     sys.stdout.flush()
                     start_time_step = time.time()
@@ -325,7 +328,7 @@ def main(config_path):
     elif corpus['label_type'] == 'kanji':
         output_size = 3386
 
-    # Load model
+    # Model setting
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=feature['input_size'] * feature['num_stack'],

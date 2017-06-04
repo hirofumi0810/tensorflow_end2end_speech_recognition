@@ -49,10 +49,7 @@ class BN_BLSTM_CTC(ctcBase):
 
         self._is_training = is_training
 
-        # Define model graph
-        self._build()
-
-    def _build(self):
+    def define(self):
         """Construct network."""
         # Generate placeholders
         self._generate_pl()

@@ -30,6 +30,9 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False, is_progressbar=True)
 
+    # Define model
+    network.define()
+
     # Add to the graph each operation
     decode_op = network.decoder(decode_type='beam_search',
                                 beam_width=20)
@@ -90,7 +93,7 @@ def main(model_path):
     elif corpus['label_type'] == 'character':
         output_size = 30
 
-    # Load model
+    # Model setting
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(batch_size=1,
                        input_size=feature['input_size'] * feature['num_stack'],

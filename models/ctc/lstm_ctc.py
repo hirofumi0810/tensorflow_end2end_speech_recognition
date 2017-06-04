@@ -48,10 +48,7 @@ class LSTM_CTC(ctcBase):
 
         self.num_proj = None if num_proj == 0 else num_proj
 
-        # Define model graph
-        self._build()
-
-    def _build(self):
+    def define(self):
         """Construct network."""
         # Generate placeholders
         self._generate_pl()

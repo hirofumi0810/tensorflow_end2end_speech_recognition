@@ -71,6 +71,10 @@ class TestCTC(unittest.TestCase):
                                 dropout_ratio_input=1.0,
                                 dropout_ratio_hidden=1.0,
                                 weight_decay=1e-6)
+            network.define()
+            # NOTE: define model under tf.Graph()
+
+            # Add to the graph each operation
             loss_op = network.loss()
             learning_rate = 1e-3
             train_op = network.train(optimizer='adam',

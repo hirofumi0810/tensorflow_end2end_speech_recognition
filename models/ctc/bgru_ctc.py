@@ -48,10 +48,7 @@ class BGRU_CTC(ctcBase):
 
         self.num_proj = None
 
-        # Define model graph
-        self._build()
-
-    def _build(self):
+    def define(self):
         """Construct network."""
         # Generate placeholders
         self._generate_pl()

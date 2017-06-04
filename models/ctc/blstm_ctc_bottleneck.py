@@ -49,10 +49,7 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
         self.bottleneck_dim = bottleneck_dim
         self.num_proj = None if num_proj == 0 else num_proj
 
-        # Define model graph
-        self._build()
-
-    def _build(self):
+    def define(self):
         """Construct Bidirectional LSTM layers."""
         # Generate placeholders
         self._generate_pl()

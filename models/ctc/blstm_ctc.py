@@ -48,10 +48,7 @@ class BLSTM_CTC(ctcBase):
 
         self.num_proj = None if num_proj == 0 else num_proj
 
-        # Define model graph
-        self._build()
-
-    def _build(self):
+    def define(self):
         """Construct Bidirectional LSTM layers."""
         # Generate placeholders
         self._generate_pl()

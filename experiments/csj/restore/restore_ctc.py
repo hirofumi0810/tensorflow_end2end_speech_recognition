@@ -37,8 +37,10 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
                          num_stack=num_stack, num_skip=num_skip,
                          is_sorted=False, is_progressbar=True)
 
+    # Define model
+    network.define()
+
     # Add to the graph each operation
-    # tf.reset_default_graph()
     decode_op = network.decoder(decode_type='beam_search',
                                 beam_width=20)
     posteriors_op = network.posteriors(decode_op)
@@ -114,7 +116,7 @@ def main(model_path):
     elif corpus['label_type'] == 'kanji':
         output_size = 3385
 
-    # Load model
+    # Modle setting
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=feature['input_size'] * feature['num_stack'],
