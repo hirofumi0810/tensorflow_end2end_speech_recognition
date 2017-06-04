@@ -1,7 +1,11 @@
-# TensofFlow Implementation of End-to-End Speech Recognition
+# TensorFlow Implementation of End-to-End Speech Recognition
 
-## Requirement
-- TensofFlow 1.1.0
+## Requirements
+- TensorFlow 1.1.0
+- tqdm 4.11.2
+- python-Levenshtein 0.12.0
+- setproctitle 1.1.10
+- seaborn 0.7.1
 
 ## Corpus
 ### TIMIT
