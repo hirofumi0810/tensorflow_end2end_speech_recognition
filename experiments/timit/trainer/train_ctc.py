@@ -21,8 +21,6 @@ from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
 from utils.util import mkdir, join
 from utils.parameter import count_total_parameters
 from utils.loss import save_loss
-from utils.labels.phone import num2phone
-from utils.labels.character import num2char
 
 # TODO
 # - multi GPU implementation
@@ -174,30 +172,9 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                     summary_writer.add_summary(summary_str_dev, step + 1)
                     summary_writer.flush()
 
-                    # Decode
-                    try:
-                        labels_pred = sparsetensor2list(labels_st, batch_size)
-                    except:
-                        labels_pred = [[0] * batch_size]
-
                     duration_step = time.time() - start_time_step
-                    if label_type == 'character':
-                        print('Step %d: loss = %.3f (%.3f) / cer = %.4f (%.4f) (%.3f min)' %
-                              (step + 1, loss_train, loss_dev, ler_train, ler_dev, duration_step / 60))
-                        map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
-                        print('True: %s' % num2char(labels[-1], map_file_path))
-                        print('Pred: %s' % num2char(
-                            labels_pred[-1], map_file_path))
-                    else:
-                        print('Step %d: loss = %.3f (%.3f) / per = %.4f (%.4f) (%.3f min)' %
-                              (step + 1, loss_train, loss_dev, ler_train, ler_dev, duration_step / 60))
-                        map_file_path = '../evaluation/mapping_files/ctc/phone2num_' + \
-                            label_type[-2:] + '.txt'
-                        print('True: %s' % num2phone(
-                            labels[-1], map_file_path))
-                        print('Pred: %s' % num2phone(
-                            labels_pred[-1], map_file_path))
-
+                    print('Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) (%.3f min)' %
+                          (step + 1, loss_train, loss_dev, ler_train, ler_dev, duration_step / 60))
                     sys.stdout.flush()
                     start_time_step = time.time()
 

@@ -11,8 +11,8 @@ import yaml
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_ctc import DataSet
-from models.ctc.load_model import load
+from data.read_dataset_multitask_ctc import DataSet
+from models.ctc.load_model_multitask import load
 from evaluation.eval_ctc import do_eval_per, do_eval_cer, decode_test, posterior_test
 
 
@@ -20,7 +20,7 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
     """Restore model.
     Args:
         network: model to restore
-        label_type: phone39 or phone48 or phone61 or character
+        label_type: phone39 or phone48 or phone61
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
         epoch: epoch to restore
@@ -39,10 +39,10 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
     network.define()
 
     # Add to the graph each operation
-    decode_op = network.decoder(decode_type='beam_search',
-                                beam_width=20)
-    posteriors_op = network.posteriors(decode_op)
-    per_op = network.ler(decode_op)
+    decode_op1, decode_op2 = network.decoder(decode_type='beam_search',
+                                             beam_width=20)
+    # posteriors_op = network.posteriors(decode_op1)
+    per_op1, per_op2 = network.ler(decode_op1, decode_op2)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -63,17 +63,19 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
             raise ValueError('There are not any checkpoints.')
 
         print('Test Data Evaluation:')
-        if label_type == 'character':
-            do_eval_cer(session=sess, decode_op=decode_op, network=network,
-                        dataset=test_data, is_progressbar=True)
-        else:
-            do_eval_per(session=sess, decode_op=decode_op, per_op=per_op,
-                        network=network, dataset=test_data,
-                        label_type=label_type, is_progressbar=True)
+        do_eval_cer(session=sess, decode_op=decode_op1, network=network,
+                    dataset=test_data, is_progressbar=True,
+                    is_multitask=True)
+
+        do_eval_per(session=sess, decode_op=decode_op2, per_op=per_op2,
+                    network=network, dataset=test_data,
+                    label_type=label_type, is_progressbar=True,
+                    is_multitask=True)
 
         # Visualize
-        decode_test(session=sess, decode_op=decode_op, network=network,
-                    dataset=test_data, label_type=label_type)
+        # decode_test(session=sess, decode_op=decode_op2, network=network,
+        #             dataset=test_data, label_type=label_type,
+        #             is_multitask=True)
         # posterior_test(session=sess, posteriors_op=posteriors_op,
         # network=network, dataset=test_data, label_type=label_type)
 
@@ -90,13 +92,11 @@ def main(model_path):
         param = config['param']
 
     if corpus['label_type'] == 'phone61':
-        output_size = 61
+        output_size2 = 61
     elif corpus['label_type'] == 'phone48':
-        output_size = 48
+        output_size2 = 48
     elif corpus['label_type'] == 'phone39':
-        output_size = 39
-    elif corpus['label_type'] == 'character':
-        output_size = 30
+        output_size2 = 39
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -104,7 +104,10 @@ def main(model_path):
                        input_size=feature['input_size'] * feature['num_stack'],
                        num_cell=param['num_cell'],
                        num_layer=param['num_layer'],
-                       output_size=output_size,
+                       num_layer2=param['num_layer2'],
+                       output_size=30,
+                       output_size2=output_size2,
+                       main_task_weight=param['main_task_weight'],
                        clip_gradients=param['clip_grad'],
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],

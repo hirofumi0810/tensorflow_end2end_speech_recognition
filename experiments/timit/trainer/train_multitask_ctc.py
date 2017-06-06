@@ -21,8 +21,6 @@ from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
 from utils.util import mkdir, join
 from utils.parameter import count_total_parameters
 from utils.loss import save_loss
-from utils.labels.phone import num2phone
-from utils.labels.character import num2char
 
 
 def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_type, num_stack, num_skip):
@@ -173,36 +171,9 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                     summary_writer.add_summary(summary_str_dev, step + 1)
                     summary_writer.flush()
 
-                    # Decode
-                    labels_st_char, labels_st_phone = sess.run([decode_op1, decode_op2],
-                                                               feed_dict=feed_dict_dev)
-                    try:
-                        labels_pred_char = sparsetensor2list(
-                            labels_st_char, batch_size)
-                        labels_pred_phone = sparsetensor2list(
-                            labels_st_phone, batch_size)
-                    except:
-                        labels_pred_char = [[0] * batch_size]
-                        labels_pred_phone = [[0] * batch_size]
-
                     duration_step = time.time() - start_time_step
-
                     print('Step %d: loss = %.3f (%.3f) / cer = %.4f (%.4f) / per = %.4f (%.4f) (%.3f min)' %
                           (step + 1, loss_train, loss_dev, cer_train, cer_dev, per_train, per_dev, duration_step / 60))
-                    map_file_path_char = '../evaluation/mapping_files/ctc/char2num.txt'
-                    map_file_path_phone = '../evaluation/mapping_files/ctc/phone2num_' + \
-                        label_type[-2:] + '.txt'
-                    print('Character')
-                    print('  True: %s' % num2char(
-                        labels_char[-1], map_file_path_char))
-                    print('  Pred: %s' % num2char(
-                        labels_pred_char[-1], map_file_path_char))
-                    print('Phone')
-                    print('  True: %s' % num2phone(
-                        labels_phone[-1], map_file_path_phone))
-                    print('  Pred: %s' % num2phone(
-                        labels_pred_phone[-1], map_file_path_phone))
-
                     sys.stdout.flush()
                     start_time_step = time.time()
 

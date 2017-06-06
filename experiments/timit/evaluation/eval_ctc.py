@@ -19,7 +19,8 @@ from utils.util import join
 
 @exception
 def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
-                eval_batch_size=1, rate=1.0, is_progressbar=False):
+                eval_batch_size=1, rate=1.0, is_progressbar=False,
+                is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
     Args:
         session: session of training model
@@ -31,6 +32,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         eval_batch_size: batch size on evaluation
         rate: A float value. Rate of evaluation data to use
         is_progressbar: if True, evaluate during training, else during restoring
+        is_multitask: if True, evaluate the multitask model
     Returns:
         per_global: phone error rate
     """
@@ -46,18 +48,19 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         iteration += 1
     per_global = 0
 
-    # Setting for progressbar
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-
     p2n_map_file_path = '../evaluation/mapping_files/ctc/phone2num_' + \
         label_type[5:7] + '.txt'
     p2n39_map_file_path = '../evaluation/mapping_files/ctc/phone2num_39.txt'
     p2p_map_file_path = '../evaluation/mapping_files/phone2phone.txt'
+    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
     for step in iterator:
         # Create feed dictionary for next mini batch
-        inputs, labels_true, seq_len, _ = dataset.next_batch(
-            batch_size=batch_size)
-        indices, values, dense_shape = list2sparsetensor(labels_true)
+        if not is_multitask:
+            inputs, labels_true, seq_len, _ = dataset.next_batch(
+                batch_size=batch_size)
+        else:
+            inputs, _, labels_true, seq_len, _ = dataset.next_batch(
+                batch_size=batch_size)
 
         feed_dict = {
             network.inputs_pl: inputs,
@@ -107,7 +110,8 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
 @exception
 def do_eval_cer(session, decode_op, network, dataset,
-                eval_batch_size=1, rate=1.0, is_progressbar=False):
+                eval_batch_size=1, rate=1.0, is_progressbar=False,
+                is_multitask=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
@@ -117,6 +121,7 @@ def do_eval_cer(session, decode_op, network, dataset,
         eval_batch_size: batch size on evaluation
         rate: rate of evaluation data to use
         is_progressbar: if True, visualize progressbar
+        is_multitask: if True, evaluate the multitask model
     Return:
         cer_mean: mean character error rate
     """
@@ -128,14 +133,16 @@ def do_eval_cer(session, decode_op, network, dataset,
         iteration += 1
     cer_sum = 0
 
-    # Setting for progressbar
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-
     map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
+    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
     for step in iterator:
         # Create feed dictionary for next mini batch
-        inputs, labels, seq_len, _ = dataset.next_batch(batch_size=batch_size)
-        indices, values, dense_shape = list2sparsetensor(labels)
+        if not is_multitask:
+            inputs, labels_true, seq_len, _ = dataset.next_batch(
+                batch_size=batch_size)
+        else:
+            inputs, labels_true, _, seq_len, _ = dataset.next_batch(
+                batch_size=batch_size)
 
         feed_dict = {
             network.inputs_pl: inputs,
@@ -144,14 +151,14 @@ def do_eval_cer(session, decode_op, network, dataset,
             network.keep_prob_hidden_pl: 1.0
         }
 
-        batch_size_each = len(labels)
-        labels_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_st, batch_size_each)
+        batch_size_each = len(labels_true)
+        labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
+        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
         for i_batch in range(batch_size_each):
 
             # Convert from list to string
             str_pred = num2char(labels_pred[i_batch], map_file_path)
-            str_true = num2char(labels[i_batch], map_file_path)
+            str_true = num2char(labels_true[i_batch], map_file_path)
 
             # Remove silence(_) labels
             str_pred = re.sub(r'[_]+', "", str_pred)
@@ -164,10 +171,12 @@ def do_eval_cer(session, decode_op, network, dataset,
 
     cer_mean = cer_sum / dataset.data_num
     print('  Character Error Rate: %f %%' % (cer_mean * 100))
+
     return cer_mean
 
 
-def decode_test(session, decode_op, network, dataset, label_type, rate=1.0):
+def decode_test(session, decode_op, network, dataset, label_type, rate=1.0,
+                is_multitask=False):
     """Visualize label outputs.
     Args:
         session: session of training model
@@ -176,6 +185,7 @@ def decode_test(session, decode_op, network, dataset, label_type, rate=1.0):
         dataset: Dataset class
         label_type: phone39 or phone48 or phone61 or character
         rate: rate of evaluation data to use
+        is_multitask: if True, evaluate the multitask model
     """
     batch_size = 1
     num_examples = dataset.data_num * rate
@@ -188,9 +198,13 @@ def decode_test(session, decode_op, network, dataset, label_type, rate=1.0):
     map_file_path_char = '../evaluation/mapping_files/ctc/char2num.txt'
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, labels, seq_len, input_names = dataset.next_batch(
+        inputs, labels_true, seq_len, input_names = dataset.next_batch(
             batch_size=batch_size)
-        indices, values, dense_shape = list2sparsetensor(labels)
+        # if is_multitask:
+        #     if label_type == 'character':
+        #         labels_true = labels_true[0]
+        #     else:
+        #         labels_true = labels_true[1]
 
         feed_dict = {
             network.inputs_pl: inputs,
@@ -200,14 +214,14 @@ def decode_test(session, decode_op, network, dataset, label_type, rate=1.0):
         }
 
         # Visualize
-        batch_size_each = len(labels)
-        labels_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_st, batch_size_each)
+        batch_size_each = len(labels_true)
+        labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
+        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
         for i_batch in range(batch_size_each):
             if label_type == 'character':
                 print('-----wav: %s-----' % input_names[i_batch])
                 print('True: %s' % num2char(
-                    labels[i_batch], map_file_path_char))
+                    labels_true[i_batch], map_file_path_char))
                 print('Pred: %s' % num2char(
                     labels_pred[i_batch], map_file_path_char))
 
@@ -215,13 +229,14 @@ def decode_test(session, decode_op, network, dataset, label_type, rate=1.0):
                 # Decode test (39 phones)
                 print('-----wav: %s-----' % input_names[i_batch])
                 print('True: %s' % num2phone(
-                    labels[i_batch], map_file_path_phone))
+                    labels_true[i_batch], map_file_path_phone))
 
                 print('Pred: %s' % num2phone(
                     labels_pred[i_batch], map_file_path_phone))
 
 
-def posterior_test(session, posteriors_op, network, dataset, label_type, rate=1.0):
+def posterior_test(session, posteriors_op, network, dataset, label_type,
+                   rate=1.0):
     """Visualize label posteriors.
     Args:
         session: session of training model
@@ -240,9 +255,8 @@ def posterior_test(session, posteriors_op, network, dataset, label_type, rate=1.
 
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, labels, seq_len, input_names = dataset.next_batch(
+        inputs, _, seq_len, input_names = dataset.next_batch(
             batch_size=batch_size)
-        indices, values, dense_shape = list2sparsetensor(labels)
 
         feed_dict = {
             network.inputs_pl: inputs,
@@ -252,13 +266,13 @@ def posterior_test(session, posteriors_op, network, dataset, label_type, rate=1.
         }
 
         # Visualize
-        batch_size_each = len(labels)
+        batch_size_each = len(seq_len)
         max_frame_num = inputs.shape[1]
         posteriors = session.run(posteriors_op, feed_dict=feed_dict)
         for i_batch in range(batch_size_each):
             posteriors_index = np.array([i_batch + (batch_size_each * j)
                                          for j in range(max_frame_num)])
-            if label_type[:5] == 'phone':
+            if label_type != 'character':
                 probs.plot_probs_ctc_phone(probs=posteriors[posteriors_index][:int(seq_len[i_batch]), :],
                                            save_path=save_path,
                                            wav_index=input_names[i_batch],

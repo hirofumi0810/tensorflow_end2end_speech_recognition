@@ -43,6 +43,6 @@ def num2phone(num_list, map_file_path):
     phone_list = []
     for i in range(len(num_list)):
         phone_list.append(map_dict[num_list[i]])
-    str_phone = '  '.join(phone_list)
+    str_phone = ' '.join(phone_list)
 
     return str_phone
