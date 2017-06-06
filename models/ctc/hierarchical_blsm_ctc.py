@@ -13,8 +13,8 @@ class Hierarchical_BLSTM_CTC(ctcBase):
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
         num_cell: int, the number of memory cells in each layer
-        num_layers: int, the number of layers of the main task
-        num_layers2: int, the number of layers of the second task. Set between 1 to num_layers
+        num_layer: int, the number of layers of the main task
+        num_layer2: int, the number of layers of the second task. Set between 1 to num_layer
         output_size: int, the number of nodes in softmax layer of the main task (except for blank class)
         output_size2: int, the number of nodes in softmax layer of the second task (except for blank class)
         main_task_weight: A float value. The weight of loss of the main task. Set between 0 to 1
@@ -32,8 +32,8 @@ class Hierarchical_BLSTM_CTC(ctcBase):
                  batch_size,
                  input_size,
                  num_cell,
-                 num_layers,
-                 num_layers2,
+                 num_layer,
+                 num_layer2,
                  output_size,
                  output_size2,
                  main_task_weight,
@@ -46,7 +46,7 @@ class Hierarchical_BLSTM_CTC(ctcBase):
                  weight_decay=0.0,
                  bottleneck_dim=None):
 
-        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
+        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
                          output_size, parameter_init,
                          clip_gradients, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
@@ -54,9 +54,9 @@ class Hierarchical_BLSTM_CTC(ctcBase):
 
         self.num_proj = None if num_proj == 0 else num_proj
 
-        if num_layers2 < 1 or num_layers2 > num_layers:
-            raise ValueError('Set num_layers2 between 1 to num_layers.')
-        self.num_layers2 = num_layers2
+        if num_layer2 < 1 or num_layer2 > num_layer:
+            raise ValueError('Set num_layer2 between 1 to num_layer.')
+        self.num_layer2 = num_layer2
         self.num_classes2 = output_size2 + 1  # plus blank label
 
         if main_task_weight < 0 or main_task_weight > 1:
@@ -86,7 +86,7 @@ class Hierarchical_BLSTM_CTC(ctcBase):
 
         # Hidden layers
         outputs = self.inputs
-        for i_layer in range(self.num_layers):
+        for i_layer in range(self.num_layer):
             with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
 
                 initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
@@ -129,7 +129,7 @@ class Hierarchical_BLSTM_CTC(ctcBase):
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
-                if i_layer == self.num_layers2:
+                if i_layer == self.num_layer2:
                     # Reshape to apply the same weights over the timesteps
                     if self.num_proj is None:
                         output_node = self.num_cell * 2

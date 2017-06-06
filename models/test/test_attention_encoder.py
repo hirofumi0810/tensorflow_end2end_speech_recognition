@@ -48,7 +48,7 @@ class TestAttentionEncoder(unittest.TestCase):
                                    parameter_init=0.1,
                                    clip_activation=5.0,
                                    num_proj=None)
-            encode_op = encoder.define()
+            encode_output = encoder.output()
 
             feed_dict = {
                 encoder.inputs_pl: inputs,
@@ -63,7 +63,8 @@ class TestAttentionEncoder(unittest.TestCase):
             with tf.Session() as sess:
                 # Initialize parameters
                 sess.run(init_op)
-                encoder_outputs = sess.run([encode_op], feed_dict=feed_dict)
+                encoder_outputs = sess.run(
+                    [encode_output], feed_dict=feed_dict)
                 outputs = encoder_outputs[0].outputs
                 (final_state_fw,
                  final_state_bw) = encoder_outputs[0].final_state

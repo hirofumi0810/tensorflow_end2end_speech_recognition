@@ -6,14 +6,14 @@ import scipy.io.wavfile
 from python_speech_features import mfcc, fbank, logfbank, hz2mel
 
 
-def read_wav(wav_path, feature_type='logmelfbank'):
+def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):
     """Read wav file & convert to MFCC or log mel filterbank features.
     Args:
         wav_path: path to a wav file
         feature: logmelfbank or mfcc
     Returns:
-        inputs:
-        seq_len:
+        inputs: `[batch_size, max_time, feature_dim]`
+        seq_len: `[batch_size, frame_num]`
     """
     # Load wav file
     fs, audio = scipy.io.wavfile.read(wav_path)
@@ -29,11 +29,14 @@ def read_wav(wav_path, feature_type='logmelfbank'):
 
     delta1 = delta(features, N=2)
     delta2 = delta(delta1, N=2)
-    inputs = np.c_[features, delta1, delta2]
+    input_data = np.c_[features, delta1, delta2]  # (291, 123)
 
     # Transform to 3D array
-    inputs = np.asarray(inputs[np.newaxis, :])  # (1, 291, 39) or (1, 291, 123)
-    seq_len = [inputs.shape[1]]  # [291]
+    # (1, 291, 39) or (1, 291, 123)
+    inputs = np.zeros((batch_size, input_data.shape[0], input_data.shape[1]))
+    for i in range(batch_size):
+        inputs[i] = input_data
+    seq_len = [inputs.shape[1]] * batch_size  # [291]
 
     # Normalization
     inputs = (inputs - np.mean(inputs)) / np.std(inputs)
@@ -93,17 +96,23 @@ def read_phone(text_path):
     return transcript
 
 
-def generate_data(label_type, model):
+def generate_data(label_type, model, batch_size=1):
     """
     Args:
-        label_type: character or phone
+        label_type: character or phone or multitask
         model: ctc or attention
+    Returns:
+        inputs: `[batch_size, max_time, feature_dim]`
+        labels:
+        seq_len: `[batch_size, frame_num]`
     """
     # Make input data
     inputs, seq_len = read_wav('./sample/LDC93S1.wav',
-                               feature_type='logmelfbank')
+                               feature_type='logmelfbank',
+                               batch_size=batch_size)
     # inputs, seq_len = read_wav('../sample/LDC93S1.wav',
-    #                            feature_type='mfcc')
+    #                            feature_type='mfcc',
+    #                            batch_size=batch_size)
 
     if label_type == 'character':
         transcript = read_text('./sample/LDC93S1.txt')
@@ -119,6 +128,16 @@ def generate_data(label_type, model):
             labels = [phone2num(transcript)]
         elif model == 'attention':
             labels = ['<'] + [phone2num(transcript)] + ['>']
+    elif label_type == 'multitask':
+        transcript_char = read_text('./sample/LDC93S1.txt')
+        transcript_phone = read_phone('./sample/LDC93S1.phn')
+        if model == 'ctc':
+            transcript_char = ' ' + transcript_char.replace('.', '') + ' '
+            labels_char = [alpha2num(transcript_char)] * batch_size
+            labels_phone = [phone2num(transcript_phone)] * batch_size
+        elif model == 'attention':
+            NotImplementedError
+        return inputs, labels_char, labels_phone, seq_len
 
     return inputs, labels, seq_len
 

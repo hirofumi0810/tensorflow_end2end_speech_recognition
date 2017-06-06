@@ -13,7 +13,7 @@ class Multitask_BLSTM_CTC(ctcBase):
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
         num_cell: int, the number of memory cells in each layer
-        num_layers: int, the number of layers
+        num_layer: int, the number of layers
         output_size: int, the number of nodes in softmax layer of the main task (except for blank class)
         output_size2: int, the number of nodes in softmax layer of the second task (except for blank class)
         main_task_weight: A float value. The weight of loss of the main task. Set between 0 to 1
@@ -25,13 +25,14 @@ class Multitask_BLSTM_CTC(ctcBase):
         num_proj: int, the number of nodes in recurrent projection layer
         weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: not used
+        num_layer2: not used
     """
 
     def __init__(self,
                  batch_size,
                  input_size,
                  num_cell,
-                 num_layers,
+                 num_layer,
                  output_size,
                  output_size2,
                  main_task_weight,
@@ -42,9 +43,10 @@ class Multitask_BLSTM_CTC(ctcBase):
                  dropout_ratio_hidden=1.0,
                  num_proj=None,
                  weight_decay=0.0,
-                 bottleneck_dim=None):
+                 bottleneck_dim=None,
+                 num_layer2=None):
 
-        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layers,
+        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
                          output_size, parameter_init,
                          clip_gradients, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
@@ -77,7 +79,7 @@ class Multitask_BLSTM_CTC(ctcBase):
 
         # Hidden layers
         outputs = self.inputs
-        for i_layer in range(self.num_layers):
+        for i_layer in range(self.num_layer):
             with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
 
                 initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
@@ -177,7 +179,8 @@ class Multitask_BLSTM_CTC(ctcBase):
             ctc_loss1 = tf.nn.ctc_loss(
                 self.labels_pl, self.logits1, tf.cast(self.seq_len_pl, tf.int32))
             ctc_loss1_mean = tf.reduce_mean(ctc_loss1, name='ctc_loss1_mean')
-            tf.add_to_collection('losses', ctc_loss1_mean * self.main_task_weight)
+            tf.add_to_collection(
+                'losses', ctc_loss1_mean * self.main_task_weight)
 
             self.summaries_train.append(
                 tf.summary.scalar('loss_train', ctc_loss1_mean * self.main_task_weight))
@@ -188,7 +191,8 @@ class Multitask_BLSTM_CTC(ctcBase):
             ctc_loss2 = tf.nn.ctc_loss(
                 self.labels_pl2, self.logits2, tf.cast(self.seq_len_pl, tf.int32))
             ctc_loss2_mean = tf.reduce_mean(ctc_loss2, name='ctc_loss2_mean2')
-            tf.add_to_collection('losses', ctc_loss2_mean * self.second_task_weight)
+            tf.add_to_collection(
+                'losses', ctc_loss2_mean * self.second_task_weight)
 
             self.summaries_train.append(
                 tf.summary.scalar('loss_train', ctc_loss2_mean * self.second_task_weight))
@@ -230,10 +234,12 @@ class Multitask_BLSTM_CTC(ctcBase):
                 raise ValueError('Set beam_width.')
 
             decoded1, _ = tf.nn.ctc_beam_search_decoder(self.logits1,
-                                                        tf.cast(self.seq_len_pl, tf.int32),
+                                                        tf.cast(
+                                                            self.seq_len_pl, tf.int32),
                                                         beam_width=beam_width)
             decoded2, _ = tf.nn.ctc_beam_search_decoder(self.logits2,
-                                                        tf.cast(self.seq_len_pl, tf.int32),
+                                                        tf.cast(
+                                                            self.seq_len_pl, tf.int32),
                                                         beam_width=beam_width)
 
         decode_op1 = tf.to_int32(decoded1[0])

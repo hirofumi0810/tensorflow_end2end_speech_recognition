@@ -8,7 +8,7 @@ import tensorflow as tf
 
 sys.path.append('../')
 sys.path.append('../../')
-from ctc.load_model import load
+from ctc.load_model_multitask import load
 from util import measure_time
 from data import generate_data, num2alpha, num2phone
 from experiments.utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
@@ -19,31 +19,33 @@ class TestCTC(unittest.TestCase):
     @measure_time
     def test_ctc(self):
         print("CTC Working check.")
-        self.check_training(
-            model_type='hierarchical_blstm_ctc')
-        self.check_training(
-            model_type='multitask_blstm_ctc')
+        self.check_training(model_type='hierarchical_blstm_ctc')
+        self.check_training(model_type='multitask_blstm_ctc')
 
     def check_training(self, model_type):
         print('----- ' + model_type + ', multitask -----')
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
+            batch_size = 4
             inputs, labels_char, labels_phone, seq_len = generate_data(label_type='multitask',
-                                                                       model='ctc')
-            indices_char, values_char, dense_shape_char = list2sparsetensor(labels_char)
-            indices_phone, values_phone, dense_shape_phone = list2sparsetensor(labels_phone)
+                                                                       model='ctc',
+                                                                       batch_size=batch_size)
+            indices_char, values_char, dense_shape_char = list2sparsetensor(
+                labels_char)
+            indices_phone, values_phone, dense_shape_phone = list2sparsetensor(
+                labels_phone)
 
             # Define model
             output_size = 26
             output_size2 = 61
             model = load(model_type=model_type)
             if model_type == 'hierarchical_blstm_ctc':
-                network = model(batch_size=1,
+                network = model(batch_size=batch_size,
                                 input_size=inputs[0].shape[1],
                                 num_cell=256,
-                                num_layers=2,
-                                num_layers2=1,
+                                num_layer=2,
+                                num_layer2=1,
                                 output_size=output_size,
                                 output_size2=output_size2,
                                 main_task_weight=0.8,
@@ -54,10 +56,10 @@ class TestCTC(unittest.TestCase):
                                 dropout_ratio_hidden=1.0,
                                 weight_decay=1e-6)
             else:
-                network = model(batch_size=1,
+                network = model(batch_size=batch_size,
                                 input_size=inputs[0].shape[1],
                                 num_cell=256,
-                                num_layers=2,
+                                num_layer=2,
                                 output_size=output_size,
                                 output_size2=output_size2,
                                 main_task_weight=0.8,

@@ -1,23 +1,15 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Select & load CTC model."""
+"""Select & load Multitask CTC model."""
 
 
-from .lstm_ctc import LSTM_CTC
-from .blstm_ctc import BLSTM_CTC
-from .blstm_ctc_bottleneck import BLSTM_CTC_BOTTLENECK
-from .gru_ctc import GRU_CTC
-from .bgru_ctc import BGRU_CTC
-from .cnn_ctc import CNN_CTC
+from .multitask_blstm_ctc import Multitask_BLSTM_CTC
+from .hierarchical_blsm_ctc import Hierarchical_BLSTM_CTC
 
 CTC = {
-    "lstm_ctc": LSTM_CTC,
-    "blstm_ctc": BLSTM_CTC,
-    "blstm_ctc_bottleneck": BLSTM_CTC_BOTTLENECK,
-    "gru_ctc": GRU_CTC,
-    "bgru_ctc": BGRU_CTC,
-    "cnn_ctc": CNN_CTC
+    "multitask_blstm_ctc": Multitask_BLSTM_CTC,
+    "hierarchical_blstm_ctc": Hierarchical_BLSTM_CTC
 }
 
 

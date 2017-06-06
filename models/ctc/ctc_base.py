@@ -22,7 +22,7 @@ class ctcBase(object):
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
         num_cell: int, the number of memory cells in each layer
-        num_layers: int, the number of layers
+        num_layer: int, the number of layers
         output_size: int, the number of nodes in softmax layer (except for blank class)
         parameter_init: A float value. Range of uniform distribution to initialize weight parameters
         clip_gradients: A float value. Range of gradient clipping (non-negative)
@@ -36,7 +36,7 @@ class ctcBase(object):
                  batch_size,
                  input_size,
                  num_cell,
-                 num_layers,
+                 num_layer,
                  output_size,
                  parameter_init,
                  clip_gradients,
@@ -50,7 +50,7 @@ class ctcBase(object):
         self.input_size = input_size
         self.output_size = output_size
         self.num_cell = num_cell
-        self.num_layers = num_layers
+        self.num_layer = num_layer
         self.num_classes = output_size + 1  # plus blank label
 
         # Regularization

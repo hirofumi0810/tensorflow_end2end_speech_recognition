@@ -39,18 +39,20 @@ class TestCTC(unittest.TestCase):
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
+            batch_size = 4
             inputs, labels, seq_len = generate_data(label_type=label_type,
-                                                    model='ctc')
+                                                    model='ctc',
+                                                    batch_size=batch_size)
             indices, values, dense_shape = list2sparsetensor(labels)
 
             # Define model
             output_size = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
             if model_type == 'blstm_ctc_bottleneck':
-                network = model(batch_size=1,
+                network = model(batch_size=batch_size,
                                 input_size=inputs[0].shape[1],
                                 num_cell=256,
-                                num_layers=2,
+                                num_layer=2,
                                 bottleneck_dim=128,
                                 output_size=output_size,
                                 parameter_init=0.1,
@@ -60,10 +62,10 @@ class TestCTC(unittest.TestCase):
                                 dropout_ratio_hidden=1.0,
                                 weight_decay=1e-6)
             else:
-                network = model(batch_size=1,
+                network = model(batch_size=batch_size,
                                 input_size=inputs[0].shape[1],
                                 num_cell=256,
-                                num_layers=2,
+                                num_layer=2,
                                 output_size=output_size,
                                 parameter_init=0.1,
                                 clip_gradients=5.0,
