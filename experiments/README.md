@@ -1,6 +1,6 @@
-## How to use
+## Usage
 
-At first, please choose the corpus and command
+At first, please choose the corpus and
 ```
 cd corpus
 ```
@@ -9,7 +9,7 @@ cd corpus
 ```
 cd trainer
 ```
-and command
+and
 ```
 ./run_ctc.sh gpu_numebr path_to_config
 ```
@@ -18,18 +18,13 @@ and command
 ```
 cd restore
 ```
-and command
+and
 ```
 python restore_ctc.py
 ```
 
 ### Restoration & Fine-tuning
-```
-fine_tuning
-```
-and command
-```
-python finetune_ctc.py
-```
+comming soon
 
 ### Visualization
+comming soon
