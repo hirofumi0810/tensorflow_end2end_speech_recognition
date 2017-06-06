@@ -17,6 +17,7 @@ from utils.exception_func import exception
 from utils.util import join
 
 
+@exception
 def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                 eval_batch_size=1, rate=1.0, is_progressbar=False):
     """Evaluate trained model by Phone Error Rate.
@@ -80,24 +81,16 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                 # Convert to phone (list of phone strings)
                 phone_pred_seq = num2phone(
                     labels_pred[i_batch], p2n_map_file_path)
-                phone_true_seq = num2phone(
-                    labels_true[i_batch], p2n_map_file_path)
                 phone_pred_list = phone_pred_seq.split(' ')
-                phone_true_list = phone_true_seq.split(' ')
 
                 # Mapping to 39 phones (list of phone strings)
                 phone_pred_list = map_to_39phone(
                     phone_pred_list, label_type, p2p_map_file_path)
-                phone_true_list = map_to_39phone(
-                    phone_true_list, label_type, p2p_map_file_path)
 
                 # Convert to num (list of phone indices)
                 phone_pred_list = phone2num(
                     phone_pred_list, p2n39_map_file_path)
-                phone_true_list = phone2num(
-                    phone_true_list, p2n39_map_file_path)
                 labels_pred[i_batch] = phone_pred_list
-                labels_true[i_batch] = phone_true_list
 
             # Compute edit distance
             labels_true_st = list2sparsetensor(labels_true)

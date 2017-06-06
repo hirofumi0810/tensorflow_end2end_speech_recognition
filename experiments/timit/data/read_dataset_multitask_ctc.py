@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Read dataset for CTC network (TIMIT corpus).
+"""Read dataset for Multitask CTC network (TIMIT corpus).
    In addition, frame stacking and skipping are used.
 """
 
@@ -23,7 +23,7 @@ class DataSet(object):
         """
         Args:
             data_type: train or dev or test
-            label_type: phone39 or phone48 or phone61 or character
+            label_type: phone39 or phone48 or phone61 (+ character)
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip
             is_sorted: if True, sort dataset by frame num
@@ -40,38 +40,47 @@ class DataSet(object):
         self.is_progressbar = is_progressbar
 
         self.input_size = 123
-        self.dataset_path = os.path.join(
+        self.dataset_char_path = os.path.join(
+            '/n/sd8/inaguma/corpus/timit/dataset/ctc/character', data_type)
+        self.dataset_phone_path = os.path.join(
             '/n/sd8/inaguma/corpus/timit/dataset/ctc/', label_type, data_type)
 
         # Load the frame number dictionary
         self.frame_num_dict_path = os.path.join(
-            self.dataset_path, 'frame_num.pickle')
+            self.dataset_char_path, 'frame_num.pickle')
         with open(self.frame_num_dict_path, 'rb') as f:
             self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label by frame num
         self.frame_num_tuple_sorted = sorted(
             self.frame_num_dict.items(), key=lambda x: x[1])
-        input_paths, label_paths = [], []
+        input_paths, label_char_paths, label_phone_paths = [], [], []
         for input_name, frame_num in self.frame_num_tuple_sorted:
             input_paths.append(os.path.join(
-                self.dataset_path, 'input', input_name + '.npy'))
-            label_paths.append(os.path.join(
-                self.dataset_path, 'label', input_name + '.npy'))
+                self.dataset_char_path, 'input', input_name + '.npy'))
+            label_char_paths.append(os.path.join(
+                self.dataset_char_path, 'label', input_name + '.npy'))
+            label_phone_paths.append(os.path.join(
+                self.dataset_phone_path, 'label', input_name + '.npy'))
+        if len(label_char_paths) != len(label_phone_paths):
+            raise ValueError('The numbers of labels between character and phone are not same.')
         self.input_paths = np.array(input_paths)
-        self.label_paths = np.array(label_paths)
+        self.label_char_paths = np.array(label_char_paths)
+        self.label_phone_paths = np.array(label_phone_paths)
         self.data_num = len(self.input_paths)
 
         # Load all dataset
         print('=> Loading ' + data_type + ' dataset (' + label_type + ')...')
-        input_list, label_list = [], []
+        input_list, label_char_list, label_phone_list = [], [], []
         iterator = tqdm(range(self.data_num)
                         ) if is_progressbar else range(self.data_num)
         for i in iterator:
             input_list.append(np.load(self.input_paths[i]))
-            label_list.append(np.load(self.label_paths[i]))
+            label_char_list.append(np.load(self.label_char_paths[i]))
+            label_phone_list.append(np.load(self.label_phone_paths[i]))
         self.input_list = np.array(input_list)
-        self.label_list = np.array(label_list)
+        self.label_char_list = np.array(label_char_list)
+        self.label_phone_list = np.array(label_phone_list)
 
         # Frame stacking
         if (num_stack is not None) and (num_skip is not None):
@@ -120,7 +129,8 @@ class DataSet(object):
             # Initialization
             input_data = np.zeros(
                 (len(sorted_indices), max_frame_num, self.input_size))
-            labels = [None] * len(sorted_indices)
+            labels_char = [None] * len(sorted_indices)
+            labels_phone = [None] * len(sorted_indices)
             seq_len = np.empty((len(sorted_indices),))
             input_names = [None] * len(sorted_indices)
 
@@ -129,7 +139,8 @@ class DataSet(object):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
                 input_data[i_batch, :frame_num, :] = data_i
-                labels[i_batch] = self.label_list[x]
+                labels_char[i_batch] = self.label_char_list[x]
+                labels_phone[i_batch] = self.label_phone_list[x]
                 seq_len[i_batch] = frame_num
                 input_names[i_batch] = os.path.basename(
                     self.input_paths[x]).split('.')[0]
@@ -161,7 +172,8 @@ class DataSet(object):
             # Initialization
             input_data = np.zeros(
                 (len(random_indices), max_frame_num, self.input_size))
-            labels = [None] * len(random_indices)
+            labels_char = [None] * len(random_indices)
+            labels_phone = [None] * len(random_indices)
             seq_len = np.empty((len(random_indices),))
             input_names = [None] * len(random_indices)
 
@@ -170,9 +182,10 @@ class DataSet(object):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
                 input_data[i_batch, :frame_num, :] = data_i
-                labels[i_batch] = self.label_list[x]
+                labels_char[i_batch] = self.label_char_list[x]
+                labels_phone[i_batch] = self.label_phone_list[x]
                 seq_len[i_batch] = frame_num
                 input_names[i_batch] = os.path.basename(
                     self.input_paths[x]).split('.')[0]
 
-        return input_data, labels, seq_len, input_names
+        return input_data, labels_char, labels_phone, seq_len, input_names
