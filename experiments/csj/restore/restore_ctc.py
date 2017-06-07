@@ -3,6 +3,10 @@
 
 """Restore trained CTC network (CSJ corpus)."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import sys
 import tensorflow as tf
@@ -121,7 +125,7 @@ def main(model_path):
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=feature['input_size'] * feature['num_stack'],
                        num_cell=param['num_cell'],
-                       num_layers=param['num_layer'],
+                       num_layer=param['num_layer'],
                        bottleneck_dim=param['bottleneck_dim'],
                        output_size=output_size,
                        clip_gradients=param['clip_grad'],

@@ -3,7 +3,12 @@
 
 """Train CTC network (CSJ corpus)."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
+from os.path import join
 import sys
 import time
 import tensorflow as tf
@@ -18,7 +23,7 @@ from data.read_dataset_ctc import DataSet
 from models.ctc.load_model import load
 from evaluation.eval_ctc import do_eval_per, do_eval_cer
 from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
-from utils.util import mkdir, join
+from utils.util import mkdir, mkdir_join
 from utils.parameter import count_total_parameters
 from utils.loss import save_loss
 from utils.labels.phone import num2phone
@@ -30,7 +35,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
     """Run training.
     Args:
         network: network to train
-        optimizer: adam or adadelta or rmsprop
+        optimizer: string, the name of optimizer. ex.) adam, rmsprop
         learning_rate: initial learning rate
         batch_size: size of mini batch
         epoch_num: epoch num to train
@@ -211,8 +216,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                           (epoch, duration_epoch / 60))
 
                     # Save model (check point)
-                    checkpoint_file = os.path.join(
-                        network.model_dir, 'model.ckpt')
+                    checkpoint_file = join(network.model_dir, 'model.ckpt')
                     save_path = saver.save(
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
@@ -257,7 +261,8 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                                     eval_batch_size=batch_size)
                             cer_mean = (cer_eval1 + cer_eval2 + cer_eval3) / 3.
                             print('■Mean:■')
-                            print('  Character Error Rate: %f' % cer_mean)
+                            print('  CER: %f %%' %
+                                  (cer_mean * 100))
 
                     else:
                         print('■Dev Evaluation:■')
@@ -291,7 +296,8 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                                     eval_batch_size=batch_size)
                             per_mean = (per_eval1 + per_eval2 + per_eval3) / 3.
                             print('■Mean:■')
-                            print('  Phone Error Rate: %f' % per_mean)
+                            print('  PER: %f %%' %
+                                  (per_mean * 100))
 
                     duration_eval = time.time() - start_time_eval
                     print('Evaluation time: %.3f min' %
@@ -308,7 +314,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                       save_path=network.model_dir)
 
             # Training was finished correctly
-            with open(os.path.join(network.model_dir, 'complete.txt'), 'w') as f:
+            with open(join(network.model_dir, 'complete.txt'), 'w') as f:
                 f.write('')
 
 
@@ -333,7 +339,7 @@ def main(config_path):
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=feature['input_size'] * feature['num_stack'],
                        num_cell=param['num_cell'],
-                       num_layers=param['num_layer'],
+                       num_layer=param['num_layer'],
                        bottleneck_dim=param['bottleneck_dim'],
                        output_size=output_size,
                        clip_gradients=param['clip_grad'],
@@ -348,31 +354,36 @@ def main(config_path):
     network.model_name += '_' + str(param['num_layer'])
     network.model_name += '_' + param['optimizer']
     network.model_name += '_lr' + str(param['learning_rate'])
+    if param['num_proj'] != 0:
+        network.model_name += '_proj' + str(param['num_proj'])
     if feature['num_stack'] != 1:
         network.model_name += '_stack' + str(feature['num_stack'])
+    if param['weight_decay'] != 0:
+        network.model_name += '_weightdecay' + str(param['weight_decay'])
 
     # Set save path
     network.model_dir = mkdir('/n/sd8/inaguma/result/csj/monolog/')
-    network.model_dir = join(network.model_dir, 'ctc')
-    network.model_dir = join(network.model_dir, corpus['label_type'])
-    network.model_dir = join(network.model_dir, corpus['train_data_size'])
-    network.model_dir = join(network.model_dir, network.model_name)
+    network.model_dir = mkdir_join(network.model_dir, 'ctc')
+    network.model_dir = mkdir_join(network.model_dir, corpus['label_type'])
+    network.model_dir = mkdir_join(
+        network.model_dir, corpus['train_data_size'])
+    network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
-    if not os.path.isfile(os.path.join(network.model_dir, 'complete.txt')):
+    if not os.path.isfile(join(network.model_dir, 'complete.txt')):
         tf.gfile.DeleteRecursively(network.model_dir)
         tf.gfile.MakeDirs(network.model_dir)
     else:
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('ctc_csj_' + corpus['label_type'] + '_' +
-                 param['optimizer'] + '_' + corpus['train_data_size'])
+    setproctitle('ctc_csj_' + corpus['label_type'] +
+                 '_' + corpus['train_data_size'])
 
     # Save config file
-    shutil.copyfile(config_path, os.path.join(network.model_dir, 'config.yml'))
+    shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
-    sys.stdout = open(os.path.join(network.model_dir, 'train.log'), 'w')
+    sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
     do_train(network=network,
              optimizer=param['optimizer'],

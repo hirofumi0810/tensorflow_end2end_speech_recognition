@@ -3,6 +3,10 @@
 
 """Define evaluation method for CTC network (CSJ corpus)."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import re
 import numpy as np
@@ -17,7 +21,8 @@ from utils.exception_func import exception
 
 @exception
 def do_eval_per(session, per_op, network, dataset,
-                eval_batch_size=None, rate=1.0, is_progressbar=False):
+                eval_batch_size=None, rate=1.0, is_progressbar=False,
+                is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
     Args:
         session: session of training model
@@ -27,6 +32,7 @@ def do_eval_per(session, per_op, network, dataset,
         eval_batch_size: batch size on evaluation
         rate: A float value. Rate of evaluation data to use
         is_progressbar: if True, evaluate during training, else during restoring
+        is_multitask: if True, evaluate the multitask model
     Returns:
         per_global: phone error rate
     """
@@ -38,13 +44,15 @@ def do_eval_per(session, per_op, network, dataset,
         iteration += 1
     per_global = 0
 
-    # Setting for progressbar
     iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-
     for step in iterator:
         # Create feed dictionary for next mini batch
-        inputs, labels, seq_len, _ = dataset.next_batch(batch_size=batch_size)
-        indices, values, dense_shape = list2sparsetensor(labels)
+        if not is_multitask:
+            inputs, labels_true, seq_len, _ = dataset.next_batch(
+                batch_size=batch_size)
+        else:
+            inputs, _, labels_true,  seq_len, _ = dataset.next_batch(
+                batch_size=batch_size)
 
         feed_dict = {
             network.inputs_pl: inputs,
@@ -53,20 +61,21 @@ def do_eval_per(session, per_op, network, dataset,
             network.keep_prob_hidden_pl: 1.0
         }
 
-        batch_size_each = len(labels)
+        batch_size_each = len(labels_true)
 
         per_local = session.run(per_op, feed_dict=feed_dict)
         per_global += per_local * batch_size_each
 
     per_global /= dataset.data_num
-    print('  Phone Error Rate: %f' % per_global)
+    print('  PER: %f' % per_global)
 
     return per_global
 
 
 @exception
 def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
-                eval_batch_size=None, rate=1.0, is_progressbar=False):
+                eval_batch_size=None, rate=1.0, is_progressbar=False,
+                is_multitask=False, is_main=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
@@ -78,6 +87,8 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         eval_batch_size: batch size on evaluation
         rate: rate of evaluation data to use
         is_progressbar: if True, visualize progressbar
+        is_multitask: if True, evaluate the multitask model
+        is_main: if True, evaluate the main task
     Return:
         cer_mean: mean character error rate
     """
@@ -89,18 +100,23 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         iteration += 1
     cer_sum = 0
 
-    # Setting for progressbar
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-
     if label_type == 'character':
         map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
     elif label_type == 'kanji':
         map_file_path = '../evaluation/mapping_files/ctc/kanji2num.txt'
+    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
     for step in iterator:
         # Create feed dictionary for next mini batch
-        inputs, labels_true, seq_len, _ = dataset.next_batch(
-            batch_size=batch_size)
-        # indices, values, dense_shape = list2sparsetensor(labels_true)
+        if not is_multitask:
+            inputs, labels_true, seq_len, _ = dataset.next_batch(
+                batch_size=batch_size)
+        else:
+            if is_main:
+                inputs, labels_true, _, seq_len, _ = dataset.next_batch(
+                    batch_size=batch_size)
+            else:
+                inputs, _, labels_true, seq_len, _ = dataset.next_batch(
+                    batch_size=batch_size)
 
         feed_dict = {
             network.inputs_pl: inputs,
@@ -117,6 +133,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
             # Convert from list to string
             str_pred = num2char(labels_pred[i_batch], map_file_path)
             str_pred = re.sub(r'_', '', str_pred)
+            # TODO: change in case of character
             if label_type == 'kanji' and is_test:
                 str_true = labels_true[i_batch]
             else:
@@ -129,7 +146,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
             cer_sum += cer_each
 
     cer_mean = cer_sum / dataset.data_num
-    print('  Character Error Rate: %f %%' % (cer_mean * 100))
+    print('  CER: %f %%' % (cer_mean * 100))
 
     return cer_mean
 
@@ -162,7 +179,6 @@ def decode_test(session, decode_op, network, dataset, label_type, is_test,
         # Create feed dictionary for next mini batch
         inputs, labels_true, seq_len, input_names = dataset.next_batch(
             batch_size=batch_size)
-        # indices, values, dense_shape = list2sparsetensor(labels_true)
 
         feed_dict = {
             network.inputs_pl: inputs,
