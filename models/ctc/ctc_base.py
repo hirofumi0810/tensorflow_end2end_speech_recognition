@@ -1,7 +1,11 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""CTC network."""
+"""Base class of CTC model."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import tensorflow as tf
 
@@ -71,7 +75,7 @@ class ctcBase(object):
 
     def _generate_pl(self):
         """Generate placeholders."""
-        # [batch_size, max_timesteps, input_size_splice]
+        # [batch_size, max_time, input_size_splice]
         self.inputs_pl = tf.placeholder(tf.float32,
                                         shape=[None, None, self.input_size],
                                         name='input')
@@ -96,6 +100,9 @@ class ctcBase(object):
 
         # Learning rate
         self.lr_pl = tf.placeholder(tf.float32, name='learning_rate')
+
+    def define(self):
+        NotImplementedError()
 
     def loss(self):
         """Operation for computing ctc loss.
@@ -230,7 +237,7 @@ class ctcBase(object):
         Return:
             posteriors_op: operation for computing posteriors for each class
         """
-        # logits_3d : (max_timesteps, batch_size, num_classes)
+        # logits_3d : (max_time, batch_size, num_classes)
         logits_2d = tf.reshape(self.logits, [-1, self.num_classes])
         posteriors_op = tf.nn.softmax(logits_2d)
 

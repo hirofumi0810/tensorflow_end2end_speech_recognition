@@ -3,6 +3,10 @@
 
 """LSTM-CTC model."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import tensorflow as tf
 from .ctc_base import ctcBase
 
@@ -96,9 +100,9 @@ class LSTM_CTC(ctcBase):
             output_node = self.num_proj
         outputs = tf.reshape(outputs, shape=[-1, output_node])
 
-        # (batch_size, max_timesteps, input_size_splice)
+        # (batch_size, max_time, input_size_splice)
         inputs_shape = tf.shape(self.inputs_pl)
-        batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
+        batch_size, max_time = inputs_shape[0], inputs_shape[1]
 
         with tf.name_scope('output'):
             # Affine
@@ -112,5 +116,5 @@ class LSTM_CTC(ctcBase):
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to (max_timesteps, batch_size, num_classes)
+            # Convert to (max_time, batch_size, num_classes)
             self.logits = tf.transpose(logits_3d, (1, 0, 2))

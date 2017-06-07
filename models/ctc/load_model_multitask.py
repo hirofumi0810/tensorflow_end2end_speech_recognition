@@ -3,6 +3,9 @@
 
 """Select & load Multitask CTC model."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 from .multitask_blstm_ctc import Multitask_BLSTM_CTC
 from .hierarchical_blsm_ctc import Hierarchical_BLSTM_CTC

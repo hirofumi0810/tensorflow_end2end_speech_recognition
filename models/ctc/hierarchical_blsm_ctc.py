@@ -3,6 +3,10 @@
 
 """Hierarchical Multi-task Bidirectional LSTM-CTC model."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import tensorflow as tf
 from .ctc_base import ctcBase
 
@@ -80,9 +84,9 @@ class Hierarchical_BLSTM_CTC(ctcBase):
                                     self.keep_prob_input_pl,
                                     name='dropout_input')
 
-        # (batch_size, max_timesteps, input_size_splice)
+        # (batch_size, max_time, input_size_splice)
         inputs_shape = tf.shape(self.inputs_pl)
-        batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
+        batch_size, max_time = inputs_shape[0], inputs_shape[1]
 
         # Hidden layers
         outputs = self.inputs
@@ -135,7 +139,8 @@ class Hierarchical_BLSTM_CTC(ctcBase):
                         output_node = self.num_cell * 2
                     else:
                         output_node = self.num_proj * 2
-                    outputs_hidden = tf.reshape(outputs, shape=[-1, output_node])
+                    outputs_hidden = tf.reshape(
+                        outputs, shape=[-1, output_node])
 
                     with tf.name_scope('output2'):
                         # Affine
@@ -143,13 +148,14 @@ class Hierarchical_BLSTM_CTC(ctcBase):
                                                                     stddev=0.1, name='W_output2'))
                         b_output2 = tf.Variable(
                             tf.zeros(shape=[self.num_classes2], name='b_output2'))
-                        logits2_2d = tf.matmul(outputs_hidden, W_output2) + b_output2
+                        logits2_2d = tf.matmul(
+                            outputs_hidden, W_output2) + b_output2
 
                         # Reshape back to the original shape
                         logits2_3d = tf.reshape(
                             logits2_2d, shape=[batch_size, -1, self.num_classes2])
 
-                        # Convert to (max_timesteps, batch_size, num_classes)
+                        # Convert to (max_time, batch_size, num_classes)
                         self.logits2 = tf.transpose(logits2_3d, (1, 0, 2))
 
         # Reshape to apply the same weights over the timesteps
@@ -171,7 +177,7 @@ class Hierarchical_BLSTM_CTC(ctcBase):
             logits1_3d = tf.reshape(
                 logits1_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to (max_timesteps, batch_size, num_classes)
+            # Convert to (max_time, batch_size, num_classes)
             self.logits1 = tf.transpose(logits1_3d, (1, 0, 2))
 
     def loss(self):
@@ -190,7 +196,8 @@ class Hierarchical_BLSTM_CTC(ctcBase):
             ctc_loss1 = tf.nn.ctc_loss(
                 self.labels_pl, self.logits1, tf.cast(self.seq_len_pl, tf.int32))
             ctc_loss1_mean = tf.reduce_mean(ctc_loss1, name='ctc_loss1_mean')
-            tf.add_to_collection('losses', ctc_loss1_mean * self.main_task_weight)
+            tf.add_to_collection(
+                'losses', ctc_loss1_mean * self.main_task_weight)
 
             self.summaries_train.append(
                 tf.summary.scalar('loss_train', ctc_loss1_mean * self.main_task_weight))
@@ -201,7 +208,8 @@ class Hierarchical_BLSTM_CTC(ctcBase):
             ctc_loss2 = tf.nn.ctc_loss(
                 self.labels_pl2, self.logits2, tf.cast(self.seq_len_pl, tf.int32))
             ctc_loss2_mean = tf.reduce_mean(ctc_loss2, name='ctc_loss2_mean2')
-            tf.add_to_collection('losses', ctc_loss2_mean * self.second_task_weight)
+            tf.add_to_collection(
+                'losses', ctc_loss2_mean * self.second_task_weight)
 
             self.summaries_train.append(
                 tf.summary.scalar('loss_train', ctc_loss2_mean * self.second_task_weight))
@@ -227,7 +235,7 @@ class Hierarchical_BLSTM_CTC(ctcBase):
             beam_width: beam width for beam search
         Return:
             decode_op1: operation for decoding of the main task
-            decode_op22: operation for decoding of the second task
+            decode_op2: operation for decoding of the second task
         """
         if decode_type not in ['greedy', 'beam_search']:
             raise ValueError('decode_type is "greedy" or "beam_search".')
@@ -243,10 +251,12 @@ class Hierarchical_BLSTM_CTC(ctcBase):
                 raise ValueError('Set beam_width.')
 
             decoded1, _ = tf.nn.ctc_beam_search_decoder(self.logits1,
-                                                        tf.cast(self.seq_len_pl, tf.int32),
+                                                        tf.cast(
+                                                            self.seq_len_pl, tf.int32),
                                                         beam_width=beam_width)
             decoded2, _ = tf.nn.ctc_beam_search_decoder(self.logits2,
-                                                        tf.cast(self.seq_len_pl, tf.int32),
+                                                        tf.cast(
+                                                            self.seq_len_pl, tf.int32),
                                                         beam_width=beam_width)
 
         decode_op1 = tf.to_int32(decoded1[0])

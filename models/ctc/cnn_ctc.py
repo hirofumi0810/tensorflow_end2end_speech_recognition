@@ -3,6 +3,10 @@
 
 """CNN-CTC model."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import tensorflow as tf
 from .ctc_base import ctcBase
 
@@ -67,9 +71,9 @@ class CNN_CTC(ctcBase):
                                     self.keep_prob_input_pl,
                                     name='dropout_input')
 
-        # (batch_size, max_timesteps, input_size_splice)
+        # (batch_size, max_time, input_size_splice)
         inputs_shape = tf.shape(self.inputs)
-        batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
+        batch_size, max_time = inputs_shape[0], inputs_shape[1]
 
         ######################################################
         # 1st conv
@@ -82,8 +86,8 @@ class CNN_CTC(ctcBase):
             # delta + deltadelta)]
             input_drop_rs = tf.reshape(self.inputs,
                                        # shape=[batch_size, self.input_size,
-                                       # max_timesteps, 1])
-                                       shape=[batch_size, int(self.input_size / 3), max_timesteps, 3])
+                                       # max_time, 1])
+                                       shape=[batch_size, int(self.input_size / 3), max_time, 3])
 
             # Affine
             conv1_shape = [3, 5, 3, 128]  # (FH, FW, InputChannel, FilterNum)
@@ -207,10 +211,10 @@ class CNN_CTC(ctcBase):
                 if i_layer != 13:
                     outputs = tf.nn.dropout(outputs, self.keep_prob_hidden_pl)
 
-        # Reshape back to the original shape (batch_size, max_timesteps,
+        # Reshape back to the original shape (batch_size, max_time,
         # num_classes)
         outputs_3d = tf.reshape(
-            outputs, shape=[batch_size, max_timesteps, self.num_classes])
+            outputs, shape=[batch_size, max_time, self.num_classes])
 
-        # Convert to (max_timesteps, batch_size, num_classes)
+        # Convert to (max_time, batch_size, num_classes)
         self.logits = tf.transpose(outputs_3d, (1, 0, 2))

@@ -3,6 +3,9 @@
 
 """Select & load CTC model."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 from .lstm_ctc import LSTM_CTC
 from .blstm_ctc import BLSTM_CTC

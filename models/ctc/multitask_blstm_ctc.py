@@ -3,6 +3,10 @@
 
 """Multi-task Bidirectional LSTM-CTC model."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import tensorflow as tf
 from .ctc_base import ctcBase
 
@@ -129,9 +133,9 @@ class Multitask_BLSTM_CTC(ctcBase):
             output_node = self.num_proj * 2
         outputs = tf.reshape(outputs, shape=[-1, output_node])
 
-        # (batch_size, max_timesteps, input_size_splice)
+        # (batch_size, max_time, input_size_splice)
         inputs_shape = tf.shape(self.inputs_pl)
-        batch_size, max_timesteps = inputs_shape[0], inputs_shape[1]
+        batch_size, max_time = inputs_shape[0], inputs_shape[1]
 
         with tf.name_scope('output1'):
             # Affine
@@ -145,7 +149,7 @@ class Multitask_BLSTM_CTC(ctcBase):
             logits1_3d = tf.reshape(
                 logits1_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to (max_timesteps, batch_size, num_classes)
+            # Convert to (max_time, batch_size, num_classes)
             self.logits1 = tf.transpose(logits1_3d, (1, 0, 2))
 
         with tf.name_scope('output2'):
@@ -160,7 +164,7 @@ class Multitask_BLSTM_CTC(ctcBase):
             logits2_3d = tf.reshape(
                 logits2_2d, shape=[batch_size, -1, self.num_classes2])
 
-            # Convert to (max_timesteps, batch_size, num_classes)
+            # Convert to (max_time, batch_size, num_classes)
             self.logits2 = tf.transpose(logits2_3d, (1, 0, 2))
 
     def loss(self):
@@ -218,7 +222,7 @@ class Multitask_BLSTM_CTC(ctcBase):
             beam_width: beam width for beam search
         Return:
             decode_op1: operation for decoding of the main task
-            decode_op22: operation for decoding of the second task
+            decode_op2: operation for decoding of the second task
         """
         if decode_type not in ['greedy', 'beam_search']:
             raise ValueError('decode_type is "greedy" or "beam_search".')
