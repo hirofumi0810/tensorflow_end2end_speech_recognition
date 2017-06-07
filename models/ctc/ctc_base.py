@@ -27,12 +27,16 @@ class ctcBase(object):
         input_size: int, the dimensions of input vectors
         num_cell: int, the number of memory cells in each layer
         num_layer: int, the number of layers
-        output_size: int, the number of nodes in softmax layer (except for blank class)
-        parameter_init: A float value. Range of uniform distribution to initialize weight parameters
-        clip_gradients: A float value. Range of gradient clipping (non-negative)
-        clip_activation: A float value. Range of activation clipping (non-negative)
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
+        output_size: int, the number of nodes in softmax layer
+            (except for blank class)
+        parameter_init: A float value. Range of uniform distribution to
+            initialize weight parameters
+        clip_gradients: A float value. Range of gradient clipping (> 0)
+        clip_activation: A float value. Range of activation clipping (> 0)
+        dropout_ratio_input: A float value. Dropout ratio in input-hidden
+            layers
+        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
+            layers
         weight_decay: A float value. Regularization parameter for weight decay
     """
 
@@ -47,7 +51,8 @@ class ctcBase(object):
                  clip_activation,
                  dropout_ratio_input,
                  dropout_ratio_hidden,
-                 weight_decay):
+                 weight_decay,
+                 name=None):
 
         # Network size
         self.batch_size = batch_size
@@ -72,6 +77,8 @@ class ctcBase(object):
         # Summaries for TensorBoard
         self.summaries_train = []
         self.summaries_dev = []
+
+        self.name = name
 
     def _generate_pl(self):
         """Generate placeholders."""
@@ -117,8 +124,9 @@ class ctcBase(object):
         tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss"):
-            ctc_loss = tf.nn.ctc_loss(
-                self.labels_pl, self.logits, tf.cast(self.seq_len_pl, tf.int32))
+            ctc_loss = tf.nn.ctc_loss(self.labels_pl,
+                                      self.logits,
+                                      tf.cast(self.seq_len_pl, tf.int32))
             ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss_mean')
             tf.add_to_collection('losses', ctc_loss_mean)
 
@@ -134,12 +142,14 @@ class ctcBase(object):
 
         return self.loss
 
-    def train(self, optimizer, learning_rate_init=None, clip_gradients_by_norm=None, is_scheduled=False):
+    def train(self, optimizer, learning_rate_init=None,
+              clip_gradients_by_norm=None, is_scheduled=False):
         """Operation for training.
         Args:
             optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
             learning_rate_init: initial learning rate
-            clip_gradients_by_norm: if True, clip gradients by norm of the value of self.clip_gradients
+            clip_gradients_by_norm: if True, clip gradients by norm of the
+                value of self.clip_gradients
             is_scheduled: if True, schedule learning rate at each epoch
         Returns:
             train_op: operation for training
@@ -159,8 +169,9 @@ class ctcBase(object):
             learning_rate = learning_rate_init
 
         if optimizer == 'momentum':
-            self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](learning_rate=learning_rate,
-                                                            momentum=0.9)
+            self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](
+                learning_rate=learning_rate,
+                momentum=0.9)
         else:
             self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](
                 learning_rate=learning_rate)
@@ -178,13 +189,15 @@ class ctcBase(object):
 
             if clip_gradients_by_norm:
                 # Clip by norm
-                self.clipped_grads = [tf.clip_by_norm(g,
-                                                      clip_norm=self.clip_gradients) for g in grads]
+                self.clipped_grads = [tf.clip_by_norm(
+                    g,
+                    clip_norm=self.clip_gradients) for g in grads]
             else:
                 # Clip by absolute values
-                self.clipped_grads = [tf.clip_by_value(g,
-                                                       clip_value_min=-self.clip_gradients,
-                                                       clip_value_max=self.clip_gradients) for g in grads]
+                self.clipped_grads = [tf.clip_by_value(
+                    g,
+                    clip_value_min=-self.clip_gradients,
+                    clip_value_max=self.clip_gradients) for g in grads]
 
             # TODO: Add histograms for variables, gradients (norms)
             self._tensorboard_statistics(trainable_vars)
@@ -196,7 +209,7 @@ class ctcBase(object):
                 name='train')
 
         # Use the optimizer to apply the gradients that minimize the loss
-        # (and also increment the global step counter) as a single training step
+        # and also increment the global step counter as a single training step
         train_op = self.optimizer.minimize(self.loss, global_step=global_step)
 
         return train_op
@@ -224,8 +237,9 @@ class ctcBase(object):
             if beam_width is None:
                 raise ValueError('Set beam_width.')
 
-            decoded, _ = tf.nn.ctc_beam_search_decoder(self.logits, tf.cast(self.seq_len_pl, tf.int32),
-                                                       beam_width=beam_width)
+            decoded, _ = tf.nn.ctc_beam_search_decoder(
+                self.logits, tf.cast(self.seq_len_pl, tf.int32),
+                beam_width=beam_width)
 
         decode_op = tf.to_int32(decoded[0])
         return decode_op
@@ -282,28 +296,33 @@ class ctcBase(object):
         # Mean
         with tf.name_scope("mean_train"):
             for var in trainable_vars:
-                self.summaries_train.append(tf.summary.scalar(var.name,
-                                                              tf.reduce_mean(var)))
+                self.summaries_train.append(
+                    tf.summary.scalar(var.name,
+                                      tf.reduce_mean(var)))
         with tf.name_scope("mean_dev"):
             for var in trainable_vars:
-                self.summaries_dev.append(tf.summary.scalar(var.name,
-                                                            tf.reduce_mean(var)))
+                self.summaries_dev.append(
+                    tf.summary.scalar(var.name,
+                                      tf.reduce_mean(var)))
 
         # Standard deviation
         with tf.name_scope("stddev_train"):
             for var in trainable_vars:
-                self.summaries_train.append(tf.summary.scalar(var.name,
-                                                              tf.sqrt(tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
+                self.summaries_train.append(
+                    tf.summary.scalar(var.name, tf.sqrt(
+                        tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
         with tf.name_scope("stddev_dev"):
             for var in trainable_vars:
-                self.summaries_dev.append(tf.summary.scalar(var.name,
-                                                            tf.sqrt(tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
+                self.summaries_dev.append(
+                    tf.summary.scalar(var.name, tf.sqrt(
+                        tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
 
         # Max
         with tf.name_scope("max_train"):
             for var in trainable_vars:
-                self.summaries_train.append(tf.summary.scalar(var.name,
-                                                              tf.reduce_max(var)))
+                self.summaries_train.append(
+                    tf.summary.scalar(var.name,
+                                      tf.reduce_max(var)))
         with tf.name_scope("max_dev"):
             for var in trainable_vars:
                 self.summaries_dev.append(
@@ -312,9 +331,11 @@ class ctcBase(object):
         # Min
         with tf.name_scope("min_train"):
             for var in trainable_vars:
-                self.summaries_train.append(tf.summary.scalar(var.name,
-                                                              tf.reduce_min(var)))
+                self.summaries_train.append(
+                    tf.summary.scalar(var.name,
+                                      tf.reduce_min(var)))
         with tf.name_scope("min_dev"):
             for var in trainable_vars:
-                self.summaries_dev.append(tf.summary.scalar(var.name,
-                                                            tf.reduce_min(var)))
+                self.summaries_dev.append(
+                    tf.summary.scalar(var.name,
+                                      tf.reduce_min(var)))

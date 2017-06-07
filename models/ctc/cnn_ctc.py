@@ -19,19 +19,24 @@ class CNN_CTC(ctcBase):
        This implementaion is based on
            https://arxiv.org/abs/1701.02720.
                Zhang, Ying, et al.
-               "Towards end-to-end speech recognition with deep convolutional neural networks."
+               "Towards end-to-end speech recognition with deep convolutional
+                neural networks."
                arXiv preprint arXiv:1701.02720 (2017).
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
         num_cell: int, the number of memory cells in each layer
         num_layer: int, the number of layers
-        output_size: int, the number of nodes in softmax layer (except for blank class)
-        parameter_init: A float value. Range of uniform distribution to initialize weight parameters
-        clip_gradients: A float value. Range of gradient clipping (non-negative)
-        clip_activation: A float value. Range of activation clipping (non-negative)
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
+        output_size: int, the number of nodes in softmax layer
+            (except for blank class)
+        parameter_init: A float value. Range of uniform distribution to
+            initialize weight parameters
+        clip_gradients: A float value. Range of gradient clipping (> 0)
+        clip_activation: A float value. Range of activation clipping (> 0)
+        dropout_ratio_input: A float value. Dropout ratio in input-hidden
+            layers
+        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
+            layers
         weight_decay: A float value. Regularization parameter for weight decay
         num_proj: not used
         bottleneck_dim: not used
@@ -50,13 +55,14 @@ class CNN_CTC(ctcBase):
                  dropout_ratio_hidden=1.0,
                  num_proj=None,
                  weight_decay=0.0,
-                 bottleneck_dim=None):
+                 bottleneck_dim=None,
+                 name='cnn_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
                          output_size, parameter_init,
                          clip_gradients, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
-                         weight_decay)
+                         weight_decay, name)
 
         self.num_proj = None
         self.splice = 0
@@ -84,16 +90,18 @@ class CNN_CTC(ctcBase):
         with tf.name_scope('conv1'):
             # Reshape to [batch, 40fbank + 1energy, timesteps, 3(current +
             # delta + deltadelta)]
-            input_drop_rs = tf.reshape(self.inputs,
-                                       # shape=[batch_size, self.input_size,
-                                       # max_time, 1])
-                                       shape=[batch_size, int(self.input_size / 3), max_time, 3])
+            input_drop_rs = tf.reshape(
+                self.inputs,
+                # shape=[batch_size, self.input_size,
+                # max_time, 1])
+                shape=[batch_size, int(self.input_size / 3), max_time, 3])
 
             # Affine
             conv1_shape = [3, 5, 3, 128]  # (FH, FW, InputChannel, FilterNum)
             W_conv1 = tf.Variable(tf.truncated_normal(
                 shape=conv1_shape, stddev=self.parameter_init))
-            b_conv1 = tf.Variable(tf.zeros([conv1_shape[3]]))
+            b_conv1 = tf.Variable(tf.zeros(
+                shape=[conv1_shape[3]]))
             outputs = tf.nn.bias_add(tf.nn.conv2d(input_drop_rs, W_conv1,
                                                   strides=[1, 1, 1, 1],
                                                   padding='SAME'),
@@ -132,7 +140,8 @@ class CNN_CTC(ctcBase):
                     conv2_shape = [3, 5, 128, 256]
                 W_conv2 = tf.Variable(tf.truncated_normal(
                     shape=conv2_shape, stddev=self.parameter_init))
-                b_conv2 = tf.Variable(tf.zeros([conv2_shape[3]]))
+                b_conv2 = tf.Variable(tf.zeros(
+                    shape=[conv2_shape[3]]))
                 outputs = tf.nn.bias_add(tf.nn.conv2d(outputs, W_conv2,
                                                       strides=[1, 1, 1, 1],
                                                       padding='SAME'),
@@ -161,7 +170,8 @@ class CNN_CTC(ctcBase):
                 conv5_shape = [3, 5, 256, 256]
                 W_conv5 = tf.Variable(tf.truncated_normal(
                     shape=conv5_shape, stddev=self.parameter_init))
-                b_conv5 = tf.Variable(tf.zeros([conv5_shape[3]]))
+                b_conv5 = tf.Variable(tf.zeros(
+                    shape=[conv5_shape[3]]))
                 outputs = tf.nn.bias_add(tf.nn.conv2d(outputs, W_conv5,
                                                       strides=[1, 1, 1, 1],
                                                       padding='SAME'),
@@ -193,9 +203,10 @@ class CNN_CTC(ctcBase):
                     fc_shape = [1024, 1024]
                 elif i_layer == 13:
                     fc_shape = [1024, self.num_classes]
-                W_fc11 = tf.Variable(
-                    tf.truncated_normal(shape=fc_shape, stddev=self.parameter_init))
-                b_fc11 = tf.Variable(tf.zeros([fc_shape[1]]))
+                W_fc11 = tf.Variable(tf.truncated_normal(
+                    shape=fc_shape, stddev=self.parameter_init))
+                b_fc11 = tf.Variable(tf.zeros(
+                    shape=[fc_shape[1]]))
                 outputs = tf.matmul(outputs, W_fc11) + b_fc11
 
                 # Weight decay

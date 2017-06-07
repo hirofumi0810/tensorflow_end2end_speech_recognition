@@ -21,14 +21,18 @@ class BN_LSTM_CTC(ctcBase):
         input_size: int, the dimensions of input vectors
         num_cell: int, the number of memory cells in each layer
         num_layer: int, the number of layers
-        output_size: int, the number of nodes in softmax layer (except for blank class)
-        parameter_init: A float value. Range of uniform distribution to initialize weight parameters
-        clip_grad: A float value. Range of gradient clipping (non-negative)
-        clip_activation: A float value. Range of activation clipping (non-negative)
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden layers
+        output_size: int, the number of nodes in softmax layer
+            (except for blank class)
+        parameter_init: A float value. Range of uniform distribution to
+            initialize weight parameters
+        clip_grad: A float value. Range of gradient clipping (> 0)
+        clip_activation: A float value. Range of activation clipping (> 0)
+        dropout_ratio_input: A float value. Dropout ratio in input-hidden
+            layers
+        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
+            layers
         weight_decay: A float value. Regularization parameter for weight decay
-        is_training: bool, set True when training.
+        is_training: bool, set True when training
     """
 
     def __init__(self,
@@ -43,13 +47,14 @@ class BN_LSTM_CTC(ctcBase):
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
                  weight_decay=0.0,
-                 is_training=True):
+                 is_training=True,
+                 name='bn_lstm_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
                          output_size, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
-                         weight_decay)
+                         weight_decay, name)
 
         self._is_training = is_training
 
@@ -69,8 +74,9 @@ class BN_LSTM_CTC(ctcBase):
         for i_layer in range(self.num_layer):
             with tf.name_scope('LSTM_hidden' + str(i_layer + 1)):
 
-                initializer = tf.random_uniform_initializer(minval=-self.parameter_init,
-                                                            maxval=self.parameter_init)
+                initializer = tf.random_uniform_initializer(
+                    minval=-self.parameter_init,
+                    maxval=self.parameter_init)
                 # initializer = orthogonal_initializer()
 
                 lstm = BatchNormLSTMCell(self.num_cell,
@@ -104,10 +110,11 @@ class BN_LSTM_CTC(ctcBase):
 
         with tf.name_scope('output'):
             # Affine
-            W_output = tf.Variable(tf.truncated_normal(shape=[self.num_cell, self.num_classes],
-                                                       stddev=0.1, name='W_output'))
-            b_output = tf.Variable(
-                tf.zeros(shape=[self.num_classes], name='b_output'))
+            W_output = tf.Variable(tf.truncated_normal(
+                shape=[self.num_cell, self.num_classes],
+                stddev=0.1, name='W_output'))
+            b_output = tf.Variable(tf.zeros(
+                shape=[self.num_classes], name='b_output'))
             logits_2d = tf.matmul(outputs, W_output) + b_output
 
             # Reshape back to the original shape
