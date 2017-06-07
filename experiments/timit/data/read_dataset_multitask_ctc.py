@@ -5,21 +5,20 @@
    In addition, frame stacking and skipping are used.
 """
 
-import os
-import sys
+from os.path import join, basename
 import pickle
 import random
 import numpy as np
 from tqdm import tqdm
 
-sys.path.append('../../')
 from utils.data.frame_stack import stack_frame
 
 
 class DataSet(object):
     """Read dataset."""
 
-    def __init__(self, data_type, label_type, num_stack=None, num_skip=None, is_sorted=True, is_progressbar=False):
+    def __init__(self, data_type, label_type, num_stack=None, num_skip=None,
+                 is_sorted=True, is_progressbar=False):
         """
         Args:
             data_type: train or dev or test
@@ -40,13 +39,13 @@ class DataSet(object):
         self.is_progressbar = is_progressbar
 
         self.input_size = 123
-        self.dataset_char_path = os.path.join(
+        self.dataset_char_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/ctc/character', data_type)
-        self.dataset_phone_path = os.path.join(
+        self.dataset_phone_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/ctc/', label_type, data_type)
 
         # Load the frame number dictionary
-        self.frame_num_dict_path = os.path.join(
+        self.frame_num_dict_path = join(
             self.dataset_char_path, 'frame_num.pickle')
         with open(self.frame_num_dict_path, 'rb') as f:
             self.frame_num_dict = pickle.load(f)
@@ -56,14 +55,15 @@ class DataSet(object):
             self.frame_num_dict.items(), key=lambda x: x[1])
         input_paths, label_char_paths, label_phone_paths = [], [], []
         for input_name, frame_num in self.frame_num_tuple_sorted:
-            input_paths.append(os.path.join(
+            input_paths.append(join(
                 self.dataset_char_path, 'input', input_name + '.npy'))
-            label_char_paths.append(os.path.join(
+            label_char_paths.append(join(
                 self.dataset_char_path, 'label', input_name + '.npy'))
-            label_phone_paths.append(os.path.join(
+            label_phone_paths.append(join(
                 self.dataset_phone_path, 'label', input_name + '.npy'))
         if len(label_char_paths) != len(label_phone_paths):
-            raise ValueError('The numbers of labels between character and phone are not same.')
+            raise ValueError(
+                'The numbers of labels between character and phone are not same.')
         self.input_paths = np.array(input_paths)
         self.label_char_paths = np.array(label_char_paths)
         self.label_phone_paths = np.array(label_phone_paths)
@@ -102,7 +102,10 @@ class DataSet(object):
             batch_size: mini batch size
         Returns:
             input_data: list of input data, size batch_size
-            labels: list of tuple `(indices, values, shape)`, size batch_size
+            labels_char: list of tuple `(indices, values, shape)`, size batch_size
+                         This is target labels for the main task (character)
+            labels_phone: list of tuple `(indices, values, shape)`, size batch_size
+                         This is target labels fo the second task (phone)
             seq_len: list of length of each label, size batch_size
             input_names: list of file name of input data, size batch_size
         """
@@ -142,7 +145,7 @@ class DataSet(object):
                 labels_char[i_batch] = self.label_char_list[x]
                 labels_phone[i_batch] = self.label_phone_list[x]
                 seq_len[i_batch] = frame_num
-                input_names[i_batch] = os.path.basename(
+                input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
         #########################
@@ -185,7 +188,7 @@ class DataSet(object):
                 labels_char[i_batch] = self.label_char_list[x]
                 labels_phone[i_batch] = self.label_phone_list[x]
                 seq_len[i_batch] = frame_num
-                input_names[i_batch] = os.path.basename(
+                input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
         return input_data, labels_char, labels_phone, seq_len, input_names

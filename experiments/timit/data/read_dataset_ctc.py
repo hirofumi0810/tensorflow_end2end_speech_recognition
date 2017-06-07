@@ -5,21 +5,24 @@
    In addition, frame stacking and skipping are used.
 """
 
-import os
-import sys
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from os.path import join, basename
 import pickle
 import random
 import numpy as np
 from tqdm import tqdm
 
-sys.path.append('../../')
 from utils.data.frame_stack import stack_frame
 
 
 class DataSet(object):
     """Read dataset."""
 
-    def __init__(self, data_type, label_type, num_stack=None, num_skip=None, is_sorted=True, is_progressbar=False):
+    def __init__(self, data_type, label_type, num_stack=None, num_skip=None,
+                 is_sorted=True, is_progressbar=False):
         """
         Args:
             data_type: train or dev or test
@@ -40,12 +43,11 @@ class DataSet(object):
         self.is_progressbar = is_progressbar
 
         self.input_size = 123
-        self.dataset_path = os.path.join(
+        self.dataset_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/ctc/', label_type, data_type)
 
         # Load the frame number dictionary
-        self.frame_num_dict_path = os.path.join(
-            self.dataset_path, 'frame_num.pickle')
+        self.frame_num_dict_path = join(self.dataset_path, 'frame_num.pickle')
         with open(self.frame_num_dict_path, 'rb') as f:
             self.frame_num_dict = pickle.load(f)
 
@@ -54,9 +56,9 @@ class DataSet(object):
             self.frame_num_dict.items(), key=lambda x: x[1])
         input_paths, label_paths = [], []
         for input_name, frame_num in self.frame_num_tuple_sorted:
-            input_paths.append(os.path.join(
+            input_paths.append(join(
                 self.dataset_path, 'input', input_name + '.npy'))
-            label_paths.append(os.path.join(
+            label_paths.append(join(
                 self.dataset_path, 'label', input_name + '.npy'))
         self.input_paths = np.array(input_paths)
         self.label_paths = np.array(label_paths)
@@ -131,7 +133,7 @@ class DataSet(object):
                 input_data[i_batch, :frame_num, :] = data_i
                 labels[i_batch] = self.label_list[x]
                 seq_len[i_batch] = frame_num
-                input_names[i_batch] = os.path.basename(
+                input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
         #########################
@@ -172,7 +174,7 @@ class DataSet(object):
                 input_data[i_batch, :frame_num, :] = data_i
                 labels[i_batch] = self.label_list[x]
                 seq_len[i_batch] = frame_num
-                input_names[i_batch] = os.path.basename(
+                input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
         return input_data, labels, seq_len, input_names

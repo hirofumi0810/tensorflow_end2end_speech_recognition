@@ -3,7 +3,11 @@
 
 """Train Multitask CTC network (TIMIT corpus)."""
 
-import os
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from os.path import join, isfile
 import sys
 import time
 import tensorflow as tf
@@ -18,7 +22,7 @@ from data.read_dataset_multitask_ctc import DataSet
 from models.ctc.load_model_multitask import load
 from evaluation.eval_ctc import do_eval_per, do_eval_cer
 from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
-from utils.util import mkdir, join
+from utils.util import mkdir, mkdir_join
 from utils.parameter import count_total_parameters
 from utils.loss import save_loss
 
@@ -27,7 +31,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
     """Run training.
     Args:
         network: network to train
-        optimizer: string, the name of optimizer
+        optimizer: string, the name of optimizer. ex.) adam, rmsprop
         learning_rate: initial learning rate
         batch_size: size of mini batch
         epoch_num: epoch num to train
@@ -39,9 +43,12 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
     train_data = DataSet(data_type='train', label_type=label_type,
                          num_stack=num_stack, num_skip=num_skip,
                          is_sorted=True)
-    dev_data = DataSet(data_type='dev', label_type='phone39',
-                       num_stack=num_stack, num_skip=num_skip,
-                       is_sorted=False)
+    dev_data61 = DataSet(data_type='dev', label_type='phone61',
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=False)
+    dev_data39 = DataSet(data_type='dev', label_type='phone39',
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=False)
     test_data = DataSet(data_type='test', label_type='phone39',
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False)
@@ -127,7 +134,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels_char, labels_phone, seq_len, _ = dev_data.next_batch(
+                inputs, labels_char, labels_phone, seq_len, _ = dev_data61.next_batch(
                     batch_size=batch_size)
                 indices_char, values_char, dense_shape_char = list2sparsetensor(
                     labels_char)
@@ -185,8 +192,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                           (epoch, duration_epoch / 60))
 
                     # Save model (check point)
-                    checkpoint_file = os.path.join(
-                        network.model_dir, 'model.ckpt')
+                    checkpoint_file = join(network.model_dir, 'model.ckpt')
                     save_path = saver.save(
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
@@ -198,15 +204,17 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                         error_epoch = do_eval_cer(session=sess,
                                                   decode_op=decode_op1,
                                                   network=network,
-                                                  dataset=dev_data,
-                                                  eval_batch_size=1)
+                                                  dataset=dev_data39,
+                                                  eval_batch_size=1,
+                                                  is_multitask=True)
                         do_eval_per(session=sess,
                                     decode_op=decode_op2,
                                     per_op=per_op2,
                                     network=network,
-                                    dataset=dev_data,
+                                    dataset=dev_data39,
                                     label_type=label_type,
-                                    eval_batch_size=1)
+                                    eval_batch_size=1,
+                                    is_multitask=True)
 
                         if error_epoch < error_best:
                             error_best = error_epoch
@@ -217,7 +225,8 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                                         decode_op=decode_op1,
                                         network=network,
                                         dataset=test_data,
-                                        eval_batch_size=1)
+                                        eval_batch_size=1,
+                                        is_multitask=True)
 
                             do_eval_per(session=sess,
                                         decode_op=decode_op2,
@@ -225,7 +234,8 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                                         network=network,
                                         dataset=test_data,
                                         label_type=label_type,
-                                        eval_batch_size=1)
+                                        eval_batch_size=1,
+                                        is_multitask=True)
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -242,7 +252,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                       save_path=network.model_dir)
 
             # Training was finished correctly
-            with open(os.path.join(network.model_dir, 'complete.txt'), 'w') as f:
+            with open(join(network.model_dir, 'complete.txt'), 'w') as f:
                 f.write('')
 
 
@@ -295,11 +305,11 @@ def main(config_path):
 
     # Set save path
     network.model_dir = mkdir('/n/sd8/inaguma/result/timit/multitask_ctc/')
-    network.model_dir = join(network.model_dir, corpus['label_type'])
-    network.model_dir = join(network.model_dir, network.model_name)
+    network.model_dir = mkdir_join(network.model_dir, corpus['label_type'])
+    network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
-    if not os.path.isfile(os.path.join(network.model_dir, 'complete.txt')):
+    if not isfile(join(network.model_dir, 'complete.txt')):
         tf.gfile.DeleteRecursively(network.model_dir)
         tf.gfile.MakeDirs(network.model_dir)
     else:
@@ -310,9 +320,9 @@ def main(config_path):
                  corpus['label_type'] + '_' + param['optimizer'])
 
     # Save config file
-    shutil.copyfile(config_path, os.path.join(network.model_dir, 'config.yml'))
+    shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
-    sys.stdout = open(os.path.join(network.model_dir, 'train.log'), 'w')
+    sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
     do_train(network=network,
              optimizer=param['optimizer'],
@@ -329,6 +339,6 @@ if __name__ == '__main__':
 
     args = sys.argv
     if len(args) != 2:
-        sys.exit(0)
+        raise ValueError
 
     main(config_path=args[1])

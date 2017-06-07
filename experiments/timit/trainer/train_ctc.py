@@ -3,7 +3,11 @@
 
 """Train CTC network (TIMIT corpus)."""
 
-import os
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from os.path import join, isfile
 import sys
 import time
 import tensorflow as tf
@@ -18,7 +22,7 @@ from data.read_dataset_ctc import DataSet
 from models.ctc.load_model import load
 from evaluation.eval_ctc import do_eval_per, do_eval_cer
 from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
-from utils.util import mkdir, join
+from utils.util import mkdir, mkdir_join
 from utils.parameter import count_total_parameters
 from utils.loss import save_loss
 
@@ -32,7 +36,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
     """Run training.
     Args:
         network: network to train
-        optimizer: string, the name of optimizer
+        optimizer: string, the name of optimizer. ex.) adam, rmsprop
         learning_rate: initial learning rate
         batch_size: size of mini batch
         epoch_num: epoch num to train
@@ -186,8 +190,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                           (epoch, duration_epoch / 60))
 
                     # Save model (check point)
-                    checkpoint_file = os.path.join(
-                        network.model_dir, 'model.ckpt')
+                    checkpoint_file = join(network.model_dir, 'model.ckpt')
                     save_path = saver.save(
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
@@ -247,7 +250,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num, label_typ
                       save_path=network.model_dir)
 
             # Training was finished correctly
-            with open(os.path.join(network.model_dir, 'complete.txt'), 'w') as f:
+            with open(join(network.model_dir, 'complete.txt'), 'w') as f:
                 f.write('')
 
 
@@ -298,11 +301,11 @@ def main(config_path):
 
     # Set save path
     network.model_dir = mkdir('/n/sd8/inaguma/result/timit/ctc/')
-    network.model_dir = join(network.model_dir, corpus['label_type'])
-    network.model_dir = join(network.model_dir, network.model_name)
+    network.model_dir = mkdir_join(network.model_dir, corpus['label_type'])
+    network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
-    if not os.path.isfile(os.path.join(network.model_dir, 'complete.txt')):
+    if not isfile(join(network.model_dir, 'complete.txt')):
         tf.gfile.DeleteRecursively(network.model_dir)
         tf.gfile.MakeDirs(network.model_dir)
     else:
@@ -313,9 +316,9 @@ def main(config_path):
                  corpus['label_type'] + '_' + param['optimizer'])
 
     # Save config file
-    shutil.copyfile(config_path, os.path.join(network.model_dir, 'config.yml'))
+    shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
-    sys.stdout = open(os.path.join(network.model_dir, 'train.log'), 'w')
+    sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
     do_train(network=network,
              optimizer=param['optimizer'],
@@ -332,6 +335,6 @@ if __name__ == '__main__':
 
     args = sys.argv
     if len(args) != 2:
-        sys.exit(0)
+        raise ValueError
 
     main(config_path=args[1])

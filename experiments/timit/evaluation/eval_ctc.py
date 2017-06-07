@@ -3,6 +3,10 @@
 
 """Define evaluation method for CTC network (TIMIT corpus)."""
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import re
 import numpy as np
 import Levenshtein
@@ -14,7 +18,7 @@ from utils.labels.phone import num2phone, phone2num
 from .util import map_to_39phone, compute_edit_distance
 from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
 from utils.exception_func import exception
-from utils.util import join
+from utils.util import mkdir_join
 
 
 @exception
@@ -246,7 +250,7 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
         label_type: phone39 or phone48 or phone61 or character
         rate: rate of evaluation data to use
     """
-    save_path = join(network.model_dir, 'ctc_output')
+    save_path = mkdir_join(network.model_dir, 'ctc_output')
     batch_size = 1
     num_examples = dataset.data_num * rate
     iteration = int(num_examples / batch_size)
