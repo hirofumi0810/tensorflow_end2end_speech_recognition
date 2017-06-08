@@ -107,8 +107,9 @@ def generate_data(label_type, model, batch_size=1):
         model: ctc or attention
     Returns:
         inputs: `[batch_size, max_time, feature_dim]`
-        labels:
+        labels: `[batch_size]`
         seq_len: `[batch_size, frame_num]`
+        target_len: `[batch_size]` (if model is attention)
     """
     # Make input data
     inputs, seq_len = read_wav('./sample/LDC93S1.wav',
@@ -118,32 +119,51 @@ def generate_data(label_type, model, batch_size=1):
     #                            feature_type='mfcc',
     #                            batch_size=batch_size)
 
-    if label_type == 'character':
-        transcript = read_text('./sample/LDC93S1.txt')
-        if model == 'ctc':
+    if model == 'ctc':
+        if label_type == 'character':
+            transcript = read_text('./sample/LDC93S1.txt')
             transcript = ' ' + transcript.replace('.', '') + ' '
-            labels = [alpha2num(transcript)]
-        elif model == 'attention':
-            transcript = '<' + transcript.replace('.', '') + '>'
-            labels = [alpha2num(transcript)]
-    elif label_type == 'phone':
-        transcript = read_phone('./sample/LDC93S1.phn')
-        if model == 'ctc':
-            labels = [phone2num(transcript)]
-        elif model == 'attention':
-            labels = ['<'] + [phone2num(transcript)] + ['>']
-    elif label_type == 'multitask':
-        transcript_char = read_text('./sample/LDC93S1.txt')
-        transcript_phone = read_phone('./sample/LDC93S1.phn')
-        if model == 'ctc':
+            labels = [alpha2num(transcript)] * batch_size
+            return inputs, labels, seq_len
+
+        elif label_type == 'phone':
+            transcript = read_phone('./sample/LDC93S1.phn')
+            labels = [phone2num(transcript)] * batch_size
+            return inputs, labels, seq_len
+
+        elif label_type == 'multitask':
+            transcript_char = read_text('./sample/LDC93S1.txt')
+            transcript_phone = read_phone('./sample/LDC93S1.phn')
             transcript_char = ' ' + transcript_char.replace('.', '') + ' '
             labels_char = [alpha2num(transcript_char)] * batch_size
             labels_phone = [phone2num(transcript_phone)] * batch_size
-        elif model == 'attention':
-            NotImplementedError
-        return inputs, labels_char, labels_phone, seq_len
+            return inputs, labels_char, labels_phone, seq_len
 
-    return inputs, labels, seq_len
+    elif model == 'attention':
+        if label_type == 'character':
+            transcript = read_text('./sample/LDC93S1.txt')
+            transcript = '<' + transcript.replace('.', '') + '>'
+            labels = [alpha2num(transcript)] * batch_size
+            target_len = [len(labels[0])] * batch_size
+            return inputs, labels, seq_len, target_len
+
+        elif label_type == 'phone':
+            transcript = read_phone('./sample/LDC93S1.phn')
+            transcript = '<' + transcript + '>'
+            labels = [phone2num(transcript)] * batch_size
+            target_len = [len(labels[0])] * batch_size
+            return inputs, labels, seq_len, target_len
+
+        elif label_type == 'multitask':
+            transcript_char = read_text('./sample/LDC93S1.txt')
+            transcript_phone = read_phone('./sample/LDC93S1.phn')
+            transcript_char = '<' + transcript_char.replace('.', '') + '>'
+            labels_char = [alpha2num(transcript_char)] * batch_size
+            labels_phone = [phone2num(transcript_phone)] * batch_size
+            target_len_char = [len(labels_char[0])] * batch_size
+            target_len_phone = [len(labels_phone[0])] * batch_size
+            return (inputs, labels_char, labels_phone,
+                    seq_len, target_len_char, target_len_phone)
 
 
 def phone2num(transcript):

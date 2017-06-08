@@ -7,21 +7,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import namedtuple
 import tensorflow as tf
-
-# template
-EncoderOutput = namedtuple(
-    "EncoderOutput",
-    [
-        "outputs",
-        "final_state",
-        "attention_values",
-        "attention_values_length"
-    ])
+from .encoder_base import EncoderOutput, EncoderBase
 
 
-class BGRUEncoder(object):
+class BGRUEncoder(EncoderBase):
     """Bidirectional GRU Encoder.
     Args:
         num_cell:
@@ -43,17 +33,9 @@ class BGRUEncoder(object):
                  num_proj=None,  # not used
                  name='bgru_encoder'):
 
-        self.num_cell = num_cell
-        self.num_layer = num_layer
-        self.keep_prob_input = keep_prob_input
-        self.keep_prob_hidden = keep_prob_hidden
-        self.parameter_init = parameter_init
-        self.name = name
-
-    def __call__(self, *args, **kwargs):
-        # TODO: variable_scope
-        with tf.name_scope('Encoder'):
-            return self._build(*args, **kwargs)
+        EncoderBase.__init__(self, num_cell, num_layer, keep_prob_input,
+                             keep_prob_hidden, parameter_init, clip_activation,
+                             num_proj, name)
 
     def _build(self, inputs, seq_len):
         """Construct Bidirectional GRU encoder.
@@ -71,7 +53,7 @@ class BGRUEncoder(object):
         """
         self.inputs = inputs
         self.seq_len = seq_len
-        
+
         # Input dropout
         outputs = tf.nn.dropout(inputs,
                                 self.keep_prob_input,
