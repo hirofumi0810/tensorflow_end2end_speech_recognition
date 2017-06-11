@@ -9,6 +9,7 @@ import sys
 import time
 import unittest
 import tensorflow as tf
+from tensorflow.python import debug as tf_debug
 
 sys.path.append('../')
 sys.path.append('../../')
@@ -18,7 +19,7 @@ from data import generate_data, num2alpha, num2phone
 from experiments.utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
 
 
-class TestCTC(unittest.TestCase):
+class TestCTC(tf.test.TestCase):
 
     @measure_time
     def test_ctc(self):
@@ -52,31 +53,18 @@ class TestCTC(unittest.TestCase):
             # Define model
             output_size = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
-            if model_type == 'blstm_ctc_bottleneck':
-                network = model(batch_size=batch_size,
-                                input_size=inputs[0].shape[1],
-                                num_cell=256,
-                                num_layer=2,
-                                bottleneck_dim=128,
-                                output_size=output_size,
-                                parameter_init=0.1,
-                                clip_gradients=5.0,
-                                clip_activation=50,
-                                dropout_ratio_input=1.0,
-                                dropout_ratio_hidden=1.0,
-                                weight_decay=1e-6)
-            else:
-                network = model(batch_size=batch_size,
-                                input_size=inputs[0].shape[1],
-                                num_cell=256,
-                                num_layer=2,
-                                output_size=output_size,
-                                parameter_init=0.1,
-                                clip_gradients=5.0,
-                                clip_activation=50,
-                                dropout_ratio_input=1.0,
-                                dropout_ratio_hidden=1.0,
-                                weight_decay=1e-6)
+            network = model(batch_size=batch_size,
+                            input_size=inputs[0].shape[1],
+                            num_cell=256,
+                            num_layer=2,
+                            bottleneck_dim=128,
+                            output_size=output_size,
+                            parameter_init=0.1,
+                            clip_grad=5.0,
+                            clip_activation=50,
+                            dropout_ratio_input=1.0,
+                            dropout_ratio_hidden=1.0,
+                            weight_decay=1e-6)
             network.define()
             # NOTE: define model under tf.Graph()
 
@@ -97,6 +85,9 @@ class TestCTC(unittest.TestCase):
                 # Initialize parameters
                 sess.run(init_op)
 
+                # Wrapper for tfdbg
+                # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+
                 # Train model
                 max_steps = 400
                 start_time_global = time.time()
@@ -106,14 +97,14 @@ class TestCTC(unittest.TestCase):
                 for step in range(max_steps):
 
                     feed_dict = {
-                        network.inputs_pl: inputs,
-                        network.label_indices_pl: indices,
-                        network.label_values_pl: values,
-                        network.label_shape_pl: dense_shape,
-                        network.seq_len_pl: seq_len,
-                        network.keep_prob_input_pl: network.dropout_ratio_input,
-                        network.keep_prob_hidden_pl: network.dropout_ratio_hidden,
-                        network.lr_pl: learning_rate
+                        network.inputs: inputs,
+                        network.label_indices: indices,
+                        network.label_values: values,
+                        network.label_shape: dense_shape,
+                        network.seq_len: seq_len,
+                        network.keep_prob_input: network.dropout_ratio_input,
+                        network.keep_prob_hidden: network.dropout_ratio_hidden,
+                        network.learning_rate: learning_rate
                     }
 
                     # Compute loss
@@ -127,8 +118,8 @@ class TestCTC(unittest.TestCase):
 
                     if (step + 1) % 10 == 0:
                         # Change feed dict for evaluation
-                        feed_dict[network.keep_prob_input_pl] = 1.0
-                        feed_dict[network.keep_prob_hidden_pl] = 1.0
+                        feed_dict[network.keep_prob_input] = 1.0
+                        feed_dict[network.keep_prob_hidden] = 1.0
 
                         # Compute accuracy
                         ler_train = sess.run(ler_op, feed_dict=feed_dict)
@@ -163,4 +154,5 @@ class TestCTC(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    tf.test.main()
+    # unittest.main()

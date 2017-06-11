@@ -27,7 +27,7 @@ CTC = {
 def load(model_type):
     """Select & load model.
     Args:
-        model_type: string, name of the ctc model in CTC
+        model_type: string, name of the ctc model in the key of CTC
     Returns:
         model: class object
     """

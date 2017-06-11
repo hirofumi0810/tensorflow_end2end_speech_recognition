@@ -22,7 +22,7 @@ class BLSTM_CTC(ctcBase):
             (except for blank class)
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
-        clip_gradients: A float value. Range of gradient clipping (> 0)
+        clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
         dropout_ratio_input: A float value. Dropout ratio in input-hidden
             layers
@@ -40,35 +40,34 @@ class BLSTM_CTC(ctcBase):
                  num_layer,
                  output_size,
                  parameter_init=0.1,
-                 clip_gradients=None,
+                 clip_grad=None,
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
                  num_proj=None,
                  weight_decay=0.0,
-                 bottleneck_dim=None,
+                 bottleneck_dim=None,  # not used
                  name='blstm_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
                          output_size, parameter_init,
-                         clip_gradients, clip_activation,
+                         clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          weight_decay, name)
 
         self.num_proj = None if num_proj == 0 else num_proj
 
     def define(self):
-        """Construct Bidirectional LSTM layers."""
+        """Construct model graph."""
         # Generate placeholders
-        self._generate_pl()
+        self._generate_placeholer()
 
         # Dropout for Input
-        self.inputs = tf.nn.dropout(self.inputs_pl,
-                                    self.keep_prob_input_pl,
-                                    name='dropout_input')
+        outputs = tf.nn.dropout(self.inputs,
+                                self.keep_prob_input,
+                                name='dropout_input')
 
         # Hidden layers
-        outputs = self.inputs
         for i_layer in range(self.num_layer):
             with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
 
@@ -96,10 +95,10 @@ class BLSTM_CTC(ctcBase):
                 # Dropout (output)
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
                     lstm_fw,
-                    output_keep_prob=self.keep_prob_hidden_pl)
+                    output_keep_prob=self.keep_prob_hidden)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(
                     lstm_bw,
-                    output_keep_prob=self.keep_prob_hidden_pl)
+                    output_keep_prob=self.keep_prob_hidden)
 
                 # _init_state_fw = lstm_fw.zero_state(self.batch_size,
                 #                                     tf.float32)
@@ -113,7 +112,7 @@ class BLSTM_CTC(ctcBase):
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
                     inputs=outputs,
-                    sequence_length=self.seq_len_pl,
+                    sequence_length=self.seq_len,
                     dtype=tf.float32,
                     scope='BiLSTM_' + str(i_layer + 1))
 
@@ -126,9 +125,8 @@ class BLSTM_CTC(ctcBase):
             output_node = self.num_proj * 2
         outputs = tf.reshape(outputs, shape=[-1, output_node])
 
-        # (batch_size, max_time, input_size_splice)
-        inputs_shape = tf.shape(self.inputs_pl)
-        batch_size, max_time = inputs_shape[0], inputs_shape[1]
+        # `[batch_size, max_time, input_size_splice]`
+        batch_size = tf.shape(self.inputs)[0]
 
         with tf.name_scope('output'):
             # Affine
@@ -143,5 +141,5 @@ class BLSTM_CTC(ctcBase):
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to (max_time, batch_size, num_classes)
+            # Convert to `[max_time, batch_size, num_classes]'
             self.logits = tf.transpose(logits_3d, (1, 0, 2))

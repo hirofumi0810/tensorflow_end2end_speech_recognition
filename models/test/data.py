@@ -23,24 +23,24 @@ def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):
     fs, audio = scipy.io.wavfile.read(wav_path)
 
     if feature_type == 'mfcc':
-        features = mfcc(audio, samplerate=fs)  # (291, 13)
+        features = mfcc(audio, samplerate=fs)  # `[291, 13]`
     elif feature_type == 'logmelfbank':
         fbank_features, energy = fbank(audio, nfilt=40)
         logfbank = np.log(fbank_features)
         logenergy = np.log(energy)
         logmelfbank = hz2mel(logfbank)
-        features = np.c_[logmelfbank, logenergy]  # (291, 41)
+        features = np.c_[logmelfbank, logenergy]  # `[291, 41]`
 
     delta1 = delta(features, N=2)
     delta2 = delta(delta1, N=2)
-    input_data = np.c_[features, delta1, delta2]  # (291, 123)
+    input_data = np.c_[features, delta1, delta2]  # `[291, 123]`
 
     # Transform to 3D array
-    # (1, 291, 39) or (1, 291, 123)
+    # `[1, 291, 39]` or `[1, 291, 123]`
     inputs = np.zeros((batch_size, input_data.shape[0], input_data.shape[1]))
     for i in range(batch_size):
         inputs[i] = input_data
-    seq_len = [inputs.shape[1]] * batch_size  # [291]
+    seq_len = [inputs.shape[1]] * batch_size  # `[291]`
 
     # Normalization
     inputs = (inputs - np.mean(inputs)) / np.std(inputs)
@@ -149,7 +149,7 @@ def generate_data(label_type, model, batch_size=1):
 
         elif label_type == 'phone':
             transcript = read_phone('./sample/LDC93S1.phn')
-            transcript = '<' + transcript + '>'
+            transcript = '< ' + transcript + ' >'
             labels = [phone2num(transcript)] * batch_size
             target_len = [len(labels[0])] * batch_size
             return inputs, labels, seq_len, target_len
@@ -158,12 +158,16 @@ def generate_data(label_type, model, batch_size=1):
             transcript_char = read_text('./sample/LDC93S1.txt')
             transcript_phone = read_phone('./sample/LDC93S1.phn')
             transcript_char = '<' + transcript_char.replace('.', '') + '>'
+            transcript_phone = '< ' + transcript_phone + ' >'
             labels_char = [alpha2num(transcript_char)] * batch_size
             labels_phone = [phone2num(transcript_phone)] * batch_size
             target_len_char = [len(labels_char[0])] * batch_size
             target_len_phone = [len(labels_phone[0])] * batch_size
             return (inputs, labels_char, labels_phone,
                     seq_len, target_len_char, target_len_phone)
+
+    elif model == 'joint_ctc_attention':
+        NotImplementedError
 
 
 def phone2num(transcript):
@@ -233,9 +237,9 @@ def alpha2num(transcript):
         if char == ' ':
             index_list.append(space_index)
         elif char == '<':
-            index_list.append(first_index + 26)  # 27
+            index_list.append(26)
         elif char == '>':
-            index_list.append(first_index + 26 + 1)  # 28
+            index_list.append(27)
         else:
             index_list.append(ord(char) - first_index)
     return index_list

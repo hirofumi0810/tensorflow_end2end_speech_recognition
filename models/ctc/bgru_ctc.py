@@ -22,13 +22,13 @@ class BGRU_CTC(ctcBase):
             (except for blank class)
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
-        clip_gradients: A float value. Range of gradient clipping (> 0)
-        clip_activation: A float value. Range of activation clipping (> 0)
+        clip_grad: A float value. Range of gradient clipping (> 0)
+        clip_activation: not used
         dropout_ratio_input: A float value. Dropout ratio in input-hidden
             layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
             layers
-        num_proj: int, the number of nodes in recurrent projection layer
+        num_proj: not used
         weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: not used
     """
@@ -40,35 +40,32 @@ class BGRU_CTC(ctcBase):
                  num_layer,
                  output_size,
                  parameter_init=0.1,
-                 clip_gradients=None,
-                 clip_activation=None,
+                 clip_grad=None,
+                 clip_activation=None,  # not used
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
-                 num_proj=None,
+                 num_proj=None,  # not used
                  weight_decay=0.0,
-                 bottleneck_dim=None,
+                 bottleneck_dim=None,  # not used
                  name='bgru_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
                          output_size, parameter_init,
-                         clip_gradients, clip_activation,
+                         clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          weight_decay, name)
 
-        self.num_proj = None
-
     def define(self):
-        """Construct network."""
+        """Construct model graph."""
         # Generate placeholders
-        self._generate_pl()
+        self._generate_placeholer()
 
         # Dropout for Input
-        self.inputs = tf.nn.dropout(self.inputs_pl,
-                                    self.keep_prob_input_pl,
-                                    name='dropout_input')
+        outputs = tf.nn.dropout(self.inputs,
+                                self.keep_prob_input,
+                                name='dropout_input')
 
         # Hidden layers
-        outputs = self.inputs
         for i_layer in range(self.num_layer):
             with tf.name_scope('BiGRU_hidden' + str(i_layer + 1)):
 
@@ -83,10 +80,10 @@ class BGRU_CTC(ctcBase):
                 # Dropout (output)
                 gru_fw = tf.contrib.rnn.DropoutWrapper(
                     gru_fw,
-                    output_keep_prob=self.keep_prob_hidden_pl)
+                    output_keep_prob=self.keep_prob_hidden)
                 gru_bw = tf.contrib.rnn.DropoutWrapper(
                     gru_bw,
-                    output_keep_prob=self.keep_prob_hidden_pl)
+                    output_keep_prob=self.keep_prob_hidden)
 
                 # _init_state_fw = gru_fw.zero_state(self.batch_size,
                 #                                    tf.float32)
@@ -100,7 +97,7 @@ class BGRU_CTC(ctcBase):
                     cell_fw=gru_fw,
                     cell_bw=gru_bw,
                     inputs=outputs,
-                    sequence_length=self.seq_len_pl,
+                    sequence_length=self.seq_len,
                     dtype=tf.float32,
                     scope='BiGRU_' + str(i_layer + 1))
 
@@ -109,9 +106,8 @@ class BGRU_CTC(ctcBase):
         # Reshape to apply the same weights over the timesteps
         outputs = tf.reshape(outputs, shape=[-1, self.num_cell * 2])
 
-        # (batch_size, max_time, input_size_splice)
-        inputs_shape = tf.shape(self.inputs_pl)
-        batch_size, max_time = inputs_shape[0], inputs_shape[1]
+        # `[batch_size, max_time, input_size_splice]`
+        batch_size = tf.shape(self.inputs)[0]
 
         with tf.name_scope('output'):
             # Affine
@@ -126,5 +122,5 @@ class BGRU_CTC(ctcBase):
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to (max_time, batch_size, num_classes)
+            # Convert to `[max_time, batch_size, num_classes]`
             self.logits = tf.transpose(logits_3d, (1, 0, 2))

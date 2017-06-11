@@ -31,14 +31,14 @@ class CNN_CTC(ctcBase):
             (except for blank class)
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
-        clip_gradients: A float value. Range of gradient clipping (> 0)
+        clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
         dropout_ratio_input: A float value. Dropout ratio in input-hidden
             layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
             layers
-        weight_decay: A float value. Regularization parameter for weight decay
         num_proj: not used
+        weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: not used
     """
 
@@ -48,19 +48,19 @@ class CNN_CTC(ctcBase):
                  num_cell,
                  num_layer,
                  output_size,
-                 parameter_init,
-                 clip_gradients=None,
+                 parameter_init=0.1,
+                 clip_grad=None,
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
-                 num_proj=None,
+                 num_proj=None,  # not used
                  weight_decay=0.0,
-                 bottleneck_dim=None,
+                 bottleneck_dim=None,  # not used
                  name='cnn_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
                          output_size, parameter_init,
-                         clip_gradients, clip_activation,
+                         clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          weight_decay, name)
 
@@ -68,7 +68,7 @@ class CNN_CTC(ctcBase):
         self.splice = 0
 
     def define(self):
-        """Construct network."""
+        """Construct model graph."""
         # Generate placeholders
         self._generate_pl()
 
@@ -77,7 +77,7 @@ class CNN_CTC(ctcBase):
                                     self.keep_prob_input_pl,
                                     name='dropout_input')
 
-        # (batch_size, max_time, input_size_splice)
+        # `[batch_size, max_time, input_size_splice]`
         inputs_shape = tf.shape(self.inputs)
         batch_size, max_time = inputs_shape[0], inputs_shape[1]
 
@@ -227,5 +227,5 @@ class CNN_CTC(ctcBase):
         outputs_3d = tf.reshape(
             outputs, shape=[batch_size, max_time, self.num_classes])
 
-        # Convert to (max_time, batch_size, num_classes)
+        # Convert to `[max_time, batch_size, num_classes]`
         self.logits = tf.transpose(outputs_3d, (1, 0, 2))

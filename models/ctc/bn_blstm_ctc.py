@@ -25,13 +25,15 @@ class BN_BLSTM_CTC(ctcBase):
             (except for blank class)
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
-        clip_gradients: A float value. Range of gradient clipping (> 0)
+        clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
         dropout_ratio_input: A float value. Dropout ratio in input-hidden
             layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
             layers
+        num_proj: int, the number of nodes in recurrent projection layer
         weight_decay: A float value. Regularization parameter for weight decay
+        bottleneck_dim: not used
         is_training: bool, set True when training
     """
 
@@ -42,36 +44,37 @@ class BN_BLSTM_CTC(ctcBase):
                  num_layer,
                  output_size,
                  parameter_init=0.1,
-                 clip_gradients=None,
+                 clip_grad=None,
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
+                 num_proj=None,  # not used
                  weight_decay=0.0,
+                 bottleneck_dim=None,  # not used
                  is_training=True,
                  name='bn_blstm_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
                          output_size, parameter_init,
-                         clip_gradients, clip_activation,
+                         clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          weight_decay, name)
 
         self._is_training = is_training
 
     def define(self):
-        """Construct network."""
+        """Construct model graph."""
         # Generate placeholders
         self._generate_pl()
 
         # Dropout for Input
-        self.inputs = tf.nn.dropout(self.inputs_pl,
-                                    self.keep_prob_input_pl,
-                                    name='dropout_input')
+        outputs = tf.nn.dropout(self.inputs_pl,
+                                self.keep_prob_input_pl,
+                                name='dropout_input')
 
         self.is_training_pl = tf.placeholder(tf.bool)
 
         # Hidden layers
-        outputs = self.inputs
         for i_layer in range(self.num_layer):
             with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
 
@@ -123,9 +126,8 @@ class BN_BLSTM_CTC(ctcBase):
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
-        # (batch_size, max_time, input_size_splice)
-        inputs_shape = tf.shape(self.inputs_pl)
-        batch_size, max_time = inputs_shape[0], inputs_shape[1]
+        # `[batch_size, max_time, input_size_splice]`
+        batch_size = tf.shape(self.inputs_pl)[0]
 
         # Reshape to apply the same weights over the timesteps
         outputs = tf.reshape(outputs, shape=[-1, self.num_cell])
@@ -143,5 +145,5 @@ class BN_BLSTM_CTC(ctcBase):
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to (max_time, batch_size, num_classes)
+            # Convert to `[max_time, batch_size, num_classes]`
             self.logits = tf.transpose(logits_3d, (1, 0, 2))
