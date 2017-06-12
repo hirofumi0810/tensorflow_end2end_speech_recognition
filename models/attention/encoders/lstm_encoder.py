@@ -14,7 +14,7 @@ from .encoder_base import EncoderOutput, EncoderBase
 class LSTMEncoder(EncoderBase):
     """LSTM Encoder.
     Args:
-        num_cell:
+        num_units:
         num_layer:
         keep_prob_input:
         keep_prob_hidden:
@@ -24,7 +24,7 @@ class LSTMEncoder(EncoderBase):
     """
 
     def __init__(self,
-                 num_cell,
+                 num_units,
                  num_layer,
                  keep_prob_input=1.0,
                  keep_prob_hidden=1.0,
@@ -33,15 +33,15 @@ class LSTMEncoder(EncoderBase):
                  num_proj=None,
                  name='lstm_encoder'):
 
-        EncoderBase.__init__(self, num_cell, num_layer, keep_prob_input,
+        EncoderBase.__init__(self, num_units, num_layer, keep_prob_input,
                              keep_prob_hidden, parameter_init, clip_activation,
                              num_proj, name)
 
-    def _build(self, inputs, seq_len):
+    def _build(self, inputs, inputs_seq_len):
         """Construct LSTM encoder.
         Args:
             inputs:
-            seq_len:
+            inputs_seq_len:
         Returns:
             EncoderOutput: A tuple of
                 `(outputs, final_state,
@@ -52,7 +52,7 @@ class LSTMEncoder(EncoderBase):
                 attention_values_length:
         """
         self.inputs = inputs
-        self.seq_len = seq_len
+        self.inputs_seq_len = inputs_seq_len
 
         # Input dropout
         outputs = tf.nn.dropout(inputs,
@@ -67,13 +67,14 @@ class LSTMEncoder(EncoderBase):
                     minval=-self.parameter_init,
                     maxval=self.parameter_init)
 
-                lstm = tf.contrib.rnn.LSTMCell(self.num_cell,
-                                               use_peepholes=True,
-                                               cell_clip=self.clip_activation,
-                                               initializer=initializer,
-                                               num_proj=self.num_proj,
-                                               forget_bias=1.0,
-                                               state_is_tuple=True)
+                lstm = tf.contrib.rnn.LSTMCell(
+                    self.num_units,
+                    use_peepholes=True,
+                    cell_clip=self.clip_activation,
+                    initializer=initializer,
+                    num_proj=self.num_proj,
+                    forget_bias=1.0,
+                    state_is_tuple=True)
 
                 # Dropout (output)
                 lstm = tf.contrib.rnn.DropoutWrapper(
@@ -87,10 +88,10 @@ class LSTMEncoder(EncoderBase):
 
         outputs, final_state = tf.nn.dynamic_rnn(cell=stacked_lstm,
                                                  inputs=inputs,
-                                                 sequence_length=seq_len,
+                                                 sequence_length=inputs_seq_len,
                                                  dtype=tf.float32)
 
         return EncoderOutput(outputs=outputs,
                              final_state=final_state,
                              attention_values=outputs,
-                             attention_values_length=seq_len)
+                             attention_values_length=inputs_seq_len)

@@ -18,6 +18,7 @@ Encoder = {
     "gru_encoder": GRUEncoder,
     "bgru_encoder": BGRUEncoder
 }
+# TODO: Add pyramidal_blstm_encoder
 
 
 def load(model_type):

@@ -14,7 +14,7 @@ from .encoder_base import EncoderOutput, EncoderBase
 class BLSTMEncoder(EncoderBase):
     """Bidirectional LSTM Encoder.
     Args:
-        num_cell:
+        num_units:
         num_layer:
         keep_prob_input:
         keep_prob_hidden:
@@ -24,7 +24,7 @@ class BLSTMEncoder(EncoderBase):
     """
 
     def __init__(self,
-                 num_cell,
+                 num_units,
                  num_layer,
                  keep_prob_input,
                  keep_prob_hidden,
@@ -33,15 +33,15 @@ class BLSTMEncoder(EncoderBase):
                  num_proj=None,
                  name='blstm_encoder'):
 
-        EncoderBase.__init__(self, num_cell, num_layer, keep_prob_input,
+        EncoderBase.__init__(self, num_units, num_layer, keep_prob_input,
                              keep_prob_hidden, parameter_init, clip_activation,
                              num_proj, name)
 
-    def _build(self, inputs, seq_len):
+    def _build(self, inputs, inputs_seq_len):
         """Construct Bidirectional LSTM encoder.
         Args:
             inputs:
-            seq_len:
+            inputs_seq_len:
         Returns:
             EncoderOutput: A tuple of
                 `(outputs, final_state,
@@ -52,7 +52,7 @@ class BLSTMEncoder(EncoderBase):
                 attention_values_length:
         """
         self.inputs = inputs
-        self.seq_len = seq_len
+        self.inputs_seq_len = inputs_seq_len
 
         # Input dropout
         outputs = tf.nn.dropout(inputs,
@@ -68,7 +68,7 @@ class BLSTMEncoder(EncoderBase):
                     maxval=self.parameter_init)
 
                 lstm_fw = tf.contrib.rnn.LSTMCell(
-                    self.num_cell,
+                    self.num_units,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,
@@ -76,7 +76,7 @@ class BLSTMEncoder(EncoderBase):
                     forget_bias=1.0,
                     state_is_tuple=True)
                 lstm_bw = tf.contrib.rnn.LSTMCell(
-                    self.num_cell,
+                    self.num_units,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,
@@ -103,7 +103,7 @@ class BLSTMEncoder(EncoderBase):
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
                     inputs=outputs,
-                    sequence_length=seq_len,
+                    sequence_length=inputs_seq_len,
                     dtype=tf.float32,
                     scope='BiLSTM_' + str(i_layer + 1))
 
@@ -112,4 +112,4 @@ class BLSTMEncoder(EncoderBase):
         return EncoderOutput(outputs=outputs,
                              final_state=final_state,
                              attention_values=outputs,
-                             attention_values_length=seq_len)
+                             attention_values_length=inputs_seq_len)

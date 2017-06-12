@@ -42,7 +42,7 @@ class TestAttentionEncoder(unittest.TestCase):
             keep_prob_input_pl = tf.placeholder(tf.float32)
             keep_prob_hidden_pl = tf.placeholder(tf.float32)
 
-            encoder = load(model_type)(num_cell=256,
+            encoder = load(model_type)(num_units=256,
                                        num_layer=2,
                                        keep_prob_input=keep_prob_input_pl,
                                        keep_prob_hidden=keep_prob_hidden_pl,
@@ -50,11 +50,11 @@ class TestAttentionEncoder(unittest.TestCase):
                                        clip_activation=5.0,
                                        num_proj=None)
             encoder_outputs_op = encoder(inputs=inputs_pl,
-                                         seq_len=seq_len_pl)
+                                         inputs_seq_len=seq_len_pl)
 
             feed_dict = {
                 encoder.inputs: inputs,
-                encoder.seq_len: seq_len,
+                encoder.inputs_seq_len: seq_len,
                 encoder.keep_prob_input: 1.0,
                 encoder.keep_prob_hidden: 1.0
             }
@@ -74,48 +74,48 @@ class TestAttentionEncoder(unittest.TestCase):
                 attention_values_length = encoder_outputs[0].attention_values_length
 
                 if model_type == 'blstm_encoder':
-                    self.assertEqual((1, frame_num, encoder.num_cell * 2),
+                    self.assertEqual((1, frame_num, encoder.num_units * 2),
                                      outputs.shape)
-                    self.assertEqual((1, encoder.num_cell),
+                    self.assertEqual((1, encoder.num_units),
                                      final_state_fw.c.shape)
-                    self.assertEqual((1, encoder.num_cell),
+                    self.assertEqual((1, encoder.num_units),
                                      final_state_bw.c.shape)
                     self.assertEqual(
-                        (1, frame_num, encoder.num_cell * 2), attention_values.shape)
+                        (1, frame_num, encoder.num_units * 2), attention_values.shape)
                     self.assertEqual(frame_num, attention_values_length[0])
 
                 elif model_type == 'lstm_encoder':
-                    self.assertEqual((1, frame_num, encoder.num_cell),
+                    self.assertEqual((1, frame_num, encoder.num_units),
                                      outputs.shape)
-                    self.assertEqual((1, encoder.num_cell),
+                    self.assertEqual((1, encoder.num_units),
                                      final_state_fw.c.shape)
-                    self.assertEqual((1, encoder.num_cell),
+                    self.assertEqual((1, encoder.num_units),
                                      final_state_bw.c.shape)
                     self.assertEqual(
-                        (1, frame_num, encoder.num_cell), attention_values.shape)
+                        (1, frame_num, encoder.num_units), attention_values.shape)
                     self.assertEqual(frame_num, attention_values_length[0])
 
                 elif model_type == 'bgru_encoder':
-                    self.assertEqual((1, frame_num, encoder.num_cell * 2),
+                    self.assertEqual((1, frame_num, encoder.num_units * 2),
                                      outputs.shape)
-                    self.assertEqual((1, encoder.num_cell),
+                    self.assertEqual((1, encoder.num_units),
                                      final_state_fw.shape)
-                    self.assertEqual((1, encoder.num_cell),
+                    self.assertEqual((1, encoder.num_units),
                                      final_state_bw.shape)
                     self.assertEqual(
-                        (1, frame_num, encoder.num_cell * 2), attention_values.shape)
+                        (1, frame_num, encoder.num_units * 2), attention_values.shape)
                     self.assertEqual(frame_num, attention_values_length[0])
 
                 elif model_type == 'gru_encoder':
-                    self.assertEqual((1, frame_num, encoder.num_cell),
+                    self.assertEqual((1, frame_num, encoder.num_units),
                                      outputs.shape)
-                    self.assertEqual((1, encoder.num_cell),
+                    self.assertEqual((1, encoder.num_units),
                                      final_state_fw.shape)
-                    self.assertEqual((1, encoder.num_cell),
+                    self.assertEqual((1, encoder.num_units),
                                      final_state_bw.shape)
                     print(final_state_bw.shape)
                     self.assertEqual(
-                        (1, frame_num, encoder.num_cell), attention_values.shape)
+                        (1, frame_num, encoder.num_units), attention_values.shape)
                     self.assertEqual(frame_num, attention_values_length[0])
 
 

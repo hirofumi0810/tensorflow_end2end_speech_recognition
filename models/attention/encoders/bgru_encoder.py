@@ -14,7 +14,7 @@ from .encoder_base import EncoderOutput, EncoderBase
 class BGRUEncoder(EncoderBase):
     """Bidirectional GRU Encoder.
     Args:
-        num_cell:
+        num_units:
         num_layer:
         keep_prob_input:
         keep_prob_hidden:
@@ -24,7 +24,7 @@ class BGRUEncoder(EncoderBase):
     """
 
     def __init__(self,
-                 num_cell,
+                 num_units,
                  num_layer,
                  keep_prob_input=1.0,
                  keep_prob_hidden=1.0,
@@ -33,15 +33,15 @@ class BGRUEncoder(EncoderBase):
                  num_proj=None,  # not used
                  name='bgru_encoder'):
 
-        EncoderBase.__init__(self, num_cell, num_layer, keep_prob_input,
+        EncoderBase.__init__(self, num_units, num_layer, keep_prob_input,
                              keep_prob_hidden, parameter_init, clip_activation,
                              num_proj, name)
 
-    def _build(self, inputs, seq_len):
+    def _build(self, inputs, inputs_seq_len):
         """Construct Bidirectional GRU encoder.
         Args:
             inputs:
-            seq_len:
+            inputs_seq_len:
         Returns:
             EncoderOutput: A tuple of
                 `(outputs, final_state,
@@ -52,7 +52,7 @@ class BGRUEncoder(EncoderBase):
                 attention_values_length:
         """
         self.inputs = inputs
-        self.seq_len = seq_len
+        self.inputs_seq_len = inputs_seq_len
 
         # Input dropout
         outputs = tf.nn.dropout(inputs,
@@ -68,8 +68,8 @@ class BGRUEncoder(EncoderBase):
                     maxval=self.parameter_init)
 
                 with tf.variable_scope('GRU', initializer=initializer):
-                    gru_fw = tf.contrib.rnn.GRUCell(self.num_cell)
-                    gru_bw = tf.contrib.rnn.GRUCell(self.num_cell)
+                    gru_fw = tf.contrib.rnn.GRUCell(self.num_units)
+                    gru_bw = tf.contrib.rnn.GRUCell(self.num_units)
 
                 # Dropout (output)
                 gru_fw = tf.contrib.rnn.DropoutWrapper(
@@ -90,7 +90,7 @@ class BGRUEncoder(EncoderBase):
                     cell_fw=gru_fw,
                     cell_bw=gru_bw,
                     inputs=outputs,
-                    sequence_length=seq_len,
+                    sequence_length=inputs_seq_len,
                     dtype=tf.float32,
                     scope='BiGRU_' + str(i_layer + 1))
 
@@ -100,4 +100,4 @@ class BGRUEncoder(EncoderBase):
         return EncoderOutput(outputs=outputs,
                              final_state=final_state,
                              attention_values=outputs,
-                             attention_values_length=seq_len)
+                             attention_values_length=inputs_seq_len)
