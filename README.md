@@ -1,7 +1,7 @@
 ## TensorFlow Implementation of End-to-End Speech Recognition
 ### Requirements
-- TensorFlow 1.1.0
-- tqdm 4.11.2
+- TensorFlow 1.2.0rc1
+- tqdm 4.14.0
 - python-Levenshtein 0.12.0
 - setproctitle 1.1.10
 - seaborn 0.7.1
@@ -31,10 +31,9 @@ If you want to do pre-processing, please look at this repo.
 #### Connectionist Temporal Classification (CTC) [\[Graves+ 2006\]](http://dl.acm.org/citation.cfm?id=1143891)
 - LSTM-CTC
 - GRU-CTC
-- Bidirectional LSTM-CTC
-- Bidirectional GRU-CTC
-- Multitask CTC (CTC where the second task is tha same layer as the main one)
-- Hierarchical CTC
+- Bidirectional LSTM-CTC (BLSTM-CTC)
+- Bidirectional GRU-CTC (BGRU-CTC)
+- Multitask CTC (you can set the CTC layer in the second task to the aubitrary layer.)
 
 ##### Options
 ###### General technique
@@ -45,8 +44,8 @@ If you want to do pre-processing, please look at this repo.
 - multitask learning
 
 ###### Awesome technique
-- projection layer[Sak+ 2014](https://arxiv.org/abs/1402.1128)
-- frame-stacking[Sak+ 2015](https://arxiv.org/abs/1507.06947)
+- projection layer[\[Sak+ 2014\]](https://arxiv.org/abs/1402.1128)
+- frame-stacking[\[Sak+ 2015\]](https://arxiv.org/abs/1507.06947)
 
 #### Attention Mechanism
 Under implementation
