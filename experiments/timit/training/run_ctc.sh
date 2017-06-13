@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-# select GPU
+# Select GPU
 if [ $# -ne 2 ]; then
   echo "Error: set GPU number & config path." 1>&2
   echo "Usage: ./ctc.sh gpu_num path_to_config_file." 1>&2

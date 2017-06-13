@@ -1,0 +1,24 @@
+model_name: 
+corpus:
+    name:
+    label_type:
+feature:
+    name:
+    input_size:
+    splice:
+    num_stack:
+    num_skip:
+param:
+    num_cell:
+    num_proj:
+    num_layer:
+    batch_size:
+    optimizer:
+    learning_rate:
+    num_epoch:
+    weight_init:
+    clip_grad:
+    clip_activation:
+    dropout_input:
+    dropout_hidden:
+    weight_decay:

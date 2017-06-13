@@ -11,18 +11,18 @@ import random
 import numpy as np
 from tqdm import tqdm
 
-from utils.data.frame_stack import stack_frame
+from utils.frame_stack import stack_frame
 
 
 class DataSet(object):
     """Read dataset."""
 
-    def __init__(self, data_type, label_type, num_stack=None, num_skip=None,
-                 is_sorted=True, is_progressbar=False):
+    def __init__(self, data_type, label_type_second, num_stack=None,
+                 num_skip=None, is_sorted=True, is_progressbar=False):
         """
         Args:
             data_type: train or dev or test
-            label_type: phone39 or phone48 or phone61 (+ character)
+            label_type_second: phone39 or phone48 or phone61
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip
             is_sorted: if True, sort dataset by frame num
@@ -32,7 +32,7 @@ class DataSet(object):
             raise ValueError('data_type is "train" or "dev" or "test".')
 
         self.data_type = data_type
-        self.label_type = label_type
+        self.label_type_second = label_type_second
         self.num_stack = num_stack
         self.num_skip = num_skip
         self.is_sorted = is_sorted
@@ -42,7 +42,8 @@ class DataSet(object):
         self.dataset_char_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/ctc/character', data_type)
         self.dataset_phone_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/ctc/', label_type, data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/ctc/',
+            label_type_second, data_type)
 
         # Load the frame number dictionary
         self.frame_num_dict_path = join(
@@ -70,7 +71,8 @@ class DataSet(object):
         self.data_num = len(self.input_paths)
 
         # Load all dataset
-        print('=> Loading ' + data_type + ' dataset (' + label_type + ')...')
+        print('=> Loading ' + data_type +
+              ' dataset (' + label_type_second + ')...')
         input_list, label_char_list, label_phone_list = [], [], []
         iterator = tqdm(range(self.data_num)
                         ) if is_progressbar else range(self.data_num)
@@ -102,12 +104,12 @@ class DataSet(object):
             batch_size: mini batch size
         Returns:
             input_data: list of input data, size batch_size
-            labels_char: list of tuple `(indices, values, shape)`, size batch_size
+            labels_char: list of tuple `(indices, values, shape)`, size of `[batch_size]`
                          This is target labels for the main task (character)
-            labels_phone: list of tuple `(indices, values, shape)`, size batch_size
+            labels_phone: list of tuple `(indices, values, shape)`, size of `[batch_size]`
                          This is target labels fo the second task (phone)
-            seq_len: list of length of each label, size batch_size
-            input_names: list of file name of input data, size batch_size
+            seq_len: list of length of each label, size of `[batch_size]`
+            input_names: list of file name of input data, size of `[batch_size]`
         """
         #########################
         # sorted dataset

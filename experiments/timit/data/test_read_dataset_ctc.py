@@ -13,7 +13,6 @@ from tqdm import tqdm
 sys.path.append('../../')
 sys.path.append('../../../')
 from utils.labels.character import num2char
-from utils.data.sparsetensor import list2sparsetensor
 from read_dataset_ctc import DataSet
 
 
@@ -25,11 +24,11 @@ class TestReadDatasetCTC(unittest.TestCase):
                           is_sorted=True, is_progressbar=True)
 
         print('=> Reading mini-batch...')
-        map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
-        for i in tqdm(range(20000)):
+        map_file_path = '../metric/mapping_files/ctc/char2num.txt'
+        for i in tqdm(range(200)):
             inputs, labels, seq_len, input_names = dataset.next_batch(
                 batch_size=64)
-            indices, values, dense_shape = list2sparsetensor(labels)
+
             str_true = num2char(labels[0], map_file_path)
             str_true = re.sub(r'_', ' ', str_true)
             print(str_true)

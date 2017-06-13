@@ -15,7 +15,7 @@ import random
 import numpy as np
 from tqdm import tqdm
 
-from utils.data.frame_stack import stack_frame
+from utils.frame_stack import stack_frame
 
 
 class DataSet(object):

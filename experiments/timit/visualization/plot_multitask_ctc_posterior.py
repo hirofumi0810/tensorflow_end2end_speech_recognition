@@ -17,7 +17,8 @@ sys.path.append('../../')
 sys.path.append('../../../')
 from data.read_dataset_multitask_ctc import DataSet
 from models.ctc.load_model_multitask import load
-from evaluation.eval_ctc import do_eval_per, do_eval_cer, decode_test, posterior_test
+from metric.eval_ctc import do_eval_per, do_eval_cer
+from metric.eval_ctc import decode_test, posterior_test
 
 
 def do_restore(network, label_type, num_stack, num_skip, epoch=None):
@@ -43,10 +44,11 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
     network.define()
 
     # Add to the graph each operation
-    decode_op1, decode_op2 = network.decoder(decode_type='beam_search',
-                                             beam_width=20)
-    # posteriors_op = network.posteriors(decode_op1)
-    per_op1, per_op2 = network.ler(decode_op1, decode_op2)
+    decode_op_main, decode_op_second = network.decoder(
+        decode_type='beam_search',
+        beam_width=20)
+    posteriors_op = network.posteriors(decode_op_main)
+    per_op_main, per_op_second = network.ler(decode_op_main, decode_op_second)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -66,64 +68,82 @@ def do_restore(network, label_type, num_stack, num_skip, epoch=None):
         else:
             raise ValueError('There are not any checkpoints.')
 
-        print('Test Data Evaluation:')
-        do_eval_cer(session=sess, decode_op=decode_op1, network=network,
-                    dataset=test_data, is_progressbar=True,
-                    is_multitask=True)
+        print('=== Test Data Evaluation ===')
+        cer_test = do_eval_cer(
+            session=sess,
+            decode_op=decode_op_main,
+            network=network,
+            dataset=test_data,
+            is_progressbar=True,
+            is_multitask=True)
+        print('  CER: %f %%' % (cer_test * 100))
 
-        do_eval_per(session=sess, decode_op=decode_op2, per_op=per_op2,
-                    network=network, dataset=test_data,
-                    label_type=label_type, is_progressbar=True,
-                    is_multitask=True)
+        per_test = do_eval_per(
+            session=sess,
+            decode_op=decode_op_second,
+            per_op=per_op_second,
+            network=network,
+            dataset=test_data,
+            label_type=label_type,
+            is_progressbar=True,
+            is_multitask=True)
+        print('  PER: %f %%' % (per_test * 100))
 
         # Visualize
-        # decode_test(session=sess, decode_op=decode_op2, network=network,
-        #             dataset=test_data, label_type=label_type,
-        #             is_multitask=True)
-        # posterior_test(session=sess, posteriors_op=posteriors_op,
-        # network=network, dataset=test_data, label_type=label_type)
+        decode_test(session=sess,
+                    decode_op=decode_op_second,
+                    network=network,
+                    dataset=test_data,
+                    label_type=label_type,
+                    is_multitask=True)
+        posterior_test(session=sess,
+                       posteriors_op=posteriors_op,
+                       network=network,
+                       dataset=test_data,
+                       label_type=label_type)
 
 
 def main(model_path):
 
     epoch = None  # if None, restore the final epoch
 
-    # Read config file
+    # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
         corpus = config['corpus']
         feature = config['feature']
         param = config['param']
 
-    if corpus['label_type'] == 'phone61':
-        output_size2 = 61
-    elif corpus['label_type'] == 'phone48':
-        output_size2 = 48
-    elif corpus['label_type'] == 'phone39':
-        output_size2 = 39
+    if corpus['label_type_second'] == 'phone61':
+        output_size_second = 61
+    elif corpus['label_type_second'] == 'phone48':
+        output_size_second = 48
+    elif corpus['label_type_second'] == 'phone39':
+        output_size_second = 39
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
-    network = CTCModel(batch_size=1,
-                       input_size=feature['input_size'] * feature['num_stack'],
-                       num_cell=param['num_cell'],
-                       num_layer=param['num_layer'],
-                       num_layer2=param['num_layer2'],
-                       output_size=30,
-                       output_size2=output_size2,
-                       main_task_weight=param['main_task_weight'],
-                       clip_gradients=param['clip_grad'],
-                       clip_activation=param['clip_activation'],
-                       dropout_ratio_input=param['dropout_input'],
-                       dropout_ratio_hidden=param['dropout_hidden'],
-                       num_proj=param['num_proj'],
-                       weight_decay=param['weight_decay'])
+    network = CTCModel(
+        batch_size=1,
+        input_size=feature['input_size'] * feature['num_stack'],
+        num_cell=param['num_cell'],
+        num_layer_main=param['num_layer_main'],
+        num_layer_second=param['num_layer_second'],
+        output_size_main=30,
+        output_size_second=output_size_second,
+        main_task_weight=param['main_task_weight'],
+        clip_grad=param['clip_grad'],
+        clip_activation=param['clip_activation'],
+        dropout_ratio_input=param['dropout_input'],
+        dropout_ratio_hidden=param['dropout_hidden'],
+        num_proj=param['num_proj'],
+        weight_decay=param['weight_decay'])
     network.model_name = config['model_name']
     network.model_dir = model_path
 
     print(network.model_dir)
     do_restore(network=network,
-               label_type=corpus['label_type'],
+               label_type=corpus['label_type_second'],
                num_stack=feature['num_stack'],
                num_skip=feature['num_skip'],
                epoch=epoch)
@@ -133,7 +153,7 @@ if __name__ == '__main__':
 
     args = sys.argv
     if len(args) != 2:
-        raise ValueError(("Set a path to saved model.\n"
-                          "Usase: python restore_ctc.py path_to_saved_model"))
-
+        raise ValueError(
+            ("Set a path to saved model.\n"
+             "Usase: python restore_ctc.py path_to_saved_model"))
     main(model_path=args[1])

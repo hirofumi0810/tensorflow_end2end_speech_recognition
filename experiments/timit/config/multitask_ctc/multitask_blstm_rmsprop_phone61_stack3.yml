@@ -1,7 +1,8 @@
 model_name: multitask_blstm_ctc
 corpus:
     name: timit
-    label_type: phone61
+    label_type_main: character
+    label_type_second: phone61
 feature:
     name: fbank
     input_size: 123
@@ -11,8 +12,8 @@ feature:
 param:
     num_cell: 256
     num_proj: 0
-    num_layer: 5
-    num_layer2: 5
+    num_layer_main: 5
+    num_layer_second: 5
     main_task_weight: 0.8
     batch_size: 32
     optimizer: rmsprop
@@ -23,4 +24,4 @@ param:
     clip_activation: 50
     dropout_input: 0.8
     dropout_hidden: 0.5
-    weight_decay: 0.0
+    weight_decay: 1e-6

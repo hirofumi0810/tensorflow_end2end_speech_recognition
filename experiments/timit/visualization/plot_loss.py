@@ -1,6 +1,10 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import sys
 import numpy as np
@@ -25,5 +29,4 @@ if __name__ == '__main__':
     if len(args) != 2:
         raise ValueError(("Set a path to saved model.\n"
                           "Usase: python plot_loss.py path_to_saved_model"))
-
     main(model_path=args[1])

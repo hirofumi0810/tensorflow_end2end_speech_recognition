@@ -1,6 +1,10 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 
 
@@ -16,7 +20,7 @@ def mkdir(path_to_dir):
     return path_to_dir
 
 
-def join(path_to_dir, dir_name):
+def mkdir_join(path_to_dir, dir_name):
     """concat 2 paths and make a new direcory if the direcory does not exist.
     Args:
         path_to_dir: path to a diretcory

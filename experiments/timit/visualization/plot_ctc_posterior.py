@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate trained CTC network (TIMIT corpus)."""
+"""Plot the trained CTC posteriors (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -17,11 +17,11 @@ sys.path.append('../../')
 sys.path.append('../../../')
 from data.read_dataset_ctc import DataSet
 from models.ctc.load_model import load
-from metric.ctc import do_eval_per, do_eval_cer
+from util import posterior_test
 
 
-def do_eval(network, label_type, num_stack, num_skip, epoch=None):
-    """Evaluate the model.
+def do_plot(network, label_type, num_stack, num_skip, epoch=None):
+    """Plot the CTC posteriors.
     Args:
         network: model to restore
         label_type: phone39 or phone48 or phone61 or character
@@ -45,7 +45,7 @@ def do_eval(network, label_type, num_stack, num_skip, epoch=None):
     # Add to the graph each operation
     decode_op = network.decoder(decode_type='beam_search',
                                 beam_width=20)
-    per_op = network.compute_ler(decode_op)
+    posteriors_op = network.posteriors(decode_op)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -65,25 +65,11 @@ def do_eval(network, label_type, num_stack, num_skip, epoch=None):
         else:
             raise ValueError('There are not any checkpoints.')
 
-        print('Test Data Evaluation:')
-        if label_type == 'character':
-            cer_test = do_eval_cer(
-                session=sess,
-                decode_op=decode_op,
-                network=network,
-                dataset=test_data,
-                is_progressbar=True)
-            print('  CER: %f %%' % (cer_test * 100))
-        else:
-            per_test = do_eval_per(
-                session=sess,
-                decode_op=decode_op,
-                per_op=per_op,
-                network=network,
-                dataset=test_data,
-                label_type=label_type,
-                is_progressbar=True)
-            print('  PER: %f %%' % (per_test * 100))
+        posterior_test(session=sess,
+                       posteriors_op=posteriors_op,
+                       network=network,
+                       dataset=test_data,
+                       label_type=label_type)
 
 
 def main(model_path):
@@ -124,7 +110,7 @@ def main(model_path):
     network.model_dir = model_path
 
     print(network.model_dir)
-    do_eval(network=network,
+    do_plot(network=network,
             label_type=corpus['label_type'],
             num_stack=feature['num_stack'],
             num_skip=feature['num_skip'],
