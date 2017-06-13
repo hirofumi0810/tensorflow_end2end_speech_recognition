@@ -44,16 +44,17 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         num_skip: int, the number of frames to skip
     """
     # Load dataset
-    train_data = DataSet(data_type='train', label_type=label_type_second,
+    train_data = DataSet(data_type='train',
+                         label_type_second=label_type_second,
                          num_stack=num_stack, num_skip=num_skip,
                          is_sorted=True)
-    dev_data61 = DataSet(data_type='dev', label_type='phone61',
-                         num_stack=num_stack, num_skip=num_skip,
-                         is_sorted=False)
-    dev_data39 = DataSet(data_type='dev', label_type='phone39',
-                         num_stack=num_stack, num_skip=num_skip,
-                         is_sorted=False)
-    test_data = DataSet(data_type='test', label_type='phone39',
+    dev_data_phone61 = DataSet(data_type='dev', label_type_second='phone61',
+                               num_stack=num_stack, num_skip=num_skip,
+                               is_sorted=False)
+    dev_data_phone39 = DataSet(data_type='dev', label_type_second='phone39',
+                               num_stack=num_stack, num_skip=num_skip,
+                               is_sorted=False)
+    test_data = DataSet(data_type='test', label_type_second='phone39',
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False)
 
@@ -65,7 +66,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         # NOTE: define model under tf.Graph()
 
         # Add to the graph each operation
-        loss_op = network.loss()
+        loss_op = network.compute_loss()
         train_op = network.train(optimizer=optimizer,
                                  learning_rate_init=learning_rate,
                                  is_scheduled=False)
@@ -130,9 +131,9 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     network.label_indices: indices_char,
                     network.label_values: values_char,
                     network.label_shape: dense_shape_char,
-                    network.label_indices2: indices_phone,
-                    network.label_values2: values_phone,
-                    network.label_shape2: dense_shape_phone,
+                    network.label_indices_second: indices_phone,
+                    network.label_values_second: values_phone,
+                    network.label_shape_second: dense_shape_phone,
                     network.seq_len: seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
@@ -140,20 +141,20 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels_char, labels_phone, seq_len, _ = dev_data61.next_batch(
+                inputs, labels_char, labels_phone, seq_len, _ = dev_data_phone61.next_batch(
                     batch_size=batch_size)
                 indices_char, values_char, dense_shape_char = list2sparsetensor(
                     labels_char)
                 indices_phone, values_phone, dense_shape_phone = list2sparsetensor(
                     labels_phone)
                 feed_dict_dev = {
-                    network.inputs_pl: inputs,
+                    network.inputs: inputs,
                     network.label_indices: indices_char,
                     network.label_values: values_char,
                     network.label_shape: dense_shape_char,
-                    network.label_indices2: indices_phone,
-                    network.label_values2: values_phone,
-                    network.label_shape2: dense_shape_phone,
+                    network.label_indices_second: indices_phone,
+                    network.label_values_second: values_phone,
+                    network.label_shape_second: dense_shape_phone,
                     network.seq_len: seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden
@@ -187,7 +188,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     summary_writer.flush()
 
                     duration_step = time.time() - start_time_step
-                    print("Step % d: loss = % .3f ( % .3f) / cer = % .4f (%.4f) / per = % .4f ( % .4f) (%.3f min)" %
+                    print("Step % d: loss = %.3f (%.3f) / cer = %.4f (%.4f) / per = % .4f (%.4f) (%.3f min)" %
                           (step + 1, loss_train, loss_dev, cer_train, cer_dev,
                            per_train, per_dev, duration_step / 60))
                     sys.stdout.flush()
@@ -213,7 +214,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                             session=sess,
                             decode_op=decode_op_main,
                             network=network,
-                            dataset=dev_data39,
+                            dataset=dev_data_phone39,
                             eval_batch_size=1,
                             is_multitask=True)
                         print('  CER: %f %%' % (cer_dev_epoch * 100))
@@ -222,7 +223,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                             decode_op=decode_op_second,
                             per_op=ler_op_second,
                             network=network,
-                            dataset=dev_data39,
+                            dataset=dev_data_phone39,
                             label_type=label_type_second,
                             eval_batch_size=1,
                             is_multitask=True)

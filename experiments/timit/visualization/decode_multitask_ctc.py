@@ -30,14 +30,9 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
         epoch: epoch to restore
     """
     # Load dataset
-    if label_type_second == 'character':
-        test_data = DataSet(data_type='test', label_type_second='character',
-                            num_stack=num_stack, num_skip=num_skip,
-                            is_sorted=False, is_progressbar=True)
-    else:
-        test_data = DataSet(data_type='test', label_type_second='phone39',
-                            num_stack=num_stack, num_skip=num_skip,
-                            is_sorted=False, is_progressbar=True)
+    test_data = DataSet(data_type='test', label_type_second='phone61',
+                        num_stack=num_stack, num_skip=num_skip,
+                        is_sorted=False, is_progressbar=True)
 
     # Define model
     network.define()
@@ -68,7 +63,7 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
         # Visualize
         # Character
         decode_test(session=sess,
-                    decode_op=decode_op_second,
+                    decode_op=decode_op_main,
                     network=network,
                     dataset=test_data,
                     label_type='character',

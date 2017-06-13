@@ -101,7 +101,6 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
             per_local = compute_edit_distance(
                 session, labels_true_st, labels_pred_st)
             per_global += per_local * batch_size_each
-            print(per_local)
 
     per_global /= dataset.data_num
 

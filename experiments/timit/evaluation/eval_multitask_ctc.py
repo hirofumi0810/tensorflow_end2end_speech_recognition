@@ -17,25 +17,25 @@ sys.path.append('../../')
 sys.path.append('../../../')
 from data.read_dataset_multitask_ctc import DataSet
 from models.ctc.load_model_multitask import load
-from metric.eval_ctc import do_eval_per, do_eval_cer
+from metric.ctc import do_eval_per, do_eval_cer
 
 
-def do_eval(network, label_type, num_stack, num_skip, epoch=None):
+def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
-        label_type: phone39 or phone48 or phone61
+        label_type_second: phone39 or phone48 or phone61
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
         epoch: epoch to restore
     """
     # Load dataset
-    if label_type == 'character':
-        test_data = DataSet(data_type='test', label_type='character',
+    if label_type_second == 'character':
+        test_data = DataSet(data_type='test', label_type_second='character',
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
     else:
-        test_data = DataSet(data_type='test', label_type='phone39',
+        test_data = DataSet(data_type='test', label_type_second='phone39',
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
 
@@ -83,7 +83,7 @@ def do_eval(network, label_type, num_stack, num_skip, epoch=None):
             per_op=per_op_second,
             network=network,
             dataset=test_data,
-            label_type=label_type,
+            label_type=label_type_second,
             is_progressbar=True,
             is_multitask=True)
         print('  PER: %f %%' % (per_test * 100))
@@ -129,7 +129,7 @@ def main(model_path):
 
     print(network.model_dir)
     do_eval(network=network,
-            label_type=corpus['label_type_second'],
+            label_type_second=corpus['label_type_second'],
             num_stack=feature['num_stack'],
             num_skip=feature['num_skip'],
             epoch=epoch)

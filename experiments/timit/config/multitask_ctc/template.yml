@@ -1,7 +1,8 @@
-model_name:
+model_name: multitask_blstm_ctc
 corpus:
     name: timit
-    label_type:
+    label_type_main: character
+    label_type_second: 
 feature:
     name:
     input_size:
@@ -11,7 +12,9 @@ feature:
 param:
     num_cell:
     num_proj:
-    num_layer:
+    num_layer_main:
+    num_layer_second:
+    main_task_weight:
     batch_size:
     optimizer:
     learning_rate:
