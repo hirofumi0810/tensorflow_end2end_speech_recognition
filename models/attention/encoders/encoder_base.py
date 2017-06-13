@@ -19,7 +19,7 @@ class EncoderOutput(
 class EncoderBase(object):
     """Base class of the encoder.
     Args:
-        num_units:
+        num_unit:
         num_layer:
         keep_prob_input:
         keep_prob_hidden:
@@ -29,7 +29,7 @@ class EncoderBase(object):
     """
 
     def __init__(self,
-                 num_units,
+                 num_unit,
                  num_layer,
                  keep_prob_input,
                  keep_prob_hidden,
@@ -38,7 +38,7 @@ class EncoderBase(object):
                  num_proj,
                  name=None):
 
-        self.num_units = num_units
+        self.num_unit = num_unit
         self.num_layer = num_layer
         self.keep_prob_input = keep_prob_input
         self.keep_prob_hidden = keep_prob_hidden

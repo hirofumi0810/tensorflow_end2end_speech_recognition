@@ -86,7 +86,7 @@ class ctcBase(object):
         self.inputs = tf.placeholder(tf.float32,
                                      shape=[None, None, self.input_size],
                                      name='input')
-        # self.labels = tf.sparse_placeholder(tf.int32, name='label')
+
         self.label_indices = tf.placeholder(tf.int64, name='indices')
         self.label_values = tf.placeholder(tf.int32, name='values')
         self.label_shape = tf.placeholder(tf.int64, name='shape')
@@ -126,7 +126,7 @@ class ctcBase(object):
     def define(self):
         NotImplementedError
 
-    def loss(self):
+    def compute_loss(self):
         """Operation for computing ctc loss.
         Returns:
             loss: operation for computing ctc loss
@@ -272,7 +272,7 @@ class ctcBase(object):
 
         return posteriors_op
 
-    def ler(self, decode_op):
+    def compute_ler(self, decode_op):
         """Operation for computing LER (Label Error Rate).
         Args:
             decode_op: operation for decoding

@@ -203,7 +203,7 @@ class Multitask_BLSTM_CTC(ctcBase):
             # Convert to (max_time, batch_size, num_classes)
             self.logits_main = tf.transpose(logits_3d, (1, 0, 2))
 
-    def loss(self):
+    def compute_loss(self):
         """Operation for computing ctc loss.
         Returns:
             loss: operation for computing ctc loss
@@ -293,7 +293,29 @@ class Multitask_BLSTM_CTC(ctcBase):
 
         return decode_op_main, decode_op_second
 
-    def ler(self, decode_op_main, decode_op_second):
+    def posteriors(self, decode_op_main, decode_op_second):
+        """Operation for computing posteriors of each time steps.
+        Args:
+            decode_op_main: operation for decoding of the main task
+            decode_op_second: operation for decoding of the second task
+        Return:
+            posteriors_op_main: operation for computing posteriors for each
+                class in the main task
+            posteriors_op_second: operation for computing posteriors for each
+                class in the second task
+        """
+        # logits_3d : (max_time, batch_size, num_classes)
+        logits_2d_main = tf.reshape(self.logits_main,
+                                    shape=[-1, self.num_classes])
+        posteriors_op_main = tf.nn.softmax(logits_2d_main)
+
+        logits_2d_second = tf.reshape(self.logits_second,
+                                      shape=[-1, self.num_classes_second])
+        posteriors_op_second = tf.nn.softmax(logits_2d_second)
+
+        return posteriors_op_main, posteriors_op_second
+
+    def compute_ler(self, decode_op_main, decode_op_second):
         """Operation for computing LER (Label Error Rate).
         Args:
             decode_op_main: operation for decoding of the main task

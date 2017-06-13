@@ -14,7 +14,7 @@ from .encoder_base import EncoderOutput, EncoderBase
 class BGRUEncoder(EncoderBase):
     """Bidirectional GRU Encoder.
     Args:
-        num_units:
+        num_unit:
         num_layer:
         keep_prob_input:
         keep_prob_hidden:
@@ -24,7 +24,7 @@ class BGRUEncoder(EncoderBase):
     """
 
     def __init__(self,
-                 num_units,
+                 num_unit,
                  num_layer,
                  keep_prob_input=1.0,
                  keep_prob_hidden=1.0,
@@ -33,7 +33,7 @@ class BGRUEncoder(EncoderBase):
                  num_proj=None,  # not used
                  name='bgru_encoder'):
 
-        EncoderBase.__init__(self, num_units, num_layer, keep_prob_input,
+        EncoderBase.__init__(self, num_unit, num_layer, keep_prob_input,
                              keep_prob_hidden, parameter_init, clip_activation,
                              num_proj, name)
 
@@ -68,8 +68,8 @@ class BGRUEncoder(EncoderBase):
                     maxval=self.parameter_init)
 
                 with tf.variable_scope('GRU', initializer=initializer):
-                    gru_fw = tf.contrib.rnn.GRUCell(self.num_units)
-                    gru_bw = tf.contrib.rnn.GRUCell(self.num_units)
+                    gru_fw = tf.contrib.rnn.GRUCell(self.num_unit)
+                    gru_bw = tf.contrib.rnn.GRUCell(self.num_unit)
 
                 # Dropout (output)
                 gru_fw = tf.contrib.rnn.DropoutWrapper(

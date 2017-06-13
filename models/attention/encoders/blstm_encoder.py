@@ -14,7 +14,7 @@ from .encoder_base import EncoderOutput, EncoderBase
 class BLSTMEncoder(EncoderBase):
     """Bidirectional LSTM Encoder.
     Args:
-        num_units:
+        num_unit:
         num_layer:
         keep_prob_input:
         keep_prob_hidden:
@@ -24,7 +24,7 @@ class BLSTMEncoder(EncoderBase):
     """
 
     def __init__(self,
-                 num_units,
+                 num_unit,
                  num_layer,
                  keep_prob_input,
                  keep_prob_hidden,
@@ -33,7 +33,7 @@ class BLSTMEncoder(EncoderBase):
                  num_proj=None,
                  name='blstm_encoder'):
 
-        EncoderBase.__init__(self, num_units, num_layer, keep_prob_input,
+        EncoderBase.__init__(self, num_unit, num_layer, keep_prob_input,
                              keep_prob_hidden, parameter_init, clip_activation,
                              num_proj, name)
 
@@ -68,7 +68,7 @@ class BLSTMEncoder(EncoderBase):
                     maxval=self.parameter_init)
 
                 lstm_fw = tf.contrib.rnn.LSTMCell(
-                    self.num_units,
+                    self.num_unit,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,
@@ -76,7 +76,7 @@ class BLSTMEncoder(EncoderBase):
                     forget_bias=1.0,
                     state_is_tuple=True)
                 lstm_bw = tf.contrib.rnn.LSTMCell(
-                    self.num_units,
+                    self.num_unit,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,

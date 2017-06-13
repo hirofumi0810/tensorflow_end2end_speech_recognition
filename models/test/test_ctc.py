@@ -16,7 +16,7 @@ sys.path.append('../../')
 from ctc.load_model import load
 from util import measure_time
 from data import generate_data, num2alpha, num2phone
-from experiments.utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
+from experiments.utils.sparsetensor import list2sparsetensor, sparsetensor2list
 
 
 class TestCTC(tf.test.TestCase):
@@ -64,19 +64,20 @@ class TestCTC(tf.test.TestCase):
                             clip_activation=50,
                             dropout_ratio_input=1.0,
                             dropout_ratio_hidden=1.0,
+                            num_proj=None,
                             weight_decay=1e-6)
             network.define()
             # NOTE: define model under tf.Graph()
 
             # Add to the graph each operation
-            loss_op = network.loss()
+            loss_op = network.compute_loss()
             learning_rate = 1e-3
             train_op = network.train(optimizer='adam',
                                      learning_rate_init=learning_rate,
                                      is_scheduled=False)
             decode_op = network.decoder(decode_type='beam_search',
-                                                    beam_width=20)
-            ler_op = network.ler(decode_op)
+                                        beam_width=20)
+            ler_op = network.compute_ler(decode_op)
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()

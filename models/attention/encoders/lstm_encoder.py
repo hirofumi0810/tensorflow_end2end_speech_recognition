@@ -14,7 +14,7 @@ from .encoder_base import EncoderOutput, EncoderBase
 class LSTMEncoder(EncoderBase):
     """LSTM Encoder.
     Args:
-        num_units:
+        num_unit:
         num_layer:
         keep_prob_input:
         keep_prob_hidden:
@@ -24,7 +24,7 @@ class LSTMEncoder(EncoderBase):
     """
 
     def __init__(self,
-                 num_units,
+                 num_unit,
                  num_layer,
                  keep_prob_input=1.0,
                  keep_prob_hidden=1.0,
@@ -33,7 +33,7 @@ class LSTMEncoder(EncoderBase):
                  num_proj=None,
                  name='lstm_encoder'):
 
-        EncoderBase.__init__(self, num_units, num_layer, keep_prob_input,
+        EncoderBase.__init__(self, num_unit, num_layer, keep_prob_input,
                              keep_prob_hidden, parameter_init, clip_activation,
                              num_proj, name)
 
@@ -68,7 +68,7 @@ class LSTMEncoder(EncoderBase):
                     maxval=self.parameter_init)
 
                 lstm = tf.contrib.rnn.LSTMCell(
-                    self.num_units,
+                    self.num_unit,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,

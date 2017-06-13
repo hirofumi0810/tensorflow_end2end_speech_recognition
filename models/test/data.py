@@ -51,12 +51,13 @@ def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):
 def delta(feat, N):
     """Compute delta features from a feature vector sequence.
     Args:
-        feat: A numpy array of size (NUMFRAMES by number of features) containing features.
-              Each row holds 1 feature vector.
-        N: For each frame, calculate delta features based on preceding and following N frames.
+        feat: A numpy array of size (NUMFRAMES by number of features)
+            containing features. Each row holds 1 feature vector.
+        N: For each frame, calculate delta features based on preceding and
+            following N frames.
     Rreturns:
-        dfeat: A numpy array of size (NUMFRAMES by number of features) containing delta features.
-               Each row holds 1 delta feature vector.
+        dfeat: A numpy array of size (NUMFRAMES by number of features)
+            containing delta features. Each row holds 1 delta feature vector.
     """
     NUMFRAMES = len(feat)
     feat = np.concatenate(([feat[0] for i in range(N)],
@@ -181,7 +182,7 @@ def phone2num(transcript):
 
     # Read mapping file from phone to number
     phone_dict = {}
-    with open('../../experiments/timit/evaluation/mapping_files/ctc/phone2num_61.txt') as f:
+    with open('../../experiments/timit/metric/mapping_files/ctc/phone2num_61.txt') as f:
         for line in f:
             line = line.strip().split()
             phone_dict[line[0]] = int(line[1])
@@ -205,7 +206,7 @@ def num2phone(index_list):
     """
     # Read a phone mapping file
     phone_dict = {}
-    with open('../../experiments/timit/evaluation/mapping_files/ctc/phone2num_61.txt') as f:
+    with open('../../experiments/timit/metric/mapping_files/ctc/phone2num_61.txt') as f:
         for line in f:
             line = line.strip().split()
             phone_dict[int(line[1])] = line[0]
@@ -258,9 +259,9 @@ def num2alpha(index_list):
     for num in index_list:
         if num == 0:
             char_list.append(' ')
-        elif num == 27:
+        elif num == 26:
             char_list.append('<')
-        elif num == 28:
+        elif num == 27:
             char_list.append('>')
         else:
             char_list.append(chr(num + first_index))
