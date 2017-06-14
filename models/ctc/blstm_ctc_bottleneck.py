@@ -16,7 +16,7 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
-        num_cell: int, the number of memory cells in each layer
+        num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
         output_size: int, the number of nodes in softmax layer
             (except for blank class)
@@ -36,7 +36,7 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
     def __init__(self,
                  batch_size,
                  input_size,
-                 num_cell,
+                 num_unit,
                  num_layer,
                  output_size,
                  parameter_init=0.1,
@@ -49,7 +49,7 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
                  bottleneck_dim=320,
                  name='blstm_ctc_bottleneck'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
+        ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
                          output_size, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
@@ -77,7 +77,7 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
                     maxval=self.parameter_init)
 
                 lstm_fw = tf.contrib.rnn.LSTMCell(
-                    self.num_cell,
+                    self.num_unit,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,
@@ -85,7 +85,7 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
                     forget_bias=1.0,
                     state_is_tuple=True)
                 lstm_bw = tf.contrib.rnn.LSTMCell(
-                    self.num_cell,
+                    self.num_unit,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,
@@ -121,7 +121,7 @@ class BLSTM_CTC_BOTTLENECK(ctcBase):
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
-            output_node = self.num_cell * 2
+            output_node = self.num_unit * 2
         else:
             output_node = self.num_proj * 2
         outputs = tf.reshape(outputs, shape=[-1, output_node])

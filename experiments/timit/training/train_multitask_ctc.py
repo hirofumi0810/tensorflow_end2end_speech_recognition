@@ -292,12 +292,13 @@ def main(config_path):
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=feature['input_size'] * feature['num_stack'],
-                       num_cell=param['num_cell'],
+                       num_unit=param['num_unit'],
                        num_layer_main=param['num_layer_main'],
                        num_layer_second=param['num_layer_second'],
                        output_size_main=30,
                        output_size_second=output_size_second,
                        main_task_weight=param['main_task_weight'],
+                       parameter_init=param['weight_init'],
                        clip_grad=param['clip_grad'],
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
@@ -306,7 +307,7 @@ def main(config_path):
                        weight_decay=param['weight_decay'])
 
     network.model_name = config['model_name'].upper()
-    network.model_name += '_' + str(param['num_cell'])
+    network.model_name += '_' + str(param['num_unit'])
     network.model_name += '_main' + str(param['num_layer_main'])
     network.model_name += '_second' + str(param['num_layer_second'])
     network.model_name += '_' + param['optimizer']

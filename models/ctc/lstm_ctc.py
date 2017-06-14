@@ -16,7 +16,7 @@ class LSTM_CTC(ctcBase):
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
-        num_cell: int, the number of memory cells in each layer
+        num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
         output_size: int, the number of nodes in softmax layer
             (except for blank class)
@@ -36,7 +36,7 @@ class LSTM_CTC(ctcBase):
     def __init__(self,
                  batch_size,
                  input_size,
-                 num_cell,
+                 num_unit,
                  num_layer,
                  output_size,
                  parameter_init=0.1,
@@ -49,7 +49,7 @@ class LSTM_CTC(ctcBase):
                  bottleneck_dim=None,  # not used
                  name='lstm_ctc'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
+        ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
                          output_size, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
@@ -76,7 +76,7 @@ class LSTM_CTC(ctcBase):
                     minval=-self.parameter_init,
                     maxval=self.parameter_init)
 
-                lstm = tf.contrib.rnn.LSTMCell(self.num_cell,
+                lstm = tf.contrib.rnn.LSTMCell(self.num_unit,
                                                use_peepholes=True,
                                                cell_clip=self.clip_activation,
                                                initializer=initializer,
@@ -102,7 +102,7 @@ class LSTM_CTC(ctcBase):
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
-            output_node = self.num_cell
+            output_node = self.num_unit
         else:
             output_node = self.num_proj
         outputs = tf.reshape(outputs, shape=[-1, output_node])

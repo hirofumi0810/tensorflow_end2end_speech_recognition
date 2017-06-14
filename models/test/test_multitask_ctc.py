@@ -15,7 +15,7 @@ sys.path.append('../../')
 from ctc.multitask_blstm_ctc import Multitask_BLSTM_CTC
 from util import measure_time
 from data import generate_data, num2alpha, num2phone
-from experiments.utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
+from experiments.utils.sparsetensor import list2sparsetensor, sparsetensor2list
 
 
 class TestCTC(unittest.TestCase):
@@ -46,7 +46,7 @@ class TestCTC(unittest.TestCase):
             network = Multitask_BLSTM_CTC(
                 batch_size=batch_size,
                 input_size=inputs[0].shape[1],
-                num_cell=256,
+                num_unit=256,
                 num_layer_main=2,
                 num_layer_second=1,
                 output_size_main=output_size_main,
@@ -57,12 +57,13 @@ class TestCTC(unittest.TestCase):
                 clip_activation=50,
                 dropout_ratio_input=1.0,
                 dropout_ratio_hidden=1.0,
+                num_proj=None,
                 weight_decay=1e-6)
             network.define()
             # NOTE: define model under tf.Graph()
 
             # Add to the graph each operation
-            loss_op = network.loss()
+            loss_op = network.compute_loss()
             learning_rate = 1e-3
             train_op = network.train(optimizer='rmsprop',
                                      learning_rate_init=learning_rate,
@@ -70,7 +71,7 @@ class TestCTC(unittest.TestCase):
             decode_op_main, decode_op_second = network.decoder(
                 decode_type='beam_search',
                 beam_width=20)
-            ler_op_main, ler_op_second = network.ler(
+            ler_op_main, ler_op_second = network.compute_ler(
                 decode_op_main, decode_op_second)
 
             # Add the variable initializer operation

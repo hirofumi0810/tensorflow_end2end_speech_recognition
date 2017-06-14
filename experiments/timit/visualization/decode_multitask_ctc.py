@@ -67,6 +67,7 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
                     network=network,
                     dataset=test_data,
                     label_type='character',
+                    save_path=network.model_dir,
                     is_multitask=True)
 
         # Phone
@@ -75,6 +76,7 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
                     network=network,
                     dataset=test_data,
                     label_type=label_type_second,
+                    save_path=network.model_dir,
                     is_multitask=True)
 
 
@@ -101,7 +103,7 @@ def main(model_path):
     network = CTCModel(
         batch_size=1,
         input_size=feature['input_size'] * feature['num_stack'],
-        num_cell=param['num_cell'],
+        num_unit=param['num_cell'],  # TODO: change to num_unit
         num_layer_main=param['num_layer_main'],
         num_layer_second=param['num_layer_second'],
         output_size_main=30,

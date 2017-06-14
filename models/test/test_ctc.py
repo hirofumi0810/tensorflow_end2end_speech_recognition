@@ -55,7 +55,7 @@ class TestCTC(tf.test.TestCase):
             model = load(model_type=model_type)
             network = model(batch_size=batch_size,
                             input_size=inputs[0].shape[1],
-                            num_cell=256,
+                            num_unit=256,
                             num_layer=2,
                             bottleneck_dim=128,
                             output_size=output_size,

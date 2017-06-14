@@ -9,7 +9,7 @@ feature:
     num_stack:
     num_skip:
 param:
-    num_cell:
+    num_unit:
     num_proj:
     num_layer:
     batch_size:

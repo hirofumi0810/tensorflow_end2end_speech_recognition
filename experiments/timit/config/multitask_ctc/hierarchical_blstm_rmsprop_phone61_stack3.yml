@@ -10,7 +10,7 @@ feature:
     num_stack: 3
     num_skip: 3
 param:
-    num_cell: 256
+    num_unit: 256
     num_proj: 0
     num_layer_main: 5
     num_layer_second: 2

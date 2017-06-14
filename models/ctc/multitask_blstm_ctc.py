@@ -16,7 +16,7 @@ class Multitask_BLSTM_CTC(ctcBase):
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
-        num_cell: int, the number of memory cells in each layer
+        num_unit: int, the number of units in each layer
         num_layer_main: int, the number of layers of the main task
         num_layer_second: int, the number of layers of the second task. Set
             between 1 to num_layer_main
@@ -42,7 +42,7 @@ class Multitask_BLSTM_CTC(ctcBase):
     def __init__(self,
                  batch_size,
                  input_size,
-                 num_cell,
+                 num_unit,
                  num_layer_main,
                  num_layer_second,
                  output_size_main,
@@ -58,7 +58,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                  bottleneck_dim=None,
                  name='multitask_blstm_ctc'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_cell,
+        ctcBase.__init__(self, batch_size, input_size, num_unit,
                          num_layer_main, output_size_main, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
@@ -110,7 +110,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                     maxval=self.parameter_init)
 
                 lstm_fw = tf.contrib.rnn.LSTMCell(
-                    self.num_cell,
+                    self.num_unit,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,
@@ -118,7 +118,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                     forget_bias=1.0,
                     state_is_tuple=True)
                 lstm_bw = tf.contrib.rnn.LSTMCell(
-                    self.num_cell,
+                    self.num_unit,
                     use_peepholes=True,
                     cell_clip=self.clip_activation,
                     initializer=initializer,
@@ -155,7 +155,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                 if i_layer == self.num_layer_second:
                     # Reshape to apply the same weights over the timesteps
                     if self.num_proj is None:
-                        output_node = self.num_cell * 2
+                        output_node = self.num_unit * 2
                     else:
                         output_node = self.num_proj * 2
                     outputs_hidden = tf.reshape(
@@ -182,7 +182,7 @@ class Multitask_BLSTM_CTC(ctcBase):
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
-            output_node = self.num_cell * 2
+            output_node = self.num_unit * 2
         else:
             output_node = self.num_proj * 2
         outputs = tf.reshape(outputs, shape=[-1, output_node])

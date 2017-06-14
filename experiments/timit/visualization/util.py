@@ -7,9 +7,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+from os.path import join
+import sys
 import numpy as np
-# import scipy.io.wavfile
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -27,7 +27,7 @@ green = '#006400'
 
 
 def decode_test(session, decode_op, network, dataset, label_type,
-                is_multitask=False):
+                save_path=None, is_multitask=False):
     """Visualize label outputs.
     Args:
         session: session of training model
@@ -35,6 +35,7 @@ def decode_test(session, decode_op, network, dataset, label_type,
         network: network to evaluate
         dataset: Dataset class
         label_type: phone39 or phone48 or phone61 or character
+        save_path: path to save decoding results
         is_multitask: if True, evaluate the multitask model
     """
     batch_size = 1
@@ -46,6 +47,8 @@ def decode_test(session, decode_op, network, dataset, label_type,
     map_file_path_phone = '../metric/mapping_files/ctc/phone2num_' + \
         label_type[5:7] + '.txt'
     map_file_path_char = '../metric/mapping_files/ctc/char2num.txt'
+    if save_path is not None:
+        sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
     for step in range(iteration):
         # Create feed dictionary for next mini batch
         if not is_multitask:
@@ -86,9 +89,11 @@ def decode_test(session, decode_op, network, dataset, label_type,
 
                 print('Pred: %s' % num2phone(
                     labels_pred[i_batch], map_file_path_phone))
+            # sys.stdout.flush()
 
 
-def posterior_test(session, posteriors_op, network, dataset, label_type):
+def posterior_test(session, posteriors_op, network, dataset, label_type,
+                   save_path=None):
     """Visualize label posteriors.
     Args:
         session: session of training model
@@ -96,8 +101,9 @@ def posterior_test(session, posteriors_op, network, dataset, label_type):
         network: network to evaluate
         dataset: Dataset class
         label_type: phone39 or phone48 or phone61 or character
+        save_path: path to save ctc outputs
     """
-    save_path = mkdir_join(network.model_dir, 'ctc_output')
+    save_path = mkdir_join(save_path, 'ctc_output')
     batch_size = 1
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
@@ -129,17 +135,17 @@ def posterior_test(session, posteriors_op, network, dataset, label_type):
                         seq_len[i_batch]), :],
                     wav_index=input_names[i_batch],
                     label_type=label_type,
-                    save_path=None)
+                    save_path=save_path)
             else:
                 plot_probs_ctc_char(
                     probs=posteriors[posteriors_index][:int(
                         seq_len[i_batch]), :],
                     wav_index=input_names[i_batch],
-                    save_path=None)
+                    save_path=save_path)
 
 
 def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second, network,
-                             dataset, label_type_second):
+                             dataset, label_type_second, save_path=None):
     """Visualize label posteriors of Multi-task CTC model.
     Args:
         session: session of training model
@@ -149,8 +155,9 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second, 
         network: network to evaluate
         dataset: Dataset class
         label_type_second: phone39 or phone48 or phone61
+        save_path: path to save ctc outpus
     """
-    save_path = mkdir_join(network.model_dir, 'ctc_output')
+    save_path = mkdir_join(save_path, 'ctc_output')
     batch_size = 1
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
@@ -187,7 +194,7 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second, 
                     seq_len[i_batch]), :],
                 wav_index=input_names[i_batch],
                 label_type_second=label_type_second,
-                save_path=None)
+                save_path=save_path)
 
 
 def plot_probs_ctc_phone(probs, wav_index, label_type, save_path=None):
@@ -225,11 +232,11 @@ def plot_probs_ctc_phone(probs, wav_index, label_type, save_path=None):
     plt.xticks(list(range(0, int(len(probs) / 100) + 1, 1)))
     plt.yticks(list(range(0, 2, 1)))
     plt.legend(loc="upper right", fontsize=12)
-    plt.show()
+    # plt.show()
 
     # Save as a png file
     if save_path is not None:
-        save_path = os.path.join(save_path, wav_index + '.png')
+        save_path = join(save_path, wav_index + '.png')
         plt.savefig(save_path, dvi=500)
 
 
@@ -262,11 +269,11 @@ def plot_probs_ctc_char(probs, wav_index, save_path=None):
     plt.xticks(list(range(0, int(len(probs) / 100) + 1, 1)))
     plt.yticks(list(range(0, 2, 1)))
     plt.legend(loc="upper right", fontsize=12)
-    plt.show()
+    # plt.show()
 
     # Save as a png file
     if save_path is not None:
-        save_path = os.path.join(save_path, wav_index + '.png')
+        save_path = join(save_path, wav_index + '.png')
         plt.savefig(save_path, dvi=500)
 
 
@@ -325,9 +332,9 @@ def plot_probs_ctc_char_phone(probs_char, probs_phone, wav_index,
     plt.xticks(list(range(0, int(len(probs_phone) / 100) + 1, 1)))
     plt.yticks(list(range(0, 2, 1)))
     plt.legend(loc="upper right", fontsize=12)
-    plt.show()
+    # plt.show()
 
     # Save as a png file
     if save_path is not None:
-        save_path = os.path.join(save_path, wav_index + '.png')
+        save_path = join(save_path, wav_index + '.png')
         plt.savefig(save_path, dvi=500)

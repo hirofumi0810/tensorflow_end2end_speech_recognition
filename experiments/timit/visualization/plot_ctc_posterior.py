@@ -69,7 +69,8 @@ def do_plot(network, label_type, num_stack, num_skip, epoch=None):
                        posteriors_op=posteriors_op,
                        network=network,
                        dataset=test_data,
-                       label_type=label_type)
+                       label_type=label_type,
+                       save_path=network.model_dir)
 
 
 def main(model_path):
@@ -97,7 +98,7 @@ def main(model_path):
     network = CTCModel(
         batch_size=1,
         input_size=feature['input_size'] * feature['num_stack'],
-        num_cell=param['num_cell'],
+        num_unit=param['num_cell'],  # TODO: change to num_unit
         num_layer=param['num_layer'],
         output_size=output_size,
         clip_grad=param['clip_grad'],

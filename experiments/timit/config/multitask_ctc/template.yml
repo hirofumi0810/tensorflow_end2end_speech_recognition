@@ -2,7 +2,7 @@ model_name: multitask_blstm_ctc
 corpus:
     name: timit
     label_type_main: character
-    label_type_second: 
+    label_type_second:
 feature:
     name:
     input_size:
@@ -10,7 +10,7 @@ feature:
     num_stack:
     num_skip:
 param:
-    num_cell:
+    num_unit:
     num_proj:
     num_layer_main:
     num_layer_second:

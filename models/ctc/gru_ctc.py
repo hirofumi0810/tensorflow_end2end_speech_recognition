@@ -12,7 +12,7 @@ class GRU_CTC(ctcBase):
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
-        num_cell: int, the number of memory cells in each layer
+        num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
         output_size: int, the number of nodes in softmax layer
             (except for blank class)
@@ -32,7 +32,7 @@ class GRU_CTC(ctcBase):
     def __init__(self,
                  batch_size,
                  input_size,
-                 num_cell,
+                 num_unit,
                  num_layer,
                  output_size,
                  parameter_init=0.1,
@@ -45,7 +45,7 @@ class GRU_CTC(ctcBase):
                  bottleneck_dim=None,  # not used
                  name='gru_ctc'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
+        ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
                          output_size, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
@@ -71,7 +71,7 @@ class GRU_CTC(ctcBase):
                     maxval=self.parameter_init)
 
                 with tf.variable_scope('GRU', initializer=initializer):
-                    gru = tf.contrib.rnn.GRUCell(self.num_cell)
+                    gru = tf.contrib.rnn.GRUCell(self.num_unit)
 
                 # Dropout (output)
                 gru = tf.contrib.rnn.DropoutWrapper(
@@ -93,12 +93,12 @@ class GRU_CTC(ctcBase):
         batch_size = tf.shape(self.inputs)[0]
 
         # Reshape to apply the same weights over the timesteps
-        outputs = tf.reshape(outputs, shape=[-1, self.num_cell])
+        outputs = tf.reshape(outputs, shape=[-1, self.num_unit])
 
         with tf.name_scope('output'):
             # Affine
             W_output = tf.Variable(tf.truncated_normal(
-                shape=[self.num_cell, self.num_classes],
+                shape=[self.num_unit, self.num_classes],
                 stddev=0.1, name='W_output'))
             b_output = tf.Variable(tf.zeros(
                 shape=[self.num_classes], name='b_output'))

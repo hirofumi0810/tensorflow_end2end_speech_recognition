@@ -198,31 +198,30 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                         start_time_eval = time.time()
                         if label_type == 'character':
                             print('=== Dev Data Evaluation ===')
-                            error_dev_epoch = do_eval_cer(
+                            cer_dev_epoch = do_eval_cer(
                                 session=sess,
                                 decode_op=decode_op,
                                 network=network,
                                 dataset=dev_data,
                                 eval_batch_size=1)
-                            print('  CER: %f %%' % (error_dev_epoch * 100))
+                            print('  CER: %f %%' % (cer_dev_epoch * 100))
 
-                            if error_dev_epoch < error_best:
-                                error_best = error_dev_epoch
+                            if cer_dev_epoch < error_best:
+                                error_best = cer_dev_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
                                 print('=== Test Data Evaluation ===')
-                                error_test_epoch = do_eval_cer(
+                                cer_test = do_eval_cer(
                                     session=sess,
                                     decode_op=decode_op,
                                     network=network,
                                     dataset=test_data,
                                     eval_batch_size=1)
-                                print('  CER: %f %%' %
-                                      (error_test_epoch * 100))
+                                print('  CER: %f %%' % (cer_test * 100))
 
                         else:
                             print('=== Dev Data Evaluation ===')
-                            error_dev_epoch = do_eval_per(
+                            per_dev_epoch = do_eval_per(
                                 session=sess,
                                 decode_op=decode_op,
                                 per_op=ler_op,
@@ -230,14 +229,14 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                 dataset=dev_data,
                                 label_type=label_type,
                                 eval_batch_size=1)
-                            print('  PER: %f %%' % (error_dev_epoch * 100))
+                            print('  PER: %f %%' % (per_dev_epoch * 100))
 
-                            if error_dev_epoch < error_best:
-                                error_best = error_dev_epoch
+                            if per_dev_epoch < error_best:
+                                error_best = per_dev_epoch
                                 print('■■■ ↑Best Score (PER)↑ ■■■')
 
                                 print('=== Test Data Evaluation ===')
-                                error_test_epoch = do_eval_per(
+                                per_test = do_eval_per(
                                     session=sess,
                                     decode_op=decode_op,
                                     per_op=ler_op,
@@ -245,7 +244,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                     dataset=test_data,
                                     label_type=label_type,
                                     eval_batch_size=1)
-                                print('  PER: %f %%' % (error_dev_epoch * 100))
+                                print('  PER: %f %%' % (per_test * 100))
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -288,9 +287,10 @@ def main(config_path):
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=feature['input_size'] * feature['num_stack'],
-                       num_cell=param['num_cell'],
+                       num_unit=param['num_unit'],
                        num_layer=param['num_layer'],
                        output_size=output_size,
+                       parameter_init=param['weight_init'],
                        clip_grad=param['clip_grad'],
                        clip_activation=param['clip_activation'],
                        dropout_ratio_input=param['dropout_input'],
@@ -299,7 +299,7 @@ def main(config_path):
                        weight_decay=param['weight_decay'])
 
     network.model_name = config['model_name'].upper()
-    network.model_name += '_' + str(param['num_cell'])
+    network.model_name += '_' + str(param['num_unit'])
     network.model_name += '_' + str(param['num_layer'])
     network.model_name += '_' + param['optimizer']
     network.model_name += '_lr' + str(param['learning_rate'])

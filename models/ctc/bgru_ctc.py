@@ -16,7 +16,7 @@ class BGRU_CTC(ctcBase):
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
-        num_cell: int, the number of memory cells in each layer
+        num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
         output_size: int, the number of nodes in softmax layer
             (except for blank class)
@@ -36,7 +36,7 @@ class BGRU_CTC(ctcBase):
     def __init__(self,
                  batch_size,
                  input_size,
-                 num_cell,
+                 num_unit,
                  num_layer,
                  output_size,
                  parameter_init=0.1,
@@ -49,7 +49,7 @@ class BGRU_CTC(ctcBase):
                  bottleneck_dim=None,  # not used
                  name='bgru_ctc'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_cell, num_layer,
+        ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
                          output_size, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
@@ -74,8 +74,8 @@ class BGRU_CTC(ctcBase):
                     maxval=self.parameter_init)
 
                 with tf.variable_scope('GRU', initializer=initializer):
-                    gru_fw = tf.contrib.rnn.GRUCell(self.num_cell)
-                    gru_bw = tf.contrib.rnn.GRUCell(self.num_cell)
+                    gru_fw = tf.contrib.rnn.GRUCell(self.num_unit)
+                    gru_bw = tf.contrib.rnn.GRUCell(self.num_unit)
 
                 # Dropout (output)
                 gru_fw = tf.contrib.rnn.DropoutWrapper(
@@ -104,7 +104,7 @@ class BGRU_CTC(ctcBase):
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
         # Reshape to apply the same weights over the timesteps
-        outputs = tf.reshape(outputs, shape=[-1, self.num_cell * 2])
+        outputs = tf.reshape(outputs, shape=[-1, self.num_unit * 2])
 
         # `[batch_size, max_time, input_size_splice]`
         batch_size = tf.shape(self.inputs)[0]
@@ -112,7 +112,7 @@ class BGRU_CTC(ctcBase):
         with tf.name_scope('output'):
             # Affine
             W_output = tf.Variable(tf.truncated_normal(
-                shape=[self.num_cell * 2, self.num_classes],
+                shape=[self.num_unit * 2, self.num_classes],
                 stddev=0.1, name='W_output'))
             b_output = tf.Variable(tf.zeros(
                 shape=[self.num_classes], name='b_output'))

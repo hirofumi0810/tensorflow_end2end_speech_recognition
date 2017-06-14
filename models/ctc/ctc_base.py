@@ -25,7 +25,7 @@ class ctcBase(object):
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
-        num_cell: int, the number of memory cells in each layer
+        num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
         output_size: int, the number of nodes in softmax layer
             (except for blank class)
@@ -43,7 +43,7 @@ class ctcBase(object):
     def __init__(self,
                  batch_size,
                  input_size,
-                 num_cell,
+                 num_unit,
                  num_layer,
                  output_size,
                  parameter_init,
@@ -58,7 +58,7 @@ class ctcBase(object):
         self.batch_size = batch_size
         self.input_size = input_size
         self.output_size = output_size
-        self.num_cell = num_cell
+        self.num_unit = num_unit
         self.num_layer = num_layer
         self.num_classes = output_size + 1  # plus blank label
 
