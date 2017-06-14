@@ -4,7 +4,6 @@
 *.out
 *.log
 *.npy
-*.png
 __pycache__
 blstm_ctc_example.py
 lstm_ctc_example.py
@@ -25,3 +24,6 @@ char2num_insert3.txt
 phone2num_insert.txt
 phone2num_insert2.txt
 phone2num_insert3.txt
+run_ctc_dialog.sh
+dialog
+csj/fine_tuning
