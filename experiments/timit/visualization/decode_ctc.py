@@ -17,7 +17,7 @@ sys.path.append('../../')
 sys.path.append('../../../')
 from data.read_dataset_ctc import DataSet
 from models.ctc.load_model import load
-from util import decode_test
+from util_decode_ctc import decode_test
 
 
 def do_decode(network, label_type, num_stack, num_skip, epoch=None):
@@ -35,7 +35,7 @@ def do_decode(network, label_type, num_stack, num_skip, epoch=None):
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
     else:
-        test_data = DataSet(data_type='test', label_type='phone39',
+        test_data = DataSet(data_type='test', label_type='phone61',
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
 
@@ -107,9 +107,8 @@ def main(model_path):
         dropout_ratio_hidden=param['dropout_hidden'],
         num_proj=param['num_proj'],
         weight_decay=param['weight_decay'])
-    network.model_name = config['model_name']
-    network.model_dir = model_path
 
+    network.model_dir = model_path
     print(network.model_dir)
     do_decode(network=network,
               label_type=corpus['label_type'],

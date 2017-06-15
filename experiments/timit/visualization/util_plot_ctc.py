@@ -1,21 +1,17 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""""Utilities for decoding and plotting."""
+""""Utilities for plotting of CTC model."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 from os.path import join
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
-from utils.sparsetensor import sparsetensor2list
 from utils.directory import mkdir_join
 
 plt.style.use('ggplot')
@@ -26,75 +22,9 @@ orange = '#D2691E'
 green = '#006400'
 
 
-def decode_test(session, decode_op, network, dataset, label_type,
-                save_path=None, is_multitask=False):
-    """Visualize label outputs.
-    Args:
-        session: session of training model
-        decode_op: operation for decoding
-        network: network to evaluate
-        dataset: Dataset class
-        label_type: phone39 or phone48 or phone61 or character
-        save_path: path to save decoding results
-        is_multitask: if True, evaluate the multitask model
-    """
-    batch_size = 1
-    num_examples = dataset.data_num
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
-
-    map_file_path_phone = '../metric/mapping_files/ctc/phone2num_' + \
-        label_type[5:7] + '.txt'
-    map_file_path_char = '../metric/mapping_files/ctc/char2num.txt'
-    if save_path is not None:
-        sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
-    for step in range(iteration):
-        # Create feed dictionary for next mini batch
-        if not is_multitask:
-            inputs, labels_true, seq_len, input_names = dataset.next_batch(
-                batch_size=batch_size)
-        else:
-            inputs, labels_true_char, labels_true_phone, seq_len, input_names = dataset.next_batch(
-                batch_size=batch_size)
-            if label_type == 'character':
-                labels_true = labels_true_char
-            else:
-                labels_true = labels_true_phone
-
-        feed_dict = {
-            network.inputs: inputs,
-            network.seq_len: seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
-        }
-
-        # Visualize
-        batch_size_each = len(labels_true)
-        labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
-        for i_batch in range(batch_size_each):
-            if label_type == 'character':
-                print('----- wav: %s -----' % input_names[i_batch])
-                print('True: %s' % num2char(
-                    labels_true[i_batch], map_file_path_char))
-                print('Pred: %s' % num2char(
-                    labels_pred[i_batch], map_file_path_char))
-
-            else:
-                # Decode (mapped to 39 phones)
-                print('----- wav: %s -----' % input_names[i_batch])
-                print('True: %s' % num2phone(
-                    labels_true[i_batch], map_file_path_phone))
-
-                print('Pred: %s' % num2phone(
-                    labels_pred[i_batch], map_file_path_phone))
-            # sys.stdout.flush()
-
-
 def posterior_test(session, posteriors_op, network, dataset, label_type,
                    save_path=None):
-    """Visualize label posteriors.
+    """Visualize label posteriors of CTC model.
     Args:
         session: session of training model
         posteriois_op: operation for computing posteriors

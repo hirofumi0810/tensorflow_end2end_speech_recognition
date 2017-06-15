@@ -17,7 +17,7 @@ sys.path.append('../../')
 sys.path.append('../../../')
 from data.read_dataset_multitask_ctc import DataSet
 from models.ctc.load_model_multitask import load
-from util import decode_test
+from util_decode_ctc import decode_test_multitask
 
 
 def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
@@ -61,23 +61,13 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
             raise ValueError('There are not any checkpoints.')
 
         # Visualize
-        # Character
-        decode_test(session=sess,
-                    decode_op=decode_op_main,
-                    network=network,
-                    dataset=test_data,
-                    label_type='character',
-                    save_path=network.model_dir,
-                    is_multitask=True)
-
-        # Phone
-        decode_test(session=sess,
-                    decode_op=decode_op_second,
-                    network=network,
-                    dataset=test_data,
-                    label_type=label_type_second,
-                    save_path=network.model_dir,
-                    is_multitask=True)
+        decode_test_multitask(session=sess,
+                              decode_op_main=decode_op_main,
+                              decode_op_second=decode_op_second,
+                              network=network,
+                              dataset=test_data,
+                              label_type_second=label_type_second,
+                              save_path=network.model_dir)
 
 
 def main(model_path):
@@ -103,7 +93,7 @@ def main(model_path):
     network = CTCModel(
         batch_size=1,
         input_size=feature['input_size'] * feature['num_stack'],
-        num_unit=param['num_cell'],  # TODO: change to num_unit
+        num_unit=param['num_unit'],
         num_layer_main=param['num_layer_main'],
         num_layer_second=param['num_layer_second'],
         output_size_main=30,
@@ -115,9 +105,8 @@ def main(model_path):
         dropout_ratio_hidden=param['dropout_hidden'],
         num_proj=param['num_proj'],
         weight_decay=param['weight_decay'])
-    network.model_name = config['model_name']
-    network.model_dir = model_path
 
+    network.model_dir = model_path
     print(network.model_dir)
     do_decode(network=network,
               label_type_second=corpus['label_type_second'],
