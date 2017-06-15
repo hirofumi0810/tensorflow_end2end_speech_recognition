@@ -13,16 +13,24 @@ from tensorflow.python.util import nest
 from .dynamic_decoder import dynamic_decode
 
 
-# template
-AttentionDecoderOutput = namedtuple(
-    "DecoderOutput",
-    [
-        "logits",
-        "predicted_ids",
-        "cell_output",
-        "attention_scores",
-        "attention_context"
-    ])
+class AttentionDecoderOutput(namedtuple(
+        "DecoderOutput",
+        [
+            "logits",
+            "predicted_ids",
+            "cell_output",
+            "attention_scores",
+            "attention_context"
+        ])):
+    """
+    Args:
+        logits:
+        predicted_ids:
+        cell_output:
+        attention_scores:
+        attention_context:
+    """
+    pass
 
 
 class AttentionDecoder(tf.contrib.seq2seq.Decoder):
@@ -36,11 +44,11 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
              i.e. number of units in the softmax layer
         attention_encoder_states: The sequence used to calculate attention
             scores. A tensor of shape
-            `[batch_size, max_time, encoder_num_units]`.
+            `[batch_size, max_time, encoder_num_unit]`.
         attention_values: The sequence to attend over.
-            A tensor of shape `[batch_size, max_time, encoder_num_units]`.
+            A tensor of shape `[batch_size, max_time, encoder_num_unit]`.
         attention_values_length: Sequence length of the attention values.
-            An int32 Tensor of shape `[batch]`.
+            An int32 Tensor of shape `[batch_size]`.
         attention_layer: The attention function to use. This function map from
             `(state, inputs)` to `(attention_weights, attention_context)`.
             For an example, see `decoders.attention_layer.AttentionLayer`.
@@ -161,14 +169,12 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         """
         # Create inputs for the first time step
         finished, first_inputs = self.helper.initialize()
-        print(first_inputs.get_shape().as_list())
-
-        # first_inputs: `[batch_size, embedding_dim]`
+        # NOTE: first_inputs: `[batch_size, embedding_dim]`
 
         # Concat empty attention context
         batch_size = tf.shape(first_inputs)[0]
-        encoder_num_units = self.attention_values.get_shape().as_list()[-1]
-        attention_context = tf.zeros(shape=[batch_size, encoder_num_units])
+        encoder_num_unit = self.attention_values.get_shape().as_list()[-1]
+        attention_context = tf.zeros(shape=[batch_size, encoder_num_unit])
 
         # Create first inputs
         first_inputs = tf.concat([first_inputs, attention_context], axis=1)

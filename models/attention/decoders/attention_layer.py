@@ -18,13 +18,13 @@ class AttentionLayer(object):
             translate."
             arXiv preprint arXiv:1409.0473 (2014).
     Args:
-        num_units: Number of units used in the attention layer
+        num_unit: Number of units used in the attention layer
         attention_type: bahdanau or layer_dot
     """
 
-    def __init__(self, num_units, attention_type='bahdanau',
+    def __init__(self, num_unit, attention_type='bahdanau',
                  name='attention_layer'):
-        self.num_units = num_units
+        self.num_unit = num_unit
         self.attention_type = attention_type
         self.name = name
 
@@ -59,11 +59,11 @@ class AttentionLayer(object):
                     A tensor of shape `[batch_size, encoder_num_units]`.
         """
         # Fully connected layers to transform both encoder_states and
-        # current_decoder_state into a tensor with `num_units` units
+        # current_decoder_state into a tensor with `num_unit` units
         # h_j (j: time index of input) => U_a * h_j
         att_encoder_states = tf.contrib.layers.fully_connected(
             inputs=encoder_states,
-            num_outputs=self.num_units,
+            num_outputs=self.num_unit,
             activation_fn=None,
             # reuse=True,
             scope="att_encoder_states")
@@ -71,13 +71,13 @@ class AttentionLayer(object):
         # s_{i-1} (i: time index of output) => W_a * s_{i-1}
         att_decoder_state = tf.contrib.layers.fully_connected(
             inputs=current_decoder_state,
-            num_outputs=self.num_units,
+            num_outputs=self.num_unit,
             activation_fn=None,
             # reuse=True,
             scope="att_decoder_state")
-        # TODO: Divide self.num_units into encoder_num_units and
+        # TODO: Divide self.num_unit into encoder_num_units and
         # decoder_num_units
-        # NOTE: エンコーダがBidirectionalのときユニット数を2倍にすることに注意
+        # NOTE: エンコーダがBidirectionalのときユニット数を2倍にすることに注意??
 
         # Compute attention scores over encoder outputs (energy: e_ij)
         # v_a = f(U_a * h_j, W_a * s_{i-1})
@@ -127,7 +127,7 @@ class AttentionLayer(object):
         if self.attention_type == 'bahdanau':
             # with tf.variable_scope("bahdanau", reuse=True):
             v_att = tf.get_variable("v_att",
-                                    shape=[self.num_units],
+                                    shape=[self.num_unit],
                                     dtype=tf.float32)
 
             # calculates a batch- and time-wise dot product with a variable

@@ -118,6 +118,16 @@ class InitialStateBridge(Bridge):
         self._bridge_input = getattr(encoder_outputs, "final_state")
         self._activation_fn = locate("tensorflow.identity")
 
+    def __call__(self, reuse=False):
+        """Runs the bridge function.
+        Args:
+            reuse:
+        Returns:
+          An initial decoder_state tensor or tuple of tensors.
+        """
+        self.reuse = reuse
+        return self._create()
+
     @staticmethod
     def default_params():
         return {
@@ -140,7 +150,9 @@ class InitialStateBridge(Bridge):
         initial_state_flat = tf.contrib.layers.fully_connected(
             inputs=bridge_input_concat,
             num_outputs=total_decoder_state_size,
-            activation_fn=self._activation_fn)
+            activation_fn=self._activation_fn,
+            reuse=self.reuse,
+            scope="bridge")
 
         # Shape back into required state size
         initial_state = tf.split(initial_state_flat, state_size_splits, axis=1)

@@ -9,8 +9,8 @@ from __future__ import print_function
 
 from collections import namedtuple, OrderedDict
 import tensorflow as tf
-from .decoders.decoder_util import transpose_batch_time, flatten_dict
-from .decoders.beam_search_decoder import BeamSearchDecoder
+# from .decoders.decoder_util import transpose_batch_time, flatten_dict
+# from .decoders.beam_search_decoder_from_seq2seq import BeamSearchDecoder
 
 
 OPTIMIZER_CLS_NAMES = {
@@ -28,39 +28,6 @@ HELPERS = {
 }
 
 
-class BeamSearchConfig(namedtuple(
-        "BeamSearchConfig",
-        [
-            "beam_width",
-            "vocab_size",
-            "eos_token",
-            "length_penalty_weight",
-            "choose_successors_fn"
-        ])):
-    pass
-
-
-def templatemethod(name_):
-    """This decorator wraps a method with `tf.make_template`. For example,
-
-    @templatemethod
-    def my_method():
-      # Create variables
-    """
-
-    def template_decorator(func):
-        """Inner decorator function"""
-
-        def func_wrapper(*args, **kwargs):
-            """Inner wrapper function"""
-            templated_func = tf.make_template(name_, func)
-            return templated_func(*args, **kwargs)
-
-        return func_wrapper
-
-    return template_decorator
-
-
 class AttentionBase(object):
     """Attention Mechanism based seq2seq model.
     Args:
@@ -68,6 +35,7 @@ class AttentionBase(object):
         input_size: int, the dimension of input vectors
         attention_dim:
         output_size: int, the number of nodes in output layer
+        embedding_dim:
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
         clip_grad: A float value. Range of gradient clipping (> 0)
@@ -79,6 +47,7 @@ class AttentionBase(object):
                  batch_size,
                  input_size,
                  attention_dim,
+                 embedding_dim,
                  output_size,
                  sos_index,
                  eos_index,
@@ -91,6 +60,7 @@ class AttentionBase(object):
         self.batch_size = batch_size
         self.input_size = input_size
         self.attention_dim = attention_dim
+        self.embedding_dim = embedding_dim
         self.num_classes = output_size
 
         # Regularization
@@ -127,6 +97,20 @@ class AttentionBase(object):
                                      shape=[None, None],
                                      name='label')
 
+        # These are prepared for computing LER
+        self.label_indices_true = tf.placeholder(tf.int64, name='indices')
+        self.label_values_true = tf.placeholder(tf.int32, name='values')
+        self.label_shape_true = tf.placeholder(tf.int64, name='shape')
+        self.labels_sparse_true = tf.SparseTensor(self.label_indices_true,
+                                                  self.label_values_true,
+                                                  self.label_shape_true)
+        self.label_indices_pred = tf.placeholder(tf.int64, name='indices')
+        self.label_values_pred = tf.placeholder(tf.int32, name='values')
+        self.label_shape_pred = tf.placeholder(tf.int64, name='shape')
+        self.labels_sparse_pred = tf.SparseTensor(self.label_indices_pred,
+                                                  self.label_values_pred,
+                                                  self.label_shape_pred)
+
         # The length of input features
         self.inputs_seq_len = tf.placeholder(tf.int32,
                                              shape=[None],  # `[batch_size]`
@@ -146,6 +130,17 @@ class AttentionBase(object):
 
         # Learning rate
         self.learning_rate = tf.placeholder(tf.float32, name='learning_rate')
+
+    def _generate_target_embedding(self, reuse):
+        """Returns the embedding used for the target sequence."""
+        with tf.variable_scope("target_embedding", reuse=reuse):
+            return tf.get_variable(
+                name="W_embedding",
+                shape=[self.num_classes, self.embedding_dim],
+                initializer=tf.random_uniform_initializer(
+                    -self.parameter_init,
+                    self.parameter_init))
+        # TODO: Consider shape of target_embedding
 
     def _encode(self):
         """Encode input features."""
@@ -219,19 +214,24 @@ class AttentionBase(object):
         """
         # Convert target labels to one-hot vectors of size
         # `[batch_size, max_time, num_classes]`
-        labels = tf.one_hot(labels,
-                            depth=self.num_classes,
-                            on_value=1.0,
-                            off_value=0.0,
-                            axis=-1)
+        # labels = tf.one_hot(labels,
+        #                     depth=self.num_classes,
+        #                     on_value=1.0,
+        #                     off_value=0.0,
+        #                     axis=-1)
+
+        # Generate embedding of target labels
+        target_embedding = self._generate_target_embedding(reuse=False)
+        target_embedded = tf.nn.embedding_lookup(target_embedding,
+                                                 labels)
 
         helper_train = tf.contrib.seq2seq.TrainingHelper(
-            # inputs=target_embedded[:, :-1],  # 正解ラベルの埋め込みベクトル
-            inputs=labels[:, :-1],
+            inputs=target_embedded[:, :-1, :],  # embedding of target labels
+            # inputs=labels[:, :-1, :],
             sequence_length=labels_seq_len - 1,
             time_major=False)
 
-        decoder_initial_state = bridge()
+        decoder_initial_state = bridge(reuse=False)
 
         # Call decoder class
         decoder_outputs, final_state = decoder(
@@ -249,17 +249,18 @@ class AttentionBase(object):
         Returns:
             decoder_outputs: A tuple of `(AttentionDecoderOutput, final_state)`
         """
-
         batch_size = tf.shape(self.inputs)[0]
         # if self.use_beam_search:
         #     batch_size = self.beam_width
         # TODO: why?
 
+        target_embedding = self._generate_target_embedding(reuse=True)
+
         helper_infer = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-            # embedding=decoder.logits,  # 出力ラベルの埋め込みベクトル
-            embedding=self.target_embedding,
-            start_tokens=tf.fill([batch_size], self.sos_index),
-            # or tf.tile([self.sos_index], [batch_size]),
+            # embedding=self.decoder_outputs_train.logits,
+            embedding=target_embedding,  # embedding of predicted labels
+            # start_tokens=tf.fill([batch_size], self.sos_index),
+            start_tokens=tf.tile([self.sos_index], [batch_size]),
             end_token=self.eos_index)
         # ex.)
         # Output tensor has shape [2, 3].
@@ -267,7 +268,7 @@ class AttentionBase(object):
         #                         [9, 9, 9]]
         # TODO: beam_search_decoder
 
-        decoder_initial_state = bridge()
+        decoder_initial_state = bridge(reuse=True)
 
         # Call decoder class
         decoder_outputs, final_state = decoder(
@@ -277,92 +278,30 @@ class AttentionBase(object):
 
         return (decoder_outputs, final_state)
 
-    @property
-    @templatemethod("target_embedding")
-    def target_embedding(self):
-        """Returns the embedding used for the target sequence."""
-        return tf.get_variable(
-            name="W_embedding",
-            shape=[self.num_classes, self.num_classes],
-            initializer=tf.random_uniform_initializer(
-                -self.parameter_init,
-                self.parameter_init))
-        # TODO: Consider shape of target_embedding
-
-    # def _create_predictions(self, decoder_output, features, labels,
-    #                         losses=None):
-    #     """Creates the dictionary of predictions that is returned by the
-    #     model.
-    #     """
-    #     predictions = {}
-    #
-    #     # Add features and, if available, labels to predictions
-    #     predictions.update(flatten_dict({"features": features}))
-    #     if labels is not None:
-    #         predictions.update(flatten_dict({"labels": labels}))
-    #
-    #     if losses is not None:
-    #         predictions["losses"] = transpose_batch_time(losses)
-    #
-    #     # Decoders returns output in time-major form
-    #     # `[max_time, batch_size, ...]`
-    #     # Here we transpose everything back to batch-major for the user
-    #     output_dict = OrderedDict(
-    #         zip(decoder_output._fields, decoder_output))
-    #     decoder_output_flat = flatten_dict(output_dict)
-    #     decoder_output_flat = {
-    #         k: transpose_batch_time(v)
-    #         for k, v in decoder_output_flat.items()
-    #     }
-    #     predictions.update(decoder_output_flat)
-    #
-    #     return predictions
-
-    def _cross_entropy_sequence_loss(self, logits, labels, labels_seq_len):
-        """Calculates the per-example cross-entropy loss for a sequence of
-           logits and masks out all losses passed the sequence length.
-        Args:
-            logits: Logits of shape `[max_time, batch_size, num_classes]`
-            labels: Target labels of shape `[max_time, batch_size]`
-            labels_seq_len: An int32 tensor of shape `[batch_size]`
-                corresponding to the length of each input to the decoder.
-                Note that this is different from seq_len, which is the length
-                of each input to the encoder.
-        Returns:
-            A tensor of shape [max_time, batch_size] that contains the loss per
-                example, per time step.
-        """
-        with tf.name_scope("cross_entropy_sequence_loss"):
-            losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=logits, labels=labels)
-
-            # Mask out the losses we don't care about
-            loss_mask = tf.sequence_mask(
-                tf.to_int32(labels_seq_len), tf.to_int32(tf.shape(labels)[0]))
-            losses = losses * tf.transpose(tf.to_float(loss_mask), [1, 0])
-
-            return losses
-
-    def _compute_loss(self, decoder_outputs, labels, labels_seq_len):
+    def compute_loss(self):
         """Operation for computing cross entropy sequence loss.
-        Args:
-            decoder_outputs: An instance of AttentionDecoderOutput
-            labels: Target lables of shape `[max_time, batch_size]`
-            labels_seq_len: The length of target labels of shape `[batch_size]`
         Returns:
             loss: operation for computing cross entropy sequence loss.
-                  This is a single scalar tensor to minimize
-            losses: the per-batch losses
+                  This is a single scalar tensor to minimize.
         """
-        # Calculate loss per example-timestep of shape `[batch_size, max_time]`
-        self.losses = self._cross_entropy_sequence_loss(
-            logits=decoder_outputs.logits[:, :, :],
-            labels=tf.transpose(labels[:, 1:], [1, 0]),
-            labels_seq_len=labels_seq_len - 1)
+        # Calculate loss per example
+        logits = self.decoder_outputs_train.logits
+        max_time = tf.shape(self.labels[:, 1:])[1]
+        loss_mask = tf.sequence_mask(tf.to_int32(self.labels_seq_len - 1),
+                                     maxlen=max_time,
+                                     dtype=tf.float32)
+        losses = tf.contrib.seq2seq.sequence_loss(
+            logits=logits,
+            targets=self.labels[:, 1:],
+            weights=loss_mask,
+            average_across_timesteps=True,
+            average_across_batch=False,
+            softmax_loss_function=None)
 
         # Calculate the average log perplexity
-        self.loss = tf.reduce_sum(self.losses) / tf.to_float(
-            tf.reduce_sum(labels_seq_len - 1))
+        # self.loss = tf.reduce_sum(losses) / tf.to_float(
+        #     tf.reduce_sum(self.labels_seq_len - 1))
+        self.loss = tf.reduce_sum(losses)
 
         # Add a scalar summary for the snapshot of loss
         self.summaries_train.append(
@@ -370,13 +309,13 @@ class AttentionBase(object):
         self.summaries_dev.append(
             tf.summary.scalar('loss_dev', self.loss))
 
-        return self.losses, self.loss
+        return self.loss
 
     def train(self, optimizer, learning_rate_init=None,
               clip_gradients_by_norm=None, is_scheduled=False):
         """Operation for training.
         Args:
-            optimizer: adam or adadelta or rmsprop or sgd or momentum
+            optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
             learning_rate_init: initial learning rate
             clip_gradients_by_norm: if True, clip gradients by norm of the
                 value of self.clip_grad
@@ -446,21 +385,49 @@ class AttentionBase(object):
 
         return train_op
 
-    # def ler(self, decode_op):
-    #     """Operation for computing LER.
-    #     Args:
-    #         decode_op: operation for decoding
-    #     Return:
-    #         ler_op: operation for computing label error rate
-    #     """
-    # compute phone error rate (normalize by label length)
-    # ler_op = tf.reduce_mean(tf.edit_distance(decode_op, self.labels,
-    #                                          normalize=True))
-    #     # TODO: ここでの編集距離は数字だから，文字に変換しないと正しい結果は得られない
-    #
-    #     # add a scalar summary for the snapshot ler
-    # self.summaries_train.append(tf.summary.scalar(
-    #     'Label Error Rate (train)', ler_op))
-    # self.summaries_dev.append(tf.summary.scalar(
-    #     'Label Error Rate (dev)', ler_op))
-    #     return ler_op
+    def _add_scaled_noise_to_gradients(grads_and_vars, gradient_noise_scale):
+        """Adds scaled noise from a 0-mean normal distribution to gradients."""
+        raise NotImplementedError
+
+    def decoder(self, decode_type, beam_width=None):
+        """Operation for decoding.
+        Args:
+            decode_type: greedy or beam_search
+            beam_width: beam width for beam search
+        Return:
+            decoded_train: operation for decoding in training
+            decoded_infer: operation for decoding in inference
+        """
+        if decode_type not in ['greedy', 'beam_search']:
+            raise ValueError('decode_type is "greedy" or "beam_search".')
+
+        if decode_type == 'greedy':
+            decoded_train = self.decoder_outputs_train.predicted_ids
+            decoded_infer = self.decoder_outputs_infer.predicted_ids
+
+        elif decode_type == 'beam_search':
+            if beam_width is None:
+                raise ValueError('Set beam_width.')
+            NotImplementedError
+
+        return decoded_train, decoded_infer
+
+    def compute_ler(self):
+        """Operation for computing LER (Label Error Rate).
+        Return:
+            ler_op: operation for computing LER
+        """
+        # Compute LER (normalize by label length)
+        ler_op = tf.reduce_mean(tf.edit_distance(
+            self.labels_sparse_pred, self.labels_sparse_true, normalize=True))
+        # TODO: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
+        # TODO: パディングを考慮して計算する
+
+        # Add a scalar summary for the snapshot of LER
+        with tf.name_scope("ler"):
+            self.summaries_train.append(tf.summary.scalar(
+                'ler_train', ler_op))
+            self.summaries_dev.append(tf.summary.scalar(
+                'ler_dev', ler_op))
+
+        return ler_op

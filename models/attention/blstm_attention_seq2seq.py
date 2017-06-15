@@ -20,13 +20,14 @@ class BLSTMAttetion(AttentionBase):
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimension of input vectors
-        encoder_num_units: int, the number of units in each layer of the
+        encoder_num_unit: int, the number of units in each layer of the
             encoder
         encoder_num_layer: int, the number of layers of the encoder
         attention_dim: int,
-        decoder_num_units: int, the number of units in each layer of the
+        decoder_num_unit: int, the number of units in each layer of the
             decoder
         decoder_num_layer: int, the number of layers of the decoder
+        embedding_dim: int, the dimension of the embedding in target spaces
         output_size: int, the number of nodes in softmax layer
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
@@ -42,17 +43,17 @@ class BLSTMAttetion(AttentionBase):
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
             layers
         weight_decay:
-        beam_width:
     """
 
     def __init__(self,
                  batch_size,
                  input_size,
-                 encoder_num_units,
+                 encoder_num_unit,
                  encoder_num_layer,
                  attention_dim,
-                 decoder_num_units,
+                 decoder_num_unit,
                  decoder_num_layer,
+                 embedding_dim,
                  output_size,
                  sos_index,
                  eos_index,
@@ -68,14 +69,14 @@ class BLSTMAttetion(AttentionBase):
                  name='blstm_attention_seq2seq'):
 
         AttentionBase.__init__(self, batch_size, input_size,
-                               attention_dim,
+                               attention_dim, embedding_dim,
                                output_size, sos_index, eos_index,
                                clip_grad, weight_decay, beam_width, name)
 
         # Network size
-        self.encoder_num_units = encoder_num_units
+        self.encoder_num_unit = encoder_num_unit
         self.encoder_num_layer = encoder_num_layer
-        self.decoder_num_units = decoder_num_units
+        self.decoder_num_unit = decoder_num_unit
         self.decoder_num_layer = decoder_num_layer
 
         # Regularization
@@ -105,7 +106,7 @@ class BLSTMAttetion(AttentionBase):
         encoder = load(model_type='blstm_encoder')(
             keep_prob_input=self.keep_prob_input,
             keep_prob_hidden=self.keep_prob_hidden,
-            num_units=self.encoder_num_units,
+            num_unit=self.encoder_num_unit,
             num_layer=self.encoder_num_layer,
             parameter_init=self.parameter_init,
             clip_activation=self.clip_activation_encoder,
@@ -113,12 +114,10 @@ class BLSTMAttetion(AttentionBase):
 
         encoder_outputs = encoder(inputs=inputs,
                                   inputs_seq_len=inputs_seq_len)
-        # TODO:: modeはいる？（消した）
-        # selfに入れる必要ある？
 
         return encoder_outputs
 
-    def _create_decoder(self, encoder_outputs, labels, reuse):
+    def _create_decoder(self, encoder_outputs, labels):
         """Create attention decoder.
         Args:
             encoder_outputs: A tuple of `()`
@@ -127,24 +126,22 @@ class BLSTMAttetion(AttentionBase):
             decoder: The decoder class instance
         """
         # Define attention layer (calculate attention weights)
-        self.attention_layer = AttentionLayer(num_units=self.attention_dim,
+        self.attention_layer = AttentionLayer(num_unit=self.attention_dim,
                                               attention_type='bahdanau')
 
         # Define RNN decoder
         with tf.name_scope('lstm_decoder'):
-            reuse = False
             initializer = tf.random_uniform_initializer(
                 minval=-self.parameter_init,
                 maxval=self.parameter_init)
             lstm = tf.contrib.rnn.LSTMCell(
-                num_units=self.decoder_num_units,
+                num_units=self.decoder_num_unit,
                 use_peepholes=True,
                 cell_clip=self.clip_activation_decoder,
                 initializer=initializer,
                 num_proj=None,
                 forget_bias=1.0,
-                state_is_tuple=True,
-                reuse=reuse)
+                state_is_tuple=True)
 
         # Define attention decoder
         decoder = AttentionDecoder(
@@ -170,9 +167,9 @@ class BLSTMAttetion(AttentionBase):
 
         # Define decoder (initialization)
         decoder_train = self._create_decoder(
-            encoder_outputs, self.labels, reuse=False)
+            encoder_outputs, self.labels)
         decoder_infer = self._create_decoder(
-            encoder_outputs, self.labels, reuse=True)
+            encoder_outputs, self.labels)
         # NOTE: initial_state and helper will be substituted in
         # self._decode_train() or self._decode_infer()
 
@@ -186,13 +183,10 @@ class BLSTMAttetion(AttentionBase):
         bridge = InitialStateBridge(
             encoder_outputs=encoder_outputs,
             decoder_state_size=decoder_train.cell.state_size)
-        # bridge_infer = InitialStateBridge(
-        #     encoder_outputs=encoder_outputs,
-        #     decoder_state_size=decoder_infer.cell.state_size)
 
-        # Call decoder
+        # Call decoder (divide into training and inference)
         # Training
-        decoder_outputs_train, _ = self._decode_train(
+        self.decoder_outputs_train, _ = self._decode_train(
             decoder=decoder_train,
             bridge=bridge,
             encoder_outputs=encoder_outputs,
@@ -200,24 +194,7 @@ class BLSTMAttetion(AttentionBase):
             labels_seq_len=self.labels_seq_len)
 
         # Inference
-        decoder_outputs_infer, _ = self._decode_infer(
+        self.decoder_outputs_infer, _ = self._decode_infer(
             decoder=decoder_infer,
             bridge=bridge,
             encoder_outputs=encoder_outputs)
-
-        losses, self.loss = self._compute_loss(
-            decoder_outputs_train, self.labels, self.labels_seq_len)
-
-        # predictions = self._create_predictions(
-        #     decoder_output=decoder_outputs, inputs=inputs, labels=labels)
-
-        # test
-        self.decoder_outputs_train = decoder_outputs_train
-        self.decoder_outputs_infer = decoder_outputs_infer
-
-        # self.train_op = self.train(loss)
-        # self.predictions = self._create_predictions(
-        #     decoder_output=decoder_outputs,
-        #     inputs=inputs,
-        #     labels=labels,
-        #     losses=losses)
