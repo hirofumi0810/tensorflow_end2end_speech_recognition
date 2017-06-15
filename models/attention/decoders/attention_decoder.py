@@ -116,6 +116,7 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
             mode:
         Returns:
             A tuple of `(outputs, final_state)`
+            attention_weights_list: list of attention weights in each time
         """
         self.mode = mode
         if mode == tf.contrib.learn.ModeKeys.TRAIN:
@@ -144,7 +145,7 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         outputs, final_state = dynamic_decode(
             decoder=self,
             output_time_major=False,  # changed
-            impute_finished=False,  # changed
+            impute_finished=True,  # changed
             maximum_iterations=maximum_iterations)
         return self.finalize(outputs, final_state)
 
@@ -281,9 +282,8 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         """
         with tf.variable_scope("step", reuse=self.reuse):
             # Call LSTMCell
-            # print(inputs.get_shape().as_list())
             cell_output_prev, cell_state_prev = self.cell(inputs, state)
-            cell_output, logits, attention_scores, attention_context = \
+            cell_output, logits, attention_weights, attention_context = \
                 self.compute_output(cell_output_prev)
 
             sample_ids = self.helper.sample(time=time,
@@ -294,7 +294,7 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
             outputs = AttentionDecoderOutput(logits=logits,
                                              predicted_ids=sample_ids,
                                              cell_output=cell_output,
-                                             attention_scores=attention_scores,
+                                             attention_scores=attention_weights,
                                              attention_context=attention_context)
 
             finished, next_inputs, next_state = self.helper.next_inputs(

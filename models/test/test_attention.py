@@ -57,6 +57,7 @@ class TestAttention(tf.test.TestCase):
                 sos_index=output_size - 2,
                 eos_index=output_size - 1,
                 max_decode_length=50,
+                attention_weights_tempareture=0.5,
                 parameter_init=0.1,
                 clip_grad=5.0,
                 clip_activation_encoder=50,

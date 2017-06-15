@@ -22,9 +22,10 @@ class AttentionLayer(object):
         attention_type: bahdanau or layer_dot
     """
 
-    def __init__(self, num_unit, attention_type='bahdanau',
-                 name='attention_layer'):
+    def __init__(self, num_unit, attention_weights_tempareture,
+                 attention_type='bahdanau', name='attention_layer'):
         self.num_unit = num_unit
+        self.attention_weights_tempareture = attention_weights_tempareture
         self.attention_type = attention_type
         self.name = name
 
@@ -98,13 +99,18 @@ class AttentionLayer(object):
         # TODO: For underflow?
 
         # Normalize the scores (attention_weights: α_ij (j=0,1,...))
-        attention_weights = tf.nn.softmax(scores, name="attention_weights")
-        # TODO: Add beta(temperature) in order to smooth output probabilities
+        # attention_weights = tf.nn.softmax(
+        #     scores, name="attention_weights")
+        attention_weights = tf.exp(scores / self.attention_weights_tempareture) / \
+            tf.reduce_sum(tf.exp(scores / self.attention_weights_tempareture),
+                          axis=-1,
+                          keep_dims=True)
 
         # Calculate the weighted average of the attention inputs
         # according to the scores
         # c_i = sigma_{j}(α_ij * h_j)
-        attention_context = tf.expand_dims(attention_weights, axis=2) * values
+        attention_context = tf.expand_dims(
+            attention_weights, axis=2) * values
         attention_context = tf.reduce_sum(
             attention_context, axis=1, name="attention_context")
         values_depth = values.get_shape().as_list()[-1]  # = encoder_num_units

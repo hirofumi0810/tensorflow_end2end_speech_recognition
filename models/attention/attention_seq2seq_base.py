@@ -234,7 +234,7 @@ class AttentionBase(object):
         decoder_initial_state = bridge(reuse=False)
 
         # Call decoder class
-        decoder_outputs, final_state = decoder(
+        (decoder_outputs, final_state) = decoder(
             initial_state=decoder_initial_state,
             helper=helper_train,
             mode=tf.contrib.learn.ModeKeys.TRAIN)
@@ -271,7 +271,7 @@ class AttentionBase(object):
         decoder_initial_state = bridge(reuse=True)
 
         # Call decoder class
-        decoder_outputs, final_state = decoder(
+        (decoder_outputs, final_state) = decoder(
             initial_state=decoder_initial_state,
             helper=helper_infer,
             mode=tf.contrib.learn.ModeKeys.INFER)
@@ -431,3 +431,6 @@ class AttentionBase(object):
                 'ler_dev', ler_op))
 
         return ler_op
+
+    def attention_weights(self):
+        return self.decoder_outputs_infer.attention_scores

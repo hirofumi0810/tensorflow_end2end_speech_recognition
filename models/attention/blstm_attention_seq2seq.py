@@ -7,9 +7,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
 from .attention_seq2seq_base import AttentionBase
-from .encoders.load_encoder import load
+from .encoders.load_encoder import load as load_encoder
+from .decoders.load_decoder import load as load_decoder
 from .decoders.attention_layer import AttentionLayer
 from .decoders.attention_decoder import AttentionDecoder
 from .bridge import InitialStateBridge
@@ -32,6 +32,7 @@ class BLSTMAttetion(AttentionBase):
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
         max_decode_length:
+        attention_weights_tempareture:
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (non-negative)
@@ -58,6 +59,7 @@ class BLSTMAttetion(AttentionBase):
                  sos_index,
                  eos_index,
                  max_decode_length,
+                 attention_weights_tempareture=1,
                  parameter_init=0.1,
                  clip_grad=5.0,
                  clip_activation_encoder=50,
@@ -92,6 +94,9 @@ class BLSTMAttetion(AttentionBase):
 
         # Setting for se2seq
         self.max_decode_length = max_decode_length
+        self.attention_weights_tempareture = attention_weights_tempareture
+        # NOTE: attention_weights_tempareture is good for narrow focus.
+        # Assume that β = 1 / attention_weights_tempareture, β=2 is recommended.
 
     def _encode(self, inputs, inputs_seq_len):
         """Encode input features.
@@ -103,7 +108,7 @@ class BLSTMAttetion(AttentionBase):
             `(outputs final_state attention_values attention_values_length)`
         """
         # Define encoder
-        encoder = load(model_type='blstm_encoder')(
+        encoder = load_encoder(model_type='blstm_encoder')(
             keep_prob_input=self.keep_prob_input,
             keep_prob_hidden=self.keep_prob_hidden,
             num_unit=self.encoder_num_unit,
@@ -126,22 +131,16 @@ class BLSTMAttetion(AttentionBase):
             decoder: The decoder class instance
         """
         # Define attention layer (calculate attention weights)
-        self.attention_layer = AttentionLayer(num_unit=self.attention_dim,
-                                              attention_type='bahdanau')
+        self.attention_layer = AttentionLayer(
+            num_unit=self.attention_dim,
+            attention_weights_tempareture=self.attention_weights_tempareture,
+            attention_type='bahdanau')
 
         # Define RNN decoder
-        with tf.name_scope('lstm_decoder'):
-            initializer = tf.random_uniform_initializer(
-                minval=-self.parameter_init,
-                maxval=self.parameter_init)
-            lstm = tf.contrib.rnn.LSTMCell(
-                num_units=self.decoder_num_unit,
-                use_peepholes=True,
-                cell_clip=self.clip_activation_decoder,
-                initializer=initializer,
-                num_proj=None,
-                forget_bias=1.0,
-                state_is_tuple=True)
+        rnn_decoder = load_decoder(model_type='lstm_decoder')
+        lstm = rnn_decoder(parameter_init=self.parameter_init,
+                           num_unit=self.decoder_num_unit,
+                           clip_activation=self.clip_activation_decoder)
 
         # Define attention decoder
         decoder = AttentionDecoder(
@@ -166,10 +165,8 @@ class BLSTMAttetion(AttentionBase):
         encoder_outputs = self._encode(self.inputs, self.inputs_seq_len)
 
         # Define decoder (initialization)
-        decoder_train = self._create_decoder(
-            encoder_outputs, self.labels)
-        decoder_infer = self._create_decoder(
-            encoder_outputs, self.labels)
+        decoder_train = self._create_decoder(encoder_outputs, self.labels)
+        decoder_infer = self._create_decoder(encoder_outputs, self.labels)
         # NOTE: initial_state and helper will be substituted in
         # self._decode_train() or self._decode_infer()
 

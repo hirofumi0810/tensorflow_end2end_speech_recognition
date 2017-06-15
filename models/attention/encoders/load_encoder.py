@@ -11,14 +11,15 @@ from .lstm_encoder import LSTMEncoder
 from .blstm_encoder import BLSTMEncoder
 from .gru_encoder import GRUEncoder
 from .bgru_encoder import BGRUEncoder
+from .pyramidal_blstm_encoder import PyramidalBLSTMEncoder
 
 Encoder = {
     "lstm_encoder": LSTMEncoder,
     "blstm_encoder": BLSTMEncoder,
     "gru_encoder": GRUEncoder,
-    "bgru_encoder": BGRUEncoder
+    "bgru_encoder": BGRUEncoder,
+    "pblstm_encoder": PyramidalBLSTMEncoder
 }
-# TODO: Add pyramidal_blstm_encoder
 
 
 def load(model_type):
@@ -26,7 +27,7 @@ def load(model_type):
     Args:
         model_type: string, name of the encoder in the key of Encoder
     Returns:
-        model: class object
+        model: An instance of RNN encoder
     """
     if model_type not in Encoder:
         raise ValueError(

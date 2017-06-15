@@ -99,6 +99,7 @@ class BLSTMEncoder(EncoderBase):
                 # initial_state_fw=_init_state_fw,
                 # initial_state_bw=_init_state_bw,
 
+                # Stacking
                 (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
@@ -107,6 +108,7 @@ class BLSTMEncoder(EncoderBase):
                     dtype=tf.float32,
                     scope='BiLSTM_' + str(i_layer + 1))
 
+                # Concatenate each direction
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
         return EncoderOutput(outputs=outputs,
