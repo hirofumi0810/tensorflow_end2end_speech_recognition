@@ -1,9 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Read dataset for CTC network (TIMIT corpus).
-   In addition, frame stacking and skipping are used.
-"""
+"""Read dataset for Attention-based model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -15,20 +13,17 @@ import random
 import numpy as np
 from tqdm import tqdm
 
-from utils.frame_stack import stack_frame
-
 
 class DataSet(object):
     """Read dataset."""
 
-    def __init__(self, data_type, label_type, num_stack=None, num_skip=None,
-                 is_sorted=True, is_progressbar=False):
+    def __init__(self, data_type, label_type, eos_index, is_sorted=True,
+                 is_progressbar=False):
         """
         Args:
             data_type: train or dev or test
             label_type: phone39 or phone48 or phone61 or character
-            num_stack: int, the number of frames to stack
-            num_skip: int, the number of frames to skip
+            eos_index: int , the index of <EOS> class
             is_sorted: if True, sort dataset by frame num
             is_progressbar: if True, visualize progressbar
         """
@@ -37,17 +32,17 @@ class DataSet(object):
 
         self.data_type = data_type
         self.label_type = label_type
-        self.num_stack = num_stack
-        self.num_skip = num_skip
+        self.eos_index = eos_index
         self.is_sorted = is_sorted
         self.is_progressbar = is_progressbar
 
         self.input_size = 123
         self.dataset_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/ctc/', label_type, data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/attention/', label_type, data_type)
 
         # Load the frame number dictionary
-        self.frame_num_dict_path = join(self.dataset_path, 'frame_num.pickle')
+        self.frame_num_dict_path = join(
+            self.dataset_path, 'frame_num_dict.pickle')
         with open(self.frame_num_dict_path, 'rb') as f:
             self.frame_num_dict = pickle.load(f)
 
@@ -75,18 +70,6 @@ class DataSet(object):
         self.input_list = np.array(input_list)
         self.label_list = np.array(label_list)
 
-        # Frame stacking
-        if (num_stack is not None) and (num_skip is not None):
-            print('=> Stacking frames...')
-            stacked_input_list = stack_frame(self.input_list,
-                                             self.input_paths,
-                                             self.frame_num_dict,
-                                             num_stack,
-                                             num_skip,
-                                             is_progressbar)
-            self.input_list = np.array(stacked_input_list)
-            self.input_size = self.input_size * num_stack
-
         self.rest = set([i for i in range(self.data_num)])
 
     def next_batch(self, batch_size):
@@ -95,9 +78,11 @@ class DataSet(object):
             batch_size: mini batch size
         Returns:
             input_data: list of input data, size batch_size
-            abels: list of tuple `(indices, values, shape)` of size
+            labels: list of tuple `(indices, values, shape)` of size
                 `[batch_size]`
             inputs_seq_len: list of length of inputs of size `[batch_size]`
+            labels_seq_len: list of length of target labels of size
+                `[batch_size]`
             input_names: list of file name of input data of size `[batch_size]`
         """
         #########################
@@ -117,14 +102,19 @@ class DataSet(object):
             # Compute max frame num in mini batch
             max_frame_num = self.input_list[sorted_indices[-1]].shape[0]
 
+            # Compute max target label length in mini batch
+            max_seq_len = max(map(len, self.label_list[sorted_indices]))
+
             # Shuffle selected mini batch (0 ~ len(self.rest)-1)
             random.shuffle(sorted_indices)
 
             # Initialization
             input_data = np.zeros(
                 (len(sorted_indices), max_frame_num, self.input_size))
-            labels = [None] * len(sorted_indices)
-            inputs_seq_len = np.empty((len(sorted_indices),))
+            labels = np.array([[self.eos_index] * max_seq_len]
+                              * len(sorted_indices), dtype=int)
+            inputs_seq_len = np.zeros((len(sorted_indices),), dtype=int)
+            labels_seq_len = np.zeros((len(sorted_indices),), dtype=int)
             input_names = [None] * len(sorted_indices)
 
             # Set values of each data in mini batch
@@ -132,8 +122,9 @@ class DataSet(object):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
                 input_data[i_batch, :frame_num, :] = data_i
-                labels[i_batch] = self.label_list[x]
+                labels[i_batch, :len(self.label_list[x])] = self.label_list[x]
                 inputs_seq_len[i_batch] = frame_num
+                labels_seq_len[i_batch] = len(self.label_list[x])
                 input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
@@ -161,11 +152,16 @@ class DataSet(object):
                 frame_num_list.append(data_i.shape[0])
             max_frame_num = max(frame_num_list)
 
+            # Compute max target label length in mini batch
+            max_seq_len = max(map(len, self.label_list[random_indices]))
+
             # Initialization
             input_data = np.zeros(
                 (len(random_indices), max_frame_num, self.input_size))
-            labels = [None] * len(random_indices)
-            inputs_seq_len = np.empty((len(random_indices),))
+            labels = np.array([[self.eos_index] * max_seq_len]
+                              * len(random_indices), dtype=int)
+            inputs_seq_len = np.zeros((len(random_indices),), dtype=int)
+            labels_seq_len = np.zeros((len(random_indices),), dtype=int)
             input_names = [None] * len(random_indices)
 
             # Set values of each data in mini batch
@@ -173,9 +169,10 @@ class DataSet(object):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
                 input_data[i_batch, :frame_num, :] = data_i
-                labels[i_batch] = self.label_list[x]
+                labels[i_batch, :len(self.label_list[x])] = self.label_list[x]
                 inputs_seq_len[i_batch] = frame_num
+                labels_seq_len[i_batch] = len(self.label_list[x])
                 input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
-        return input_data, labels, inputs_seq_len, input_names
+        return input_data, labels, inputs_seq_len, labels_seq_len, input_names

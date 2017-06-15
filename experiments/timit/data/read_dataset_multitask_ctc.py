@@ -104,12 +104,14 @@ class DataSet(object):
             batch_size: mini batch size
         Returns:
             input_data: list of input data, size batch_size
-            labels_char: list of tuple `(indices, values, shape)`, size of `[batch_size]`
-                         This is target labels for the main task (character)
-            labels_phone: list of tuple `(indices, values, shape)`, size of `[batch_size]`
-                         This is target labels fo the second task (phone)
-            seq_len: list of length of each label, size of `[batch_size]`
-            input_names: list of file name of input data, size of `[batch_size]`
+            labels_char: list of tuple `(indices, values, shape)` of size
+                `[batch_size]`
+                This is target labels for the main task (character)
+            labels_phone: list of tuple `(indices, values, shape)` of size
+                `[batch_size]`
+                 This is target labels fo the second task (phone)
+            inputs_seq_len: list of length of inputs of size `[batch_size]`
+            input_names: list of file name of input data of size `[batch_size]`
         """
         #########################
         # sorted dataset
@@ -136,7 +138,7 @@ class DataSet(object):
                 (len(sorted_indices), max_frame_num, self.input_size))
             labels_char = [None] * len(sorted_indices)
             labels_phone = [None] * len(sorted_indices)
-            seq_len = np.empty((len(sorted_indices),))
+            inputs_seq_len = np.empty((len(sorted_indices),))
             input_names = [None] * len(sorted_indices)
 
             # Set values of each data in mini batch
@@ -146,7 +148,7 @@ class DataSet(object):
                 input_data[i_batch, :frame_num, :] = data_i
                 labels_char[i_batch] = self.label_char_list[x]
                 labels_phone[i_batch] = self.label_phone_list[x]
-                seq_len[i_batch] = frame_num
+                inputs_seq_len[i_batch] = frame_num
                 input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
@@ -179,7 +181,7 @@ class DataSet(object):
                 (len(random_indices), max_frame_num, self.input_size))
             labels_char = [None] * len(random_indices)
             labels_phone = [None] * len(random_indices)
-            seq_len = np.empty((len(random_indices),))
+            inputs_seq_len = np.empty((len(random_indices),))
             input_names = [None] * len(random_indices)
 
             # Set values of each data in mini batch
@@ -189,8 +191,8 @@ class DataSet(object):
                 input_data[i_batch, :frame_num, :] = data_i
                 labels_char[i_batch] = self.label_char_list[x]
                 labels_phone[i_batch] = self.label_phone_list[x]
-                seq_len[i_batch] = frame_num
+                inputs_seq_len[i_batch] = frame_num
                 input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
-        return input_data, labels_char, labels_phone, seq_len, input_names
+        return input_data, labels_char, labels_phone, inputs_seq_len, input_names
