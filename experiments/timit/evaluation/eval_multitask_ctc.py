@@ -39,15 +39,40 @@ def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
 
-    # Define model
-    network.define()
+    # Define placeholders
+    network.inputs = tf.placeholder(
+        tf.float32,
+        shape=[None, None, network.input_size],
+        name='input')
+    indices_pl = tf.placeholder(tf.int64, name='indices')
+    values_pl = tf.placeholder(tf.int32, name='values')
+    shape_pl = tf.placeholder(tf.int64, name='shape')
+    network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
+    indices_second_pl = tf.placeholder(tf.int64, name='indices_second')
+    values_second_pl = tf.placeholder(tf.int32, name='values_second')
+    shape_second_pl = tf.placeholder(tf.int64, name='shape_second')
+    network.labels_second = tf.SparseTensor(indices_second_pl,
+                                            values_second_pl,
+                                            shape_second_pl)
+    network.inputs_seq_len = tf.placeholder(tf.int64,
+                                            shape=[None],
+                                            name='inputs_seq_len')
 
     # Add to the graph each operation
+    loss_op, logits_main, logits_second = network.compute_loss(
+        network.inputs,
+        network.labels,
+        network.labels_second,
+        network.inputs_seq_len)
     decode_op_main, decode_op_second = network.decoder(
+        logits_main,
+        logits_second,
+        network.inputs_seq_len,
         decode_type='beam_search',
         beam_width=20)
     per_op_main, per_op_second = network.compute_ler(
-        decode_op_main, decode_op_second)
+        decode_op_main, decode_op_second,
+        network.labels, network.labels_second)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -112,7 +137,7 @@ def main(model_path):
     network = CTCModel(
         batch_size=1,
         input_size=feature['input_size'] * feature['num_stack'],
-        num_cell=param['num_cell'],
+        num_unit=param['num_unit'],
         num_layer_main=param['num_layer_main'],
         num_layer_second=param['num_layer_second'],
         output_size_main=30,
@@ -124,9 +149,8 @@ def main(model_path):
         dropout_ratio_hidden=param['dropout_hidden'],
         num_proj=param['num_proj'],
         weight_decay=param['weight_decay'])
-    network.model_name = config['model_name']
-    network.model_dir = model_path
 
+    network.model_dir = model_path
     print(network.model_dir)
     do_eval(network=network,
             label_type_second=corpus['label_type_second'],

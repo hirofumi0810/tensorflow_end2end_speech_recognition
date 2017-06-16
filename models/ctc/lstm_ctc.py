@@ -30,7 +30,7 @@ class LSTM_CTC(ctcBase):
             layers
         num_proj: int, the number of nodes in recurrent projection layer
         weight_decay: A float value. Regularization parameter for weight decay
-        bottleneck_dim: not used
+        bottleneck_dim: int, the dimensions of the bottleneck layer
     """
 
     def __init__(self,
@@ -46,7 +46,7 @@ class LSTM_CTC(ctcBase):
                  dropout_ratio_hidden=1.0,
                  num_proj=None,
                  weight_decay=0.0,
-                 bottleneck_dim=None,  # not used
+                 bottleneck_dim=None,
                  name='lstm_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
@@ -56,21 +56,29 @@ class LSTM_CTC(ctcBase):
                          weight_decay, name)
 
         self.num_proj = None if num_proj == 0 else num_proj
+        self.bottleneck_dim = bottleneck_dim
 
-    def define(self):
-        """Construct model graph."""
-        # Generate placeholders
-        self._generate_placeholer()
-
-        # Dropout for Input
-        inputs_drop = tf.nn.dropout(self.inputs,
-                                    self.keep_prob_input,
-                                    name='dropout_input')
+    def _build(self, inputs, inputs_seq_len):
+        """Construct model graph.
+        Args:
+            inputs: A tensor of `[batch_size, max_time, input_dim]`
+            inputs_seq_len:  A tensor of `[batch_size]`
+        Returns:
+            logits:
+        """
+        # Dropout for inputs
+        self.keep_prob_input = tf.placeholder(tf.float32,
+                                              name='keep_prob_input')
+        self.keep_prob_hidden = tf.placeholder(tf.float32,
+                                               name='keep_prob_hidden')
+        inputs = tf.nn.dropout(inputs,
+                               self.keep_prob_input,
+                               name='dropout_input')
 
         # Hidden layers
         lstm_list = []
         for i_layer in range(self.num_layer):
-            with tf.name_scope('LSTM_hidden' + str(i_layer + 1)):
+            with tf.name_scope('lstm_hidden' + str(i_layer + 1)):
 
                 initializer = tf.random_uniform_initializer(
                     minval=-self.parameter_init,
@@ -84,7 +92,7 @@ class LSTM_CTC(ctcBase):
                                                forget_bias=1.0,
                                                state_is_tuple=True)
 
-                # Dropout (output)
+                # Dropout for outputs of each layer
                 lstm = tf.contrib.rnn.DropoutWrapper(
                     lstm, output_keep_prob=self.keep_prob_hidden)
 
@@ -96,8 +104,8 @@ class LSTM_CTC(ctcBase):
 
         # Ignore 2nd return (the last state)
         outputs, _ = tf.nn.dynamic_rnn(cell=stacked_lstm,
-                                       inputs=inputs_drop,
-                                       sequence_length=self.seq_len,
+                                       inputs=inputs,
+                                       sequence_length=inputs_seq_len,
                                        dtype=tf.float32)
 
         # Reshape to apply the same weights over the timesteps
@@ -108,7 +116,18 @@ class LSTM_CTC(ctcBase):
         outputs = tf.reshape(outputs, shape=[-1, output_node])
 
         # `[batch_size, max_time, input_size_splice]`
-        batch_size = tf.shape(self.inputs)[0]
+        batch_size = tf.shape(inputs)[0]
+
+        if self.bottleneck_dim is not None:
+            with tf.name_scope('bottleneck'):
+                # Affine
+                W_bottleneck = tf.Variable(tf.truncated_normal(
+                    shape=[output_node, self.bottleneck_dim],
+                    stddev=0.1, name='W_bottleneck'))
+                b_bottleneck = tf.Variable(tf.zeros(
+                    shape=[self.bottleneck_dim], name='b_bottleneck'))
+                outputs = tf.matmul(outputs, W_bottleneck) + b_bottleneck
+                output_node = self.bottleneck_dim
 
         with tf.name_scope('output'):
             # Affine
@@ -123,5 +142,7 @@ class LSTM_CTC(ctcBase):
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to `[max_time, batch_size, num_classes]`
-            self.logits = tf.transpose(logits_3d, (1, 0, 2))
+            # Convert to `[max_time, batch_size, num_classes]'
+            logits = tf.transpose(logits_3d, (1, 0, 2))
+
+            return logits

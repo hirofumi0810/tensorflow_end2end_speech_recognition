@@ -36,7 +36,7 @@ class Multitask_BLSTM_CTC(ctcBase):
             layers
         num_proj: int, the number of nodes in recurrent projection layer
         weight_decay: A float value. Regularization parameter for weight decay
-        bottleneck_dim: not used
+        bottleneck_dim: int, the dimensions of the bottleneck layer
     """
 
     def __init__(self,
@@ -65,8 +65,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                          weight_decay, name)
 
         self.num_proj = None if num_proj == 0 else num_proj
-        # TODO: implement projection layer
-        # TODO: implement bottleneck layer
+        self.bottleneck_dim = bottleneck_dim
 
         if num_layer_second < 1 or num_layer_second > num_layer_main:
             raise ValueError(
@@ -79,31 +78,29 @@ class Multitask_BLSTM_CTC(ctcBase):
         self.main_task_weight = main_task_weight
         self.second_task_weight = 1 - main_task_weight
 
-    def define(self):
-        """Construct model graph."""
-        # Generate placeholders
-        self._generate_placeholer()
-        self.label_indices_second = tf.placeholder(tf.int64,
-                                                   name='indices_second')
-        self.label_values_second = tf.placeholder(tf.int32,
-                                                  name='values_second')
-        self.label_shape_second = tf.placeholder(tf.int64,
-                                                 name='shape_second')
-        self.labels_second = tf.SparseTensor(self.label_indices_second,
-                                             self.label_values_second,
-                                             self.label_shape_second)
-
-        # Dropout for Input
-        outputs = tf.nn.dropout(self.inputs,
+    def _build(self, inputs, inputs_seq_len):
+        """Construct model graph.
+        Args:
+            inputs: A tensor of `[batch_size, max_time, input_dim]`
+            inputs_seq_len:  A tensor of `[batch_size]`
+        Returns:
+            logits:
+        """
+        # Dropout for inputs
+        self.keep_prob_input = tf.placeholder(tf.float32,
+                                              name='keep_prob_input')
+        self.keep_prob_hidden = tf.placeholder(tf.float32,
+                                               name='keep_prob_hidden')
+        outputs = tf.nn.dropout(inputs,
                                 self.keep_prob_input,
                                 name='dropout_input')
 
         # `[batch_size, max_time, input_size_splice]`
-        batch_size = tf.shape(self.inputs)[0]
+        batch_size = tf.shape(inputs)[0]
 
         # Hidden layers
         for i_layer in range(self.num_layer):
-            with tf.name_scope('BiLSTM_hidden' + str(i_layer + 1)):
+            with tf.name_scope('blstm_hidden' + str(i_layer + 1)):
 
                 initializer = tf.random_uniform_initializer(
                     minval=-self.parameter_init,
@@ -126,7 +123,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                     forget_bias=1.0,
                     state_is_tuple=True)
 
-                # Dropout (output)
+                # Dropout for outputs of each layer
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
                     lstm_fw,
                     output_keep_prob=self.keep_prob_hidden)
@@ -146,9 +143,9 @@ class Multitask_BLSTM_CTC(ctcBase):
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
                     inputs=outputs,
-                    sequence_length=self.seq_len,
+                    sequence_length=inputs_seq_len,
                     dtype=tf.float32,
-                    scope='BiLSTM_' + str(i_layer + 1))
+                    scope='blstm_' + str(i_layer + 1))
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
@@ -178,7 +175,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                             shape=[batch_size, -1, self.num_classes_second])
 
                         # Convert to `[max_time, batch_size, num_classes]`
-                        self.logits_second = tf.transpose(logits_3d, (1, 0, 2))
+                        logits_second = tf.transpose(logits_3d, (1, 0, 2))
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
@@ -186,6 +183,17 @@ class Multitask_BLSTM_CTC(ctcBase):
         else:
             output_node = self.num_proj * 2
         outputs = tf.reshape(outputs, shape=[-1, output_node])
+
+        if self.bottleneck_dim is not None:
+            with tf.name_scope('bottleneck'):
+                # Affine
+                W_bottleneck = tf.Variable(tf.truncated_normal(
+                    shape=[output_node, self.bottleneck_dim],
+                    stddev=0.1, name='W_bottleneck'))
+                b_bottleneck = tf.Variable(tf.zeros(
+                    shape=[self.bottleneck_dim], name='b_bottleneck'))
+                outputs = tf.matmul(outputs, W_bottleneck) + b_bottleneck
+                output_node = self.bottleneck_dim
 
         with tf.name_scope('output_main'):
             # Affine
@@ -200,14 +208,28 @@ class Multitask_BLSTM_CTC(ctcBase):
             logits_3d = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to (max_time, batch_size, num_classes)
-            self.logits_main = tf.transpose(logits_3d, (1, 0, 2))
+            # Convert to `[max_time, batch_size, num_classes]'
+            logits_main = tf.transpose(logits_3d, (1, 0, 2))
 
-    def compute_loss(self):
+            return logits_main, logits_second
+
+    def compute_loss(self, inputs, labels_main, labels_second, inputs_seq_len,
+                     num_gpu=1, scope=None):
         """Operation for computing ctc loss.
+        Args:
+            inputs: A tensor of size `[batch_size, max_time, input_size]`
+            labels_main: A SparseTensor of target labels in the main task
+            labels_second: A SparseTensor of target labels in the second task
+            inputs_seq_len: A tensor of size `[batch_size]`
+            num_gpu: the number of GPUs
         Returns:
             loss: operation for computing ctc loss
+            logits_main:
+            logits_second:
         """
+        # Build model graph
+        logits_main, logits_second = self._build(inputs, inputs_seq_len)
+
         # Weight decay
         weight_sum = 0
         for var in tf.trainable_variables():
@@ -216,9 +238,9 @@ class Multitask_BLSTM_CTC(ctcBase):
         tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss_main"):
-            ctc_loss = tf.nn.ctc_loss(self.labels,
-                                      self.logits_main,
-                                      tf.cast(self.seq_len, tf.int32))
+            ctc_loss = tf.nn.ctc_loss(labels_main,
+                                      logits_main,
+                                      tf.cast(inputs_seq_len, tf.int32))
             ctc_loss_mean = tf.reduce_mean(
                 ctc_loss, name='ctc_loss_main_mean')
             tf.add_to_collection(
@@ -232,9 +254,9 @@ class Multitask_BLSTM_CTC(ctcBase):
                                   ctc_loss_mean * self.main_task_weight))
 
         with tf.name_scope("ctc_loss_second"):
-            ctc_loss = tf.nn.ctc_loss(self.labels_second,
-                                      self.logits_second,
-                                      tf.cast(self.seq_len, tf.int32))
+            ctc_loss = tf.nn.ctc_loss(labels_second,
+                                      logits_second,
+                                      tf.cast(inputs_seq_len, tf.int32))
             ctc_loss_mean = tf.reduce_mean(
                 ctc_loss, name='ctc_loss_second_mean')
             tf.add_to_collection(
@@ -248,20 +270,24 @@ class Multitask_BLSTM_CTC(ctcBase):
                                   ctc_loss_mean * self.second_task_weight))
 
         # Total loss
-        self.loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
         # Add a scalar summary for the snapshot of loss
         with tf.name_scope("total_loss"):
             self.summaries_train.append(
-                tf.summary.scalar('total_loss_train', self.loss))
+                tf.summary.scalar('total_loss_train', loss))
             self.summaries_dev.append(
-                tf.summary.scalar('total_loss_dev', self.loss))
+                tf.summary.scalar('total_loss_dev', loss))
 
-        return self.loss
+        return loss, logits_main, logits_second
 
-    def decoder(self, decode_type, beam_width=None):
+    def decoder(self, logits_main, logits_second, inputs_seq_len, decode_type,
+                beam_width=None):
         """Operation for decoding.
         Args:
+            logits_main:
+            logits_second:
+            inputs_seq_len: A tensor of size `[batch_size]`
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
         Return:
@@ -273,19 +299,19 @@ class Multitask_BLSTM_CTC(ctcBase):
 
         if decode_type == 'greedy':
             decoded_main, _ = tf.nn.ctc_greedy_decoder(
-                self.logits_main, tf.cast(self.seq_len, tf.int32))
+                logits_main, tf.cast(inputs_seq_len, tf.int32))
             decoded_second, _ = tf.nn.ctc_greedy_decoder(
-                self.logits_second, tf.cast(self.seq_len, tf.int32))
+                logits_second, tf.cast(inputs_seq_len, tf.int32))
 
         elif decode_type == 'beam_search':
             if beam_width is None:
                 raise ValueError('Set beam_width.')
 
             decoded_main, _ = tf.nn.ctc_beam_search_decoder(
-                self.logits_main, tf.cast(self.seq_len, tf.int32),
+                logits_main, tf.cast(inputs_seq_len, tf.int32),
                 beam_width=beam_width)
             decoded_second, _ = tf.nn.ctc_beam_search_decoder(
-                self.logits_second, tf.cast(self.seq_len, tf.int32),
+                logits_second, tf.cast(inputs_seq_len, tf.int32),
                 beam_width=beam_width)
 
         decode_op_main = tf.to_int32(decoded_main[0])
@@ -293,9 +319,12 @@ class Multitask_BLSTM_CTC(ctcBase):
 
         return decode_op_main, decode_op_second
 
-    def posteriors(self, decode_op_main, decode_op_second):
+    def posteriors(self, logits_main, logits_second,
+                   decode_op_main, decode_op_second):
         """Operation for computing posteriors of each time steps.
         Args:
+            logits_main:
+            logits_second:
             decode_op_main: operation for decoding of the main task
             decode_op_second: operation for decoding of the second task
         Return:
@@ -305,31 +334,34 @@ class Multitask_BLSTM_CTC(ctcBase):
                 class in the second task
         """
         # logits_3d : (max_time, batch_size, num_classes)
-        logits_2d_main = tf.reshape(self.logits_main,
+        logits_2d_main = tf.reshape(logits_main,
                                     shape=[-1, self.num_classes])
         posteriors_op_main = tf.nn.softmax(logits_2d_main)
 
-        logits_2d_second = tf.reshape(self.logits_second,
+        logits_2d_second = tf.reshape(logits_second,
                                       shape=[-1, self.num_classes_second])
         posteriors_op_second = tf.nn.softmax(logits_2d_second)
 
         return posteriors_op_main, posteriors_op_second
 
-    def compute_ler(self, decode_op_main, decode_op_second):
+    def compute_ler(self, decode_op_main, decode_op_second,
+                    labels_main, labels_second):
         """Operation for computing LER (Label Error Rate).
         Args:
             decode_op_main: operation for decoding of the main task
             decode_op_second: operation for decoding of the second task
+            labels_main: A SparseTensor of target labels in the main task
+            labels_second: A SparseTensor of target labels in the second task
         Return:
             ler_op_main: operation for computing LER of the main task
             ler_op_second: operation for computing LER of the second task
         """
         # Compute LER (normalize by label length)
         ler_op_main = tf.reduce_mean(tf.edit_distance(
-            decode_op_main, self.labels, normalize=True))
+            decode_op_main, labels_main, normalize=True))
         ler_op_second = tf.reduce_mean(tf.edit_distance(
-            decode_op_second, self.labels_second, normalize=True))
-        # TODO: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
+            decode_op_second, labels_second, normalize=True))
+        # NOTE: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
 
         # Add a scalar summary for the snapshot of LER
         with tf.name_scope("ler"):

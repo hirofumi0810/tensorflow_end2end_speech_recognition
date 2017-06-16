@@ -24,7 +24,7 @@ from metric.ctc import do_eval_per, do_eval_cer
 from utils.sparsetensor import list2sparsetensor
 from utils.directory import mkdir, mkdir_join
 from utils.parameter import count_total_parameters
-from utils.loss import save_loss
+from utils.csv import save_loss, save_ler
 
 
 def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
@@ -61,20 +61,44 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
 
-        # Define model
-        network.define()
-        # NOTE: define model under tf.Graph()
+        # Define placeholders
+        network.inputs = tf.placeholder(
+            tf.float32,
+            shape=[None, None, network.input_size],
+            name='input')
+        indices_pl = tf.placeholder(tf.int64, name='indices')
+        values_pl = tf.placeholder(tf.int32, name='values')
+        shape_pl = tf.placeholder(tf.int64, name='shape')
+        network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
+        indices_second_pl = tf.placeholder(tf.int64, name='indices_second')
+        values_second_pl = tf.placeholder(tf.int32, name='values_second')
+        shape_second_pl = tf.placeholder(tf.int64, name='shape_second')
+        network.labels_second = tf.SparseTensor(indices_second_pl,
+                                                values_second_pl,
+                                                shape_second_pl)
+        network.inputs_seq_len = tf.placeholder(tf.int64,
+                                                shape=[None],
+                                                name='inputs_seq_len')
 
         # Add to the graph each operation
-        loss_op = network.compute_loss()
-        train_op = network.train(optimizer=optimizer,
+        loss_op, logits_main, logits_second = network.compute_loss(
+            network.inputs,
+            network.labels,
+            network.labels_second,
+            network.inputs_seq_len)
+        train_op = network.train(loss_op,
+                                 optimizer='rmsprop',
                                  learning_rate_init=learning_rate,
                                  is_scheduled=False)
         decode_op_main, decode_op_second = network.decoder(
+            logits_main,
+            logits_second,
+            network.inputs_seq_len,
             decode_type='beam_search',
             beam_width=20)
         ler_op_main, ler_op_second = network.compute_ler(
-            decode_op_main, decode_op_second)
+            decode_op_main, decode_op_second,
+            network.labels, network.labels_second)
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -96,7 +120,9 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
               (len(parameters_dict.keys()),
                "{:,}".format(total_parameters / 1000000)))
 
-        csv_steps, csv_train_loss, csv_dev_loss = [], [], []
+        csv_steps, csv_loss_train, csv_loss_dev = [], [], []
+        csv_cer_train, csv_cer_dev = [], []
+        csv_per_train, csv_per_dev = [], []
         # Create a session for running operation on the graph
         with tf.Session() as sess:
 
@@ -120,57 +146,42 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_char, labels_phone, seq_len, _ = train_data.next_batch(
+                inputs, labels_char, labels_phone, inputs_seq_len, _ = train_data.next_batch(
                     batch_size=batch_size)
-                indices_char, values_char, dense_shape_char = list2sparsetensor(
-                    labels_char)
-                indices_phone, values_phone, dense_shape_phone = list2sparsetensor(
-                    labels_phone)
                 feed_dict_train = {
                     network.inputs: inputs,
-                    network.label_indices: indices_char,
-                    network.label_values: values_char,
-                    network.label_shape: dense_shape_char,
-                    network.label_indices_second: indices_phone,
-                    network.label_values_second: values_phone,
-                    network.label_shape_second: dense_shape_phone,
-                    network.seq_len: seq_len,
+                    network.labels: list2sparsetensor(labels_char),
+                    network.labels_second: list2sparsetensor(labels_phone),
+                    network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.learning_rate: learning_rate
+                    network.lr: learning_rate
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels_char, labels_phone, seq_len, _ = dev_data_phone61.next_batch(
+                inputs, labels_char, labels_phone, inputs_seq_len, _ = dev_data_phone61.next_batch(
                     batch_size=batch_size)
-                indices_char, values_char, dense_shape_char = list2sparsetensor(
-                    labels_char)
-                indices_phone, values_phone, dense_shape_phone = list2sparsetensor(
-                    labels_phone)
                 feed_dict_dev = {
                     network.inputs: inputs,
-                    network.label_indices: indices_char,
-                    network.label_values: values_char,
-                    network.label_shape: dense_shape_char,
-                    network.label_indices_second: indices_phone,
-                    network.label_values_second: values_phone,
-                    network.label_shape_second: dense_shape_phone,
-                    network.seq_len: seq_len,
+                    network.labels: list2sparsetensor(labels_char),
+                    network.labels_second: list2sparsetensor(labels_phone),
+                    network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden
                 }
 
-                # Update parameters & compute loss
-                _, loss_train = sess.run(
-                    [train_op, loss_op], feed_dict=feed_dict_train)
-                loss_dev = sess.run(loss_op, feed_dict=feed_dict_dev)
-                csv_steps.append(step)
-                csv_train_loss.append(loss_train)
-                csv_dev_loss.append(loss_dev)
+                # Update parameters
+                sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % 10 == 0:
+                    # Compute loss
+                    loss_train = sess.run(loss_op, feed_dict=feed_dict_train)
+                    loss_dev = sess.run(loss_op, feed_dict=feed_dict_dev)
+                    csv_steps.append(step)
+                    csv_loss_train.append(loss_train)
+                    csv_loss_dev.append(loss_dev)
 
-                    # Change feed dict for evaluation
+                    # Change to evaluation mode
                     feed_dict_train[network.keep_prob_input] = 1.0
                     feed_dict_train[network.keep_prob_hidden] = 1.0
                     feed_dict_dev[network.keep_prob_input] = 1.0
@@ -183,6 +194,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     cer_dev, per_dev, summary_str_dev = sess.run(
                         [ler_op_main, ler_op_second,  summary_dev],
                         feed_dict=feed_dict_dev)
+                    csv_cer_train.append(cer_train)
+                    csv_cer_dev.append(cer_dev)
+                    csv_per_train.append(per_train)
+                    csv_per_dev.append(per_dev)
                     summary_writer.add_summary(summary_str_train, step + 1)
                     summary_writer.add_summary(summary_str_dev, step + 1)
                     summary_writer.flush()
@@ -263,9 +278,13 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
 
-            # Save train & dev loss
-            save_loss(csv_steps, csv_train_loss, csv_dev_loss,
+            # Save train & dev loss, ler
+            save_loss(csv_steps, csv_loss_train, csv_loss_dev,
                       save_path=network.model_dir)
+            save_ler(csv_steps, csv_cer_train, csv_cer_dev,
+                     save_path=network.model_dir)
+            save_ler(csv_steps, csv_per_train, csv_per_dev,
+                     save_path=network.model_dir)
 
             # Training was finished correctly
             with open(join(network.model_dir, 'complete.txt'), 'w') as f:

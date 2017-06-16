@@ -7,8 +7,8 @@ from __future__ import print_function
 
 import sys
 import time
-import unittest
 import tensorflow as tf
+from tensorflow.python import debug as tf_debug
 
 sys.path.append('../')
 sys.path.append('../../')
@@ -18,7 +18,7 @@ from data import generate_data, num2alpha, num2phone
 from experiments.utils.sparsetensor import list2sparsetensor, sparsetensor2list
 
 
-class TestCTC(unittest.TestCase):
+class TestCTC(tf.test.TestCase):
 
     @measure_time
     def test_ctc(self):
@@ -31,16 +31,30 @@ class TestCTC(unittest.TestCase):
         with tf.Graph().as_default():
             # Load batch data
             batch_size = 4
-            inputs, labels_char, labels_phone, seq_len = generate_data(
+            inputs, labels_char, labels_phone, inputs_seq_len = generate_data(
                 label_type='multitask',
                 model='ctc',
                 batch_size=batch_size)
-            indices_char, values_char, dense_shape_char = list2sparsetensor(
-                labels_char)
-            indices_phone, values_phone, dense_shape_phone = list2sparsetensor(
-                labels_phone)
 
-            # Define model
+            # Define placeholders
+            inputs_pl = tf.placeholder(tf.float32,
+                                       shape=[None, None, inputs.shape[-1]],
+                                       name='input')
+            indices_pl = tf.placeholder(tf.int64, name='indices')
+            values_pl = tf.placeholder(tf.int32, name='values')
+            shape_pl = tf.placeholder(tf.int64, name='shape')
+            labels_pl = tf.SparseTensor(indices_pl, values_pl, shape_pl)
+            indices_second_pl = tf.placeholder(tf.int64, name='indices_second')
+            values_second_pl = tf.placeholder(tf.int32, name='values_second')
+            shape_second_pl = tf.placeholder(tf.int64, name='shape_second')
+            labels_second_pl = tf.SparseTensor(indices_second_pl,
+                                               values_second_pl,
+                                               shape_second_pl)
+            inputs_seq_len_pl = tf.placeholder(tf.int64,
+                                               shape=[None],
+                                               name='inputs_seq_len')
+
+            # Define model graph
             output_size_main = 26
             output_size_second = 61
             network = Multitask_BLSTM_CTC(
@@ -59,27 +73,47 @@ class TestCTC(unittest.TestCase):
                 dropout_ratio_hidden=1.0,
                 num_proj=None,
                 weight_decay=1e-6)
-            network.define()
-            # NOTE: define model under tf.Graph()
 
             # Add to the graph each operation
-            loss_op = network.compute_loss()
+            loss_op, logits_main, logits_second = network.compute_loss(
+                inputs_pl,
+                labels_pl,
+                labels_second_pl,
+                inputs_seq_len_pl)
             learning_rate = 1e-3
-            train_op = network.train(optimizer='rmsprop',
+            train_op = network.train(loss_op,
+                                     optimizer='rmsprop',
                                      learning_rate_init=learning_rate,
                                      is_scheduled=False)
             decode_op_main, decode_op_second = network.decoder(
+                logits_main,
+                logits_second,
+                inputs_seq_len_pl,
                 decode_type='beam_search',
                 beam_width=20)
             ler_op_main, ler_op_second = network.compute_ler(
-                decode_op_main, decode_op_second)
+                decode_op_main, decode_op_second, labels_pl, labels_second_pl)
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
 
+            # Make feed dict
+            feed_dict = {
+                inputs_pl: inputs,
+                labels_pl: list2sparsetensor(labels_char),
+                labels_second_pl: list2sparsetensor(labels_phone),
+                inputs_seq_len_pl: inputs_seq_len,
+                network.keep_prob_input: network.dropout_ratio_input,
+                network.keep_prob_hidden: network.dropout_ratio_hidden,
+                network.lr: learning_rate
+            }
+
             with tf.Session() as sess:
                 # Initialize parameters
                 sess.run(init_op)
+
+                # Wrapper for tfdbg
+                # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 
                 # Train model
                 max_steps = 400
@@ -88,20 +122,6 @@ class TestCTC(unittest.TestCase):
                 ler_train_char_pre = 1
                 not_improved_count = 0
                 for step in range(max_steps):
-
-                    feed_dict = {
-                        network.inputs: inputs,
-                        network.label_indices: indices_char,
-                        network.label_values: values_char,
-                        network.label_shape: dense_shape_char,
-                        network.label_indices_second: indices_phone,
-                        network.label_values_second: values_phone,
-                        network.label_shape_second: dense_shape_phone,
-                        network.seq_len: seq_len,
-                        network.keep_prob_input: network.dropout_ratio_input,
-                        network.keep_prob_hidden: network.dropout_ratio_hidden,
-                        network.learning_rate: learning_rate
-                    }
 
                     # Compute loss
                     _, loss_train = sess.run(
@@ -113,7 +133,7 @@ class TestCTC(unittest.TestCase):
                     #     print(np.max(grad))
 
                     if (step + 1) % 10 == 0:
-                        # Change feed dict for evaluation
+                        # Change to evaluation mode
                         feed_dict[network.keep_prob_input] = 1.0
                         feed_dict[network.keep_prob_hidden] = 1.0
 
@@ -152,9 +172,12 @@ class TestCTC(unittest.TestCase):
                             break
                         ler_train_char_pre = ler_train_char
 
+                        # Change to training mode
+                        network.is_training = True
+
                 duration_global = time.time() - start_time_global
                 print('Total time: %.3f sec' % (duration_global))
 
 
 if __name__ == "__main__":
-    unittest.main()
+    tf.test.main()

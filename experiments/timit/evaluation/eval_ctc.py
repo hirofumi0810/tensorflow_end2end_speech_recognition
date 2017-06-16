@@ -39,13 +39,28 @@ def do_eval(network, label_type, num_stack, num_skip, epoch=None):
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
 
-    # Define model
-    network.define()
+    # Define placeholders
+    network.inputs = tf.placeholder(
+        tf.float32,
+        shape=[None, None, network.input_size],
+        name='input')
+    indices_pl = tf.placeholder(tf.int64, name='indices')
+    values_pl = tf.placeholder(tf.int32, name='values')
+    shape_pl = tf.placeholder(tf.int64, name='shape')
+    network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
+    network.inputs_seq_len = tf.placeholder(tf.int64,
+                                            shape=[None],
+                                            name='inputs_seq_len')
 
-    # Add to the graph each operation
-    decode_op = network.decoder(decode_type='beam_search',
+    # Add to the graph each operation (including model definition)
+    loss_op, logits = network.compute_loss(network.inputs,
+                                           network.labels,
+                                           network.inputs_seq_len)
+    decode_op = network.decoder(logits,
+                                network.inputs_seq_len,
+                                decode_type='beam_search',
                                 beam_width=20)
-    per_op = network.compute_ler(decode_op)
+    per_op = network.compute_ler(decode_op, network.labels)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -111,7 +126,7 @@ def main(model_path):
     network = CTCModel(
         batch_size=1,
         input_size=feature['input_size'] * feature['num_stack'],
-        num_cell=param['num_cell'],
+        num_unit=param['num_unit'],
         num_layer=param['num_layer'],
         output_size=output_size,
         clip_grad=param['clip_grad'],
@@ -120,9 +135,8 @@ def main(model_path):
         dropout_ratio_hidden=param['dropout_hidden'],
         num_proj=param['num_proj'],
         weight_decay=param['weight_decay'])
-    network.model_name = config['model_name']
-    network.model_dir = model_path
 
+    network.model_dir = model_path
     print(network.model_dir)
     do_eval(network=network,
             label_type=corpus['label_type'],

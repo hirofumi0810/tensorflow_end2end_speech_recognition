@@ -3,15 +3,23 @@
 # Select GPU
 if [ $# -ne 2 ]; then
   echo "Error: set GPU number & config path." 1>&2
-  echo "Usage: ./ctc.sh gpu_num path_to_config_file." 1>&2
+  echo "Usage: ./ctc.sh path_to_config_file gpu" 1>&2
   exit 1
 fi
 
-# GPU setting
+# Set path to CUDA
 export PATH=$PATH:/usr/local/cuda-8.0/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-8.0/lib64:/usr/local/cuda-8.0/extras/CUPTI/lib64
+
+# Set path to python
 PYTHON=/home/lab5/inaguma/.pyenv/versions/anaconda3-4.1.1/bin/python
 
-filename=$(basename $2 | awk -F. '{print $1}')
-CUDA_VISIBLE_DEVICES=$1 nohup $PYTHON train_multitask_ctc.py $2 > log/$filename".log" &
-# CUDA_VISIBLE_DEVICES=$1 $PYTHON train_multitask_ctc.py $2
+config_path=$1
+gpu_index=$2
+filename=$(basename $config_path | awk -F. '{print $1}')
+
+# Background job version
+CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_multitask_ctc.py $config_path > log/$filename".log" &
+
+# Standard output version
+# CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_multitask_ctc.py $config_path

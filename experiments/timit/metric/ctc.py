@@ -41,7 +41,6 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
             'data_type is "phone39" or "phone48" or "phone61".')
 
     batch_size = eval_batch_size
-
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
     if (num_examples / batch_size) != int(num_examples / batch_size):
@@ -56,15 +55,16 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     for step in iterator:
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, seq_len, _ = dataset.next_batch(
+            inputs, labels_true, inputs_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
         else:
-            inputs, _, labels_true, seq_len, _ = dataset.next_batch(
+            inputs, _, labels_true, inputs_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
 
         feed_dict = {
             network.inputs: inputs,
-            network.seq_len: seq_len,
+            network.labels: list2sparsetensor(labels_true),
+            network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
@@ -123,7 +123,6 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=1,
         cer_mean: An average of CER
     """
     batch_size = eval_batch_size
-
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
     if (num_examples / batch_size) != int(num_examples / batch_size):
@@ -135,15 +134,16 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=1,
     for step in iterator:
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, seq_len, _ = dataset.next_batch(
+            inputs, labels_true, inputs_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
         else:
-            inputs, labels_true, _, seq_len, _ = dataset.next_batch(
+            inputs, labels_true, _, inputs_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
 
         feed_dict = {
             network.inputs: inputs,
-            network.seq_len: seq_len,
+            network.labels: list2sparsetensor(labels_true),
+            network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }

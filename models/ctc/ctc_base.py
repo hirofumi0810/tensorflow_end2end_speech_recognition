@@ -66,10 +66,6 @@ class ctcBase(object):
         self.parameter_init = parameter_init
         self.clip_grad = clip_grad
         self.clip_activation = clip_activation
-        if dropout_ratio_input == 1.0 and dropout_ratio_hidden == 1.0:
-            self.dropout = False
-        else:
-            self.dropout = True
         self.dropout_ratio_input = dropout_ratio_input
         self.dropout_ratio_hidden = dropout_ratio_hidden
         self.weight_decay = float(weight_decay)
@@ -80,35 +76,7 @@ class ctcBase(object):
 
         self.name = name
 
-    def _generate_placeholer(self):
-        """Generate placeholders."""
-        # `[batch_size, max_time, input_size]`
-        self.inputs = tf.placeholder(tf.float32,
-                                     shape=[None, None, self.input_size],
-                                     name='input')
-
-        self.label_indices = tf.placeholder(tf.int64, name='indices')
-        self.label_values = tf.placeholder(tf.int32, name='values')
-        self.label_shape = tf.placeholder(tf.int64, name='shape')
-        self.labels = tf.SparseTensor(self.label_indices,
-                                      self.label_values,
-                                      self.label_shape)
-        # `[batch_size]`
-        self.seq_len = tf.placeholder(tf.int64,
-                                      shape=[None],
-                                      name='seq_len')
-        # NOTE: change to tf.int64 if you use the bidirectional model
-
-        # For dropout
-        self.keep_prob_input = tf.placeholder(tf.float32,
-                                              name='keep_prob_input')
-        self.keep_prob_hidden = tf.placeholder(tf.float32,
-                                               name='keep_prob_hidden')
-
-        # Learning rate
-        self.learning_rate = tf.placeholder(tf.float32, name='learning_rate')
-
-    def add_gaussian_noise(self, inputs, stddev=0.1):
+    def _add_gaussian_noise_to_inputs(self, inputs, stddev=0.075):
         """Add gaussian noise to the inputs.
         Args:
             inputs: the noise free input-features.
@@ -123,47 +91,62 @@ class ctcBase(object):
                     tf.shape(inputs), 0.0, stddev) + inputs
         return inputs
 
-    def define(self):
-        NotImplementedError
+    def _add_noise_to_gradients(grads_and_vars, gradient_noise_scale,
+                                stddev=0.075):
+        """Adds scaled noise from a 0-mean normal distribution to gradients."""
+        raise NotImplementedError
 
-    def compute_loss(self):
+    def compute_loss(self, inputs, labels, inputs_seq_len,
+                     num_gpu=1, scope=None):
         """Operation for computing ctc loss.
+        Args:
+            inputs: A tensor of size `[batch_size, max_time, input_size]`
+            labels: A SparseTensor of target labels
+            inputs_seq_len: A tensor of size `[batch_size]`
+            num_gpu: the number of GPUs
         Returns:
             loss: operation for computing ctc loss
+            logits:
         """
+        # Build model graph
+        logits = self._build(inputs, inputs_seq_len)
+
         # Weight decay
-        weight_sum = 0
-        for var in tf.trainable_variables():
-            if 'bias' not in var.name.lower():
-                weight_sum += tf.nn.l2_loss(var)
-        tf.add_to_collection('losses', weight_sum * self.weight_decay)
+        with tf.name_scope("weight_decay_loss"):
+            weight_sum = 0
+            for var in tf.trainable_variables():
+                if 'bias' not in var.name.lower():
+                    weight_sum += tf.nn.l2_loss(var)
+            tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss"):
-            ctc_loss = tf.nn.ctc_loss(self.labels,
-                                      self.logits,
-                                      tf.cast(self.seq_len, tf.int32))
+            ctc_loss = tf.nn.ctc_loss(labels,
+                                      logits,
+                                      tf.cast(inputs_seq_len, tf.int32))
             ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss_mean')
             tf.add_to_collection('losses', ctc_loss_mean)
 
-        # Total loss
-        self.loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        # Compute total loss
+        loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
-        # Add a scalar summary for the snapshot of loss
-        with tf.name_scope("total_loss"):
-            self.summaries_train.append(
-                tf.summary.scalar('loss_train', self.loss))
-            self.summaries_dev.append(
-                tf.summary.scalar('loss_dev', self.loss))
+        if num_gpu == 1:
+            # Add a scalar summary for the snapshot of loss
+            with tf.name_scope("total_loss"):
+                self.summaries_train.append(
+                    tf.summary.scalar('loss_train', loss))
+                self.summaries_dev.append(
+                    tf.summary.scalar('loss_dev', loss))
 
-        return self.loss
+        return loss, logits
 
-    def train(self, optimizer, learning_rate_init=None,
-              clip_gradients_by_norm=None, is_scheduled=False):
+    def train(self, loss, optimizer, learning_rate_init=None,
+              clip_grad_by_norm=None, is_scheduled=False):
         """Operation for training.
         Args:
+            loss: An operation for computing loss
             optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
             learning_rate_init: initial learning rate
-            clip_gradients_by_norm: if True, clip gradients by norm of the
+            clip_grad_by_norm: if True, clip gradients by norm of the
                 value of self.clip_grad
             is_scheduled: if True, schedule learning rate at each epoch
         Returns:
@@ -177,65 +160,76 @@ class ctcBase(object):
         if learning_rate_init < 0.0:
             raise ValueError("Invalid learning_rate %s.", learning_rate_init)
 
-        # Select parameter update method
+        self.lr = tf.placeholder(tf.float32, name='learning_rate')
+
+        # Select optimizer
         if is_scheduled:
-            learning_rate = self.learning_rate
-        else:
-            learning_rate = learning_rate_init
+            learning_rate_init = self.lr
 
         if optimizer == 'momentum':
-            self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate,
+            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
+                learning_rate=learning_rate_init,
                 momentum=0.9)
         else:
-            self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate)
+            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
+                learning_rate=learning_rate_init)
 
         # Create a variable to track the global step
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        # Gradient clipping
         if self.clip_grad is not None:
-            # Compute gradients
-            trainable_vars = tf.trainable_variables()
-            grads = tf.gradients(self.loss, trainable_vars)
+            # Gradient clipping
+            train_op = self._gradient_clipping(loss,
+                                               optimizer,
+                                               clip_grad_by_norm,
+                                               global_step)
 
-            # TODO: Optionally add gradient noise
+            # TODO: Optionally add noise to weight matrix when training
+            # どっちが先？
 
-            if clip_gradients_by_norm:
-                # Clip by norm
-                self.clipped_grads = [tf.clip_by_norm(
-                    g,
-                    clip_norm=self.clip_grad) for g in grads]
-            else:
-                # Clip by absolute values
-                self.clipped_grads = [tf.clip_by_value(
-                    g,
-                    clip_value_min=-self.clip_grad,
-                    clip_value_max=self.clip_grad) for g in grads]
-
-            # TODO: Add histograms for variables, gradients (norms)
-            self._tensorboard_statistics(trainable_vars)
-
-            # Create gradient updates
-            train_op = self.optimizer.apply_gradients(
-                zip(self.clipped_grads, trainable_vars),
-                global_step=global_step,
-                name='train')
-
-        # Use the optimizer to apply the gradients that minimize the loss
-        # and also increment the global step counter as a single training step
-        train_op = self.optimizer.minimize(self.loss, global_step=global_step)
+        else:
+            # Use the optimizer to apply the gradients that minimize the loss
+            # and also increment the global step counter as a single training
+            # step
+            train_op = optimizer.minimize(loss, global_step=global_step)
 
         return train_op
 
-    def _add_scaled_noise_to_gradients(grads_and_vars, gradient_noise_scale):
-        """Adds scaled noise from a 0-mean normal distribution to gradients."""
-        raise NotImplementedError
+    def _gradient_clipping(self, loss, optimizer, clip_grad_by_norm,
+                           global_step):
+        print('--- Apply gradient clipping ---')
+        # Compute gradients
+        trainable_vars = tf.trainable_variables()
+        grads = tf.gradients(loss, trainable_vars)
 
-    def decoder(self, decode_type, beam_width=None):
+        if clip_grad_by_norm:
+            # Clip by norm
+            self.clipped_grads = [tf.clip_by_norm(
+                g,
+                clip_norm=self.clip_grad) for g in grads]
+        else:
+            # Clip by absolute values
+            self.clipped_grads = [tf.clip_by_value(
+                g,
+                clip_value_min=-self.clip_grad,
+                clip_value_max=self.clip_grad) for g in grads]
+
+        # TODO: Add histograms for variables, gradients (norms)
+        # self._tensorboard_statistics(trainable_vars)
+
+        # Create gradient updates
+        train_op = optimizer.apply_gradients(
+            zip(self.clipped_grads, trainable_vars),
+            global_step=global_step,
+            name='train')
+
+        return train_op
+
+    def decoder(self, logits, inputs_seq_len, decode_type, beam_width=None):
         """Operation for decoding.
         Args:
+            logits:
+            inputs_seq_len: A tensor of size `[batch_size]`
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
         Return:
@@ -246,43 +240,45 @@ class ctcBase(object):
 
         if decode_type == 'greedy':
             decoded, _ = tf.nn.ctc_greedy_decoder(
-                self.logits, tf.cast(self.seq_len, tf.int32))
+                logits, tf.cast(inputs_seq_len, tf.int32))
 
         elif decode_type == 'beam_search':
             if beam_width is None:
                 raise ValueError('Set beam_width.')
 
             decoded, _ = tf.nn.ctc_beam_search_decoder(
-                self.logits, tf.cast(self.seq_len, tf.int32),
+                logits, tf.cast(inputs_seq_len, tf.int32),
                 beam_width=beam_width)
 
         decode_op = tf.to_int32(decoded[0])
         return decode_op
 
-    def posteriors(self, decode_op):
+    def posteriors(self, logits, decode_op):
         """Operation for computing posteriors of each time steps.
         Args:
+            logits:
             decode_op: operation for decoding
         Return:
             posteriors_op: operation for computing posteriors for each class
         """
         # logits_3d : (max_time, batch_size, num_classes)
-        logits_2d = tf.reshape(self.logits, [-1, self.num_classes])
+        logits_2d = tf.reshape(logits, [-1, self.num_classes])
         posteriors_op = tf.nn.softmax(logits_2d)
 
         return posteriors_op
 
-    def compute_ler(self, decode_op):
+    def compute_ler(self, decode_op, labels):
         """Operation for computing LER (Label Error Rate).
         Args:
             decode_op: operation for decoding
+            labels: A SparseTensor of target labels
         Return:
             ler_op: operation for computing LER
         """
         # Compute LER (normalize by label length)
         ler_op = tf.reduce_mean(tf.edit_distance(
-            decode_op, self.labels, normalize=True))
-        # TODO: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
+            decode_op, labels, normalize=True))
+        # NOTE: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
 
         # Add a scalar summary for the snapshot of LER
         with tf.name_scope("ler"):

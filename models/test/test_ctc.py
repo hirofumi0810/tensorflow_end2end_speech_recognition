@@ -7,7 +7,6 @@ from __future__ import print_function
 
 import sys
 import time
-import unittest
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
@@ -24,10 +23,6 @@ class TestCTC(tf.test.TestCase):
     @measure_time
     def test_ctc(self):
         print("CTC Working check.")
-        self.check_training(
-            model_type='blstm_ctc_bottleneck', label_type='character')
-        self.check_training(
-            model_type='blstm_ctc_bottleneck', label_type='phone')
         self.check_training(model_type='blstm_ctc', label_type='character')
         self.check_training(model_type='blstm_ctc', label_type='phone')
         self.check_training(model_type='lstm_ctc', label_type='character')
@@ -45,12 +40,23 @@ class TestCTC(tf.test.TestCase):
         with tf.Graph().as_default():
             # Load batch data
             batch_size = 4
-            inputs, labels, seq_len = generate_data(label_type=label_type,
-                                                    model='ctc',
-                                                    batch_size=batch_size)
-            indices, values, dense_shape = list2sparsetensor(labels)
+            inputs, labels, inputs_seq_len = generate_data(label_type=label_type,
+                                                           model='ctc',
+                                                           batch_size=batch_size)
 
-            # Define model
+            # Define placeholders
+            inputs_pl = tf.placeholder(tf.float32,
+                                       shape=[None, None, inputs.shape[-1]],
+                                       name='input')
+            indices_pl = tf.placeholder(tf.int64, name='indices')
+            values_pl = tf.placeholder(tf.int32, name='values')
+            shape_pl = tf.placeholder(tf.int64, name='shape')
+            labels_pl = tf.SparseTensor(indices_pl, values_pl, shape_pl)
+            inputs_seq_len_pl = tf.placeholder(tf.int64,
+                                               shape=[None],
+                                               name='inputs_seq_len')
+
+            # Define model graph
             output_size = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
             network = model(batch_size=batch_size,
@@ -66,21 +72,34 @@ class TestCTC(tf.test.TestCase):
                             dropout_ratio_hidden=1.0,
                             num_proj=None,
                             weight_decay=1e-6)
-            network.define()
-            # NOTE: define model under tf.Graph()
 
             # Add to the graph each operation
-            loss_op = network.compute_loss()
+            loss_op, logits = network.compute_loss(inputs_pl,
+                                                   labels_pl,
+                                                   inputs_seq_len_pl)
             learning_rate = 1e-3
-            train_op = network.train(optimizer='adam',
+            train_op = network.train(loss_op,
+                                     optimizer='adam',
                                      learning_rate_init=learning_rate,
                                      is_scheduled=False)
-            decode_op = network.decoder(decode_type='beam_search',
+            decode_op = network.decoder(logits,
+                                        inputs_seq_len_pl,
+                                        decode_type='beam_search',
                                         beam_width=20)
-            ler_op = network.compute_ler(decode_op)
+            ler_op = network.compute_ler(decode_op, labels_pl)
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
+
+            # Make feed dict
+            feed_dict = {
+                inputs_pl: inputs,
+                labels_pl: list2sparsetensor(labels),
+                inputs_seq_len_pl: inputs_seq_len,
+                network.keep_prob_input: network.dropout_ratio_input,
+                network.keep_prob_hidden: network.dropout_ratio_hidden,
+                network.lr: learning_rate
+            }
 
             with tf.Session() as sess:
                 # Initialize parameters
@@ -97,17 +116,6 @@ class TestCTC(tf.test.TestCase):
                 not_improved_count = 0
                 for step in range(max_steps):
 
-                    feed_dict = {
-                        network.inputs: inputs,
-                        network.label_indices: indices,
-                        network.label_values: values,
-                        network.label_shape: dense_shape,
-                        network.seq_len: seq_len,
-                        network.keep_prob_input: network.dropout_ratio_input,
-                        network.keep_prob_hidden: network.dropout_ratio_hidden,
-                        network.learning_rate: learning_rate
-                    }
-
                     # Compute loss
                     _, loss_train = sess.run(
                         [train_op, loss_op], feed_dict=feed_dict)
@@ -118,7 +126,7 @@ class TestCTC(tf.test.TestCase):
                     #     print(np.max(grad))
 
                     if (step + 1) % 10 == 0:
-                        # Change feed dict for evaluation
+                        # Change to evaluation mode
                         feed_dict[network.keep_prob_input] = 1.0
                         feed_dict[network.keep_prob_hidden] = 1.0
 
@@ -156,4 +164,3 @@ class TestCTC(tf.test.TestCase):
 
 if __name__ == "__main__":
     tf.test.main()
-    # unittest.main()
