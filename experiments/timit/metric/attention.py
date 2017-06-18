@@ -1,39 +1,36 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Define evaluation method for CTC network (TIMIT corpus)."""
+"""Define evaluation method for Attention-based model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import re
-import numpy as np
 import Levenshtein
 from tqdm import tqdm
 
-from plot import probs
 from utils.labels.character import num2char
 from utils.labels.phone import num2phone, phone2num
 from .mapping import map_to_39phone
 from .edit_distance import compute_edit_distance
-from utils.sparsetensor import list2sparsetensor, sparsetensor2list
+from utils.sparsetensor import list2sparsetensor
 from utils.exception_func import exception
-from utils.directory import mkdir_join
 
 
 @exception
 def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
-                eval_batch_size=1, is_progressbar=False, is_multitask=False):
+                eval_batch_size=None, is_progressbar=False, is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
     Args:
         session: session of training model
         decode_op: operation for decoding
         per_op: operation for computing phone error rate
         network: network to evaluate
-        dataset: `Dataset' class
-        label_type: phone39 or phone48 or phone61 or character
-        eval_batch_size: batch size on evaluation
+        dataset: An instance of a `Dataset' class
+        label_type: string, phone39 or phone48 or phone61 or character
+        eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
     Returns:
@@ -43,7 +40,13 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         raise ValueError(
             'data_type is "phone39" or "phone48" or "phone61".')
 
-    batch_size = eval_batch_size
+    if eval_batch_size is not None:
+        batch_size = eval_batch_size
+    else:
+        batch_size = dataset.batch_size
+
+    # Change to training mode
+    # network.is_training = True
 
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
@@ -51,23 +54,25 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         iteration += 1
     per_global = 0
 
-    phone2num_map_file_path = '../metric/mapping_files/ctc/phone2num_' + \
+    phone2num_map_file_path = '../metric/mapping_files/attention/phone2num_' + \
         label_type[5:7] + '.txt'
-    phone2num_39_map_file_path = '../metric/mapping_files/ctc/phone2num_39.txt'
+    phone2num_39_map_file_path = '../metric/mapping_files/attention/phone2num_39.txt'
     phone2phone_map_file_path = '../metric/mapping_files/phone2phone.txt'
     iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
     for step in iterator:
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, seq_len, _ = dataset.next_batch(
+            inputs, labels_true, inputs_seq_len, labels_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
         else:
-            inputs, _, labels_true, seq_len, _ = dataset.next_batch(
+            inputs, _, labels_true, inputs_seq_len, labels_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
 
         feed_dict = {
             network.inputs: inputs,
-            network.seq_len: seq_len,
+            network.labels: labels_true,
+            network.inputs_seq_len: inputs_seq_len,
+            network.labels_seq_len: labels_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
@@ -81,12 +86,11 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
         else:
             # Evaluate by 39 phones
-            labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-            labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
+            predicted_ids = session.run(decode_op, feed_dict=feed_dict)
             for i_batch in range(batch_size_each):
                 # Convert num to phone (list of phone strings)
                 phone_pred_seq = num2phone(
-                    labels_pred[i_batch], phone2num_map_file_path)
+                    predicted_ids[i_batch], phone2num_map_file_path)
                 phone_pred_list = phone_pred_seq.split(' ')
 
                 # Mapping to 39 phones (list of phone strings)
@@ -96,15 +100,14 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                 # Convert phone to num (list of phone indices)
                 phone_pred_list = phone2num(
                     phone_pred_list, phone2num_39_map_file_path)
-                labels_pred[i_batch] = phone_pred_list
+                predicted_ids[i_batch] = phone_pred_list
 
             # Compute edit distance
             labels_true_st = list2sparsetensor(labels_true)
-            labels_pred_st = list2sparsetensor(labels_pred)
+            labels_pred_st = list2sparsetensor(predicted_ids)
             per_local = compute_edit_distance(
                 session, labels_true_st, labels_pred_st)
             per_global += per_local * batch_size_each
-            print(per_local)
 
     per_global /= dataset.data_num
 
@@ -112,21 +115,27 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
 
 @exception
-def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=1,
+def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
                 is_progressbar=False, is_multitask=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
         decode_op: operation for decoding
         network: network to evaluate
-        dataset: Dataset class
-        eval_batch_size: batch size on evaluation
+        dataset: An instance of a `Dataset` class
+        eval_batch_size: int, batch size when evaluating the model
         is_progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
     Return:
         cer_mean: An average of CER
     """
-    batch_size = eval_batch_size
+    if eval_batch_size is not None:
+        batch_size = eval_batch_size
+    else:
+        batch_size = dataset.batch_size
+
+    # Change to training mode
+    # network.is_training = True
 
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
@@ -134,36 +143,39 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=1,
         iteration += 1
     cer_sum = 0
 
-    map_file_path = '../metric/mapping_files/ctc/char2num.txt'
+    map_file_path = '../metric/mapping_files/attention/char2num.txt'
     iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
     for step in iterator:
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, seq_len, _ = dataset.next_batch(
+            inputs, labels_true, inputs_seq_len, labels_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
         else:
-            inputs, labels_true, _, seq_len, _ = dataset.next_batch(
+            inputs, labels_true, _, inputs_seq_len, labels_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
 
         feed_dict = {
             network.inputs: inputs,
-            network.seq_len: seq_len,
+            network.labels: labels_true,
+            network.inputs_seq_len: inputs_seq_len,
+            network.labels_seq_len: labels_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
 
         batch_size_each = len(labels_true)
-        labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
+        predicted_ids = session.run(decode_op, feed_dict=feed_dict)
         for i_batch in range(batch_size_each):
 
             # Convert from list to string
-            str_pred = num2char(labels_pred[i_batch], map_file_path)
             str_true = num2char(labels_true[i_batch], map_file_path)
+            str_pred = num2char(predicted_ids[i_batch], map_file_path)
 
             # Remove silence(_) labels
+            str_true = re.sub(r'[_<>]+', "", str_true)
             str_pred = re.sub(r'[_]+', "", str_pred)
-            str_true = re.sub(r'[_]+', "", str_true)
+            print(str_true)
+            print(str_pred)
 
             # Compute edit distance
             cer_each = Levenshtein.distance(
@@ -173,112 +185,3 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=1,
     cer_mean = cer_sum / dataset.data_num
 
     return cer_mean
-
-
-def decode_test(session, decode_op, network, dataset, label_type,
-                is_multitask=False):
-    """Visualize label outputs.
-    Args:
-        session: session of training model
-        decode_op: operation for decoding
-        network: network to evaluate
-        dataset: Dataset class
-        label_type: phone39 or phone48 or phone61 or character
-        is_multitask: if True, evaluate the multitask model
-    """
-    batch_size = 1
-    num_examples = dataset.data_num
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
-
-    map_file_path_phone = '../metric/mapping_files/ctc/phone2num_' + \
-        label_type[5:7] + '.txt'
-    map_file_path_char = '../metric/mapping_files/ctc/char2num.txt'
-    for step in range(iteration):
-        # Create feed dictionary for next mini batch
-        inputs, labels_true, seq_len, input_names = dataset.next_batch(
-            batch_size=batch_size)
-        # if is_multitask:
-        #     if label_type == 'character':
-        #         labels_true = labels_true[0]
-        #     else:
-        #         labels_true = labels_true[1]
-
-        feed_dict = {
-            network.inputs: inputs,
-            network.seq_len: seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
-        }
-
-        # Visualize
-        batch_size_each = len(labels_true)
-        labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
-        for i_batch in range(batch_size_each):
-            if label_type == 'character':
-                print('-----wav: %s-----' % input_names[i_batch])
-                print('True: %s' % num2char(
-                    labels_true[i_batch], map_file_path_char))
-                print('Pred: %s' % num2char(
-                    labels_pred[i_batch], map_file_path_char))
-
-            else:
-                # Decode test (39 phones)
-                print('-----wav: %s-----' % input_names[i_batch])
-                print('True: %s' % num2phone(
-                    labels_true[i_batch], map_file_path_phone))
-
-                print('Pred: %s' % num2phone(
-                    labels_pred[i_batch], map_file_path_phone))
-
-
-def posterior_test(session, posteriors_op, network, dataset, label_type):
-    """Visualize label posteriors.
-    Args:
-        session: session of training model
-        posteriois_op: operation for computing posteriors
-        network: network to evaluate
-        dataset: Dataset class
-        label_type: phone39 or phone48 or phone61 or character
-    """
-    save_path = mkdir_join(network.model_dir, 'ctc_output')
-    batch_size = 1
-    num_examples = dataset.data_num
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
-
-    for step in range(iteration):
-        # Create feed dictionary for next mini batch
-        inputs, _, seq_len, input_names = dataset.next_batch(
-            batch_size=batch_size)
-
-        feed_dict = {
-            network.inputs: inputs,
-            network.seq_len: seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
-        }
-
-        # Visualize
-        batch_size_each = len(seq_len)
-        max_frame_num = inputs.shape[1]
-        posteriors = session.run(posteriors_op, feed_dict=feed_dict)
-        for i_batch in range(batch_size_each):
-            posteriors_index = np.array([i_batch + (batch_size_each * j)
-                                         for j in range(max_frame_num)])
-            if label_type != 'character':
-                probs.plot_probs_ctc_phone(
-                    probs=posteriors[posteriors_index][:int(
-                        seq_len[i_batch]), :],
-                    save_path=save_path,
-                    wav_index=input_names[i_batch],
-                    data_type=dataset.data_type,
-                    label_type=label_type)
-            # Else:
-            #     probs.plot_probs_ctc_char(probs=posteriors[posteriors_index][:int(seq_len[i_batch]), :],
-            #                               save_path=save_path,
-            #                               wav_index=input_names[i_batch],
-            #                               data_type=dataset.data_type)

@@ -29,53 +29,50 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
         session: session of training model
         posteriois_op: operation for computing posteriors
         network: network to evaluate
-        dataset: Dataset class
-        label_type: phone39 or phone48 or phone61 or character
+        dataset: An instance of a `Dataset` class
+        label_type: string, phone39 or phone48 or phone61 or character
         save_path: path to save ctc outputs
     """
+    # Batch size is expected to be 1
+    iteration = dataset.data_num
+
     save_path = mkdir_join(save_path, 'ctc_output')
-    batch_size = 1
-    num_examples = dataset.data_num
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
 
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, _, seq_len, input_names = dataset.next_batch(
-            batch_size=batch_size)
+        inputs, _, inputs_seq_len, input_names = dataset.next_batch()
 
         feed_dict = {
             network.inputs: inputs,
-            network.seq_len: seq_len,
+            network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
 
         # Visualize
-        batch_size_each = len(seq_len)
+        batch_size_each = len(inputs_seq_len)
         max_frame_num = inputs.shape[1]
         posteriors = session.run(posteriors_op, feed_dict=feed_dict)
-        for i_batch in range(batch_size_each):
-            posteriors_index = np.array([i_batch + (batch_size_each * j)
-                                         for j in range(max_frame_num)])
-            if label_type != 'character':
-                plot_probs_ctc_phone(
-                    probs=posteriors[posteriors_index][:int(
-                        seq_len[i_batch]), :],
-                    wav_index=input_names[i_batch],
-                    label_type=label_type,
-                    save_path=save_path)
-            else:
-                plot_probs_ctc_char(
-                    probs=posteriors[posteriors_index][:int(
-                        seq_len[i_batch]), :],
-                    wav_index=input_names[i_batch],
-                    save_path=save_path)
+        posteriors_index = np.array([0 + (batch_size_each * j)
+                                     for j in range(max_frame_num)])
+        if label_type != 'character':
+            plot_probs_ctc_phone(
+                probs=posteriors[posteriors_index][:int(
+                    inputs_seq_len[0]), :],
+                wav_index=input_names[0],
+                label_type=label_type,
+                save_path=save_path)
+        else:
+            plot_probs_ctc_char(
+                probs=posteriors[posteriors_index][:int(
+                    inputs_seq_len[0]), :],
+                wav_index=input_names[0],
+                save_path=save_path)
 
 
-def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second, network,
-                             dataset, label_type_second, save_path=None):
+def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
+                             network, dataset, label_type_second,
+                             save_path=None):
     """Visualize label posteriors of Multi-task CTC model.
     Args:
         session: session of training model
@@ -83,57 +80,54 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second, 
         posteriois_op_second: operation for computing posteriors in the second
             task
         network: network to evaluate
-        dataset: Dataset class
-        label_type_second: phone39 or phone48 or phone61
+        dataset: An instance of a `Dataset` class
+        label_type_second: string, phone39 or phone48 or phone61
         save_path: path to save ctc outpus
     """
+    # Batch size is expected to be 1
+    iteration = dataset.data_num
+
     save_path = mkdir_join(save_path, 'ctc_output')
-    batch_size = 1
-    num_examples = dataset.data_num
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
 
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, _, _, seq_len, input_names = dataset.next_batch(
-            batch_size=batch_size)
+        inputs, _, _, inputs_seq_len, input_names = dataset.next_batch()
 
         feed_dict = {
             network.inputs: inputs,
-            network.seq_len: seq_len,
+            network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
 
         # Visualize
-        batch_size_each = len(seq_len)
+        batch_size_each = len(inputs_seq_len)
         max_frame_num = inputs.shape[1]
         posteriors_char = session.run(
             posteriors_op_main, feed_dict=feed_dict)
         posteriors_phone = session.run(
             posteriors_op_second, feed_dict=feed_dict)
-        for i_batch in range(batch_size_each):
-            posteriors_index = np.array([i_batch + (batch_size_each * j)
-                                         for j in range(max_frame_num)])
 
-            plot_probs_ctc_char_phone(
-                probs_char=posteriors_char[posteriors_index][:int(
-                    seq_len[i_batch]), :],
-                probs_phone=posteriors_phone[posteriors_index][:int(
-                    seq_len[i_batch]), :],
-                wav_index=input_names[i_batch],
-                label_type_second=label_type_second,
-                save_path=save_path)
+        posteriors_index = np.array([0 + (batch_size_each * j)
+                                     for j in range(max_frame_num)])
+
+        plot_probs_ctc_char_phone(
+            probs_char=posteriors_char[posteriors_index][:int(
+                inputs_seq_len[0]), :],
+            probs_phone=posteriors_phone[posteriors_index][:int(
+                inputs_seq_len[0]), :],
+            wav_index=input_names[0],
+            label_type_second=label_type_second,
+            save_path=save_path)
 
 
 def plot_probs_ctc_phone(probs, wav_index, label_type, save_path=None):
     """Plot posteriors of phones.
     Args:
         probs:
-        wav_index: int
-        label_type: phone39 or phone48 or phone61
-        save_path:
+        wav_index: int,
+        label_type: string, phone39 or phone48 or phone61
+        save_path: path to save ctc outpus
     """
     duration = probs.shape[0]
     times_probs = np.arange(len(probs))
@@ -174,8 +168,8 @@ def plot_probs_ctc_char(probs, wav_index, save_path=None):
     """Plot posteriors of characters.
     Args:
         probs:
-        wav_index: int
-        save_path:
+        wav_index: int,
+        save_path: path to save ctc outpus
     """
     duration = probs.shape[0]
     times_probs = np.arange(len(probs))
@@ -214,7 +208,7 @@ def plot_probs_ctc_char_phone(probs_char, probs_phone, wav_index,
         probs_char:
         probs_phone:
         wav_index: int
-        label_type_second:
+        label_type_second: string, phone39 or phone48, phone61
         save_path:
     """
     duration = probs_char.shape[0]

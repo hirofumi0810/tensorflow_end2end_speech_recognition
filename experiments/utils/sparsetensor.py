@@ -6,6 +6,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import tensorflow as tf
 
 
 def list2sparsetensor(labels):
@@ -18,6 +19,11 @@ def list2sparsetensor(labels):
     indices, values = [], []
     for i_utt, each_label in enumerate(labels):
         for i_l, l in enumerate(each_label):
+            # -1 means empty
+            # Plaese see details in
+            # some_timit/data/read_dataset_ctc.py
+            if l == -1:
+                break
             indices.append([i_utt, i_l])
             values.append(l)
     dense_shape = [len(labels), np.asarray(indices).max(0)[1] + 1]
@@ -29,12 +35,17 @@ def list2sparsetensor(labels):
 def sparsetensor2list(labels_st, batch_size):
     """Convert labels from sparse tensor to list.
     Args:
-        labels_st: sparse tensor of labels
+        labels_st: A SparseTensor of labels
     Returns:
         labels: list of labels
     """
-    indices = labels_st.indices
-    values = labels_st.values
+    if isinstance(labels_st, tf.SparseTensorValue):
+        indices = labels_st.indices
+        values = labels_st.values
+    else:
+        # expected to list of [indices, values, shape]
+        indices = labels_st[0]
+        values = labels_st[1]
 
     labels = []
     batch_boundary = np.where(indices[:, 1] == 0)[0]

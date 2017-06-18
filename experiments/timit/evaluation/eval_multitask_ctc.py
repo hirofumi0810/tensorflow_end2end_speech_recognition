@@ -24,18 +24,20 @@ def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
-        label_type_second: phone39 or phone48 or phone61
+        label_type_second: string, phone39 or phone48 or phone61
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
-        epoch: epoch to restore
+        epoch: int, the epoch to restore
     """
     # Load dataset
     if label_type_second == 'character':
         test_data = DataSet(data_type='test', label_type_second='character',
+                            batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
     else:
         test_data = DataSet(data_type='test', label_type_second='phone39',
+                            batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
 
@@ -59,7 +61,7 @@ def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
                                             name='inputs_seq_len')
 
     # Add to the graph each operation
-    loss_op, logits_main, logits_second = network.compute_loss(
+    _, logits_main, logits_second = network.compute_loss(
         network.inputs,
         network.labels,
         network.labels_second,
@@ -108,7 +110,7 @@ def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
             per_op=per_op_second,
             network=network,
             dataset=test_data,
-            label_type=label_type_second,
+            train_label_type=label_type_second,
             is_progressbar=True,
             is_multitask=True)
         print('  PER: %f %%' % (per_test * 100))

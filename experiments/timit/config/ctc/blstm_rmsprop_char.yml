@@ -12,6 +12,7 @@ param:
     num_unit: 256
     num_proj: 0
     num_layer: 5
+    bottleneck_dim: 0
     batch_size: 64
     optimizer: rmsprop
     learning_rate: 0.001

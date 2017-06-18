@@ -33,6 +33,7 @@ class BLSTMAttetion(AttentionBase):
         eos_index: index of the end of sentence tag (<EOS>)
         max_decode_length:
         attention_weights_tempareture:
+        logits_tempareture:
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (non-negative)
@@ -60,6 +61,7 @@ class BLSTMAttetion(AttentionBase):
                  eos_index,
                  max_decode_length,
                  attention_weights_tempareture=1,
+                 logits_tempareture=1,
                  parameter_init=0.1,
                  clip_grad=5.0,
                  clip_activation_encoder=50,
@@ -73,6 +75,7 @@ class BLSTMAttetion(AttentionBase):
         AttentionBase.__init__(self, batch_size, input_size,
                                attention_dim, embedding_dim,
                                output_size, sos_index, eos_index,
+                               logits_tempareture,
                                clip_grad, weight_decay, beam_width, name)
 
         # Network size

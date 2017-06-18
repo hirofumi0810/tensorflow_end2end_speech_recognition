@@ -319,14 +319,11 @@ class Multitask_BLSTM_CTC(ctcBase):
 
         return decode_op_main, decode_op_second
 
-    def posteriors(self, logits_main, logits_second,
-                   decode_op_main, decode_op_second):
+    def posteriors(self, logits_main, logits_second):
         """Operation for computing posteriors of each time steps.
         Args:
             logits_main:
             logits_second:
-            decode_op_main: operation for decoding of the main task
-            decode_op_second: operation for decoding of the second task
         Return:
             posteriors_op_main: operation for computing posteriors for each
                 class in the main task

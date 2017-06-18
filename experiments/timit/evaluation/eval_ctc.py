@@ -24,20 +24,23 @@ def do_eval(network, label_type, num_stack, num_skip, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
-        label_type: phone39 or phone48 or phone61 or character
+        label_type: string, phone39 or phone48 or phone61 or character
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
-        epoch: epoch to restore
+        epoch: int, the epoch to restore
     """
     # Load dataset
     if label_type == 'character':
         test_data = DataSet(data_type='test', label_type='character',
+                            batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
     else:
         test_data = DataSet(data_type='test', label_type='phone39',
+                            batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
+    network.label_type = label_type
 
     # Define placeholders
     network.inputs = tf.placeholder(
@@ -53,9 +56,9 @@ def do_eval(network, label_type, num_stack, num_skip, epoch=None):
                                             name='inputs_seq_len')
 
     # Add to the graph each operation (including model definition)
-    loss_op, logits = network.compute_loss(network.inputs,
-                                           network.labels,
-                                           network.inputs_seq_len)
+    _, logits = network.compute_loss(network.inputs,
+                                     network.labels,
+                                     network.inputs_seq_len)
     decode_op = network.decoder(logits,
                                 network.inputs_seq_len,
                                 decode_type='beam_search',
@@ -96,7 +99,7 @@ def do_eval(network, label_type, num_stack, num_skip, epoch=None):
                 per_op=per_op,
                 network=network,
                 dataset=test_data,
-                label_type=label_type,
+                train_label_type=label_type,
                 is_progressbar=True)
             print('  PER: %f %%' % (per_test * 100))
 

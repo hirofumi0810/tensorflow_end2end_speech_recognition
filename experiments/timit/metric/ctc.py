@@ -20,27 +20,30 @@ from utils.exception_func import exception
 
 
 @exception
-def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
-                eval_batch_size=1, is_progressbar=False, is_multitask=False):
+def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
+                eval_batch_size=None, is_progressbar=False,
+                is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
     Args:
         session: session of training model
         decode_op: operation for decoding
         per_op: operation for computing phone error rate
         network: network to evaluate
-        dataset: `Dataset' class
-        label_type: phone39 or phone48 or phone61 or character
-        eval_batch_size: batch size on evaluation
+        dataset: Am instance of a `Dataset' class
+        train_label_type: string, phone39 or phone48 or phone61
+        eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
     Returns:
         per_global: An average of PER
     """
-    if label_type not in ['phone39', 'phone48', 'phone61']:
-        raise ValueError(
-            'data_type is "phone39" or "phone48" or "phone61".')
+    if eval_batch_size is not None:
+        batch_size = eval_batch_size
+    else:
+        batch_size = dataset.batch_size
 
-    batch_size = eval_batch_size
+    data_label_type = dataset.label_type
+
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
     if (num_examples / batch_size) != int(num_examples / batch_size):
@@ -48,37 +51,37 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     per_global = 0
 
     phone2num_map_file_path = '../metric/mapping_files/ctc/phone2num_' + \
-        label_type[5:7] + '.txt'
+        train_label_type[5:7] + '.txt'
     phone2num_39_map_file_path = '../metric/mapping_files/ctc/phone2num_39.txt'
     phone2phone_map_file_path = '../metric/mapping_files/phone2phone.txt'
     iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
     for step in iterator:
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, inputs_seq_len, _ = dataset.next_batch(
+            inputs, labels_true_st, inputs_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
         else:
-            inputs, _, labels_true, inputs_seq_len, _ = dataset.next_batch(
+            inputs, _, labels_true_st, inputs_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
 
         feed_dict = {
             network.inputs: inputs,
-            network.labels: list2sparsetensor(labels_true),
             network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
 
-        batch_size_each = len(labels_true)
+        batch_size_each = len(inputs_seq_len)
 
         if False:
-            # Evaluate by 61 phones
+            # Evaluate by the same phones as phones used when training
             per_local = session.run(per_op, feed_dict=feed_dict)
             per_global += per_local * batch_size_each
 
         else:
             # Evaluate by 39 phones
             labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
+            labels_true = sparsetensor2list(labels_true_st, batch_size_each)
             labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
             for i_batch in range(batch_size_each):
                 # Convert num to phone (list of phone strings)
@@ -88,12 +91,29 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
                 # Mapping to 39 phones (list of phone strings)
                 phone_pred_list = map_to_39phone(
-                    phone_pred_list, label_type, phone2phone_map_file_path)
+                    phone_pred_list, train_label_type,
+                    phone2phone_map_file_path)
 
                 # Convert phone to num (list of phone indices)
                 phone_pred_list = phone2num(
                     phone_pred_list, phone2num_39_map_file_path)
                 labels_pred[i_batch] = phone_pred_list
+
+                if data_label_type != 'phone39':
+                    # Convert num to phone (list of phone strings)
+                    phone_true_seq = num2phone(
+                        labels_true[i_batch], phone2num_map_file_path)
+                    phone_true_list = phone_true_seq.split(' ')
+
+                    # Mapping to 39 phones (list of phone strings)
+                    phone_true_list = map_to_39phone(
+                        phone_true_list, data_label_type,
+                        phone2phone_map_file_path)
+
+                    # Convert phone to num (list of phone indices)
+                    phone_true_list = phone2num(
+                        phone_true_list, phone2num_39_map_file_path)
+                    labels_true[i_batch] = phone_true_list
 
             # Compute edit distance
             labels_true_st = list2sparsetensor(labels_true)
@@ -108,21 +128,25 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
 
 @exception
-def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=1,
+def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
                 is_progressbar=False, is_multitask=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
         decode_op: operation for decoding
         network: network to evaluate
-        dataset: Dataset class
-        eval_batch_size: batch size on evaluation
+        dataset: An instance of a `Dataset` class
+        eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
     Return:
         cer_mean: An average of CER
     """
-    batch_size = eval_batch_size
+    if eval_batch_size is not None:
+        batch_size = eval_batch_size
+    else:
+        batch_size = dataset.batch_size
+
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
     if (num_examples / batch_size) != int(num_examples / batch_size):
@@ -134,22 +158,23 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=1,
     for step in iterator:
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, inputs_seq_len, _ = dataset.next_batch(
+            inputs, labels_true_st, inputs_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
         else:
-            inputs, labels_true, _, inputs_seq_len, _ = dataset.next_batch(
+            inputs, labels_true_st, _, inputs_seq_len, _ = dataset.next_batch(
                 batch_size=batch_size)
 
         feed_dict = {
             network.inputs: inputs,
-            network.labels: list2sparsetensor(labels_true),
             network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
 
-        batch_size_each = len(labels_true)
+        batch_size_each = len(inputs_seq_len)
+
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
+        labels_true = sparsetensor2list(labels_true_st, batch_size_each)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
         for i_batch in range(batch_size_each):
 

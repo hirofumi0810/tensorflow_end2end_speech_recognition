@@ -24,26 +24,43 @@ def do_decode(network, label_type, num_stack, num_skip, epoch=None):
     """Decode the CTC outputs.
     Args:
         network: model to restore
-        label_type: phone39 or phone48 or phone61 or character
+        label_type: string, phone39 or phone48 or phone61 or character
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
-        epoch: epoch to restore
+        epoch: int, the epoch to restore
     """
     # Load dataset
     if label_type == 'character':
         test_data = DataSet(data_type='test', label_type='character',
+                            batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
     else:
         test_data = DataSet(data_type='test', label_type='phone61',
+                            batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
 
-    # Define model
-    network.define()
+    # Define placeholders
+    network.inputs = tf.placeholder(
+        tf.float32,
+        shape=[None, None, network.input_size],
+        name='input')
+    indices_pl = tf.placeholder(tf.int64, name='indices')
+    values_pl = tf.placeholder(tf.int32, name='values')
+    shape_pl = tf.placeholder(tf.int64, name='shape')
+    network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
+    network.inputs_seq_len = tf.placeholder(tf.int64,
+                                            shape=[None],
+                                            name='inputs_seq_len')
 
-    # Add to the graph each operation
-    decode_op = network.decoder(decode_type='beam_search',
+    # Add to the graph each operation (including model definition)
+    _, logits = network.compute_loss(network.inputs,
+                                     network.labels,
+                                     network.inputs_seq_len)
+    decode_op = network.decoder(logits,
+                                network.inputs_seq_len,
+                                decode_type='beam_search',
                                 beam_width=20)
 
     # Create a saver for writing training checkpoints
@@ -69,7 +86,6 @@ def do_decode(network, label_type, num_stack, num_skip, epoch=None):
                     decode_op=decode_op,
                     network=network,
                     dataset=test_data,
-                    label_type=label_type,
                     save_path=network.model_dir)
 
 
@@ -98,7 +114,7 @@ def main(model_path):
     network = CTCModel(
         batch_size=1,
         input_size=feature['input_size'] * feature['num_stack'],
-        num_unit=param['num_cell'],  # TODO: change to num_unit
+        num_unit=param['num_unit'],
         num_layer=param['num_layer'],
         output_size=output_size,
         clip_grad=param['clip_grad'],

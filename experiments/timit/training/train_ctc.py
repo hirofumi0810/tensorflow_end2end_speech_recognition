@@ -21,7 +21,6 @@ sys.path.append('../../../')
 from data.read_dataset_ctc import DataSet
 from models.ctc.load_model import load
 from metric.ctc import do_eval_per, do_eval_cer
-from utils.sparsetensor import list2sparsetensor
 from utils.directory import mkdir, mkdir_join
 from utils.parameter import count_total_parameters
 from utils.csv import save_loss, save_ler
@@ -35,29 +34,34 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         network: network to train
         optimizer: string, the name of optimizer.
             ex.) adam, rmsprop
-        learning_rate: initial learning rate
-        batch_size: size of mini batch
-        epoch_num: epoch num to train
-        label_type: phone39 or phone48 or phone61 or character
+        learning_rate: A float value, the initial learning rate
+        batch_size: int, the size of mini-batch
+        epoch_num: int, the number of epochs to train
+        label_type: string, phone39 or phone48 or phone61 or character
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
     """
     # Load dataset
     train_data = DataSet(data_type='train', label_type=label_type,
+                         batch_size=batch_size,
                          num_stack=num_stack, num_skip=num_skip,
                          is_sorted=True)
     if label_type == 'character':
         dev_data = DataSet(data_type='dev', label_type='character',
+                           batch_size=batch_size,
                            num_stack=num_stack, num_skip=num_skip,
                            is_sorted=False)
         test_data = DataSet(data_type='test', label_type='character',
+                            batch_size=batch_size,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False)
     else:
-        dev_data = DataSet(data_type='dev', label_type='phone39',
+        dev_data = DataSet(data_type='dev', label_type=label_type,
+                           batch_size=1,
                            num_stack=num_stack, num_skip=num_skip,
                            is_sorted=False)
         test_data = DataSet(data_type='test', label_type='phone39',
+                            batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False)
 
@@ -82,7 +86,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                                network.labels,
                                                network.inputs_seq_len)
         train_op = network.train(loss_op,
-                                 optimizer='adam',
+                                 optimizer=optimizer,
                                  learning_rate_init=learning_rate,
                                  is_scheduled=False)
         decode_op = network.decoder(logits,
@@ -136,11 +140,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels, inputs_seq_len, _ = train_data.next_batch(
-                    batch_size=batch_size)
+                inputs, labels_st, inputs_seq_len, _ = train_data.next_batch()
                 feed_dict_train = {
                     network.inputs: inputs,
-                    network.labels: list2sparsetensor(labels),
+                    network.labels: labels_st,
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
@@ -148,11 +151,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels, inputs_seq_len, _ = dev_data.next_batch(
-                    batch_size=batch_size)
+                inputs, labels_st, inputs_seq_len, _ = dev_data.next_batch()
                 feed_dict_dev = {
                     network.inputs: inputs,
-                    network.labels: list2sparsetensor(labels),
+                    network.labels: labels_st,
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden
@@ -215,8 +217,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                 session=sess,
                                 decode_op=decode_op,
                                 network=network,
-                                dataset=dev_data,
-                                eval_batch_size=1)
+                                dataset=dev_data)
                             print('  CER: %f %%' % (cer_dev_epoch * 100))
 
                             if cer_dev_epoch < error_best:
@@ -240,8 +241,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                 per_op=ler_op,
                                 network=network,
                                 dataset=dev_data,
-                                label_type=label_type,
-                                eval_batch_size=1)
+                                train_label_type=label_type)
                             print('  PER: %f %%' % (per_dev_epoch * 100))
 
                             if per_dev_epoch < error_best:
@@ -255,7 +255,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                     per_op=ler_op,
                                     network=network,
                                     dataset=test_data,
-                                    label_type=label_type,
+                                    train_label_type=label_type,
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (per_test * 100))
 
@@ -326,7 +326,8 @@ def main(config_path):
         network.model_name += '_weightdecay' + str(param['weight_decay'])
 
     # Set save path
-    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/ctc/')
+    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/')
+    network.model_dir = mkdir_join(network.model_dir, 'ctc')
     network.model_dir = mkdir_join(network.model_dir, corpus['label_type'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 

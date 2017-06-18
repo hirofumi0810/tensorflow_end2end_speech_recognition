@@ -25,11 +25,11 @@ from metric.attention import do_eval_per, do_eval_cer
 from utils.sparsetensor import list2sparsetensor
 from utils.directory import mkdir, mkdir_join
 from utils.parameter import count_total_parameters
-from utils.loss import save_loss
+from utils.csv import save_loss, save_ler
 
 
 def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
-             label_type, num_stack, num_skip):
+             label_type, eos_index):
     """Run training. If target labels are phone, the model is evaluated by PER
     with 39 phones.
     Args:
@@ -40,27 +40,21 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         batch_size: size of mini batch
         epoch_num: epoch num to train
         label_type: phone39 or phone48 or phone61 or character
-        num_stack: int, the number of frames to stack
-        num_skip: int, the number of frames to skip
+        eos_index: int, the index of <EOS> class. This is used for padding.
     """
     # Load dataset
     train_data = DataSet(data_type='train', label_type=label_type,
-                         num_stack=num_stack, num_skip=num_skip,
-                         is_sorted=True)
+                         eos_index=eos_index, is_sorted=True)
     if label_type == 'character':
         dev_data = DataSet(data_type='dev', label_type='character',
-                           num_stack=num_stack, num_skip=num_skip,
-                           is_sorted=False)
+                           eos_index=eos_index, is_sorted=False)
         test_data = DataSet(data_type='test', label_type='character',
-                            num_stack=num_stack, num_skip=num_skip,
-                            is_sorted=False)
+                            eos_index=eos_index, is_sorted=False)
     else:
         dev_data = DataSet(data_type='dev', label_type='phone39',
-                           num_stack=num_stack, num_skip=num_skip,
-                           is_sorted=False)
+                           eos_index=eos_index, is_sorted=False)
         test_data = DataSet(data_type='test', label_type='phone39',
-                            num_stack=num_stack, num_skip=num_skip,
-                            is_sorted=False)
+                            eos_index=eos_index, is_sorted=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -75,7 +69,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                  learning_rate_init=learning_rate,
                                  is_scheduled=False)
         decode_op_train, decode_op_infer = network.decoder(
-            decode_type='beam_search',
+            decode_type='greedy',
             beam_width=20)
         ler_op = network.compute_ler()
 
@@ -99,7 +93,8 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
               (len(parameters_dict.keys()),
                "{:,}".format(total_parameters / 1000000)))
 
-        csv_steps, csv_train_loss, csv_dev_loss = [], [], []
+        csv_steps, csv_loss_train, csv_loss_dev = [], [], []
+        csv_ler_train, csv_ler_dev = [], []
         # Create a session for running operation on the graph
         with tf.Session() as sess:
 
@@ -123,11 +118,11 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels, inputs_seq_len, labels_seq_len = train_data.next_batch(
+                inputs, labels_train, inputs_seq_len, labels_seq_len, _ = train_data.next_batch(
                     batch_size=batch_size)
                 feed_dict_train = {
                     network.inputs: inputs,
-                    network.labels: labels,
+                    network.labels: labels_train,
                     network.inputs_seq_len: inputs_seq_len,
                     network.labels_seq_len: labels_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
@@ -136,27 +131,27 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels, inputs_seq_len, labels_seq_len = dev_data.next_batch(
+                inputs, labels_dev, inputs_seq_len, labels_seq_len, _ = dev_data.next_batch(
                     batch_size=batch_size)
                 feed_dict_dev = {
                     network.inputs: inputs,
-                    network.labels: labels,
+                    network.labels: labels_dev,
                     network.inputs_seq_len: inputs_seq_len,
                     network.labels_seq_len: labels_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.learning_rate: learning_rate
+                    network.keep_prob_hidden: network.dropout_ratio_hidden
                 }
 
-                # Update parameters & compute loss
-                _, loss_train = sess.run(
-                    [train_op, loss_op], feed_dict=feed_dict_train)
-                loss_dev = sess.run(loss_op, feed_dict=feed_dict_dev)
-                csv_steps.append(step)
-                csv_train_loss.append(loss_train)
-                csv_dev_loss.append(loss_dev)
+                # Update parameters
+                _ = sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % 10 == 0:
+                    # Compute loss
+                    loss_train = sess.run(loss_op, feed_dict=feed_dict_train)
+                    loss_dev = sess.run(loss_op, feed_dict=feed_dict_dev)
+                    csv_steps.append(step)
+                    csv_loss_train.append(loss_train)
+                    csv_loss_dev.append(loss_dev)
 
                     # Change feed dict for evaluation
                     feed_dict_train[network.keep_prob_input] = 1.0
@@ -165,42 +160,53 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     feed_dict_dev[network.keep_prob_hidden] = 1.0
 
                     # Predict ids
-                    predicted_ids_train, predicted_ids_infer = sess.run(
-                        [decode_op_train, decode_op_infer],
-                        feed_dict=feed_dict_train)
+                    predicted_ids_train = sess.run(
+                        [decode_op_infer], feed_dict=feed_dict_train)
+                    predicted_ids_dev = sess.run(
+                        [decode_op_infer], feed_dict=feed_dict_dev)
 
-                    # Convert to sparsetensor for computing LER
-                    indices, values, shape = list2sparsetensor(labels)
-                    indices_train, values_train, shape_train = list2sparsetensor(
+                    # Convert to sparsetensor to compute LER
+                    indices_true, values_true, shape_true = list2sparsetensor(
+                        labels_train)
+                    indices_pred, values_pred, shape_pred = list2sparsetensor(
                         predicted_ids_train)
-                    indices_infer, values_infer, shape_infer = list2sparsetensor(
-                        predicted_ids_infer)
-
-                    feed_dict_ler = {
-                        network.label_indices_true: indices,
-                        network.label_values_true:  values,
-                        network.label_shape_true: shape,
-                        network.label_indices_pred: indices_infer,
-                        network.label_values_pred:  values_infer,
-                        network.label_shape_pred: shape_infer
+                    feed_dict_ler_train = {
+                        network.label_indices_true: indices_true,
+                        network.label_values_true:  values_true,
+                        network.label_shape_true: shape_true,
+                        network.label_indices_pred: indices_pred,
+                        network.label_values_pred:  values_pred,
+                        network.label_shape_pred: shape_pred
                     }
-                    # TODO: Add dev version
+
+                    indices_true, values_true, shape_true = list2sparsetensor(
+                        labels_dev)
+                    indices_pred, values_pred, shape_pred = list2sparsetensor(
+                        predicted_ids_dev)
+                    feed_dict_ler_dev = {
+                        network.label_indices_true: indices_true,
+                        network.label_values_true:  values_true,
+                        network.label_shape_true: shape_true,
+                        network.label_indices_pred: indices_pred,
+                        network.label_values_pred:  values_pred,
+                        network.label_shape_pred: shape_pred
+                    }
 
                     # Compute accuracy & update event file
-                    ler_train = sess.run(
-                        [ler_op], feed_dict=feed_dict_ler)
                     # ler_train, summary_str_train = sess.run(
-                    #     [ler_op, summary_train], feed_dict=feed_dict_train)
+                    #     [ler_op, summary_train], feed_dict=feed_dict_ler_train)
                     # ler_dev, summary_str_dev = sess.run(
-                    #     [ler_op, summary_dev], feed_dict=feed_dict_dev)
+                    #     [ler_op, summary_dev], feed_dict=feed_dict_ler_dev)
+                    # csv_ler_train.append(ler_train)
+                    # csv_ler_dev.append(ler_dev)
                     # summary_writer.add_summary(summary_str_train, step + 1)
                     # summary_writer.add_summary(summary_str_dev, step + 1)
                     # summary_writer.flush()
 
                     duration_step = time.time() - start_time_step
                     print("Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) (%.3f min)" %
-                          (step + 1, loss_train, loss_dev, ler_train,
-                           1, duration_step / 60))
+                          (step + 1, loss_train, loss_dev, 1, 1,
+                           duration_step / 60))
                     sys.stdout.flush()
                     start_time_step = time.time()
 
@@ -280,9 +286,11 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
 
-            # Save train & dev loss
-            save_loss(csv_steps, csv_train_loss, csv_dev_loss,
+            # Save train & dev loss, ler
+            save_loss(csv_steps, csv_loss_train, csv_loss_dev,
                       save_path=network.model_dir)
+            save_ler(csv_steps, csv_ler_train, csv_loss_dev,
+                     save_path=network.model_dir)
 
             # Training was finished correctly
             with open(join(network.model_dir, 'complete.txt'), 'w') as f:
@@ -305,60 +313,46 @@ def main(config_path):
     elif corpus['label_type'] == 'phone39':
         output_size = 41
     elif corpus['label_type'] == 'character':
-        output_size = 32
+        output_size = 33
 
     # Model setting
-    # CTCModel = load(model_type=config['model_name'])
-    network = (
-        batch_size=batch_size,
-        input_size=inputs[0].shape[1],
-        encoder_num_units=256,
-        encoder_num_layer=2,
-        attention_dim=128,
-        decoder_num_units=256,
-        decoder_num_layer=1,
-        embedding_dim=50,
+    # AttentionModel = load(model_type=config['model_name'])
+    network = blstm_attention_seq2seq.BLSTMAttetion(
+        batch_size=param['batch_size'],
+        input_size=feature['input_size'],
+        encoder_num_unit=param['encoder_num_unit'],
+        encoder_num_layer=param['encoder_num_layer'],
+        attention_dim=param['attention_dim'],
+        decoder_num_unit=param['decoder_num_unit'],
+        decoder_num_layer=param['decoder_num_layer'],
+        embedding_dim=param['embedding_dim'],
         output_size=output_size,
         sos_index=output_size - 2,
         eos_index=output_size - 1,
-        max_decode_length=50,
-        parameter_init=0.1,
-        clip_grad=5.0,
-        clip_activation_encoder=50,
-        clip_activation_decoder=50,
-        dropout_ratio_input=1.0,
-        dropout_ratio_hidden=1.0,
-        weight_decay=1e-6,
-        beam_width=0)
-
-    network = blstm_attention_seq2seq.BLSTMAttetion(
-        batch_size=param['batch_size'],
-        input_size=feature['input_size'] * feature['num_stack'],
-        encoder_num_unit=param['encoder_num_units'],
-        encoder_num_layer=num_cell=param['num_cell'],
-        num_layer=param['num_layer'],
-        output_size=output_size,
+        max_decode_length=param['max_decode_length'],
+        attention_weights_tempareture=param['attention_weights_tempareture'],
+        logits_tempareture=param['logits_tempareture'],
+        parameter_init=param['weight_init'],
         clip_grad=param['clip_grad'],
-        clip_activation=param['clip_activation'],
+        clip_activation_encoder=param['clip_activation_encoder'],
+        clip_activation_decoder=param['clip_activation_decoder'],
         dropout_ratio_input=param['dropout_input'],
         dropout_ratio_hidden=param['dropout_hidden'],
-        num_proj=param['num_proj'],
         weight_decay=param['weight_decay'])
 
     network.model_name = config['model_name'].upper()
-    network.model_name += '_' + str(param['num_cell'])
-    network.model_name += '_' + str(param['num_layer'])
+    network.model_name += '_encoder' + str(param['encoder_num_unit'])
+    network.model_name += '_' + str(param['encoder_num_layer'])
+    network.model_name += '_attdim' + str(param['attention_dim'])
+    network.model_name += '_decoder' + str(param['decoder_num_unit'])
+    network.model_name += '_' + str(param['decoder_num_layer'])
     network.model_name += '_' + param['optimizer']
     network.model_name += '_lr' + str(param['learning_rate'])
-    if param['num_proj'] != 0:
-        network.model_name += '_proj' + str(param['num_proj'])
-    if feature['num_stack'] != 1:
-        network.model_name += '_stack' + str(feature['num_stack'])
     if param['weight_decay'] != 0:
         network.model_name += '_weightdecay' + str(param['weight_decay'])
 
     # Set save path
-    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/ctc/')
+    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/attention/')
     network.model_dir = mkdir_join(network.model_dir, corpus['label_type'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
@@ -370,7 +364,7 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('ctc_timit_' + corpus['label_type'])
+    setproctitle('attention_timit_' + corpus['label_type'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
@@ -383,8 +377,7 @@ def main(config_path):
              batch_size=param['batch_size'],
              epoch_num=param['num_epoch'],
              label_type=corpus['label_type'],
-             num_stack=feature['num_stack'],
-             num_skip=feature['num_skip'])
+             eos_index=output_size - 1)
     sys.stdout = sys.__stdout__
 
 

@@ -11,14 +11,16 @@ from os.path import join, basename
 import pickle
 import random
 import numpy as np
-from tqdm import tqdm
+import tensorflow as tf
+
+from utils.progressbar import wrap_iterator
 
 
 class DataSet(object):
     """Read dataset."""
 
     def __init__(self, data_type, label_type, eos_index, is_sorted=True,
-                 is_progressbar=False):
+                 is_progressbar=False, num_gpu=1):
         """
         Args:
             data_type: train or dev or test
@@ -38,7 +40,8 @@ class DataSet(object):
 
         self.input_size = 123
         self.dataset_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/attention/', label_type, data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/attention/',
+            label_type, data_type)
 
         # Load the frame number dictionary
         self.frame_num_dict_path = join(
@@ -62,9 +65,7 @@ class DataSet(object):
         # Load all dataset
         print('=> Loading ' + data_type + ' dataset (' + label_type + ')...')
         input_list, label_list = [], []
-        iterator = tqdm(range(self.data_num)
-                        ) if is_progressbar else range(self.data_num)
-        for i in iterator:
+        for i in wrap_iterator(range(self.data_num), self.is_progressbar):
             input_list.append(np.load(self.input_paths[i]))
             label_list.append(np.load(self.label_paths[i]))
         self.input_list = np.array(input_list)
@@ -72,12 +73,13 @@ class DataSet(object):
 
         self.rest = set([i for i in range(self.data_num)])
 
-    def next_batch(self, batch_size):
-        """Make mini batch.
+    def next_batch(self, batch_size=None, session=None):
+        """Make mini-batch.
         Args:
-            batch_size: mini batch size
+            batch_size: int, the size of mini-batch
+            session:
         Returns:
-            input_data: list of input data, size batch_size
+            inputs: list of input data, size `[batch_size]`
             labels: list of tuple `(indices, values, shape)` of size
                 `[batch_size]`
             inputs_seq_len: list of length of inputs of size `[batch_size]`
@@ -85,6 +87,12 @@ class DataSet(object):
                 `[batch_size]`
             input_names: list of file name of input data of size `[batch_size]`
         """
+        if session is None and self.num_gpu != 1:
+            raise ValueError('Set session when using multiple GPUs.')
+
+        if batch_size is None:
+            batch_size = self.batch_size
+
         #########################
         # sorted dataset
         #########################
@@ -92,7 +100,6 @@ class DataSet(object):
             if len(self.rest) > batch_size:
                 sorted_indices = list(self.rest)[:batch_size]
                 self.rest -= set(sorted_indices)
-
             else:
                 sorted_indices = list(self.rest)
                 self.rest = set([i for i in range(self.data_num)])
@@ -109,7 +116,7 @@ class DataSet(object):
             random.shuffle(sorted_indices)
 
             # Initialization
-            input_data = np.zeros(
+            inputs = np.zeros(
                 (len(sorted_indices), max_frame_num, self.input_size))
             labels = np.array([[self.eos_index] * max_seq_len]
                               * len(sorted_indices), dtype=int)
@@ -121,7 +128,7 @@ class DataSet(object):
             for i_batch, x in enumerate(sorted_indices):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
-                input_data[i_batch, :frame_num, :] = data_i
+                inputs[i_batch, :frame_num, :] = data_i
                 labels[i_batch, :len(self.label_list[x])] = self.label_list[x]
                 inputs_seq_len[i_batch] = frame_num
                 labels_seq_len[i_batch] = len(self.label_list[x])
@@ -136,7 +143,6 @@ class DataSet(object):
                 # Randomly sample mini batch
                 random_indices = random.sample(list(self.rest), batch_size)
                 self.rest -= set(random_indices)
-
             else:
                 random_indices = list(self.rest)
                 self.rest = set([i for i in range(self.data_num)])
@@ -156,7 +162,7 @@ class DataSet(object):
             max_seq_len = max(map(len, self.label_list[random_indices]))
 
             # Initialization
-            input_data = np.zeros(
+            inputs = np.zeros(
                 (len(random_indices), max_frame_num, self.input_size))
             labels = np.array([[self.eos_index] * max_seq_len]
                               * len(random_indices), dtype=int)
@@ -168,11 +174,11 @@ class DataSet(object):
             for i_batch, x in enumerate(random_indices):
                 data_i = self.input_list[x]
                 frame_num = data_i.shape[0]
-                input_data[i_batch, :frame_num, :] = data_i
+                inputs[i_batch, :frame_num, :] = data_i
                 labels[i_batch, :len(self.label_list[x])] = self.label_list[x]
                 inputs_seq_len[i_batch] = frame_num
                 labels_seq_len[i_batch] = len(self.label_list[x])
                 input_names[i_batch] = basename(
                     self.input_paths[x]).split('.')[0]
 
-        return input_data, labels, inputs_seq_len, labels_seq_len, input_names
+        return inputs, labels, inputs_seq_len, labels_seq_len, input_names

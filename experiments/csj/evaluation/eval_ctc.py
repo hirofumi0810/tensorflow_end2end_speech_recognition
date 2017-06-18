@@ -1,212 +1,181 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Define evaluation method for CTC network (CSJ corpus)."""
+"""Evaluate trained CTC network (CSJ corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import os
-import re
-import numpy as np
-import Levenshtein
-from tqdm import tqdm
+import sys
+import tensorflow as tf
+import yaml
 
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
-from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
-from utils.exception_func import exception
+sys.path.append('../')
+sys.path.append('../../')
+sys.path.append('../../../')
+from data.read_dataset_ctc import DataSet
+from models.ctc.load_model import load
+from metric.ctc import do_eval_per, do_eval_cer
 
 
-@exception
-def do_eval_per(session, per_op, network, dataset,
-                eval_batch_size=None, rate=1.0, is_progressbar=False,
-                is_multitask=False):
-    """Evaluate trained model by Phone Error Rate.
+def do_eval(network, label_type, num_stack, num_skip, train_data_size, epoch=None):
+    """Evaluate the model.
     Args:
-        session: session of training model
-        per_op: operation for computing phone error rate
-        network: network to evaluate
-        dataset: `Dataset' class
-        eval_batch_size: batch size on evaluation
-        rate: A float value. Rate of evaluation data to use
-        is_progressbar: if True, evaluate during training, else during restoring
-        is_multitask: if True, evaluate the multitask model
-    Returns:
-        per_global: phone error rate
+        network: model to restore
+        label_type: phone or character o kanji
+        num_stack: int, the number of frames to stack
+        num_skip: int, the number of frames to skip
+        train_data_size: default or large
+        epoch: epoch to restore
     """
-    batch_size = network.batch_size if eval_batch_size is None else eval_batch_size
+    # Load dataset
+    eval1_data = DataSet(data_type='eval1', label_type=label_type,
+                         train_data_size=train_data_size,
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=False, is_progressbar=True)
+    eval2_data = DataSet(data_type='eval2', label_type=label_type,
+                         train_data_size=train_data_size,
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=False, is_progressbar=True)
+    eval3_data = DataSet(data_type='eval3', label_type=label_type,
+                         train_data_size=train_data_size,
+                         num_stack=num_stack, num_skip=num_skip,
+                         is_sorted=False, is_progressbar=True)
 
-    num_examples = dataset.data_num * rate
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
-    per_global = 0
+    # Define model
+    network.define()
 
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-    for step in iterator:
-        # Create feed dictionary for next mini batch
-        if not is_multitask:
-            inputs, labels_true, seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+    # Add to the graph each operation
+    decode_op = network.decoder(decode_type='beam_search',
+                                beam_width=20)
+    per_op = network.compute_ler(decode_op)
+
+    # Create a saver for writing training checkpoints
+    saver = tf.train.Saver()
+
+    with tf.Session() as sess:
+        ckpt = tf.train.get_checkpoint_state(network.model_dir)
+
+        # If check point exists
+        if ckpt:
+            # Use last saved model
+            model_path = ckpt.model_checkpoint_path
+            if epoch is not None:
+                model_path = model_path.split('/')[:-1]
+                model_path = '/'.join(model_path) + '/model.ckpt-' + str(epoch)
+            saver.restore(sess, model_path)
+            print("Model restored: " + model_path)
         else:
-            inputs, _, labels_true,  seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            raise ValueError('There are not any checkpoints.')
 
-        feed_dict = {
-            network.inputs_pl: inputs,
-            network.seq_len_pl: seq_len,
-            network.keep_prob_input_pl: 1.0,
-            network.keep_prob_hidden_pl: 1.0
-        }
+        if label_type in ['character', 'kanji']:
+            print('=== eval1 Evaluation ===')
+            cer_eval1 = do_eval_cer(
+                session=sess,
+                decode_op=decode_op,
+                network=network,
+                dataset=eval1_data, eval_batch_size=network.batch_size,
+                is_progressbar=True)
+            print('  CER: %f %%' % (cer_eval1 * 100))
 
-        batch_size_each = len(labels_true)
+            print('=== eval2 Evaluation ===')
+            cer_eval2 = do_eval_cer(
+                session=sess,
+                decode_op=decode_op, network=network,
+                dataset=eval2_data, eval_batch_size=network.batch_size,
+                is_progressbar=True)
+            print('  CER: %f %%' % (cer_eval2 * 100))
 
-        per_local = session.run(per_op, feed_dict=feed_dict)
-        per_global += per_local * batch_size_each
+            print('=== eval3 Evaluation ===')
+            cer_eval3 = do_eval_cer(
+                session=sess,
+                decode_op=decode_op,
+                network=network,
+                dataset=eval3_data, eval_batch_size=network.batch_size,
+                is_progressbar=True)
+            print('  CER: %f %%' % (cer_eval3 * 100))
 
-    per_global /= dataset.data_num
-    print('  PER: %f' % per_global)
-
-    return per_global
-
-
-@exception
-def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
-                eval_batch_size=None, rate=1.0, is_progressbar=False,
-                is_multitask=False, is_main=False):
-    """Evaluate trained model by Character Error Rate.
-    Args:
-        session: session of training model
-        decode_op: operation for decoding
-        network: network to evaluate
-        dataset: Dataset class
-        label_type: character or kanji
-        is_test: set to True when evaluating by the test set
-        eval_batch_size: batch size on evaluation
-        rate: rate of evaluation data to use
-        is_progressbar: if True, visualize progressbar
-        is_multitask: if True, evaluate the multitask model
-        is_main: if True, evaluate the main task
-    Return:
-        cer_mean: mean character error rate
-    """
-    batch_size = network.batch_size if eval_batch_size is None else eval_batch_size
-
-    num_examples = dataset.data_num * rate
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
-    cer_sum = 0
-
-    if label_type == 'character':
-        map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
-    elif label_type == 'kanji':
-        map_file_path = '../evaluation/mapping_files/ctc/kanji2num.txt'
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-    for step in iterator:
-        # Create feed dictionary for next mini batch
-        if not is_multitask:
-            inputs, labels_true, seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
         else:
-            if is_main:
-                inputs, labels_true, _, seq_len, _ = dataset.next_batch(
-                    batch_size=batch_size)
-            else:
-                inputs, _, labels_true, seq_len, _ = dataset.next_batch(
-                    batch_size=batch_size)
+            print('=== eval1 Evaluation ===')
+            per_eval1 = do_eval_per(
+                session=sess,
+                per_op=per_op,
+                network=network,
+                dataset=eval1_data, eval_batch_size=network.batch_size,
+                is_progressbar=True)
+            print('  PER: %f %%' % (per_eval1 * 100))
 
-        feed_dict = {
-            network.inputs_pl: inputs,
-            network.seq_len_pl: seq_len,
-            network.keep_prob_input_pl: 1.0,
-            network.keep_prob_hidden_pl: 1.0
-        }
+            print('=== eval2 Evaluation ===')
+            per_eval2 = do_eval_per(
+                session=sess,
+                per_op=per_op,
+                network=network,
+                dataset=eval2_data, eval_batch_size=network.batch_size,
+                is_progressbar=True)
+            print('  PER: %f %%' % (per_eval2 * 100))
 
-        batch_size_each = len(labels_true)
-        labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
-        for i_batch in range(batch_size_each):
-
-            # Convert from list to string
-            str_pred = num2char(labels_pred[i_batch], map_file_path)
-            str_pred = re.sub(r'_', '', str_pred)
-            # TODO: change in case of character
-            if label_type == 'kanji' and is_test:
-                str_true = labels_true[i_batch]
-            else:
-                str_true = num2char(labels_true[i_batch], map_file_path)
-            str_true = re.sub(r'_', '', str_true)
-
-            # Compute edit distance
-            cer_each = Levenshtein.distance(
-                str_pred, str_true) / len(list(str_true))
-            cer_sum += cer_each
-
-    cer_mean = cer_sum / dataset.data_num
-    print('  CER: %f %%' % (cer_mean * 100))
-
-    return cer_mean
+            print('=== eval3 Evaluation ===')
+            per_eval3 = do_eval_per(
+                session=sess,
+                per_op=per_op,
+                network=network,
+                dataset=eval3_data, eval_batch_size=network.batch_size,
+                is_progressbar=True)
+            print('  PER: %f %%' % (per_eval3 * 100))
 
 
-def decode_test(session, decode_op, network, dataset, label_type, is_test,
-                eval_batch_size=None, rate=1.0):
-    """Visualize label outputs.
-    Args:
-        session: session of training model
-        decode_op: operation for decoding
-        network: network to evaluate
-        dataset: Dataset class
-        label_type: phone or character or kanji
-        is_test: set to True when evaluating by the test set
-        eval_batch_size: batch size on evaluation
-        rate: rate of evaluation data to use
-    """
-    batch_size = 1
-    num_examples = dataset.data_num * rate
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
+def main(model_path):
 
-    map_file_path_phone = '../evaluation/mapping_files/ctc/phone2num.txt'
-    if label_type == 'character':
-        map_file_path = '../evaluation/mapping_files/ctc/char2num.txt'
-    elif label_type == 'kanji':
-        map_file_path = '../evaluation/mapping_files/ctc/kanji2num.txt'
-    for step in range(iteration):
-        # Create feed dictionary for next mini batch
-        inputs, labels_true, seq_len, input_names = dataset.next_batch(
-            batch_size=batch_size)
+    epoch = None  # if None, restore the final epoch
 
-        feed_dict = {
-            network.inputs_pl: inputs,
-            network.seq_len_pl: seq_len,
-            network.keep_prob_input_pl: 1.0,
-            network.keep_prob_hidden_pl: 1.0
-        }
+    # Load config file (.yml)
+    with open(os.path.join(model_path, 'config.yml'), "r") as f:
+        config = yaml.load(f)
+        corpus = config['corpus']
+        feature = config['feature']
+        param = config['param']
 
-        # Visualize
-        batch_size_each = len(labels_true)
-        labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
-        for i_batch in range(batch_size_each):
-            if label_type in ['character', 'kanji']:
-                # Convert from list to string
-                str_pred = num2char(labels_pred[i_batch], map_file_path)
-                if label_type == 'kanji' and is_test:
-                    str_true = labels_true[i_batch]
-                else:
-                    str_true = num2char(labels_true[i_batch], map_file_path)
+    if corpus['label_type'] == 'phone':
+        output_size = 37
+    elif corpus['label_type'] == 'character':
+        output_size = 146
+    elif corpus['label_type'] == 'kanji':
+        output_size = 3385
 
-                print('-----wav: %s-----' % input_names[i_batch])
-                print('True: %s' % str_true)
-                print('Pred: %s' % str_pred)
+    # Modle setting
+    CTCModel = load(model_type=config['model_name'])
+    network = CTCModel(
+        batch_size=param['batch_size'],
+        input_size=feature['input_size'] * feature['num_stack'],
+        num_cell=param['num_cell'],
+        num_layer=param['num_layer'],
+        bottleneck_dim=param['bottleneck_dim'],
+        output_size=output_size,
+        clip_grad=param['clip_grad'],
+        clip_activation=param['clip_activation'],
+        dropout_ratio_input=param['dropout_input'],
+        dropout_ratio_hidden=param['dropout_hidden'],
+        num_proj=param['num_proj'],
+        weight_decay=param['weight_decay'])
+    network.model_name = config['model_name']
+    network.model_dir = model_path
 
-            elif label_type == 'phone':
-                print('-----wav: %s-----' % input_names[i_batch])
-                print('True: %s' % num2phone(
-                    labels_true[i_batch], map_file_path_phone))
-                print('Pred: %s' % num2phone(
-                    labels_pred[i_batch], map_file_path_phone))
+    print(network.model_dir)
+    do_eval(network=network,
+            label_type=corpus['label_type'],
+            num_stack=feature['num_stack'],
+            num_skip=feature['num_skip'],
+            train_data_size=corpus['train_data_size'],
+            epoch=epoch)
+
+
+if __name__ == '__main__':
+
+    args = sys.argv
+    if len(args) != 2:
+        raise ValueError(
+            ("Set a path to saved model.\n"
+             "Usase: python restore_ctc.py path_to_saved_model"))
+    main(model_path=args[1])

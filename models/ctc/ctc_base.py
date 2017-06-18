@@ -233,7 +233,7 @@ class ctcBase(object):
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
         Return:
-            decode_op: operation for decoding
+            decode_op: A SparseTensor
         """
         if decode_type not in ['greedy', 'beam_search']:
             raise ValueError('decode_type is "greedy" or "beam_search".')
@@ -251,13 +251,13 @@ class ctcBase(object):
                 beam_width=beam_width)
 
         decode_op = tf.to_int32(decoded[0])
+
         return decode_op
 
-    def posteriors(self, logits, decode_op):
+    def posteriors(self, logits):
         """Operation for computing posteriors of each time steps.
         Args:
             logits:
-            decode_op: operation for decoding
         Return:
             posteriors_op: operation for computing posteriors for each class
         """

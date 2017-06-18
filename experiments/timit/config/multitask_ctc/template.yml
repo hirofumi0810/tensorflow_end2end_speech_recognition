@@ -13,6 +13,7 @@ param:
     num_unit:
     num_proj:
     num_layer_main:
+    bottleneck_dim:
     num_layer_second:
     main_task_weight:
     batch_size:

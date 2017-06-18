@@ -1,576 +1,576 @@
------ wav: felc0_sx126 -----
-True: _artificial_intelligence_is_for_real._
-Pred: _ar_oficial_inteligences_for_real._
------ wav: fpas0_sx224 -----
-True: _how_good_is_your_endurance_
-Pred: _how_godes_our_endurnce._
------ wav: mtas1_sx28 -----
-True: _beg_that_guard_for_one_gallon_of_gas._
-Pred: _bay_tick_gard_for_wone_gelim_ot_gas._
------ wav: mwew0_sx191 -----
-True: _withdraw_all_phony_accusations_at_once._
-Pred: _we_dral_fony_acizations_a_once._
------ wav: mpam0_si1961 -----
-True: _a_second_twitched_his_shirtsleeve,_and_he_felt_a_brief_burn_on_his_upper_arm._
-Pred: _e_sucend_twiched_his_shurs_live_andy_felt_the_breop_barman_is_a_brown._
------ wav: mklt0_si1213 -----
-True: _my_own_experience_has_followed_simpler_lines._
-Pred: _mol_and_experence_is_volov_simpler_limes._
------ wav: mwbt0_sx113 -----
-True: _a_muscular_abdomen_is_good_for_your_back._
-Pred: _a_muscuila_a_domen_his_god_for_you_back._
------ wav: mtls0_sx290 -----
-True: _this_brochure_is_particularly_informative_for_prospective_buyer._
-Pred: _this_brefureis_pecting_fom_tofor_prespective_vire._
------ wav: mdab0_si1669 -----
-True: _be_excited_and_don't_identify_yourself._
-Pred: _the_ecidted_in_do_atint_fy_eself._
------ wav: fnlp0_sx48 -----
-True: _grandmother_outgrew_her_upbringing_in_petticoats._
-Pred: _ramo_ther_augrod_her_ubringing_impatiodes._
------ wav: mtas1_sx118 -----
-True: _combine_all_the_ingredients_in_a_large_bowl._
-Pred: _com_byn_al_thein_greients_in_a_largeble._
------ wav: mtls0_sx380 -----
-True: _why_charge_money_for_such_garbage_
-Pred: _why_carge_many_for_sech_garbage._
------ wav: mbpm0_sx407 -----
-True: _laugh,_dance,_and_sing_if_fortune_smiles_upon_you._
-Pred: _leftents_inseing_of_forcion_smals_a_ponu._
------ wav: fmgd0_sx124 -----
-True: _objects_made_of_pewter_are_beautiful._
-Pred: _ob_jects_made_of_cuer_ar_beaeful._
------ wav: mgrt0_sx100 -----
-True: _project_development_was_proceeding_too_slowly._
-Pred: _project_develoment_was_percevting_toslowly._
------ wav: mklt0_si583 -----
-True: _this_we_can_sympathetically_understand._
-Pred: _this_we_consympathenticaly_und_stan._
------ wav: mjln0_si819 -----
-True: _there,_forces_are_more_latent_than_in_electricity,_and_less_than_in_magnetism._
-Pred: _they_are_forces_a_marly_ne_bin_in_letrisity_and_lesthin_in_manghism._
------ wav: fmld0_sx295 -----
-True: _if_carol_comes_tomorrow,_have_her_arrange_for_a_meeting_at_two._
-Pred: _if_caral_comsto_marl_hever_rances_for_medinito._
------ wav: mwew0_si731 -----
-True: _a_few_years_later_the_dome_fell_in._
-Pred: _a_fe_use_later_the_dong_calim._
------ wav: felc0_si756 -----
-True: _materials_ceramic_modeling_clay_red,_white_or_buff._
-Pred: _theteriels_soromic_molinclay,_redwait_wor_bogh._
------ wav: fmld0_sx205 -----
-True: _military_personnel_are_expected_to_obey_government_orders._
-Pred: _the_liter_percenalar_expectedto_wil_bag_over_men_orders._
------ wav: felc0_si2016 -----
-True: _heave_on_those_ropes_the_boat's_come_unstuck._
-Pred: _he_one_nos_rops,_the_bots_come_on_stak._
------ wav: fdhc0_si2189 -----
-True: _you_saw_them_always_together_those_years._
-Pred: _you_saw_them_alway_stegothar_dos_years._
------ wav: mcmj0_sx194 -----
-True: _they_enjoy_it_when_i_audition._
-Pred: _the_njoyat_are_ni_ordition._
------ wav: mjdh0_sx94 -----
-True: _youngsters_love_common_candy_as_treats._
-Pred: _younsters_loft_conin_candues_treh._
------ wav: mwew0_sx371 -----
-True: _right_now_may_not_be_the_best_time_for_business_mergers._
-Pred: _rea_now_man_ope_the_best_tat_for_bdisnes_murgers._
------ wav: mlnt0_si1902 -----
-True: _the_pulsing_glow_of_a_cigarette._
-Pred: _the_posing_glor_pae_siarect._
------ wav: fjlm0_si1043 -----
-True: _not_surprisingly,_this_approach_did_not_work._
-Pred: _not_suprosingly,_this_aproched_did_not_werk._
------ wav: mdab0_sx409 -----
-True: _eating_spinach_nightly_increases_strength_miraculously._
-Pred: _eating_spetich_nigtly_increasestrats_mracholously._
------ wav: fdhc0_sx119 -----
-True: _the_misquote_was_retracted_with_an_apology._
-Pred: _the_misquet_was_retracted_with_in_apolegy._
------ wav: fdhc0_si1559 -----
-True: _visually,_these_approximated_what_he_was_feeling_within_himself._
-Pred: _thes_uraly_es_aprocimated_woul_o_wa_seling_withan_himself._
------ wav: mlll0_sx373 -----
-True: _a_boring_novel_is_a_superb_sleeping_pill._
-Pred: _aboriyg_nos_as_so_pearb_seking_tal._
------ wav: mjdh0_sx4 -----
-True: _jane_may_earn_more_money_by_working_hard._
-Pred: _gant_mayerin_more_mony_by_working_hard._
------ wav: mjmp0_si1791 -----
-True: _no,_the_man_was_not_drunk_he_wondered_how_he_got_tied_up_with_this_stranger._
-Pred: _no_wa_the_men_was_not_tron,_he_onderd_how_e_gat_tied_u_with_the_stranger._
------ wav: mlll0_si733 -----
-True: _do_avoid_puncturing_or_cutting_into_meats_test_them._
-Pred: _to_o_voig_pontrain_er_caind_an_to_mests_disthem._
------ wav: mtas1_sx298 -----
-True: _i'd_rather_not_buy_these_shoes_than_be_overcharged._
-Pred: _a_ro_the_not_by_as_shoes_the_be_overcharged._
------ wav: fnlp0_sx408 -----
-True: _i'd_ride_the_subway,_but_i_haven't_enough_change._
-Pred: _audrog_the_sublay_but_ho_have_anyg_ne_zange._
------ wav: fpas0_sx314 -----
-True: _if_people_were_more_generous,_there_would_be_no_need_for_welfare._
-Pred: _if_fepl_wre_morejuners_there_be_no_ned_for_welfer._
------ wav: fmgd0_si934 -----
-True: _authorities_say_that_oldsters_are_a_prime_target._
-Pred: _a_theryos_say_an_elsters_are_a_trimtarded._
------ wav: mbpm0_sx137 -----
-True: _tradition_requires_parental_approval_for_underage_marriage._
-Pred: _cordition_require_prenl_aproval_for_underage_marge._
------ wav: mjln0_sx99 -----
-True: _medieval_society_was_based_on_hierarchies._
-Pred: _madyful_sasiny_was_base_dun_hiharkties._
------ wav: mcmj0_si1094 -----
-True: _american_newspaper_reviewers_like_to_call_his_plays_nihilistic._
-Pred: _narcan_nuse_teper_revewers_mike_to_crois_tises_neoistic._
------ wav: mgrt0_sx280 -----
-True: _the_oasis_was_a_mirage._
-Pred: _the_a_icis_was_im_murige._
------ wav: fmld0_sx385 -----
-True: _his_shoulder_felt_as_if_it_were_broken._
-Pred: _his_shelderfeltes_if_it_wer_broken._
------ wav: mpam0_si1189 -----
-True: _eight_field_guns_were_captured_in_position._
-Pred: _at_fil_gons_were_coumpturd_inposition._
------ wav: mwew0_sx281 -----
-True: _cory_and_trish_played_tag_with_beach_balls_for_hours._
-Pred: _cory_antresh_ply_tade_wiuld_bigs_balts_were_aurs._
------ wav: mgrt0_sx190 -----
-True: _serve_the_coleslaw_after_i_add_the_oil._
-Pred: _serves_the_colslow_haftera_and_the_oal._
------ wav: mbpm0_sx317 -----
-True: _the_cranberry_bog_gets_very_pretty_in_autumn._
-Pred: _the_cranbrade_bought_dits_gra_party_an_otom._
------ wav: mjmp0_sx275 -----
-True: _steve_wore_a_bright_red_cashmere_sweater._
-Pred: _stese_wore_braikt_red_casimers_swaier._
------ wav: fnlp0_sx138 -----
-True: _the_clumsy_customer_spilled_some_expensive_perfume._
-Pred: _the_counsy_casom_mer_stilts_an_me_stensive_parfn._
------ wav: mwbt0_sx23 -----
-True: _those_musicians_harmonize_marvelously._
-Pred: _those_musitians_have_an_ize_mivelesly._
------ wav: mwbt0_si923 -----
-True: _to_many_experts,_this_trend_was_inevitable._
-Pred: _to_many_experts_this_tren_was_in_eviabol._
------ wav: mlnt0_sx12 -----
-True: _will_robin_wear_a_yellow_lily_
-Pred: _we'l_wraben_ware_a_yelow_wily._
------ wav: fmld0_si925 -----
-True: _while_he_was_in_custody_his_wife_divorced_him._
-Pred: _wil_he_was_ancoscity_is_whie_to_borstim._
 ----- wav: mcmj0_sx374 -----
 True: _john_cleans_shellfish_for_a_living._
-Pred: _janacreains_shelfache_for_even._
------ wav: mlll0_si1363 -----
-True: _some_of_these_speculations_may_have_some_merit,_others_are_somewhat_ambiguous._
-Pred: _soleas_peculations_ma_somert_others_ore_somewhent_im_bigus._
------ wav: fpkt0_sx8 -----
-True: _why_yell_or_worry_over_silly_items_
-Pred: _why_yel_a_wor_overceily_idems._
------ wav: mwbt0_sx293 -----
-True: _please_take_this_dirty_table_cloth_to_the_cleaners_for_me._
-Pred: _these_take_this_tarty_table_clas_to_the_cleanes_for_thay._
------ wav: mjdh0_si1984 -----
-True: _and_what_eyes_they_were._
-Pred: _and_what_iyce_they_wor._
------ wav: mwew0_sx101 -----
-True: _kindergarten_children_decorate_their_classrooms_for_all_holidays._
-Pred: _can_agarn_child_ren_decorather_clasions_ral_alidiys._
------ wav: mpam0_sx19 -----
-True: _aluminum_silverware_can_often_be_flimsy._
-Pred: _alonan_soverworkan_often_beflumsy._
------ wav: mwbt0_sx383 -----
-True: _the_carpet_cleaners_shampooed_our_oriental_rug._
-Pred: _the_copret_cleaners_sha_proedthout_alry_untl_rog._
------ wav: fpkt0_sx368 -----
-True: _lori's_costume_needed_black_gloves_to_be_completely_elegant._
-Pred: _mor_is_cost_tim_neded_blank_glesthe_be_compleaely_aligit._
------ wav: fpas0_si1272 -----
-True: _laboratory_astrophysics._
-Pred: _levertory_astrafisixts._
------ wav: mklt0_sx313 -----
-True: _drop_five_forms_in_the_box_before_you_go_out._
-Pred: _drouw_faful_ans_in_the_bocts_of_for_y_go_elt._
------ wav: mlnt0_sx192 -----
-True: _straw_hats_are_out_of_fashion_this_year._
-Pred: _straw_hads_are_oun_efashion_dishere._
------ wav: mlll0_sx13 -----
-True: _swing_your_arm_as_high_as_you_can._
-Pred: _swein_your_ar_mas_highe_a_can._
------ wav: mnjm0_sx320 -----
-True: _the_nearest_synagogue_may_not_be_within_walking_distance._
-Pred: _the_there_is_sen_agog,_may_nobe_was_thar_walking_vistence._
------ wav: mjln0_sx369 -----
-True: _bob_papered_over_the_living_room_murals._
-Pred: _bob_papert_over_deviving_um_marals._
------ wav: mjmp0_si1535 -----
-True: _he_trembled_lest_his_piece_should_fail._
-Pred: _he_thamble_lestos_peacshitd_shail._
------ wav: mklt0_sx223 -----
-True: _put_the_butcher_block_table_in_the_garage._
-Pred: _pu_coubuth_ar_blot_table_in_the_gerage._
------ wav: mtls0_si1370 -----
-True: _we_may_say_that_his_problem_was_diagnosed_but_that_he_refused_treatment._
-Pred: _we_masatat_his_problem_wa_stag_nowsd_that_that_e_refese_treatment.
------ wav: mdab0_sx49 -----
-True: _at_twilight_on_the_twelfth_day_we'll_have_chablis._
-Pred: _atwilatom_has_fot_tayle_esiably._
------ wav: mwew0_si1991 -----
-True: _lot_of_people_will_roam_the_streets_in_costumes_and_masks,_and_having_a_ball._
-Pred: _wha_of_peple_al_rong_thi_streats_nd_costims_a_mask_and_naveing_a_bowl._
------ wav: fmld0_sx25 -----
-True: _only_lawyers_love_millionaires._
-Pred: _wone_ly_layers_love_may_iners._
------ wav: mbpm0_sx227 -----
-True: _it's_healthier_to_cook_without_sugar._
-Pred: _it's_halthere_to_cuqith_ecxtiber._
------ wav: mdab0_sx229 -----
-True: _are_you_looking_for_employment_
-Pred: _a_oakhieg_fom_flot._
------ wav: fmgd0_sx34 -----
-True: _don't_do_charlie's_dirty_dishes._
-Pred: _don't_do_caralys_terdeditios._
------ wav: mnjm0_sx230 -----
-True: _allow_leeway_here,_but_rationalize_all_errors._
-Pred: _a_lawlay_way_neara_but_rahsmalizes_hal_hers._
------ wav: fjlm0_sx413 -----
-True: _daphne's_swedish_needlepoint_scarf_matched_her_skirt._
-Pred: _tany_sweist_ned_a_poits_carf_mest_her_skir._
------ wav: fmld0_si2185 -----
-True: __she_said_sharks_have_no_bones_and_shrimp_swam_backward._
-Pred: _she_se_sherks_ave_no_boans_instrencts_wemn_backord._
------ wav: mtas1_sx388 -----
-True: _her_right_hand_aches_whenever_the_barometric_pressure_changes._
-Pred: _er_righ_han_aes_when_ever_the_baramatirc_presherchanges._
------ wav: mcmj0_sx104 -----
-True: _he_stole_a_dime_from_a_beggar._
-Pred: _he_stol_a_dime_from_a_bagor._
------ wav: mgrt0_si1450 -----
-True: _meats_the_radiation_processing_of_meat_has_received_extensive_investigation._
-Pred: _mets_the_reation_procesing_have_met_has_receved_extencye_in_mistigation._
------ wav: mnjm0_si2210 -----
-True: _no_return_address_whatsoever._
-Pred: _thel_retur_an_agros_wets_solemer._
------ wav: mklt0_sx403 -----
-True: _her_wardrobe_consists_of_only_skirts_and_blouses._
-Pred: _whe_wor_driveconsest_of_only_skirts_ind_blilzsns._
------ wav: mpam0_sx199 -----
-True: _young_children_should_avoid_exposure_to_contagious_diseases._
-Pred: _young_children_to_hamorit_exposure_to_contages_doseses._
------ wav: mtas1_si838 -----
-True: _increasing_tempo_of_new_product_development._
-Pred: _inpreasing_timple_of_e_protic_development._
------ wav: felc0_sx216 -----
-True: _the_small_boy_put_the_worm_on_the_hook._
-Pred: _the_smal_boy_put_the_warmon_hok._
------ wav: mcmj0_si602 -----
-True: _but_the_ships_are_very_slow_now,_and_we_don't_get_so_many_sailors_any_more._
-Pred: _but_he_shoupd_sivery_sow_now_no_wa_don_gate_some_my_a_seler_s_an_y_more._
------ wav: mgrt0_si2080 -----
-True: _he_would_not_carry_a_brief_case._
-Pred: _he_would_not_carily_a_bref_tasce._
------ wav: fmgd0_sx394 -----
-True: _calcium_makes_bones_and_teeth_strong._
-Pred: _counsem_make_bos_inteaxstron._
------ wav: mjdh0_si724 -----
-True: _it's_a_streamlined_rifle,_fast_and_wellmade._
-Pred: _it's_istre_min_rifle_festin_wal_maid._
------ wav: mjmp0_sx95 -----
-True: _iguanas_and_alligators_are_tropical_reptiles._
-Pred: _e_longe_as_a_noligaters_are_trypical_ratiles._
------ wav: mpam0_si1819 -----
-True: _he_rubbed_his_eyes_sleepily_with_one_huge_paw._
-Pred: _he_ral_disiceslplely_with_one_huge_pol._
------ wav: mbpm0_si1577 -----
-True: _brown_eyes,_eyebrow_mustache._
-Pred: _brun_eyes_i_brol_mastash._
------ wav: fmgd0_sx214 -----
-True: _the_morning_dew_on_the_spider_web_glistened_in_the_sun._
-Pred: _the_moning_do_on_th_splayer_whad_lisen_thin_the_sun._
------ wav: mtls0_si2000 -----
-True: _we_can_get_it_if_we_dig,_he_said_patiently._
-Pred: _we_chin_get_it_ifodag,_is_sad_patiently._
------ wav: mlll0_sx103 -----
-True: _call_an_ambulance_for_medical_assistance._
-Pred: _con_abients_frmanicalsistence._
------ wav: mdab0_si2299 -----
-True: _sometimes,_he_coincided_with_my_father's_being_at_home._
-Pred: _sometesy_corsid_with_liyth_vales_be_a_home._
------ wav: mcmj0_si464 -----
-True: _the_prospect_of_cutting_back_spending_is_an_unpleasant_one_for_any_governor._
-Pred: _the_prospact_ofe_cuding_bexpenging_is_in_ertisint_one_frany_gevrner._
------ wav: mnjm0_sx50 -----
-True: _catastrophic_economic_cutbacks_neglect_the_poor._
-Pred: _cat_astrofic_ac_andoman_copacxks_thie_glex_the_por._
------ wav: mdab0_si1039 -----
-True: _he_has_never,_himself,_done_anything_for_which_to_be_hated__which_of_us_has_
-Pred: _he_has_never_hmselftay_han_forwhich_he_haded,_whatch_of_he_shous._
------ wav: mwew0_si1361 -----
-True: _but_in_this_one_section_we_welcomed_auditors._
-Pred: _what_in_this_one_section_we_wel_pen_dodaters._
------ wav: mnjm0_sx140 -----
-True: _agricultural_products_are_unevenly_distributed._
-Pred: _arecoltual_proets_are_ouna_evaly_the_shobeted._
------ wav: mnjm0_si950 -----
-True: _as_such,_it_was_beyond_politics_and_had_no_need_of_justification_by_a_message._
-Pred: _a_soch_it_was_bong_politexes_and_had_no_neand_atesilication,_wy_a_masange._
------ wav: mbpm0_sx47 -----
-True: _mom_strongly_dislikes_appetizers._
-Pred: _lon_stonly_dislecs_opartizers._
------ wav: fpas0_si2204 -----
-True: _pretty_soon_a_woman_came_along_carrying_a_folded_umbrella_as_a_walking_stick._
-Pred: _predyce_or_me_came_alon_carintherful_them_browl_as_a_wakingsteack._
------ wav: mbpm0_si947 -----
-True: _few_rural_areas_are_protected_by_zoning._
-Pred: _fu_rlaris_ar_pretecked_biszuning._
------ wav: fmgd0_si2194 -----
-True: _he_had_fallen_into_a_soft_job,_and_now_the_job_was_gone_and_he_was_stranded._
-Pred: _he_had_furl_into_wa_sof_jam_and_not_the_jab_was_gong_an_he_whe_stranded._
------ wav: mdab0_sx139 -----
-True: _the_bungalow_was_pleasantly_situated_near_the_shore._
-Pred: _the_bungolaw_was_posently_suxtuat_ive_in_the_shor._
------ wav: mtls0_sx110 -----
-True: _the_best_way_to_learn_is_to_solve_extra_problems._
-Pred: _the_bastblay_to_marn_is_to_saw_mextor_problems._
------ wav: mjdh0_sx184 -----
-True: _the_cat's_meow_always_hurts_my_ears._
-Pred: _the_cats_be_al_woy_sherch_maers._
------ wav: mlnt0_sx102 -----
-True: _special_task_forces_rescue_hostages_from_kidnappers._
-Pred: _spashor_tas_fors_as_rest_you_hrostages_from_teck_nepers._
------ wav: fpkt0_si1538 -----
-True: _a_carriage_crunched_by,_its_dim_lights_filtering_through_the_gloom._
-Pred: _acarage_croncspimes_tam_winkestultin_di_the_gluon._
------ wav: mlll0_si1993 -----
-True: _should_she_wake_him_
-Pred: _shil_he_wekeim._
------ wav: mcmj0_sx14 -----
-True: _before_thursday's_exam,_review_every_formula._
-Pred: _the_forthers_thars_exame_revew_every_for_nena._
------ wav: mjln0_si2079 -----
-True: _they_had_slapped_their_thighs._
-Pred: _an_hid_slap_they_efies._
------ wav: mjdh0_sx364 -----
-True: _each_untimely_income_loss_coincided_with_the_breakdown_of_a_heating_system_part._
-Pred: _ea_tontimely_and_comewas_coincided_with_the_break_down_of_a_ceating_sist_en_parkt._
------ wav: mlnt0_sx372 -----
-True: _that_diagram_makes_sense_only_after_much_study._
-Pred: _the_digrand_make_sens_onle_after_much_sday._
------ wav: fjlm0_sx323 -----
-True: _the_fog_prevented_them_from_arriving_on_time._
-Pred: _the_fal_prevented_dems_for_the_riving_long_time._
------ wav: fnlp0_si1938 -----
-True: _lighted_windows_glowed_jewelbright_through_the_downpour._
-Pred: _litet_when_does_ble_je_big_to_the_ampor._
------ wav: mklt0_sx43 -----
-True: _elderly_people_are_often_excluded._
-Pred: _alothy_peopler_often_exquded._
------ wav: fmgd0_sx304 -----
-True: _cheap_stockings_run_the_first_time_they're_worn._
-Pred: _chea_stackings_from_the_firstime_their_worne._
------ wav: fnlp0_si678 -----
-True: _salvation_reconsidered._
-Pred: _selvacian_reconsidered._
------ wav: mlnt0_sx282 -----
-True: _the_tooth_fairy_forgot_to_come_when_roger's_tooth_fell_out._
-Pred: _the_two_pery_for_got_to_come_and_rijers_to_the_laut._
------ wav: mwew0_sx11 -----
-True: _he_will_allow_a_rare_lie._
-Pred: _he_wlow_a_rarely._
------ wav: mgrt0_sx10 -----
-True: _are_your_grades_higher_or_lower_than_nancy's_
-Pred: _a_yoare_greades_he_har_ar_lower_the_nancies._
------ wav: fmgd0_si1564 -----
-True: _husbandry_was_bounded_by_snakerail_fences,_and_there_were_grazing_cattle._
-Pred: _as_biner_was_downded_by_snake_realphences_amd_ther_were_braisin_catle._
------ wav: fpas0_sx134 -----
-True: _december_and_january_are_nice_months_to_spend_in_miami._
-Pred: _the_sumbrange_an_rar_an_ice_mones_tdispon_i_myame._
------ wav: fmld0_si822 -----
-True: _milk_production_may_be_increased_by_the_antiinfective_properties_of_this_drug._
-Pred: _no_predection_may_be_in_creasbody_afteranfecthe_propres_of_the_strag._
------ wav: fjlm0_sx233 -----
-True: _highway_and_freeway_mean_the_same_thing._
-Pred: _how_way_enfre_went_mean,_e_sime_tame._
------ wav: mjmp0_si905 -----
-True: _his_work_began_just_six_days_after_the_flood._
-Pred: _his_work_begange_i_six_tas_af_to_thiflid._
------ wav: felc0_si1386 -----
-True: _in_wage_negotiations,_the_industry_bargains_as_a_unit_with_a_single_union._
-Pred: _ind_wage_agosiations_the_endestry_bardens_as_a_umnit_wit_the_single_unin._
------ wav: fdhc0_sx209 -----
-True: _michael_colored_the_bedroom_wall_with_crayons._
-Pred: _mical_colerd_the_ber_wal_wa_trans._
------ wav: mjdh0_sx274 -----
-True: _cliff_was_soothed_by_the_luxurious_massage._
-Pred: _tefweas_sos_buth_a_wiltures_mesash._
------ wav: fdhc0_si929 -----
-True: _but_such_cases_were,_in_the_past,_unusual._
-Pred: _but_sexcase_es_wore_in_the_post_andusial._
------ wav: mjmp0_sx365 -----
-True: _the_gunman_kept_his_victim_cornered_at_gunpoint_for_three_hours._
-Pred: _the_dunman_teptistic_cem_corard_a_compolinct_twrish_reors._
------ wav: mklt0_sx133 -----
-True: _pizzerias_are_convenient_for_quick_lunch._
-Pred: _peteres_a_convingy_for_quek_longe._
------ wav: fpkt0_sx278 -----
-True: _to_further_his_prestige,_he_occasionally_reads_the_wall_street_journal._
-Pred: _to_fr_her_his_perostated_hecationan_res_the_walstragernal._
------ wav: mnjm0_sx410 -----
-True: _greg_buys_fresh_milk_each_weekday_morning._
-Pred: _great_bly_ins_frest_mal_ache_we_tham_moring._
------ wav: fnlp0_sx318 -----
-True: _please_dig_my_potatoes_up_before_frost._
-Pred: _pleastrant_mumpotados_a_bo_for_faus._
------ wav: mwbt0_sx203 -----
-True: _the_causeway_ended_abruptly_at_the_shore._
-Pred: _the_coase_way_indete_broply_at_the_shawar._
------ wav: mtls0_sx200 -----
-True: _ralph_controlled_the_stopwatch_from_the_bleachers._
-Pred: _ralph_controe_the_stompockts_from_the_peactheres._
------ wav: fpkt0_si2168 -----
-True: _they_make_us_conformists_look_good._
-Pred: _they_make_es_conformus_leded._
------ wav: mjln0_sx279 -----
-True: _alice's_ability_to_work_without_supervision_is_noteworthy._
-Pred: _alwsa_the_bility_to_wark_with_houts_seprevistion_is_no_worsy._
------ wav: mtas1_si1473 -----
-True: _you_don't_eat_enough,_honey._
-Pred: _your_eat_enough_hune._
------ wav: fnlp0_si1308 -----
-True: _indeed_it_is_possible_to_separate_electron_paramagnetic_from_nuclear_effects._
-Pred: _ind_dint_it_is_posible_to_cepteragey_lot_tome_hare_man_naniny_for_micle_r_fads._
------ wav: fjlm0_sx53 -----
-True: _even_a_simple_vocabulary_contains_symbols._
-Pred: _eaven_as_simple_al_cabulara_contine_simbles._
------ wav: mjdh0_si1354 -----
-True: _within_the_larger_social_system_are_the_structural_and_functional_subsystems._
-Pred: _withim_the_larger_social_system_ware_this_strutrom_fung_tran_olf_subsistems._
------ wav: fjlm0_si2303 -----
-True: _in_short,_and_to_borrow_an_arboreal_phrase,_slash_timber._
-Pred: _and_shore_into_baran_aur_burl_freaes_slest_thimber._
------ wav: mwbt0_si1553 -----
-True: _however,_the_litter_remained,_augmented_by_several_dozen_lunchroom_suppers._
-Pred: _how_over_the_letery_may_dog_bented_by_severl_dos_an_leats_from_sepers._
------ wav: fnlp0_sx228 -----
-True: _the_viewpoint_overlooked_the_ocean._
-Pred: _lhe_vea_point_ofverlet_the_aciean._
------ wav: mtas1_si2098 -----
-True: _he_gave_a_short_hard_laugh_and_looked_at_her_knowingly._
-Pred: _he_gavely_shore_hard_laf_and_liktda_her_noingly._
------ wav: felc0_sx396 -----
-True: _the_fish_began_to_leap_frantically_on_the_surface_of_the_small_lake._
-Pred: _the_fish_bugantily_prenticaly_on_e_servf_some_the_smal_lik._
------ wav: mpam0_sx289 -----
-True: _weatherproof_galoshes_are_very_useful_in_seattle._
-Pred: _wht_her_prof_calacsioes_are_var_us_foangs,_the_adom._
------ wav: mnjm0_si1580 -----
-True: _he_always_seemed_to_have_money_in_his_pocket._
-Pred: _ne_alwey_samed_tho_hautmonea_ind_his_poket._
------ wav: mgrt0_si820 -----
-True: _by_that,_one_feels_that_magnetic_forces_are_as_general_as_electrical_forces._
-Pred: _by_a_than_when_fiels_at_make_anig_forces_ars_genral_as_a_lectical_forces._
------ wav: mjln0_sx189 -----
-True: _destroy_every_file_related_to_my_audits._
-Pred: _the_strowy_every_fone_rlated_to_my_autates._
------ wav: fpkt0_si908 -----
-True: _we_always_thought_we_would_die_with_our_boots_on._
-Pred: _we_al_ways_thot_we_would_die_wtherbite_son._
------ wav: mlnt0_si1574 -----
-True: _flies_swarmed_around_the_bowl_of_lentils_in_which_he_mopped_thick_black_bread._
-Pred: _lice_worm_around_h_bold_ablentils_and_which_he_mak_tick_backe_brad._
------ wav: fjlm0_sx143 -----
-True: _the_sound_of_jennifer's_bugle_scared_the_antelope._
-Pred: _the_sade_geneferst_petal_steared_the_analal._
------ wav: felc0_sx306 -----
-True: _a_chosen_few_will_become_generals._
-Pred: _a_chos_enfew_wil_becomegenrals._
------ wav: mlnt0_si642 -----
-True: _their_props_were_two_stepladders,_a_chair_and_a_palm_fan._
-Pred: _ther_props_were_to_stp_laters_buc_cheare_and_aprom_fand._
------ wav: mtas1_sx208 -----
-True: _rob_sat_by_the_pond_and_sketched_the_stray_geese._
-Pred: _rob_sa_by_the_powed_and_studged_the_stradease._
------ wav: fpkt0_sx98 -----
-True: _guess_the_question_from_the_answer._
-Pred: _des_he_question_from_the_answer._
------ wav: mpam0_sx109 -----
-True: _she_slipped_and_sprained_her_ankle_on_the_steep_slope._
-Pred: _she_sleped_in_sprandaranqon_the_step_slop._
------ wav: mjmp0_sx5 -----
-True: _she_is_thinner_than_i_am._
-Pred: _she_a_stenter_tha_nam._
------ wav: fpas0_si944 -----
-True: _if_the_farm_is_rented,_the_rent_must_be_paid._
-Pred: _is_a_farmas_rented_the_ramos_be_pad._
------ wav: mklt0_si1843 -----
-True: _she_was_ready_for_her_great_adventures_and_the_arrival_of_her_mobile_partner._
-Pred: _she_was_radyfolr_agread_ifventurs_and_the_rovel_of_ar_moble_parten._
------ wav: mtls0_si740 -----
-True: _do_without_fancy_tablecloths._
-Pred: _it_without_fency_table_oules._
------ wav: fjlm0_si1673 -----
-True: _one_thing,_he_thought,_nobody_knows_about_it_yet._
-Pred: _wone_thang,_he_thoght,_no_boy_nows_a_bat_at_yant._
------ wav: mgrt0_sx370 -----
-True: _that_noise_problem_grows_more_annoying_each_day._
-Pred: _the_moist_prolom_gros_more_a_noy_ing_each_day._
------ wav: fdhc0_sx389 -----
-True: _they_own_a_big_house_in_the_remote_countryside._
-Pred: _they_on_abigous_in_their_mout_contrside._
------ wav: mlll0_sx193 -----
-True: _why_buy_oil_when_you_always_use_mine_
-Pred: _wly_bayh_was,_whe_yolish_hes_min._
------ wav: mjln0_sx9 -----
-True: _where_were_you_while_we_were_away_
-Pred: _where_were_you_wal_we_were_wa._
------ wav: mwbt0_si2183 -----
-True: _books_are_for_schnooks._
-Pred: _buck_sufish_nuc._
------ wav: fmld0_sx115 -----
-True: _the_emblem_depicts_the_acropolis_all_aglow._
-Pred: _the_imlome_do_tixe_the_ocropleus_al_a_go._
------ wav: mjmp0_sx185 -----
-True: _did_you_buy_any_corduroy_overalls_
-Pred: _did_you_by_any_curdta_ra_ove_ros._
------ wav: felc0_sx36 -----
-True: _only_the_most_accomplished_artists_obtain_popularity._
-Pred: _only_the_most_ocomplus_artise_sobtaine_popularity._
------ wav: fpas0_sx404 -----
-True: _barb_burned_paper_and_leaves_in_a_big_bonfire._
-Pred: _bib_burn_paperonaleves_an_a_big_bonfir._
------ wav: mbpm0_si1584 -----
-True: _rector_was_often_curious_often_tempted_to_ask_questions_but_he_never_did._
-Pred: _recture_es_often_turious_often_tempe_th_dasquestions_buy_neverdid._
------ wav: fpkt0_sx188 -----
-True: _who_authorized_the_unlimited_expense_account_
-Pred: _whe_atorie_inlimitit_exmesicount._
------ wav: fdhc0_sx299 -----
-True: _shaving_cream_is_a_popular_item_on_halloween._
-Pred: _chenmen_tramis_apopular_itomon_hala_wean._
------ wav: fdhc0_sx29 -----
-True: _help_greg_to_pick_a_peck_of_potatoes._
-Pred: _help_grad_to_pick_a_dect_of_phetatmes._
------ wav: mjln0_si1449 -----
-True: _chief_interest_in_radiosterilization_resides_in_the_military_services._
-Pred: _te_fenters_and_raduoustorolization,_resids_in_e_moiterescerices._
------ wav: mdab0_sx319 -----
-True: _a_big_goat_idly_ambled_through_the_farmyard._
-Pred: _a_pigo_ialy_able_to_the_farlmard._
------ wav: mlll0_sx283 -----
-True: _planned_parenthood_organizations_promote_birth_control._
-Pred: _plantetardid_orgrizations_mop_birs_contral._
+Pred: _jonacrams,_shelfirche_for_livering._
 ----- wav: mcmj0_sx284 -----
 True: _jeff_thought_you_argued_in_favor_of_a_centrifuge_purchase._
-Pred: _jef_tour_you_oure_geving_faver_ove_at_sintrefurge_purches._
+Pred: _jefth_vared_you_are_gevin_faver_ove_a_sent_af_hurge_purchese._
+----- wav: mtls0_sx380 -----
+True: _why_charge_money_for_such_garbage_
+Pred: _why_charge_rny_for_sech_parpage._
+----- wav: mlll0_sx373 -----
+True: _a_boring_novel_is_a_superb_sleeping_pill._
+Pred: _a_boring_na_moys_as_su_perbs_seking_til._
+----- wav: mwbt0_sx383 -----
+True: _the_carpet_cleaners_shampooed_our_oriental_rug._
+Pred: _the_coperd_cleaters_shampoed_ire_alry_onto_rod._
+----- wav: mlnt0_sx192 -----
+True: _straw_hats_are_out_of_fashion_this_year._
+Pred: _straw_hads_ere_aulufashion_disyeare._
+----- wav: mbpm0_sx317 -----
+True: _the_cranberry_bog_gets_very_pretty_in_autumn._
+Pred: _the_cran_bray_bought_didsvery_pritiy_and_otom._
+----- wav: mnjm0_sx50 -----
+True: _catastrophic_economic_cutbacks_neglect_the_poor._
+Pred: _at_astrafic_acanomic_copacks_,_the_glack_the_por._
+----- wav: fmgd0_sx34 -----
+True: _don't_do_charlie's_dirty_dishes._
+Pred: _doun't_do_turleyterty_dicious._
+----- wav: mnjm0_sx230 -----
+True: _allow_leeway_here,_but_rationalize_all_errors._
+Pred: _a_lowly_way_heare_bitrashiomalizes_al_hers._
+----- wav: mcmj0_sx104 -----
+True: _he_stole_a_dime_from_a_beggar._
+Pred: _he_stala_dime_from_a_bagor._
+----- wav: mlnt0_si1902 -----
+True: _the_pulsing_glow_of_a_cigarette._
+Pred: _the_posing_galowe_pa_sigret._
+----- wav: mdab0_sx139 -----
+True: _the_bungalow_was_pleasantly_situated_near_the_shore._
+Pred: _the_bungalow_is_plosently_sech_at_vf_it_a_shore._
+----- wav: mwew0_sx281 -----
+True: _cory_and_trish_played_tag_with_beach_balls_for_hours._
+Pred: _cory_intresbly_tag_would_begs_balhe_where_ors._
+----- wav: mcmj0_sx194 -----
+True: _they_enjoy_it_when_i_audition._
+Pred: _nay_enjoyiat_orniordition._
+----- wav: mwew0_si731 -----
+True: _a_few_years_later_the_dome_fell_in._
+Pred: _a_fe_use_later_the_don_cel_him._
+----- wav: mdab0_si1669 -----
+True: _be_excited_and_don't_identify_yourself._
+Pred: _be_acited_indon_ateta_fy_roself._
+----- wav: mgrt0_sx370 -----
+True: _that_noise_problem_grows_more_annoying_each_day._
+Pred: _then_moist_problemn_grows_more_anoying_each_day._
+----- wav: mlll0_si1993 -----
+True: _should_she_wake_him_
+Pred: _should_she_wrick_him._
+----- wav: mlll0_si733 -----
+True: _do_avoid_puncturing_or_cutting_into_meats_test_them._
+Pred: _to_ovoic_pontriner_cate_into_mestistem._
+----- wav: mgrt0_sx100 -----
+True: _project_development_was_proceeding_too_slowly._
+Pred: _project_develoment_waspreceating_toseloly._
+----- wav: mbpm0_sx47 -----
+True: _mom_strongly_dislikes_appetizers._
+Pred: _momstronglng_dislexe_ape_partisers._
+----- wav: mpam0_sx19 -----
+True: _aluminum_silverware_can_often_be_flimsy._
+Pred: _alone_hm_sote_work_an_often_beflemsy._
+----- wav: mtas1_sx28 -----
+True: _beg_that_guard_for_one_gallon_of_gas._
+Pred: _badicgard_for_wene_golen_of_gas._
+----- wav: mjmp0_sx275 -----
+True: _steve_wore_a_bright_red_cashmere_sweater._
+Pred: _steve_or_ar_breagt_redcasiom_mer_swater._
+----- wav: mklt0_sx43 -----
+True: _elderly_people_are_often_excluded._
+Pred: _aldreitly_people_are_often_excuted._
+----- wav: fjlm0_sx143 -----
+True: _the_sound_of_jennifer's_bugle_scared_the_antelope._
+Pred: _the_sand_o_genofors_pegles_skared_the_andalod._
+----- wav: mlll0_sx193 -----
+True: _why_buy_oil_when_you_always_use_mine_
+Pred: _why_by_als,_when_youlashe_is_min._
+----- wav: mjmp0_si905 -----
+True: _his_work_began_just_six_days_after_the_flood._
+Pred: _his_worok_begans_is_sixdays_aftor_tiflud._
+----- wav: mwew0_sx371 -----
+True: _right_now_may_not_be_the_best_time_for_business_mergers._
+Pred: _reagnow_mand_oped_the_bustae_for_bisones_murgers._
+----- wav: mdab0_si1039 -----
+True: _he_has_never,_himself,_done_anything_for_which_to_be_hated__which_of_us_has_
+Pred: _he_hes_never_hemselftoay_haveful_which_sme_haded_whach_of_usas._
+----- wav: felc0_sx126 -----
+True: _artificial_intelligence_is_for_real._
+Pred: _are_oficial_inteligenceis_for_real._
+----- wav: fmgd0_sx214 -----
+True: _the_morning_dew_on_the_spider_web_glistened_in_the_sun._
+Pred: _the_moning_ge_on_the_spaer_webe_thiszend_din_asun._
+----- wav: fpkt0_sx98 -----
+True: _guess_the_question_from_the_answer._
+Pred: _gus_the_quastion_from_the_enswer._
+----- wav: mgrt0_si2080 -----
+True: _he_would_not_carry_a_brief_case._
+Pred: _he_would_not_cariy_ar_breof_case._
+----- wav: mlll0_sx13 -----
+True: _swing_your_arm_as_high_as_you_can._
+Pred: _swein_your_are_as_heyes_acan._
+----- wav: felc0_si756 -----
+True: _materials_ceramic_modeling_clay_red,_white_or_buff._
+Pred: _meterials,_ceremit_molingclay,_redwaide_or_both._
+----- wav: mbpm0_si1584 -----
+True: _rector_was_often_curious_often_tempted_to_ask_questions_but_he_never_did._
+Pred: _rector_is_oftencurious_oftentump_to_desquistions_but_in_never_did._
+----- wav: mjdh0_sx364 -----
+True: _each_untimely_income_loss_coincided_with_the_breakdown_of_a_heating_system_part._
+Pred: _each_ontimely_in_come_wast_coincid_with_the_preakdown_of_fo_heating_sistem_part._
+----- wav: mjmp0_sx95 -----
+True: _iguanas_and_alligators_are_tropical_reptiles._
+Pred: _it_waes_an_oligaters_are_typical_ropties._
+----- wav: mlll0_sx283 -----
+True: _planned_parenthood_organizations_promote_birth_control._
+Pred: _pland_paridled_orgrizations_tromot_birst_ontral._
+----- wav: mjmp0_sx5 -----
+True: _she_is_thinner_than_i_am._
+Pred: _she_us_stender_t_an_aham._
+----- wav: mjmp0_si1535 -----
+True: _he_trembled_lest_his_piece_should_fail._
+Pred: _he_tamval_nest_is_pese_should_fail._
+----- wav: mpam0_si1819 -----
+True: _he_rubbed_his_eyes_sleepily_with_one_huge_paw._
+Pred: _he_rapdesie_sleply_with_one_huged_po._
+----- wav: mnjm0_sx140 -----
+True: _agricultural_products_are_unevenly_distributed._
+Pred: _arecaltoral_produts_are_uny_a_vonie_the_tribited._
+----- wav: mtas1_sx388 -----
+True: _her_right_hand_aches_whenever_the_barometric_pressure_changes._
+Pred: _her_right_hin_is_what_ever_the_birimenter_presur_changes._
+----- wav: mtas1_sx208 -----
+True: _rob_sat_by_the_pond_and_sketched_the_stray_geese._
+Pred: _rob_said_by_the_poned_and_skudged_the_stragties._
+----- wav: mcmj0_si1094 -----
+True: _american_newspaper_reviewers_like_to_call_his_plays_nihilistic._
+Pred: _narcon_is_paper_revewir_asmiked_a_calhis_tas_in_the_oistert._
+----- wav: mgrt0_sx10 -----
+True: _are_your_grades_higher_or_lower_than_nancy's_
+Pred: _ie_your_greads_hire_ared_lower_than_nances._
+----- wav: mjmp0_sx185 -----
+True: _did_you_buy_any_corduroy_overalls_
+Pred: _did_you_by_anequrteray_overals_
+----- wav: mtls0_si2000 -----
+True: _we_can_get_it_if_we_dig,_he_said_patiently._
+Pred: _we_can_get_it_if_for_did,_i_sfidtationaly._
+----- wav: fjlm0_si2303 -----
+True: _in_short,_and_to_borrow_an_arboreal_phrase,_slash_timber._
+Pred: _in_shore_into_boran_oberal_fres,_slast_thember._
+----- wav: mtas1_si2098 -----
+True: _he_gave_a_short_hard_laugh_and_looked_at_her_knowingly._
+Pred: _he_gave_y_shore_hard_lafe_in_loked_if_her_noingly._
+----- wav: fmgd0_sx124 -----
+True: _objects_made_of_pewter_are_beautiful._
+Pred: _ojects_made_of_cuter_are_beatiful._
+----- wav: mlnt0_sx102 -----
+True: _special_task_forces_rescue_hostages_from_kidnappers._
+Pred: _spesurae_tas_foreses_a_rest_you_hostages_from_keke_apers._
+----- wav: mgrt0_sx280 -----
+True: _the_oasis_was_a_mirage._
+Pred: _the_alaytis_was_un_mariye._
+----- wav: mwew0_si1991 -----
+True: _lot_of_people_will_roam_the_streets_in_costumes_and_masks,_and_having_a_ball._
+Pred: _what_of_peplalal_rong_the_stret_and_castumes_in_masks_and_heveing_a_bowl._
+----- wav: felc0_sx306 -----
+True: _a_chosen_few_will_become_generals._
+Pred: _atchoes_in_fhew_wil_be_comegenerals._
+----- wav: mjln0_si1449 -----
+True: _chief_interest_in_radiosterilization_resides_in_the_military_services._
+Pred: _kef_hinterst_in_redioustaralization_resides_an_a_molitar_aseraces._
+----- wav: fdhc0_sx389 -----
+True: _they_own_a_big_house_in_the_remote_countryside._
+Pred: _bay_outo_bidy_house_in_the_rmot_contrysided._
+----- wav: mwew0_sx101 -----
+True: _kindergarten_children_decorate_their_classrooms_for_all_holidays._
+Pred: _ten_a_garn_child_en_decarator_clesions_roled_alitas._
+----- wav: mdab0_si2299 -----
+True: _sometimes,_he_coincided_with_my_father's_being_at_home._
+Pred: _sometosiy_colas_side_was_my_halus_be_at_home._
+----- wav: mcmj0_sx14 -----
+True: _before_thursday's_exam,_review_every_formula._
+Pred: _the_foraters_thars_exime_reveaw_every_fornera._
+----- wav: mbpm0_sx137 -----
+True: _tradition_requires_parental_approval_for_underage_marriage._
+Pred: _cradition_requires_protle_aproval_for_underage_murage._
+----- wav: mpam0_sx199 -----
+True: _young_children_should_avoid_exposure_to_contagious_diseases._
+Pred: _young_childrens_o_ivorad_exposure_to_contagis_dosuses._
 ----- wav: mtls0_sx20 -----
 True: _she_wore_warm,_fleecy,_woolen_overalls._
-Pred: _she_wore_walrm,_flese_wil_an_olverhals._
+Pred: _she_ware_walrm_feacy_wil_enoverals._
+----- wav: mwbt0_si2183 -----
+True: _books_are_for_schnooks._
+Pred: _bock_sofish_snexks._
+----- wav: fdhc0_si1559 -----
+True: _visually,_these_approximated_what_he_was_feeling_within_himself._
+Pred: _thes_youraly_bes_aproximated_withy_was_speling_with_an_imself._
+----- wav: mklt0_si1213 -----
+True: _my_own_experience_has_followed_simpler_lines._
+Pred: _molend_experance_his_volad_sinther_limes._
+----- wav: mbpm0_sx227 -----
+True: _it's_healthier_to_cook_without_sugar._
+Pred: _it's_helthere_to_cok_with_acturdere._
+----- wav: mbpm0_sx407 -----
+True: _laugh,_dance,_and_sing_if_fortune_smiles_upon_you._
+Pred: _leftencs_ind_sing_i_forchiand_smils_a_poniour._
+----- wav: mlnt0_si642 -----
+True: _their_props_were_two_stepladders,_a_chair_and_a_palm_fan._
+Pred: _their_props_where_ton_step_waters_atchare_and_apome_fand._
+----- wav: fjlm0_sx233 -----
+True: _highway_and_freeway_mean_the_same_thing._
+Pred: _how_way_infre_whay_mean_me_same_teine._
+----- wav: fmgd0_si1564 -----
+True: _husbandry_was_bounded_by_snakerail_fences,_and_there_were_grazing_cattle._
+Pred: _as_benre_was_nownded_by_nage_realfenses_and_there_were_graising_catle._
+----- wav: mdab0_sx49 -----
+True: _at_twilight_on_the_twelfth_day_we'll_have_chablis._
+Pred: _a_towilatom_us_foth_day_il_oceably._
+----- wav: mtls0_sx290 -----
+True: _this_brochure_is_particularly_informative_for_prospective_buyer._
+Pred: _this_bresureis_pecktend_from_to_for_prespect_ive_vire._
+----- wav: mlnt0_sx372 -----
+True: _that_diagram_makes_sense_only_after_much_study._
+Pred: _thet_diagram_makes_zens_only_acter_much_stay._
+----- wav: mgrt0_si820 -----
+True: _by_that,_one_feels_that_magnetic_forces_are_as_general_as_electrical_forces._
+Pred: _by_a_thand,_one_fils_at_makenanic_forces_ares_genral_as_electical_forces._
+----- wav: mcmj0_si464 -----
+True: _the_prospect_of_cutting_back_spending_is_an_unpleasant_one_for_any_governor._
+Pred: _the_prostpect_ivfe_calding_bexpending_is_in_rentosin_one_for_anty_garviner._
+----- wav: fpkt0_sx278 -----
+True: _to_further_his_prestige,_he_occasionally_reads_the_wall_street_journal._
+Pred: _to_frther_his_prostedes,_he_casionly_reasd_the_wastra_journale._
+----- wav: fmgd0_si2194 -----
+True: _he_had_fallen_into_a_soft_job,_and_now_the_job_was_gone_and_he_was_stranded._
+Pred: _he_had_forlin_into_asoft_job_and_nothejop_was_gon_in_he_wastranded._
+----- wav: fpas0_sx404 -----
+True: _barb_burned_paper_and_leaves_in_a_big_bonfire._
+Pred: _bob_burn_paper_anlieves_in_a_big_bomfire._
+----- wav: mbpm0_si947 -----
+True: _few_rural_areas_are_protected_by_zoning._
+Pred: _few_ruralar_is_ar_protected_by_ziding._
+----- wav: fpkt0_si2168 -----
+True: _they_make_us_conformists_look_good._
+Pred: _they_make_us_conform_ma_sleokded._
+----- wav: mjmp0_sx365 -----
+True: _the_gunman_kept_his_victim_cornered_at_gunpoint_for_three_hours._
+Pred: _the_dudmen_ceptisic_im_corared_a_tem_polinte_forthreors._
+----- wav: mdab0_sx229 -----
+True: _are_you_looking_for_employment_
+Pred: _ar_ouliu_vrom_flowit._
+----- wav: fdhc0_si929 -----
+True: _but_such_cases_were,_in_the_past,_unusual._
+Pred: _but_sexh_cases_ware_in_the_past_and_usual._
+----- wav: fpkt0_si908 -----
+True: _we_always_thought_we_would_die_with_our_boots_on._
+Pred: _we_always_thout_we_wedive_wi_herbod_son._
+----- wav: mwbt0_sx113 -----
+True: _a_muscular_abdomen_is_good_for_your_back._
+Pred: _a_muschile_abdimen_is_god_for_you_back._
+----- wav: felc0_si2016 -----
+True: _heave_on_those_ropes_the_boat's_come_unstuck._
+Pred: _he_vondos_rops,_the_bots_comeon_stack._
+----- wav: mpam0_si1961 -----
+True: _a_second_twitched_his_shirtsleeve,_and_he_felt_a_brief_burn_on_his_upper_arm._
+Pred: _a_sected_twrich_tis_surce_leve_and_y_fult_to_breap_bardon_as_a_bram._
+----- wav: felc0_si1386 -----
+True: _in_wage_negotiations,_the_industry_bargains_as_a_unit_with_a_single_union._
+Pred: _in_wagionagociations,_the_endestry_barkens_as_a_unet_with_a_singley_ounin._
+----- wav: mnjm0_si2210 -----
+True: _no_return_address_whatsoever._
+Pred: _bal_retar_n_agras_whets_sowomer._
+----- wav: mpam0_si1189 -----
+True: _eight_field_guns_were_captured_in_position._
+Pred: _it_fil_grons_were_capturd_in_position._
+----- wav: fdhc0_sx299 -----
+True: _shaving_cream_is_a_popular_item_on_halloween._
+Pred: _sheming_pream_as_apopular_itemont_hale_ren._
+----- wav: mjdh0_sx274 -----
+True: _cliff_was_soothed_by_the_luxurious_massage._
+Pred: _thi_whis_ses_buth_a_lept_youries_masashe._
+----- wav: fpkt0_sx8 -----
+True: _why_yell_or_worry_over_silly_items_
+Pred: _why_ealer_wory_overcily_items._
+----- wav: mlnt0_sx12 -----
+True: _will_robin_wear_a_yellow_lily_
+Pred: _whil_wraben_ware_a_yol_valy._
+----- wav: mnjm0_si1580 -----
+True: _he_always_seemed_to_have_money_in_his_pocket._
+Pred: _the_alway_samed_tha_hatmoniya_in_his_pocket._
+----- wav: mjln0_sx279 -----
+True: _alice's_ability_to_work_without_supervision_is_noteworthy._
+Pred: _alwas_o_the_bility_to_work_with_outcuprvition_is_no_wordy._
+----- wav: fjlm0_sx413 -----
+True: _daphne's_swedish_needlepoint_scarf_matched_her_skirt._
+Pred: _dafhy_swetis_sne_a_poitsquare_mextor_skirt._
+----- wav: fnlp0_sx408 -----
+True: _i'd_ride_the_subway,_but_i_haven't_enough_change._
+Pred: _odro,_the_subay,_but_at_have_any_neugh_change._
+----- wav: mlnt0_si1574 -----
+True: _flies_swarmed_around_the_bowl_of_lentils_in_which_he_mopped_thick_black_bread._
+Pred: _blyce_wrornd_tharound_the_bol_apenentils_and_whitch_heu_moke_dig_blight_brat._
+----- wav: mklt0_si583 -----
+True: _this_we_can_sympathetically_understand._
+Pred: _this_we_can_soe_a_theticaly_andstand._
+----- wav: mjdh0_sx94 -----
+True: _youngsters_love_common_candy_as_treats._
+Pred: _yungsteros_loth_coman_cand_es_trets._
+----- wav: mnjm0_sx410 -----
+True: _greg_buys_fresh_milk_each_weekday_morning._
+Pred: _greagh_byes_frashmel_ach_wate_theym_moring._
+----- wav: mklt0_sx133 -----
+True: _pizzerias_are_convenient_for_quick_lunch._
+Pred: _petorears_a_convany_for_quete_lunch._
+----- wav: fpas0_sx314 -----
+True: _if_people_were_more_generous,_there_would_be_no_need_for_welfare._
+Pred: _if_pop_wre_more_junders_theire_be_no_ned_for_wealther._
+----- wav: fnlp0_si1308 -----
+True: _indeed_it_is_possible_to_separate_electron_paramagnetic_from_nuclear_effects._
+Pred: _onten_it_is_posible_to_septratey_liked_tomparimaing_netid_for_necleareafects._
+----- wav: mpam0_sx109 -----
+True: _she_slipped_and_sprained_her_ankle_on_the_steep_slope._
+Pred: _she_sliped_in_sprained_arancon_the_step_slop._
+----- wav: mdab0_sx409 -----
+True: _eating_spinach_nightly_increases_strength_miraculously._
+Pred: _eating_spitet_nighely_acresis_stats_rachlosly._
+----- wav: fpas0_si944 -----
+True: _if_the_farm_is_rented,_the_rent_must_be_paid._
+Pred: _is_a_farm_as_runded_the_remos_be_paed._
+----- wav: fnlp0_sx228 -----
+True: _the_viewpoint_overlooked_the_ocean._
+Pred: _tlove_ve_point_overlect_the_acen._
+----- wav: mnjm0_si950 -----
+True: _as_such,_it_was_beyond_politics_and_had_no_need_of_justification_by_a_message._
+Pred: _as_such,_it_was_beog_poletects_and_had_noinaed_aptesiblication_by_a_mathage._
+----- wav: mtas1_si1473 -----
+True: _you_don't_eat_enough,_honey._
+Pred: _you_your_eate_enough_huney_
+----- wav: mwbt0_sx293 -----
+True: _please_take_this_dirty_table_cloth_to_the_cleaners_for_me._
+Pred: _these_take_this_dudy_tabe_clas_to_the_cleanas_fom_nea._
+----- wav: fdhc0_sx29 -----
+True: _help_greg_to_pick_a_peck_of_potatoes._
+Pred: _help_gred_to_pick_apac_is_petatems._
+----- wav: mwew0_sx11 -----
+True: _he_will_allow_a_rare_lie._
+Pred: _he_wil_low_wer_rare_ly._
+----- wav: fpas0_si1272 -----
+True: _laboratory_astrophysics._
+Pred: _levertory_aster_fisits._
+----- wav: fmld0_sx385 -----
+True: _his_shoulder_felt_as_if_it_were_broken._
+Pred: _his_shilderfelthers_if_it_werbroked._
+----- wav: mjdh0_si724 -----
+True: _it's_a_streamlined_rifle,_fast_and_wellmade._
+Pred: _dids_the_streamoing_rifefle_fast_and_whalt_made._
+----- wav: fdhc0_si2189 -----
+True: _you_saw_them_always_together_those_years._
+Pred: _you_saw_them_always_togother_dos_years._
+----- wav: fnlp0_si1938 -----
+True: _lighted_windows_glowed_jewelbright_through_the_downpour._
+Pred: _lidet_wen_dos_blug_gu_big_to_the_dampor._
+----- wav: fnlp0_sx48 -----
+True: _grandmother_outgrew_her_upbringing_in_petticoats._
+Pred: _gramo_ther_outgro_he_apbringing_inpeticods._
+----- wav: fjlm0_sx53 -----
+True: _even_a_simple_vocabulary_contains_symbols._
+Pred: _even_a_simple_of_cabulary_containe_simbles._
+----- wav: mtls0_sx110 -----
+True: _the_best_way_to_learn_is_to_solve_extra_problems._
+Pred: _the_bastwake_te_veron_is_to_so_extr_problems._
+----- wav: mklt0_sx313 -----
+True: _drop_five_forms_in_the_box_before_you_go_out._
+Pred: _gdrough_fafoms_in_the_bocxs_wbe_fore_you_go_oupt._
+----- wav: felc0_sx36 -----
+True: _only_the_most_accomplished_artists_obtain_popularity._
+Pred: _only_he_most_acomplouspardes_subtean_popularity._
+----- wav: fpas0_sx224 -----
+True: _how_good_is_your_endurance_
+Pred: _ho_god_is_our_indirense._
+----- wav: fnlp0_si678 -----
+True: _salvation_reconsidered._
+Pred: _scelvacion_reconsidered._
+----- wav: fdhc0_sx119 -----
+True: _the_misquote_was_retracted_with_an_apology._
+Pred: _the_misquet_was_retracted_with_in_apolagin_
+----- wav: mtas1_sx118 -----
+True: _combine_all_the_ingredients_in_a_large_bowl._
+Pred: _comboying_al_theangreients_in_a_large_bol._
+----- wav: mpam0_sx289 -----
+True: _weatherproof_galoshes_are_very_useful_in_seattle._
+Pred: _whath_ir_profgolasiors_are_vereious_folance_atol._
+----- wav: fmgd0_si934 -----
+True: _authorities_say_that_oldsters_are_a_prime_target._
+Pred: _athorh_y_sayve_at_alsters_arera_frimetardi._
+----- wav: mjdh0_sx184 -----
+True: _the_cat's_meow_always_hurts_my_ears._
+Pred: _the_cath_be_ow_oiye_serch_maers._
+----- wav: fjlm0_si1043 -----
+True: _not_surprisingly,_this_approach_did_not_work._
+Pred: _not_suprisingly_tis_aproched_did_no_wherk._
+----- wav: mwew0_si1361 -----
+True: _but_in_this_one_section_we_welcomed_auditors._
+Pred: _what_inthis_one_section,wey_welk_ondotiters._
+----- wav: fmld0_si2185 -----
+True: __she_said_sharks_have_no_bones_and_shrimp_swam_backward._
+Pred: _she_sud_charchs_have_no_bons_instreps_wheme_backard._
+----- wav: fmld0_si822 -----
+True: _milk_production_may_be_increased_by_the_antiinfective_properties_of_this_drug._
+Pred: _noperduction_may_be_and_creaspaty_aftrianed_vac_toe_praperies_of_the_strug._
 ----- wav: fpas0_sx44 -----
 True: _basketball_can_be_an_entertaining_sport._
-Pred: _bust_abolk_can_bein_intertainings_poart._
+Pred: _bost_abole_can_bean_intortrainings_bort._
+----- wav: mjdh0_si1984 -----
+True: _and_what_eyes_they_were._
+Pred: _it_what_a_ye_they_wore_
+----- wav: mwbt0_si1553 -----
+True: _however,_the_litter_remained,_augmented_by_several_dozen_lunchroom_suppers._
+Pred: _how_over_the_leter_remaydo_bented_by_several_dison_wath_tron_supers._
+----- wav: mtls0_sx200 -----
+True: _ralph_controlled_the_stopwatch_from_the_bleachers._
+Pred: _raph_controve_the_stopbach_from_the_patures._
+----- wav: mwbt0_si923 -----
+True: _to_many_experts,_this_trend_was_inevitable._
+Pred: _to_many_experitches_this_trind_was_in_evetabole._
+----- wav: fdhc0_sx209 -----
+True: _michael_colored_the_bedroom_wall_with_crayons._
+Pred: _micalcolard_the_bedurn_wal_ith_crends._
+----- wav: mcmj0_si602 -----
+True: _but_the_ships_are_very_slow_now,_and_we_don't_get_so_many_sailors_any_more._
+Pred: _but_this_shoupd_oevery_stanonow,_arwe_dounk_ats_som_an_a_celers_an_yu_more._
+----- wav: mgrt0_si1450 -----
+True: _meats_the_radiation_processing_of_meat_has_received_extensive_investigation._
+Pred: _mekes,_the_reation_prosising_hav_mned_has_received_extensite_inmistigation._
+----- wav: fmld0_sx25 -----
+True: _only_lawyers_love_millionaires._
+Pred: _only_lawyers_leve_nay_eners._
+----- wav: fjlm0_si1673 -----
+True: _one_thing,_he_thought,_nobody_knows_about_it_yet._
+Pred: _one_thing,_he_boght,_novodynos_about_ac_yit._
+----- wav: fpas0_sx134 -----
+True: _december_and_january_are_nice_months_to_spend_in_miami._
+Pred: _the_sumberagenrare_anicemonts_dispen_i_miamy._
+----- wav: fmld0_sx205 -----
+True: _military_personnel_are_expected_to_obey_government_orders._
+Pred: _but_lictora_persenalowr_expected_to_o_bage_overnentoters._
+----- wav: mwbt0_sx23 -----
+True: _those_musicians_harmonize_marvelously._
+Pred: _those_muszitions_him_anies_mivelosly._
+----- wav: felc0_sx396 -----
+True: _the_fish_began_to_leap_frantically_on_the_surface_of_the_small_lake._
+Pred: _the_fish_begintol_prenticaly_in_the_serveceson_the_smal_lik._
 ----- wav: mpam0_sx379 -----
 True: _pam_gives_driving_lessons_on_thursdays._
-Pred: _tame_gof_driting_lesoms_ome_therstays._
+Pred: _pem_givesdradinglisons_ond_thirsdas._
+----- wav: mtas1_sx298 -----
+True: _i'd_rather_not_buy_these_shoes_than_be_overcharged._
+Pred: _a_grothernougt_by_thes_shews_then_be_overcharged._
+----- wav: mklt0_sx403 -----
+True: _her_wardrobe_consists_of_only_skirts_and_blouses._
+Pred: _wa_wordrip_an_sust_of_on_my_skirts_ind_bloisns._
+----- wav: fnlp0_sx138 -----
+True: _the_clumsy_customer_spilled_some_expensive_perfume._
+Pred: _the_clonsy_castim_mer_spils_o_ma_spens_ive_parfoun._
+----- wav: mjdh0_si1354 -----
+True: _within_the_larger_social_system_are_the_structural_and_functional_subsystems._
+Pred: _with_in_the_largers_social_system_are_thi_struxtron_fruntrmal_subsistems._
+----- wav: mlll0_sx103 -----
+True: _call_an_ambulance_for_medical_assistance._
+Pred: _col_abuments_frometicalosistemces._
+----- wav: mwbt0_sx203 -----
+True: _the_causeway_ended_abruptly_at_the_shore._
+Pred: _the_clouseway_indo_tho_bruply,_out_the_shor._
+----- wav: fjlm0_sx323 -----
+True: _the_fog_prevented_them_from_arriving_on_time._
+Pred: _the_fal_prevented_dhemph_in_a_rading_ontome_
+----- wav: felc0_sx216 -----
+True: _the_small_boy_put_the_worm_on_the_hook._
+Pred: _the_smal_bory_put_the_warmoned_hock._
+----- wav: mjln0_si819 -----
+True: _there,_forces_are_more_latent_than_in_electricity,_and_less_than_in_magnetism._
+Pred: _they_ere_forces_in_morelaten,_ben_inolextricity,_and_lesthn_in_maing_thism._
+----- wav: mlll0_si1363 -----
+True: _some_of_these_speculations_may_have_some_merit,_others_are_somewhat_ambiguous._
+Pred: _sothe_ispiculations_me_su_merit_others_or_sevelen_im_bigus._
+----- wav: fmld0_sx115 -----
+True: _the_emblem_depicts_the_acropolis_all_aglow._
+Pred: _the_inmbone_to_taxes_the_acroples_aliga._
+----- wav: mwew0_sx191 -----
+True: _withdraw_all_phony_accusations_at_once._
+Pred: _would_drawl_fony_acizations_of_once_
+----- wav: fmgd0_sx304 -----
+True: _cheap_stockings_run_the_first_time_they're_worn._
+Pred: _she'd_stockedings_froun_the_firstame_their_worne._
+----- wav: fnlp0_sx318 -----
+True: _please_dig_my_potatoes_up_before_frost._
+Pred: _pleasetote_mom_the_tadas_abefort_faste._
+----- wav: mjln0_sx189 -----
+True: _destroy_every_file_related_to_my_audits._
+Pred: _the_strawy_every_fiwe_related_to_my_outates._
+----- wav: mgrt0_sx190 -----
+True: _serve_the_coleslaw_after_i_add_the_oil._
+Pred: _serves_he_calselot_hafter_a_ad_the_oyal._
+----- wav: fpkt0_si1538 -----
+True: _a_carriage_crunched_by,_its_dim_lights_filtering_through_the_gloom._
+Pred: _acurage_crunhsvides_dim_winkes_tultren_to_the_glon._
+----- wav: mjdh0_sx4 -----
+True: _jane_may_earn_more_money_by_working_hard._
+Pred: _gant_mayrin_ore_money_by_working_hard._
+----- wav: mjln0_sx99 -----
+True: _medieval_society_was_based_on_hierarchies._
+Pred: _madeval_sasidy_wash_based_on_higr_archies._
+----- wav: fpas0_si2204 -----
+True: _pretty_soon_a_woman_came_along_carrying_a_folded_umbrella_as_a_walking_stick._
+Pred: _predicit_orm_an_caime_wone_cari_if_ful_than_broas_a_wackenstack._
+----- wav: mjmp0_si1791 -----
+True: _no,_the_man_was_not_drunk_he_wondered_how_he_got_tied_up_with_this_stranger._
+Pred: _no_a_the_man_was_not_june_he_ondered_hau_heget_tided_up_with_the_straing._
+----- wav: mlnt0_sx282 -----
+True: _the_tooth_fairy_forgot_to_come_when_roger's_tooth_fell_out._
+Pred: _the_two_pariy_for_got_to_come_and_ragers_to_th_thelout._
+----- wav: fmld0_si925 -----
+True: _while_he_was_in_custody_his_wife_divorced_him._
+Pred: _al_he_was_encostity_is_wike_to_vorstom._
+----- wav: mtls0_si1370 -----
+True: _we_may_say_that_his_problem_was_diagnosed_but_that_he_refused_treatment._
+Pred: _we_may_sae_at_his_problen_was_bagnos,_but_that_he_refese_treatment._
+----- wav: mjln0_sx369 -----
+True: _bob_papered_over_the_living_room_murals._
+Pred: _bob_papered_over_the_living_um_mearels._
+----- wav: fpkt0_sx188 -----
+True: _who_authorized_the_unlimited_expense_account_
+Pred: _he_laut_thoriting_limed_atd_expesic_unt._
+----- wav: mjln0_si2079 -----
+True: _they_had_slapped_their_thighs._
+Pred: _ay_hid_slap_ther_five._
+----- wav: mbpm0_si1577 -----
+True: _brown_eyes,_eyebrow_mustache._
+Pred: _bruh_izes_ie_brouwn_mystash._
+----- wav: mklt0_si1843 -----
+True: _she_was_ready_for_her_great_adventures_and_the_arrival_of_her_mobile_partner._
+Pred: _she_was_radiful_he_greadifvetures_in_the_rable_of_er_movele_partn._
+----- wav: fpkt0_sx368 -----
+True: _lori's_costume_needed_black_gloves_to_be_completely_elegant._
+Pred: _lorys_costd_him_neded_blankglas_ot_be_completely_olidedt._
+----- wav: mnjm0_sx320 -----
+True: _the_nearest_synagogue_may_not_be_within_walking_distance._
+Pred: _the_theire_at_senagog_man_oper_was_an_walking_vistence._
+----- wav: mtas1_si838 -----
+True: _increasing_tempo_of_new_product_development._
+Pred: _increasing_timple_of_ne_prodet_development._
+----- wav: fmld0_sx295 -----
+True: _if_carol_comes_tomorrow,_have_her_arrange_for_a_meeting_at_two._
+Pred: _if_cure_comes_to_mole_havear_rainced_for_am_meading_anto_
+----- wav: fmgd0_sx394 -----
+True: _calcium_makes_bones_and_teeth_strong._
+Pred: _cosim_makes_bons_inteks_strown._
+----- wav: mtls0_si740 -----
+True: _do_without_fancy_tablecloths._
+Pred: _do_without_fance_he_table_fols._
+----- wav: mdab0_sx319 -----
+True: _a_big_goat_idly_ambled_through_the_farmyard._
+Pred: _a_bigo_idely_able_to_ta_far_eard._
+----- wav: mjln0_sx9 -----
+True: _where_were_you_while_we_were_away_
+Pred: _were_were_you_walwe_wre_awan_
+----- wav: mklt0_sx223 -----
+True: _put_the_butcher_block_table_in_the_garage._
+Pred: _put_a_buch_able_ont_table_in_the_garige._

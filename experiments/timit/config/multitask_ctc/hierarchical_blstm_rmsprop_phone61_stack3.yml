@@ -13,6 +13,7 @@ param:
     num_unit: 256
     num_proj: 0
     num_layer_main: 5
+    bottleneck_dim: 0
     num_layer_second: 2
     main_task_weight: 0.8
     batch_size: 32

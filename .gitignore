@@ -9,8 +9,6 @@ blstm_ctc_example.py
 lstm_ctc_example.py
 .dropbox.attr
 
-# timit
-train_ctc_multigpu.py
 
 # csj
 train_ctc_dialog.py

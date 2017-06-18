@@ -38,6 +38,7 @@ class AttentionBase(object):
         embedding_dim:
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
+        logits_tempareture:
         clip_grad: A float value. Range of gradient clipping (> 0)
         weight_decay: A float value. Regularization parameter for weight decay
         beam_width: if 0, use greedy decoding
@@ -51,6 +52,7 @@ class AttentionBase(object):
                  output_size,
                  sos_index,
                  eos_index,
+                 logits_tempareture,
                  clip_grad,
                  weight_decay,
                  beam_width,
@@ -70,6 +72,7 @@ class AttentionBase(object):
         # Setting for seq2seq
         self.sos_index = sos_index
         self.eos_index = eos_index
+        self.logits_tempareture = logits_tempareture
         self.beam_width = beam_width
 
         # Summaries for TensorBoard
@@ -285,7 +288,10 @@ class AttentionBase(object):
                   This is a single scalar tensor to minimize.
         """
         # Calculate loss per example
-        logits = self.decoder_outputs_train.logits
+        logits = self.decoder_outputs_train.logits / self.logits_tempareture
+        # NOTE: This is done for better decoding.
+        # See details in ??
+
         max_time = tf.shape(self.labels[:, 1:])[1]
         loss_mask = tf.sequence_mask(tf.to_int32(self.labels_seq_len - 1),
                                      maxlen=max_time,

@@ -24,25 +24,44 @@ def do_plot(network, label_type_second, num_stack, num_skip, epoch=None):
     """Plot the Multi-task CTC posteriors.
     Args:
         network: model to restore
-        label_type_second: phone39 or phone48 or phone61
+        label_type_second: string, phone39 or phone48 or phone61
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
-        epoch: epoch to restore
+        epoch: int, the epoch to restore
     """
     # Load dataset
     test_data = DataSet(data_type='test', label_type_second='phone61',
+                        batch_size=1,
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False, is_progressbar=True)
 
-    # Define model
-    network.define()
+    # Define placeholders
+    network.inputs = tf.placeholder(
+        tf.float32,
+        shape=[None, None, network.input_size],
+        name='input')
+    indices_pl = tf.placeholder(tf.int64, name='indices')
+    values_pl = tf.placeholder(tf.int32, name='values')
+    shape_pl = tf.placeholder(tf.int64, name='shape')
+    network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
+    indices_second_pl = tf.placeholder(tf.int64, name='indices_second')
+    values_second_pl = tf.placeholder(tf.int32, name='values_second')
+    shape_second_pl = tf.placeholder(tf.int64, name='shape_second')
+    network.labels_second = tf.SparseTensor(indices_second_pl,
+                                            values_second_pl,
+                                            shape_second_pl)
+    network.inputs_seq_len = tf.placeholder(tf.int64,
+                                            shape=[None],
+                                            name='inputs_seq_len')
 
-    # Add to the graph each operation
-    decode_op_main, decode_op_second = network.decoder(
-        decode_type='beam_search',
-        beam_width=20)
+    # Add to the graph each operation (including model definition)
+    _, logits_main, logits_second = network.compute_loss(
+        network.inputs,
+        network.labels,
+        network.labels_second,
+        network.inputs_seq_len)
     posteriors_op_main, posteriors_op_second = network.posteriors(
-        decode_op_main, decode_op_second)
+        logits_main, logits_second)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()

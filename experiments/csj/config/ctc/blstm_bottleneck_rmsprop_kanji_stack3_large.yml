@@ -1,4 +1,4 @@
-model_name: blstm_ctc_bottleneck
+model_name: blstm_ctc
 corpus:
     name: csj
     label_type: kanji
@@ -23,4 +23,4 @@ param:
     clip_activation: 50
     dropout_input: 1.0
     dropout_hidden: 0.8
-    weight_decay: 0.0
+    weight_decay: 1e-6

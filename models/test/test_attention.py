@@ -13,7 +13,7 @@ from tensorflow.python import debug as tf_debug
 
 sys.path.append('../')
 sys.path.append('../../')
-from attention import blstm_attention_seq2seq
+from attention.blstm_attention_seq2seq import BLSTMAttetion
 from util import measure_time
 from data import generate_data, num2alpha, num2phone
 from experiments.utils.sparsetensor import list2sparsetensor
@@ -44,7 +44,7 @@ class TestAttention(tf.test.TestCase):
             else:
                 output_size = 61 + 2
             # model = load(model_type=model_type)
-            network = blstm_attention_seq2seq.BLSTMAttetion(
+            network = BLSTMAttetion(
                 batch_size=batch_size,
                 input_size=inputs[0].shape[1],
                 encoder_num_unit=256,
@@ -58,6 +58,7 @@ class TestAttention(tf.test.TestCase):
                 eos_index=output_size - 1,
                 max_decode_length=50,
                 attention_weights_tempareture=0.5,
+                logits_tempareture=4,
                 parameter_init=0.1,
                 clip_grad=5.0,
                 clip_activation_encoder=50,
