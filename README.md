@@ -1,9 +1,9 @@
 ## TensorFlow Implementation of End-to-End Speech Recognition
 ### Requirements
-- TensorFlow 1.2.0rc1
-- tqdm 4.14.0
-- python-Levenshtein 0.12.0
-- setproctitle 1.1.10
+- TensorFlow >= 1.2.0
+- tqdm >= 4.14.0
+- python-Levenshtein >= 0.12.0
+- setproctitle >= 1.1.10
 - seaborn 0.7.1
 
 
@@ -44,8 +44,8 @@ If you want to do pre-processing, please look at this repo.
 - multitask learning
 
 ###### Awesome technique
-- projection layer[\[Sak+ 2014\]](https://arxiv.org/abs/1402.1128)
-- frame-stacking[\[Sak+ 2015\]](https://arxiv.org/abs/1507.06947)
+- projection layer [\[Sak+ 2014\]](https://arxiv.org/abs/1402.1128)
+- frame-stacking [\[Sak+ 2015\]](https://arxiv.org/abs/1507.06947)
 
 #### Attention Mechanism
 Under implementation

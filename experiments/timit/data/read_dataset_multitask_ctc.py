@@ -3,6 +3,7 @@
 
 """Read dataset for Multitask CTC network (TIMIT corpus).
    In addition, frame stacking and skipping are used.
+   You can use the multi-GPU version.
 """
 
 from os.path import join, basename
@@ -35,8 +36,6 @@ class DataSet(object):
         """
         if data_type not in ['train', 'dev', 'test']:
             raise ValueError('data_type is "train" or "dev" or "test".')
-        if batch_size % num_gpu != 0:
-            raise ValueError('batch_size shoule be by a factor of num_gpu.')
 
         self.data_type = data_type
         self.label_type_second = label_type_second
@@ -73,13 +72,14 @@ class DataSet(object):
                 self.dataset_phone_path, 'label', input_name + '.npy'))
         if len(label_char_paths) != len(label_phone_paths):
             raise ValueError(
-                'The numbers of labels between character and phone are not same.')
+                'The numbers of labels between ' +
+                'character and phone are not same.')
         self.input_paths = np.array(input_paths)
         self.label_char_paths = np.array(label_char_paths)
         self.label_phone_paths = np.array(label_phone_paths)
         self.data_num = len(self.input_paths)
 
-        # Load all dataset
+        # Load all dataset in advance
         print('=> Loading ' + data_type +
               ' dataset (' + label_type_second + ')...')
         input_list, label_char_list, label_phone_list = [], [], []
@@ -125,121 +125,139 @@ class DataSet(object):
         if batch_size is None:
             batch_size = self.batch_size
 
-        #########################
-        # sorted dataset
-        #########################
-        if self.is_sorted:
-            if len(self.rest) > batch_size:
-                sorted_indices = list(self.rest)[:batch_size]
-                self.rest -= set(sorted_indices)
+        next_epoch_flag = False
+
+        while True:
+            #########################
+            # sorted dataset
+            #########################
+            if self.is_sorted:
+                if len(self.rest) > batch_size:
+                    sorted_indices = list(self.rest)[:batch_size]
+                    self.rest -= set(sorted_indices)
+                else:
+                    sorted_indices = list(self.rest)
+                    self.rest = set([i for i in range(self.data_num)])
+                    next_epoch_flag = True
+                    if self.data_type == 'train':
+                        print('---Next epoch---')
+
+                # Compute max frame num in mini-batch
+                max_frame_num = self.input_list[sorted_indices[-1]].shape[0]
+
+                # Compute max target label length in mini-batch
+                max_seq_len_char = max(
+                    map(len, self.label_char_list[sorted_indices]))
+                max_seq_len_phone = max(
+                    map(len, self.label_phone_list[sorted_indices]))
+
+                # Shuffle selected mini-batch
+                random.shuffle(sorted_indices)
+
+                # Initialization
+                inputs = np.zeros(
+                    (len(sorted_indices), max_frame_num, self.input_size))
+                # Padding with -1
+                labels_char = np.array([[-1] * max_seq_len_char]
+                                       * len(sorted_indices), dtype=int)
+                labels_phone = np.array([[-1] * max_seq_len_phone]
+                                        * len(sorted_indices), dtype=int)
+                inputs_seq_len = np.empty((len(sorted_indices),), dtype=int)
+                input_names = [None] * len(sorted_indices)
+
+                # Set values of each data in mini-batch
+                for i_batch, x in enumerate(sorted_indices):
+                    data_i = self.input_list[x]
+                    frame_num = data_i.shape[0]
+                    inputs[i_batch, :frame_num, :] = data_i
+                    labels_char[i_batch, :len(
+                        self.label_char_list[x])] = self.label_char_list[x]
+                    labels_phone[i_batch, :len(
+                        self.label_phone_list[x])] = self.label_phone_list[x]
+                    inputs_seq_len[i_batch] = frame_num
+                    input_names[i_batch] = basename(
+                        self.input_paths[x]).split('.')[0]
+
+            #########################
+            # not sorted dataset
+            #########################
             else:
-                sorted_indices = list(self.rest)
-                self.rest = set([i for i in range(self.data_num)])
-                if self.data_type == 'train':
-                    print('---Next epoch---')
+                if len(self.rest) > batch_size:
+                    # Randomly sample mini-batch
+                    random_indices = random.sample(
+                        list(self.rest), batch_size)
+                    self.rest -= set(random_indices)
+                else:
+                    random_indices = list(self.rest)
+                    self.rest = set([i for i in range(self.data_num)])
+                    next_epoch_flag = True
+                    if self.data_type == 'train':
+                        print('---Next epoch---')
 
-            # Compute max frame num in mini batch
-            max_frame_num = self.input_list[sorted_indices[-1]].shape[0]
+                    # Shuffle selected mini-batch
+                    random.shuffle(random_indices)
 
-            # Compute max target label length in mini batch
-            max_seq_len_char = max(
-                map(len, self.label_char_list[sorted_indices]))
-            max_seq_len_phone = max(
-                map(len, self.label_phone_list[sorted_indices]))
+                # Compute max frame num in mini-batch
+                max_frame_num = max(
+                    map(lambda x: x.shape[0], self.input_list[random_indices]))
 
-            # Shuffle selected mini batch (0 ~ len(self.rest)-1)
-            random.shuffle(sorted_indices)
+                # Compute max target label length in mini-batch
+                max_seq_len_char = max(
+                    map(len, self.label_char_list[random_indices]))
+                max_seq_len_phone = max(
+                    map(len, self.label_phone_list[random_indices]))
 
-            # Initialization
-            inputs = np.zeros(
-                (len(sorted_indices), max_frame_num, self.input_size))
-            labels_char = np.array([[-1] * max_seq_len_char]  # Padding by -1
-                                   * len(sorted_indices), dtype=int)
-            labels_phone = np.array([[-1] * max_seq_len_phone]  # Padding by -1
-                                    * len(sorted_indices), dtype=int)
-            inputs_seq_len = np.empty((len(sorted_indices),), dtype=int)
-            input_names = [None] * len(sorted_indices)
+                # Initialization
+                inputs = np.zeros(
+                    (len(random_indices), max_frame_num, self.input_size))
+                # Padding with -1
+                labels_char = np.array([[-1] * max_seq_len_char]
+                                       * len(random_indices), dtype=int)
+                labels_phone = np.array([[-1] * max_seq_len_phone]
+                                        * len(random_indices), dtype=int)
+                inputs_seq_len = np.empty((len(random_indices),), dtype=int)
+                input_names = [None] * len(random_indices)
 
-            # Set values of each data in mini batch
-            for i_batch, x in enumerate(sorted_indices):
-                data_i = self.input_list[x]
-                frame_num = data_i.shape[0]
-                inputs[i_batch, :frame_num, :] = data_i
-                labels_char[i_batch, :len(
-                    self.label_char_list[x])] = self.label_char_list[x]
-                labels_phone[i_batch, :len(
-                    self.label_phone_list[x])] = self.label_phone_list[x]
-                inputs_seq_len[i_batch] = frame_num
-                input_names[i_batch] = basename(
-                    self.input_paths[x]).split('.')[0]
+                # Set values of each data in mini-batch
+                for i_batch, x in enumerate(random_indices):
+                    data_i = self.input_list[x]
+                    frame_num = data_i.shape[0]
+                    inputs[i_batch, :frame_num, :] = data_i
+                    labels_char[i_batch, :len(
+                        self.label_char_list[x])] = self.label_char_list[x]
+                    labels_phone[i_batch, :len(
+                        self.label_phone_list[x])] = self.label_phone_list[x]
+                    inputs_seq_len[i_batch] = frame_num
+                    input_names[i_batch] = basename(
+                        self.input_paths[x]).split('.')[0]
 
-        #########################
-        # not sorted dataset
-        #########################
-        else:
-            if len(self.rest) > batch_size:
-                # Randomly sample mini batch
-                random_indices = random.sample(
-                    list(self.rest), batch_size)
-                self.rest -= set(random_indices)
+            if self.num_gpu > 1:
+                divide_num = self.num_gpu
+                if next_epoch_flag:
+                    for i in range(self.num_gpu, 0, -1):
+                        if len(self.rest) % i == 0:
+                            divide_num = i
+                            break
+                    next_epoch_flag = False
+
+                # Now we split the mini-batch data by num_gpu
+                inputs = tf.split(inputs, divide_num, axis=0)
+                labels_char = tf.split(labels_char, divide_num, axis=0)
+                labels_phone = tf.split(labels_phone, divide_num, axis=0)
+                inputs_seq_len = tf.split(inputs_seq_len, divide_num, axis=0)
+                input_names = tf.split(input_names, divide_num, axis=0)
+
+                # Convert from SparseTensor to numpy.ndarray
+                inputs = list(map(session.run, inputs))
+                labels_char = list(map(session.run, labels_char))
+                labels_phone = list(map(session.run, labels_phone))
+                labels_char_st = list(map(list2sparsetensor, labels_char))
+                labels_phone_st = list(map(list2sparsetensor, labels_phone))
+                inputs_seq_len = list(map(session.run, inputs_seq_len))
+                input_names = list(map(session.run, input_names))
             else:
-                random_indices = list(self.rest)
-                self.rest = set([i for i in range(self.data_num)])
-                if self.data_type == 'train':
-                    print('---Next epoch---')
+                labels_char_st = list2sparsetensor(labels_char)
+                labels_phone_st = list2sparsetensor(labels_phone)
 
-                # Shuffle selected mini batch (0 ~ len(self.rest)-1)
-                random.shuffle(random_indices)
-
-            # Compute max frame num in mini batch
-            max_frame_num = max(
-                map(lambda x: x.shape[0], self.input_list[random_indices]))
-
-            # Compute max target label length in mini batch
-            max_seq_len_char = max(
-                map(len, self.label_char_list[random_indices]))
-            max_seq_len_phone = max(
-                map(len, self.label_phone_list[random_indices]))
-
-            # Initialization
-            inputs = np.zeros(
-                (len(random_indices), max_frame_num, self.input_size))
-            labels_char = np.array([[-1] * max_seq_len_char]  # Padding by -1
-                                   * len(random_indices), dtype=int)
-            labels_phone = np.array([[-1] * max_seq_len_phone]  # Padding by -1
-                                    * len(random_indices), dtype=int)
-            inputs_seq_len = np.empty((len(random_indices),), dtype=int)
-            input_names = [None] * len(random_indices)
-
-            # Set values of each data in mini batch
-            for i_batch, x in enumerate(random_indices):
-                data_i = self.input_list[x]
-                frame_num = data_i.shape[0]
-                inputs[i_batch, :frame_num, :] = data_i
-                labels_char[i_batch, :len(
-                    self.label_char_list[x])] = self.label_char_list[x]
-                labels_phone[i_batch, :len(
-                    self.label_phone_list[x])] = self.label_phone_list[x]
-                inputs_seq_len[i_batch] = frame_num
-                input_names[i_batch] = basename(
-                    self.input_paths[x]).split('.')[0]
-
-        if self.num_gpu > 1:
-            # Now we split the mini-batch data by num_gpu
-            inputs = tf.split(inputs, self.num_gpu, axis=0)
-            labels_char = tf.split(labels_char, self.num_gpu, axis=0)
-            labels_phone = tf.split(labels_phone, self.num_gpu, axis=0)
-            inputs_seq_len = tf.split(inputs_seq_len, self.num_gpu, axis=0)
-            input_names = tf.split(input_names, self.num_gpu, axis=0)
-
-            labels_char_st, labels_phone_st = [], []
-            for i_gpu in range(self.num_gpu):
-                labels_char_st.append(list2sparsetensor(
-                    session.run(labels_char[i_gpu])))
-                labels_phone_st.append(list2sparsetensor(
-                    session.run(labels_phone[i_gpu])))
-        else:
-            labels_char_st = list2sparsetensor(labels_char)
-            labels_phone_st = list2sparsetensor(labels_phone)
-
-        return inputs, labels_char_st, labels_phone_st, inputs_seq_len, input_names
+            yield (inputs, labels_char_st, labels_phone_st, inputs_seq_len,
+                   input_names)

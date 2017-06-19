@@ -9,6 +9,8 @@ blstm_ctc_example.py
 lstm_ctc_example.py
 .dropbox.attr
 
+read_dataset_ctc_cluster.py
+read_dataset_multitask_ctc_cluster.py
 
 # csj
 train_ctc_dialog.py

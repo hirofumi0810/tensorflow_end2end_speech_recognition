@@ -8,7 +8,6 @@ from __future__ import print_function
 import re
 import sys
 import unittest
-from tqdm import tqdm
 import tensorflow as tf
 
 sys.path.append('../../')
@@ -27,25 +26,36 @@ class TestReadDatasetMultitaskCTC(unittest.TestCase):
         self.check_reading(num_gpu=2, is_sorted=True)
         self.check_reading(num_gpu=2, is_sorted=False)
 
+        # For many GPUs
+        self.check_reading(num_gpu=7, is_sorted=True)
+
     def check_reading(self, num_gpu, is_sorted):
         print('----- num_gpu: ' + str(num_gpu) +
               ', is_sorted: ' + str(is_sorted) + ' -----')
-        dataset = DataSet(data_type='test', label_type_second='phone61',
-                          batch_size=64,
+
+        batch_size = 64
+        dataset = DataSet(data_type='train', label_type_second='phone61',
+                          batch_size=batch_size,
                           num_stack=3, num_skip=3,
                           is_sorted=is_sorted, is_progressbar=True,
                           num_gpu=num_gpu)
 
+        tf.reset_default_graph()
         with tf.Session().as_default() as sess:
             print('=> Reading mini-batch...')
             map_file_path_char = '../metric/mapping_files/ctc/char2num.txt'
             map_file_path_phone = '../metric/mapping_files/ctc/phone2num_61.txt'
 
-            for i in tqdm(range(10)):
-                inputs, labels_char_st, labels_phone_st, inputs_seq_len, input_names = dataset.next_batch(
-                    session=sess)
+            mini_batch = dataset.next_batch(session=sess)
+
+            iter_per_epoch = int(dataset.data_num /
+                                 (batch_size * num_gpu)) + 1
+            for i in range(iter_per_epoch + 1):
+                inputs, labels_char_st, labels_phone_st, inputs_seq_len, input_names = mini_batch.__next__()
 
                 if num_gpu > 1:
+                    for inputs_gpu in inputs:
+                        print(inputs_gpu.shape)
                     labels_char_st = labels_char_st[0]
                     labels_phone_st = labels_phone_st[0]
 
