@@ -4,12 +4,12 @@
 - tqdm >= 4.14.0
 - python-Levenshtein >= 0.12.0
 - setproctitle >= 1.1.10
-- seaborn 0.7.1
+- seaborn >= 0.7.1
 
 
 ### Corpus
 #### TIMIT
-- phone-level (39 or 48 or 61 phones)
+- phone-level (39, 48, 61 phones)
 - character-level
 
 #### CSJ (Corpus of Spontaneous Japanese)
@@ -33,7 +33,7 @@ If you want to do pre-processing, please look at this repo.
 - GRU-CTC
 - Bidirectional LSTM-CTC (BLSTM-CTC)
 - Bidirectional GRU-CTC (BGRU-CTC)
-- Multitask CTC (you can set the CTC layer in the second task to the aubitrary layer.)
+- Multitask CTC (you can set another CTC layer to the aubitrary layer.)
 
 ##### Options
 ###### General technique
@@ -47,7 +47,28 @@ If you want to do pre-processing, please look at this repo.
 - projection layer [\[Sak+ 2014\]](https://arxiv.org/abs/1402.1128)
 - frame-stacking [\[Sak+ 2015\]](https://arxiv.org/abs/1507.06947)
 
+
 #### Attention Mechanism
+##### Encoder
+- LSTM encoder
+- BLSTM encoder
+- GRU encoder
+- BGRU encoder
+
+##### Decoder
+
+##### Attention type
+Under implementation
+
+###### Options
+###### General technique
+
+##### Awesome technique
+- temperature in the softmax layer (Compute attention weights)
+- temperature in the softmax layer (Output posteriors)
+
+
+#### Joint CTC-Attention
 Under implementation
 
 
