@@ -53,13 +53,19 @@ def do_plot(network, label_type_second, num_stack, num_skip, epoch=None):
     network.inputs_seq_len = tf.placeholder(tf.int64,
                                             shape=[None],
                                             name='inputs_seq_len')
+    network.keep_prob_input = tf.placeholder(tf.float32,
+                                             name='keep_prob_input')
+    network.keep_prob_hidden = tf.placeholder(tf.float32,
+                                              name='keep_prob_hidden')
 
     # Add to the graph each operation (including model definition)
     _, logits_main, logits_second = network.compute_loss(
         network.inputs,
         network.labels,
         network.labels_second,
-        network.inputs_seq_len)
+        network.inputs_seq_len,
+        network.keep_prob_input,
+        network.keep_prob_hidden)
     posteriors_op_main, posteriors_op_second = network.posteriors(
         logits_main, logits_second)
 

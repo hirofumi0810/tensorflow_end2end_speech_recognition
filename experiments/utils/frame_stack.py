@@ -6,7 +6,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-from tqdm import tqdm
+from .progressbar import wrap_iterator
 
 
 def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is_progressbar=False):
@@ -28,16 +28,13 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
         stacked_input_list: list of frame-stacked inputs
     """
     if num_stack < num_skip:
-        raise ValueError('Error: skip must be less than stack.')
+        raise ValueError('num_skip must be less than num_stack.')
 
     input_size = input_list[0].shape[1]
     utt_num = len(input_paths)
 
-    # Setting for progressbar
-    iterator = tqdm(range(utt_num)) if is_progressbar else range(utt_num)
-
     stacked_input_list = []
-    for i_utt in iterator:
+    for i_utt in wrap_iterator(range(utt_num), is_progressbar):
         # Per utterance
         input_name = input_paths[i_utt].split('/')[-1].split('.')[0]
         frame_num = frame_num_dict[input_name]

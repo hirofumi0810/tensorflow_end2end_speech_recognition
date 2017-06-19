@@ -78,21 +78,20 @@ class Multitask_BLSTM_CTC(ctcBase):
         self.main_task_weight = main_task_weight
         self.second_task_weight = 1 - main_task_weight
 
-    def _build(self, inputs, inputs_seq_len):
+    def _build(self, inputs, inputs_seq_len, keep_prob_input,
+               keep_prob_hidden):
         """Construct model graph.
         Args:
             inputs: A tensor of `[batch_size, max_time, input_dim]`
-            inputs_seq_len:  A tensor of `[batch_size]`
+            inputs_seq_len: A tensor of `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
         Returns:
             logits:
         """
         # Dropout for inputs
-        self.keep_prob_input = tf.placeholder(tf.float32,
-                                              name='keep_prob_input')
-        self.keep_prob_hidden = tf.placeholder(tf.float32,
-                                               name='keep_prob_hidden')
         outputs = tf.nn.dropout(inputs,
-                                self.keep_prob_input,
+                                keep_prob_input,
                                 name='dropout_input')
 
         # `[batch_size, max_time, input_size_splice]`
@@ -126,10 +125,10 @@ class Multitask_BLSTM_CTC(ctcBase):
                 # Dropout for outputs of each layer
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
                     lstm_fw,
-                    output_keep_prob=self.keep_prob_hidden)
+                    output_keep_prob=keep_prob_hidden)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(
                     lstm_bw,
-                    output_keep_prob=self.keep_prob_hidden)
+                    output_keep_prob=keep_prob_hidden)
 
                 # _init_state_fw = lstm_fw.zero_state(self.batch_size,
                 #                                     tf.float32)
@@ -145,11 +144,11 @@ class Multitask_BLSTM_CTC(ctcBase):
                     inputs=outputs,
                     sequence_length=inputs_seq_len,
                     dtype=tf.float32,
-                    scope='blstm_' + str(i_layer + 1))
+                    scope='blstm_dynamic' + str(i_layer + 1))
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
-                if i_layer == self.num_layer_second:
+                if i_layer == self.num_layer_second - 1:
                     # Reshape to apply the same weights over the timesteps
                     if self.num_proj is None:
                         output_node = self.num_unit * 2
@@ -214,13 +213,15 @@ class Multitask_BLSTM_CTC(ctcBase):
             return logits_main, logits_second
 
     def compute_loss(self, inputs, labels_main, labels_second, inputs_seq_len,
-                     num_gpu=1, scope=None):
+                     keep_prob_input, keep_prob_hidden, num_gpu=1, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[batch_size, max_time, input_size]`
             labels_main: A SparseTensor of target labels in the main task
             labels_second: A SparseTensor of target labels in the second task
             inputs_seq_len: A tensor of size `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
             num_gpu: the number of GPUs
         Returns:
             loss: operation for computing ctc loss
@@ -228,19 +229,26 @@ class Multitask_BLSTM_CTC(ctcBase):
             logits_second:
         """
         # Build model graph
-        logits_main, logits_second = self._build(inputs, inputs_seq_len)
+        logits_main, logits_second = self._build(
+            inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden)
 
         # Weight decay
-        weight_sum = 0
-        for var in tf.trainable_variables():
-            if 'bias' not in var.name.lower():
-                weight_sum += tf.nn.l2_loss(var)
-        tf.add_to_collection('losses', weight_sum * self.weight_decay)
+        with tf.name_scope("weight_decay_loss"):
+            weight_sum = 0
+            for var in tf.trainable_variables():
+                if 'bias' not in var.name.lower():
+                    weight_sum += tf.nn.l2_loss(var)
+            tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss_main"):
             ctc_loss = tf.nn.ctc_loss(labels_main,
                                       logits_main,
-                                      tf.cast(inputs_seq_len, tf.int32))
+                                      tf.cast(inputs_seq_len, tf.int32),
+                                      preprocess_collapse_repeated=False,
+                                      ctc_merge_repeated=True,
+                                      ignore_longer_outputs_than_inputs=True,  # changed
+                                      time_major=True)
+            # TODO: Fix bug
             ctc_loss_mean = tf.reduce_mean(
                 ctc_loss, name='ctc_loss_main_mean')
             tf.add_to_collection(
@@ -256,7 +264,12 @@ class Multitask_BLSTM_CTC(ctcBase):
         with tf.name_scope("ctc_loss_second"):
             ctc_loss = tf.nn.ctc_loss(labels_second,
                                       logits_second,
-                                      tf.cast(inputs_seq_len, tf.int32))
+                                      tf.cast(inputs_seq_len, tf.int32),
+                                      preprocess_collapse_repeated=False,
+                                      ctc_merge_repeated=True,
+                                      ignore_longer_outputs_than_inputs=True,  # changed
+                                      time_major=True)
+            # TODO: Fix bug
             ctc_loss_mean = tf.reduce_mean(
                 ctc_loss, name='ctc_loss_second_mean')
             tf.add_to_collection(
@@ -269,7 +282,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                 tf.summary.scalar('ctc_loss_dev_second',
                                   ctc_loss_mean * self.second_task_weight))
 
-        # Total loss
+        # Compute total loss
         loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
         # Add a scalar summary for the snapshot of loss

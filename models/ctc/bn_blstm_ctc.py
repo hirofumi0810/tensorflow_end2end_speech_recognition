@@ -64,21 +64,20 @@ class BN_BLSTM_CTC(ctcBase):
         self.num_proj = None if num_proj == 0 else num_proj
         self._is_training = is_training
 
-    def _build(self, inputs, inputs_seq_len):
+    def _build(self, inputs, inputs_seq_len, keep_prob_input,
+               keep_prob_hidden):
         """Construct model graph.
         Args:
             inputs: A tensor of `[batch_size, max_time, input_dim]`
             inputs_seq_len:  A tensor of `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
         Returns:
             logits:
         """
         # Dropout for inputs
-        self.keep_prob_input = tf.placeholder(tf.float32,
-                                              name='keep_prob_input')
-        self.keep_prob_hidden = tf.placeholder(tf.float32,
-                                               name='keep_prob_hidden')
         outputs = tf.nn.dropout(inputs,
-                                self.keep_prob_input,
+                                keep_prob_input,
                                 name='dropout_input')
 
         self.is_training = tf.placeholder(tf.bool)
@@ -114,10 +113,10 @@ class BN_BLSTM_CTC(ctcBase):
                 # Dropout for outputs of each layer
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
                     lstm_fw,
-                    output_keep_prob=self.keep_prob_hidden)
+                    output_keep_prob=keep_prob_hidden)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(
                     lstm_bw,
-                    output_keep_prob=self.keep_prob_hidden)
+                    output_keep_prob=keep_prob_hidden)
 
                 # _init_state_fw = lstm_fw.zero_state(self.batch_size,
                 #                                     tf.float32)

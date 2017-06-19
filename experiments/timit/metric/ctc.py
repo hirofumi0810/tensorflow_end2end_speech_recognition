@@ -9,14 +9,14 @@ from __future__ import print_function
 
 import re
 import Levenshtein
-from tqdm import tqdm
 
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone, phone2num
 from .mapping import map_to_39phone
 from .edit_distance import compute_edit_distance
+from utils.labels.character import num2char
+from utils.labels.phone import num2phone, phone2num
 from utils.sparsetensor import list2sparsetensor, sparsetensor2list
 from utils.exception_func import exception
+from utils.progressbar import wrap_iterator
 
 
 @exception
@@ -29,7 +29,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
         decode_op: operation for decoding
         per_op: operation for computing phone error rate
         network: network to evaluate
-        dataset: Am instance of a `Dataset' class
+        dataset: An instance of a `Dataset' class
         train_label_type: string, phone39 or phone48 or phone61
         eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize the progressbar
@@ -50,19 +50,19 @@ def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
         iteration += 1
     per_global = 0
 
+    # Make data generator
+    mini_batch = dataset.next_batch()
+
     phone2num_map_file_path = '../metric/mapping_files/ctc/phone2num_' + \
         train_label_type[5:7] + '.txt'
     phone2num_39_map_file_path = '../metric/mapping_files/ctc/phone2num_39.txt'
     phone2phone_map_file_path = '../metric/mapping_files/phone2phone.txt'
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-    for step in iterator:
+    for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true_st, inputs_seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            inputs, labels_true_st, inputs_seq_len, _ = mini_batch.__next__()
         else:
-            inputs, _, labels_true_st, inputs_seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            inputs, _, labels_true_st, inputs_seq_len, _ = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,
@@ -153,16 +153,16 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
         iteration += 1
     cer_sum = 0
 
+    # Make data generator
+    mini_batch = dataset.next_batch()
+
     map_file_path = '../metric/mapping_files/ctc/char2num.txt'
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-    for step in iterator:
+    for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true_st, inputs_seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            inputs, labels_true_st, inputs_seq_len, _ = mini_batch.__next__()
         else:
-            inputs, labels_true_st, _, inputs_seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            inputs, labels_true_st, _, inputs_seq_len, _ = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,
@@ -179,12 +179,12 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
         for i_batch in range(batch_size_each):
 
             # Convert from list to string
-            str_pred = num2char(labels_pred[i_batch], map_file_path)
             str_true = num2char(labels_true[i_batch], map_file_path)
+            str_pred = num2char(labels_pred[i_batch], map_file_path)
 
             # Remove silence(_) labels
-            str_pred = re.sub(r'[_]+', "", str_pred)
             str_true = re.sub(r'[_]+', "", str_true)
+            str_pred = re.sub(r'[_]+', "", str_pred)
 
             # Compute edit distance
             cer_each = Levenshtein.distance(

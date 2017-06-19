@@ -36,11 +36,14 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
     # Batch size is expected to be 1
     iteration = dataset.data_num
 
+    # Make data generator
+    mini_batch = dataset.next_batch()
+
     save_path = mkdir_join(save_path, 'ctc_output')
 
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, _, inputs_seq_len, input_names = dataset.next_batch()
+        inputs, _, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,
@@ -87,11 +90,14 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
     # Batch size is expected to be 1
     iteration = dataset.data_num
 
+    # Make data generator
+    mini_batch = dataset.next_batch()
+
     save_path = mkdir_join(save_path, 'ctc_output')
 
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, _, _, inputs_seq_len, input_names = dataset.next_batch()
+        inputs, _, _, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,

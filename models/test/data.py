@@ -8,6 +8,7 @@ from __future__ import print_function
 import numpy as np
 import scipy.io.wavfile
 from python_speech_features import mfcc, fbank, logfbank, hz2mel
+from experiments.utils.sparsetensor import list2sparsetensor
 
 
 def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):
@@ -17,7 +18,7 @@ def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):
         feature: logmelfbank or mfcc
     Returns:
         inputs: `[batch_size, max_time, feature_dim]`
-        seq_len: `[batch_size, frame_num]`
+        inputs_seq_len: `[batch_size, frame_num]`
     """
     # Load wav file
     fs, audio = scipy.io.wavfile.read(wav_path)
@@ -40,12 +41,12 @@ def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):
     inputs = np.zeros((batch_size, input_data.shape[0], input_data.shape[1]))
     for i in range(batch_size):
         inputs[i] = input_data
-    seq_len = [inputs.shape[1]] * batch_size  # `[291]`
+    inputs_seq_len = [inputs.shape[1]] * batch_size  # `[291]`
 
     # Normalization
     inputs = (inputs - np.mean(inputs)) / np.std(inputs)
 
-    return inputs, seq_len
+    return inputs, inputs_seq_len
 
 
 def delta(feat, N):
@@ -109,14 +110,14 @@ def generate_data(label_type, model, batch_size=1):
     Returns:
         inputs: `[batch_size, max_time, feature_dim]`
         labels: `[batch_size]`
-        seq_len: `[batch_size, frame_num]`
-        target_len: `[batch_size]` (if model is attention)
+        inputs_seq_len: `[batch_size, frame_num]`
+        labels_seq_len: `[batch_size]` (if model is attention)
     """
     # Make input data
-    inputs, seq_len = read_wav('./sample/LDC93S1.wav',
-                               feature_type='logmelfbank',
-                               batch_size=batch_size)
-    # inputs, seq_len = read_wav('../sample/LDC93S1.wav',
+    inputs, inputs_seq_len = read_wav('./sample/LDC93S1.wav',
+                                      feature_type='logmelfbank',
+                                      batch_size=batch_size)
+    # inputs, inputs_seq_len = read_wav('../sample/LDC93S1.wav',
     #                            feature_type='mfcc',
     #                            batch_size=batch_size)
 
@@ -125,12 +126,18 @@ def generate_data(label_type, model, batch_size=1):
             transcript = read_text('./sample/LDC93S1.txt')
             transcript = ' ' + transcript.replace('.', '') + ' '
             labels = [alpha2num(transcript)] * batch_size
-            return inputs, labels, seq_len
+
+            # Convert to SparseTensor
+            labels = list2sparsetensor(labels)
+            return inputs, labels, inputs_seq_len
 
         elif label_type == 'phone':
             transcript = read_phone('./sample/LDC93S1.phn')
             labels = [phone2num(transcript)] * batch_size
-            return inputs, labels, seq_len
+
+            # Convert to SparseTensor
+            labels = list2sparsetensor(labels)
+            return inputs, labels, inputs_seq_len
 
         elif label_type == 'multitask':
             transcript_char = read_text('./sample/LDC93S1.txt')
@@ -138,22 +145,26 @@ def generate_data(label_type, model, batch_size=1):
             transcript_char = ' ' + transcript_char.replace('.', '') + ' '
             labels_char = [alpha2num(transcript_char)] * batch_size
             labels_phone = [phone2num(transcript_phone)] * batch_size
-            return inputs, labels_char, labels_phone, seq_len
+
+            # Convert to SparseTensor
+            labels_char = list2sparsetensor(labels_char)
+            labels_phone = list2sparsetensor(labels_phone)
+            return inputs, labels_char, labels_phone, inputs_seq_len
 
     elif model == 'attention':
         if label_type == 'character':
             transcript = read_text('./sample/LDC93S1.txt')
             transcript = '<' + transcript.replace('.', '') + '>'
             labels = [alpha2num(transcript)] * batch_size
-            target_len = [len(labels[0])] * batch_size
-            return inputs, labels, seq_len, target_len
+            labels_seq_len = [len(labels[0])] * batch_size
+            return inputs, labels, inputs_seq_len, labels_seq_len
 
         elif label_type == 'phone':
             transcript = read_phone('./sample/LDC93S1.phn')
             transcript = '< ' + transcript + ' >'
             labels = [phone2num(transcript)] * batch_size
-            target_len = [len(labels[0])] * batch_size
-            return inputs, labels, seq_len, target_len
+            labels_seq_len = [len(labels[0])] * batch_size
+            return inputs, labels, inputs_seq_len, labels_seq_len
 
         elif label_type == 'multitask':
             transcript_char = read_text('./sample/LDC93S1.txt')
@@ -165,7 +176,7 @@ def generate_data(label_type, model, batch_size=1):
             target_len_char = [len(labels_char[0])] * batch_size
             target_len_phone = [len(labels_phone[0])] * batch_size
             return (inputs, labels_char, labels_phone,
-                    seq_len, target_len_char, target_len_phone)
+                    inputs_seq_len, target_len_char, target_len_phone)
 
     elif model == 'joint_ctc_attention':
         NotImplementedError

@@ -60,9 +60,22 @@ class TestReadDatasetMultitaskCTC(unittest.TestCase):
                     labels_phone_st = labels_phone_st[0]
 
                 labels_char = sparsetensor2list(
-                    labels_char_st, batch_size=len(labels_char_st))
+                    labels_char_st, batch_size=len(inputs))
                 labels_phone = sparsetensor2list(
-                    labels_phone_st, batch_size=len(labels_phone_st))
+                    labels_phone_st, batch_size=len(inputs))
+
+                if num_gpu < 1:
+                    for inputs_i, labels_i in zip(inputs, labels_char):
+                        if len(inputs_i) < len(labels_i):
+                            print(len(inputs_i))
+                            print(len(labels_i))
+                            raise ValueError
+                    for inputs_i, labels_i in zip(inputs, labels_phone):
+                        if len(inputs_i) < len(labels_i):
+                            print(len(inputs_i))
+                            print(len(labels_i))
+                            raise ValueError
+
                 str_true_char = num2char(labels_char[0], map_file_path_char)
                 str_true_char = re.sub(r'_', ' ', str_true_char)
                 str_true_phone = num2phone(

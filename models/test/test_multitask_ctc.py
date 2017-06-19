@@ -15,7 +15,7 @@ sys.path.append('../../')
 from ctc.multitask_blstm_ctc import Multitask_BLSTM_CTC
 from util import measure_time
 from data import generate_data, num2alpha, num2phone
-from experiments.utils.sparsetensor import list2sparsetensor, sparsetensor2list
+from experiments.utils.sparsetensor import sparsetensor2list
 
 
 class TestCTC(tf.test.TestCase):
@@ -31,7 +31,7 @@ class TestCTC(tf.test.TestCase):
         with tf.Graph().as_default():
             # Load batch data
             batch_size = 4
-            inputs, labels_char, labels_phone, inputs_seq_len = generate_data(
+            inputs, labels_true_char_st, labels_true_phone_st, inputs_seq_len = generate_data(
                 label_type='multitask',
                 model='ctc',
                 batch_size=batch_size)
@@ -53,6 +53,10 @@ class TestCTC(tf.test.TestCase):
             inputs_seq_len_pl = tf.placeholder(tf.int64,
                                                shape=[None],
                                                name='inputs_seq_len')
+            keep_prob_input_pl = tf.placeholder(tf.float32,
+                                                name='keep_prob_input')
+            keep_prob_hidden_pl = tf.placeholder(tf.float32,
+                                                 name='keep_prob_hidden')
 
             # Define model graph
             output_size_main = 26
@@ -79,7 +83,9 @@ class TestCTC(tf.test.TestCase):
                 inputs_pl,
                 labels_pl,
                 labels_second_pl,
-                inputs_seq_len_pl)
+                inputs_seq_len_pl,
+                keep_prob_input_pl,
+                keep_prob_hidden_pl)
             learning_rate = 1e-3
             train_op = network.train(loss_op,
                                      optimizer='rmsprop',
@@ -100,11 +106,11 @@ class TestCTC(tf.test.TestCase):
             # Make feed dict
             feed_dict = {
                 inputs_pl: inputs,
-                labels_pl: list2sparsetensor(labels_char),
-                labels_second_pl: list2sparsetensor(labels_phone),
+                labels_pl: labels_true_char_st,
+                labels_second_pl: labels_true_phone_st,
                 inputs_seq_len_pl: inputs_seq_len,
-                network.keep_prob_input: network.dropout_ratio_input,
-                network.keep_prob_hidden: network.dropout_ratio_hidden,
+                keep_prob_input_pl: network.dropout_ratio_input,
+                keep_prob_hidden_pl: network.dropout_ratio_hidden,
                 network.lr: learning_rate
             }
 
@@ -134,8 +140,8 @@ class TestCTC(tf.test.TestCase):
 
                     if (step + 1) % 10 == 0:
                         # Change to evaluation mode
-                        feed_dict[network.keep_prob_input] = 1.0
-                        feed_dict[network.keep_prob_hidden] = 1.0
+                        feed_dict[keep_prob_input_pl] = 1.0
+                        feed_dict[keep_prob_hidden_pl] = 1.0
 
                         # Compute accuracy
                         ler_train_char, ler_train_phone = sess.run(
@@ -143,23 +149,29 @@ class TestCTC(tf.test.TestCase):
 
                         duration_step = time.time() - start_time_step
                         print('Step %d: loss = %.3f / cer = %.4f / per = %.4f (%.3f sec)\n' %
-                              (step + 1, loss_train, ler_train_char, ler_train_phone, duration_step))
+                              (step + 1, loss_train, ler_train_char,
+                               ler_train_phone, duration_step))
                         start_time_step = time.time()
 
                         # Visualize
-                        labels_st_char, labels_st_phone = sess.run(
-                            [decode_op_main, decode_op_main], feed_dict=feed_dict)
+                        labels_pred_char_st, labels_pred_phone_st = sess.run(
+                            [decode_op_main, decode_op_second],
+                            feed_dict=feed_dict)
+                        labels_true_char = sparsetensor2list(
+                            labels_true_char_st, batch_size=batch_size)
+                        labels_true_phone = sparsetensor2list(
+                            labels_true_phone_st, batch_size=batch_size)
                         labels_pred_char = sparsetensor2list(
-                            labels_st_char, batch_size=1)
+                            labels_pred_char_st, batch_size=batch_size)
                         labels_pred_phone = sparsetensor2list(
-                            labels_st_phone, batch_size=1)
+                            labels_pred_phone_st, batch_size=batch_size)
 
                         # character
                         print('Character')
-                        print('  True: %s' % num2alpha(labels_char[0]))
+                        print('  True: %s' % num2alpha(labels_true_char[0]))
                         print('  Pred: %s' % num2alpha(labels_pred_char[0]))
                         print('Phone')
-                        print('  True: %s' % num2phone(labels_phone[0]))
+                        print('  True: %s' % num2phone(labels_true_phone[0]))
                         print('  Pred: %s' % num2phone(labels_pred_phone[0]))
                         print('----------------------------------------')
 
@@ -167,7 +179,7 @@ class TestCTC(tf.test.TestCase):
                             not_improved_count += 1
                         else:
                             not_improved_count = 0
-                        if not_improved_count >= 3:
+                        if not_improved_count >= 5:
                             print('Modle is Converged.')
                             break
                         ler_train_char_pre = ler_train_char

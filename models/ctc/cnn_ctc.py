@@ -67,21 +67,23 @@ class CNN_CTC(ctcBase):
         self.num_proj = None
         self.splice = 0
 
-    def _build(self, inputs, inputs_seq_len):
+    def _build(self, inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden):
         """Construct model graph.
         Args:
             inputs: A tensor of `[batch_size, max_time, input_dim]`
             inputs_seq_len:  A tensor of `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
         Returns:
             logits:
         """
         # Dropout for inputs
-        self.keep_prob_input = tf.placeholder(tf.float32,
-                                              name='keep_prob_input')
-        self.keep_prob_hidden = tf.placeholder(tf.float32,
-                                               name='keep_prob_hidden')
+        keep_prob_input = tf.placeholder(tf.float32,
+                                         name='keep_prob_input')
+        keep_prob_hidden = tf.placeholder(tf.float32,
+                                          name='keep_prob_hidden')
         outputs = tf.nn.dropout(inputs,
-                                self.keep_prob_input,
+                                keep_prob_input,
                                 name='dropout_input')
 
         # `[batch_size, max_time, input_size_splice]`
@@ -130,7 +132,7 @@ class CNN_CTC(ctcBase):
             outputs = pool(outputs, shape=[3, 1], pool_type='max')
 
             # Dropout
-            outputs = tf.nn.dropout(outputs, self.keep_prob_hidden)
+            outputs = tf.nn.dropout(outputs, keep_prob_hidden)
 
         ############################
         # 2~4th conv
@@ -164,7 +166,7 @@ class CNN_CTC(ctcBase):
                 outputs = tf.nn.relu(outputs)
 
                 # Dropout
-                outputs = tf.nn.dropout(outputs, self.keep_prob_hidden)
+                outputs = tf.nn.dropout(outputs, keep_prob_hidden)
 
         ###########################
         # 5~10th conv
@@ -194,7 +196,7 @@ class CNN_CTC(ctcBase):
                 outputs = tf.nn.relu(outputs)
 
                 # Dropout
-                outputs = tf.nn.dropout(outputs, self.keep_prob_hidden)
+                outputs = tf.nn.dropout(outputs, keep_prob_hidden)
 
         # Reshape for fully-connected layer
         outputs = tf.reshape(outputs, shape=[-1, 14 * 256])
@@ -227,7 +229,7 @@ class CNN_CTC(ctcBase):
 
                 # Dropout
                 if i_layer != 13:
-                    outputs = tf.nn.dropout(outputs, self.keep_prob_hidden)
+                    outputs = tf.nn.dropout(outputs, keep_prob_hidden)
 
         # Reshape back to the original shape (batch_size, max_time,
         # num_classes)

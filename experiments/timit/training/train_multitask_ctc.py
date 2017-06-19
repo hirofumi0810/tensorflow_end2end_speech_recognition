@@ -79,16 +79,22 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         network.inputs_seq_len = tf.placeholder(tf.int64,
                                                 shape=[None],
                                                 name='inputs_seq_len')
+        network.keep_prob_input = tf.placeholder(tf.float32,
+                                                 name='keep_prob_input')
+        network.keep_prob_hidden = tf.placeholder(tf.float32,
+                                                  name='keep_prob_hidden')
 
         # Add to the graph each operation
         loss_op, logits_main, logits_second = network.compute_loss(
             network.inputs,
             network.labels,
             network.labels_second,
-            network.inputs_seq_len)
+            network.inputs_seq_len,
+            network.keep_prob_input,
+            network.keep_prob_hidden)
         train_op = network.train(loss_op,
                                  optimizer=optimizer,
-                                 learning_rate_init=learning_rate,
+                                 learning_rate_init=float(learning_rate),
                                  is_scheduled=False)
         decode_op_main, decode_op_second = network.decoder(
             logits_main,
@@ -133,6 +139,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             # Initialize parameters
             sess.run(init_op)
 
+            # Make mini-batch generator
+            mini_batch_train = train_data.next_batch()
+            mini_batch_dev = dev_data.next_batch()
+
             # Train model
             iter_per_epoch = int(train_data.data_num / batch_size)
             train_step = train_data.data_num / batch_size
@@ -146,7 +156,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_char_st, labels_phone_st, inputs_seq_len, _ = train_data.next_batch()
+                inputs, labels_char_st, labels_phone_st, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
                     network.labels: labels_char_st,
@@ -158,7 +168,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels_char, labels_phone, inputs_seq_len, _ = dev_data.next_batch()
+                inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_dev.__next__()
                 feed_dict_dev = {
                     network.inputs: inputs,
                     network.labels: labels_char_st,
@@ -245,15 +255,15 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                             print('■■■ ↑Best Score (CER)↑ ■■■')
 
                             print('=== Test Data Evaluation ===')
-                            cer_test_epoch = do_eval_cer(
+                            cer_test = do_eval_cer(
                                 session=sess,
                                 decode_op=decode_op_main,
                                 network=network,
                                 dataset=test_data,
                                 eval_batch_size=1,
                                 is_multitask=True)
-                            print('  CER: %f %%' % (cer_test_epoch * 100))
-                            per_test_epoch = do_eval_per(
+                            print('  CER: %f %%' % (cer_test * 100))
+                            per_test = do_eval_per(
                                 session=sess,
                                 decode_op=decode_op_second,
                                 per_op=ler_op_second,
@@ -262,7 +272,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                 train_label_type=label_type_second,
                                 eval_batch_size=1,
                                 is_multitask=True)
-                            print('  PER: %f %%' % (per_test_epoch * 100))
+                            print('  PER: %f %%' % (per_test * 100))
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -310,6 +320,7 @@ def main(config_path):
                        num_unit=param['num_unit'],
                        num_layer_main=param['num_layer_main'],
                        num_layer_second=param['num_layer_second'],
+                       #    bottleneck_dim=param['bottleneck_dim'],
                        output_size_main=30,
                        output_size_second=output_size_second,
                        main_task_weight=param['main_task_weight'],
@@ -336,7 +347,8 @@ def main(config_path):
     network.model_name += '_taskweight' + str(param['main_task_weight'])
 
     # Set save path
-    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/ctc/')
+    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/')
+    network.model_dir = mkdir_join(network.model_dir, 'ctc')
     network.model_dir = mkdir_join(
         network.model_dir, 'char_' + corpus['label_type_second'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)

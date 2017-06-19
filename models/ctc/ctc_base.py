@@ -96,20 +96,23 @@ class ctcBase(object):
         """Adds scaled noise from a 0-mean normal distribution to gradients."""
         raise NotImplementedError
 
-    def compute_loss(self, inputs, labels, inputs_seq_len,
-                     num_gpu=1, scope=None):
+    def compute_loss(self, inputs, labels, inputs_seq_len, keep_prob_input,
+                     keep_prob_hidden, num_gpu=1, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[batch_size, max_time, input_size]`
             labels: A SparseTensor of target labels
             inputs_seq_len: A tensor of size `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
             num_gpu: the number of GPUs
         Returns:
             loss: operation for computing ctc loss
             logits:
         """
         # Build model graph
-        logits = self._build(inputs, inputs_seq_len)
+        logits = self._build(
+            inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden)
 
         # Weight decay
         with tf.name_scope("weight_decay_loss"):
@@ -122,7 +125,11 @@ class ctcBase(object):
         with tf.name_scope("ctc_loss"):
             ctc_loss = tf.nn.ctc_loss(labels,
                                       logits,
-                                      tf.cast(inputs_seq_len, tf.int32))
+                                      tf.cast(inputs_seq_len, tf.int32),
+                                      preprocess_collapse_repeated=False,
+                                      ctc_merge_repeated=True,
+                                      ignore_longer_outputs_than_inputs=False,
+                                      time_major=True)
             ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss_mean')
             tf.add_to_collection('losses', ctc_loss_mean)
 

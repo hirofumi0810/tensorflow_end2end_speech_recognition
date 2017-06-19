@@ -57,21 +57,20 @@ class BGRU_CTC(ctcBase):
 
         self.bottleneck_dim = bottleneck_dim
 
-    def _build(self, inputs, inputs_seq_len):
+    def _build(self, inputs, inputs_seq_len, keep_prob_input,
+               keep_prob_hidden):
         """Construct model graph.
         Args:
             inputs: A tensor of `[batch_size, max_time, input_dim]`
             inputs_seq_len:  A tensor of `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
         Returns:
             logits:
         """
         # Dropout for inputs
-        self.keep_prob_input = tf.placeholder(tf.float32,
-                                              name='keep_prob_input')
-        self.keep_prob_hidden = tf.placeholder(tf.float32,
-                                               name='keep_prob_hidden')
         outputs = tf.nn.dropout(inputs,
-                                self.keep_prob_input,
+                                keep_prob_input,
                                 name='dropout_input')
 
         # Hidden layers
@@ -89,10 +88,10 @@ class BGRU_CTC(ctcBase):
                 # Dropout for outputs of each layer
                 gru_fw = tf.contrib.rnn.DropoutWrapper(
                     gru_fw,
-                    output_keep_prob=self.keep_prob_hidden)
+                    output_keep_prob=keep_prob_hidden)
                 gru_bw = tf.contrib.rnn.DropoutWrapper(
                     gru_bw,
-                    output_keep_prob=self.keep_prob_hidden)
+                    output_keep_prob=keep_prob_hidden)
 
                 # _init_state_fw = gru_fw.zero_state(self.batch_size,
                 #                                    tf.float32)

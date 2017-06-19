@@ -29,6 +29,9 @@ def decode_test(session, decode_op, network, dataset, label_type,
     # Batch size is expected to be 1
     iteration = dataset.data_num
 
+    # Make data generator
+    mini_batch = dataset.next_batch()
+
     if label_type == 'character':
         map_file_path = '../metric/mapping_files/ctc/char2num.txt'
     else:
@@ -40,7 +43,7 @@ def decode_test(session, decode_op, network, dataset, label_type,
 
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, labels_true_st, inputs_seq_len, input_names = dataset.next_batch()
+        inputs, labels_true_st, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,
@@ -86,6 +89,9 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
     # Batch size is expected to be 1
     iteration = dataset.data_num
 
+    # Make data generator
+    mini_batch = dataset.next_batch()
+
     if save_path is not None:
         sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
 
@@ -94,7 +100,7 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
     map_file_path = '../metric/mapping_files/ctc/char2num.txt'
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, labels_true_st, _, inputs_seq_len, input_names = dataset.next_batch()
+        inputs, labels_true_st, _, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,
@@ -121,7 +127,7 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
         label_type_second[5:7] + '.txt'
     for step in range(iteration):
         # Create feed dictionary for next mini batch
-        inputs, _, labels_true_st, inputs_seq_len, input_names = dataset.next_batch()
+        inputs, _, labels_true_st, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,

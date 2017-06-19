@@ -53,13 +53,18 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
     network.inputs_seq_len = tf.placeholder(tf.int64,
                                             shape=[None],
                                             name='inputs_seq_len')
-
+    network.keep_prob_input = tf.placeholder(tf.float32,
+                                             name='keep_prob_input')
+    network.keep_prob_hidden = tf.placeholder(tf.float32,
+                                              name='keep_prob_hidden')
     # Add to the graph each operation (including model definition)
     _, logits_main, logits_second = network.compute_loss(
         network.inputs,
         network.labels,
         network.labels_second,
-        network.inputs_seq_len)
+        network.inputs_seq_len,
+        network.keep_prob_input,
+        network.keep_prob_hidden)
     decode_op_main, decode_op_second = network.decoder(
         logits_main,
         logits_second,
@@ -94,6 +99,7 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
                               decode_op_second=decode_op_second,
                               network=network,
                               dataset=test_data,
+                              label_type_second=label_type_second,
                               save_path=network.model_dir)
 
 

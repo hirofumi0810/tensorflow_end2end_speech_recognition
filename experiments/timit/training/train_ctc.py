@@ -80,14 +80,20 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         network.inputs_seq_len = tf.placeholder(tf.int64,
                                                 shape=[None],
                                                 name='inputs_seq_len')
+        network.keep_prob_input = tf.placeholder(tf.float32,
+                                                 name='keep_prob_input')
+        network.keep_prob_hidden = tf.placeholder(tf.float32,
+                                                  name='keep_prob_hidden')
 
         # Add to the graph each operation (including model definition)
         loss_op, logits = network.compute_loss(network.inputs,
                                                network.labels,
-                                               network.inputs_seq_len)
+                                               network.inputs_seq_len,
+                                               network.keep_prob_input,
+                                               network.keep_prob_hidden)
         train_op = network.train(loss_op,
                                  optimizer=optimizer,
-                                 learning_rate_init=learning_rate,
+                                 learning_rate_init=float(learning_rate),
                                  is_scheduled=False)
         decode_op = network.decoder(logits,
                                     network.inputs_seq_len,
@@ -115,6 +121,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
               (len(parameters_dict.keys()),
                "{:,}".format(total_parameters / 1000000)))
 
+        # Make mini-batch generator
+        mini_batch_train = train_data.next_batch()
+        mini_batch_dev = dev_data.next_batch()
+
         csv_steps, csv_loss_train, csv_loss_dev = [], [], []
         csv_ler_train, csv_ler_dev = [], []
         # Create a session for running operation on the graph
@@ -140,7 +150,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_st, inputs_seq_len, _ = train_data.next_batch()
+                inputs, labels_st, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
                     network.labels: labels_st,
@@ -151,7 +161,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels_st, inputs_seq_len, _ = dev_data.next_batch()
+                inputs, labels_st, inputs_seq_len, _ = mini_batch_dev.__next__()
                 feed_dict_dev = {
                     network.inputs: inputs,
                     network.labels: labels_st,
@@ -211,6 +221,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
 
                     if epoch >= 10:
                         start_time_eval = time.time()
+
                         if label_type == 'character':
                             print('=== Dev Data Evaluation ===')
                             cer_dev_epoch = do_eval_cer(
