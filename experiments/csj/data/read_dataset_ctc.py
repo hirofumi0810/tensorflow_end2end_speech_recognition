@@ -15,7 +15,6 @@ import pickle
 import random
 import numpy as np
 import tensorflow as tf
-import time
 
 from utils.frame_stack import stack_frame
 from utils.sparsetensor import list2sparsetensor
@@ -69,7 +68,7 @@ class DataSet(object):
         # Sort paths to input & label by frame num
         print('=> loading paths to dataset...')
         self.frame_num_tuple_sorted = sorted(
-            self.frame_num_dict.items(), key=lambda x: x[1], reverse=True)
+            self.frame_num_dict.items(), key=lambda x: x[1])
         input_paths, label_paths = [], []
         for input_name, frame_num in wrap_iterator(self.frame_num_tuple_sorted,
                                                    self.is_progressbar):
@@ -81,10 +80,6 @@ class DataSet(object):
         self.input_paths = np.array(input_paths)
         self.label_paths = np.array(label_paths)
         self.data_num = len(self.input_paths)
-
-        # Divide dataset into some clusters
-        # total: 384198 utterances (train: 240h)
-        # total: 896755 utterances (train_all: 586h)
 
         if (self.num_stack is not None) and (self.num_skip is not None):
             self.input_size = self.input_size * num_stack
@@ -123,7 +118,7 @@ class DataSet(object):
                 else:
                     sorted_indices = list(self.rest)
                     self.rest = set(
-                        [i for i in range(len(self.data_num))])
+                        [i for i in range(self.data_num)])
                     next_epoch_flag = True
                     if self.data_type == 'train':
                         print('---Next epoch---')
@@ -131,7 +126,6 @@ class DataSet(object):
                 # Shuffle selected mini-batch
                 random.shuffle(sorted_indices)
 
-                start = time.time()
                 # Load dataset in mini-batch
                 input_list, label_list, input_name_list = [], [], []
                 for i in sorted_indices:
@@ -149,10 +143,7 @@ class DataSet(object):
                 input_list = np.array(input_list)
                 label_list = np.array(label_list)
                 input_name_list = np.array(input_name_list)
-                print('load')
-                print(time.time() - start)
 
-                start = time.time()
                 # Frame stacking
                 if (self.num_stack is not None) and (self.num_skip is not None):
                     stacked_input_list = stack_frame(
@@ -163,8 +154,6 @@ class DataSet(object):
                         self.num_skip,
                         is_progressbar=False)
                     input_list = np.array(stacked_input_list)
-                print('stack')
-                print(time.time() - start)
 
                 # Compute max frame num in mini-batch
                 max_frame_num = max(map(lambda x: x.shape[0], input_list))
@@ -186,7 +175,8 @@ class DataSet(object):
                     data_i = input_list[i_batch]
                     frame_num = data_i.shape[0]
                     inputs[i_batch, :frame_num, :] = data_i
-                    labels[i_batch, :len(label_list[i_batch])] = label_list[i_batch]
+                    labels[i_batch, :len(label_list[i_batch])
+                           ] = label_list[i_batch]
                     inputs_seq_len[i_batch] = frame_num
                     input_names[i_batch] = input_name_list[i_batch]
 
@@ -216,8 +206,10 @@ class DataSet(object):
                     # label_list.append(np.load(self.label_paths[i]))
                     # input_name_list.append(
                     #     basename(self.input_paths[i]).split('.')[0])
-                    input_list.append(np.load(np.take(self.input_paths, i, axis=0)))
-                    label_list.append(np.load(np.take(self.label_paths, i, axis=0)))
+                    input_list.append(
+                        np.load(np.take(self.input_paths, i, axis=0)))
+                    label_list.append(
+                        np.load(np.take(self.label_paths, i, axis=0)))
                     input_name_list.append(
                         basename(np.take(self.input_paths, i, axis=0)).split('.')[0])
                 input_list = np.array(input_list)
@@ -255,7 +247,8 @@ class DataSet(object):
                     data_i = input_list[i_batch]
                     frame_num = data_i.shape[0]
                     inputs[i_batch, : frame_num, :] = data_i
-                    labels[i_batch, :len(label_list[i_batch])] = label_list[i_batch]
+                    labels[i_batch, :len(label_list[i_batch])
+                           ] = label_list[i_batch]
                     inputs_seq_len[i_batch] = frame_num
                     input_names[i_batch] = input_name_list[i_batch]
 
@@ -268,24 +261,18 @@ class DataSet(object):
                             break
                     next_epoch_flag = False
 
-                start = time.time()
                 # Now we split the mini-batch data by num_gpu
                 inputs = tf.split(inputs, divide_num, axis=0)
                 labels = tf.split(labels, divide_num, axis=0)
                 inputs_seq_len = tf.split(inputs_seq_len, divide_num, axis=0)
                 input_names = tf.split(input_names, divide_num, axis=0)
-                print('tf.split')
-                print(time.time() - start)
 
-                start = time.time()
                 # Convert from SparseTensor to numpy.ndarray
                 inputs = list(map(session.run, inputs))
                 labels = list(map(session.run, labels))
                 labels_st = list(map(list2sparsetensor, labels))
                 inputs_seq_len = list(map(session.run, inputs_seq_len))
                 input_names = list(map(session.run, input_names))
-                print('session.run')
-                print(time.time() - start)
 
             else:
                 labels_st = list2sparsetensor(labels)

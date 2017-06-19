@@ -1,7 +1,8 @@
-model_name: blstm_ctc
+model_name: multitask_blstm_ctc
 corpus:
     name: csj
-    label_type: kanji
+    label_type_main: kanji
+    label_type_second: phone
     train_data_size: default
 feature:
     name: fbank
@@ -12,8 +13,10 @@ feature:
 param:
     num_unit: 320
     num_proj: 0
-    num_layer: 5
+    num_layer_main: 5
     bottleneck_dim: 0
+    num_layer_second: 3
+    main_task_weight: 0.8
     batch_size: 32
     optimizer: rmsprop
     learning_rate: 1e-3

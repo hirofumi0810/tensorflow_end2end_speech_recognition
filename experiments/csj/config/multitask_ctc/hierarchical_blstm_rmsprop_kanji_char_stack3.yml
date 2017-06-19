@@ -1,4 +1,4 @@
-model_name: hierarchical_blstm_ctc
+model_name: multitask_blstm_ctc
 corpus:
     name: csj
     label_type_main: kanji
@@ -11,19 +11,19 @@ feature:
     num_stack: 3
     num_skip: 3
 param:
-    num_cell: 320
+    num_unit: 320
     num_proj: 0
-    num_layer: 5
-    num_layer2: 3
+    num_layer_main: 5
+    bottleneck_dim: 0
+    num_layer_second: 3
     main_task_weight: 0.8
-    # bottleneck_dim: 320
     batch_size: 32
     optimizer: rmsprop
-    learning_rate: 0.001
+    learning_rate: 1e-3
     num_epoch: 20
     weight_init: 0.1
     clip_grad: 5.0
     clip_activation: 50
     dropout_input: 1.0
     dropout_hidden: 0.8
-    weight_decay: 0.0
+    weight_decay: 1e-6

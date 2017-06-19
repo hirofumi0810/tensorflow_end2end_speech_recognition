@@ -10,13 +10,13 @@ feature:
     num_stack: 3
     num_skip: 3
 param:
-    num_cell: 320
+    num_unit: 320
     num_proj: 0
     num_layer: 5
     bottleneck_dim: 0
     batch_size: 32
     optimizer: rmsprop
-    learning_rate: 0.001
+    learning_rate: 1e-3
     num_epoch: 20
     weight_init: 0.1
     clip_grad: 5.0

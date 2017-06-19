@@ -110,9 +110,22 @@ class TestReadDatasetCTC(unittest.TestCase):
                     labels_second_st = labels_second_st[0]
 
                 labels_main = sparsetensor2list(
-                    labels_main_st, batch_size=len(labels_main_st))
+                    labels_main_st, batch_size=len(inputs))
                 labels_second = sparsetensor2list(
-                    labels_second_st, batch_size=len(labels_second_st))
+                    labels_second_st, batch_size=len(inputs))
+
+                if num_gpu < 1:
+                    for inputs_i, labels_i in zip(inputs, labels_main):
+                        if len(inputs_i) < len(labels_i):
+                            print(len(inputs_i))
+                            print(len(labels_i))
+                            raise ValueError
+                    for inputs_i, labels_i in zip(inputs, labels_second):
+                        if len(inputs_i) < len(labels_i):
+                            print(len(inputs_i))
+                            print(len(labels_i))
+                            raise ValueError
+
                 str_true_main = map_fn_main(labels_main[0], map_file_path_main)
                 # str_true_main = re.sub(r'_', ' ', str_true_main)
                 str_true_second = map_fn_second(

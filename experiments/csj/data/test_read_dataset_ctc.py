@@ -23,14 +23,15 @@ class TestReadDatasetCTC(unittest.TestCase):
     def test(self):
         self.check_reading(label_type='kanji', num_gpu=1, is_sorted=True)
         self.check_reading(label_type='kanji', num_gpu=1, is_sorted=False)
-        self.check_reading(label_type='kanji', num_gpu=2, is_sorted=True)
-        self.check_reading(label_type='kanji', num_gpu=2, is_sorted=False)
         self.check_reading(label_type='character', num_gpu=1, is_sorted=True)
         self.check_reading(label_type='character', num_gpu=1, is_sorted=False)
-        self.check_reading(label_type='character', num_gpu=2, is_sorted=True)
-        self.check_reading(label_type='character', num_gpu=2, is_sorted=False)
         self.check_reading(label_type='phone', num_gpu=1, is_sorted=True)
         self.check_reading(label_type='phone', num_gpu=1, is_sorted=False)
+
+        self.check_reading(label_type='kanji', num_gpu=2, is_sorted=True)
+        self.check_reading(label_type='kanji', num_gpu=2, is_sorted=False)
+        self.check_reading(label_type='character', num_gpu=2, is_sorted=True)
+        self.check_reading(label_type='character', num_gpu=2, is_sorted=False)
         self.check_reading(label_type='phone', num_gpu=2, is_sorted=True)
         self.check_reading(label_type='phone', num_gpu=2, is_sorted=False)
 
@@ -75,7 +76,15 @@ class TestReadDatasetCTC(unittest.TestCase):
                     labels_st = labels_st[0]
 
                 labels = sparsetensor2list(
-                    labels_st, batch_size=len(labels_st))
+                    labels_st, batch_size=len(inputs))
+
+                if num_gpu < 1:
+                    for inputs_i, labels_i in zip(inputs, labels):
+                        if len(inputs_i) < len(labels_i):
+                            print(len(inputs_i))
+                            print(len(labels_i))
+                            raise ValueError
+
                 str_true = map_fn(labels[0], map_file_path)
                 str_true = re.sub(r'_', ' ', str_true)
                 print(str_true)

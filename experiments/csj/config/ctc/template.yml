@@ -1,0 +1,26 @@
+model_name:
+corpus:
+    name: csj
+    label_type:
+    train_data_size:
+feature:
+    name:
+    input_size:
+    splice:
+    num_stack:
+    num_skip:
+param:
+    num_unit:
+    num_proj:
+    num_layer:
+    bottleneck_dim:
+    batch_size:
+    optimizer:
+    learning_rate:
+    num_epoch:
+    weight_init:
+    clip_grad:
+    clip_activation:
+    dropout_input:
+    dropout_hidden:
+    weight_decay:

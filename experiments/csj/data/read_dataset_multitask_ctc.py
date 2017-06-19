@@ -15,7 +15,6 @@ import pickle
 import random
 import numpy as np
 import tensorflow as tf
-import time
 
 from utils.frame_stack import stack_frame
 from utils.sparsetensor import list2sparsetensor
@@ -74,7 +73,7 @@ class DataSet(object):
         # Sort paths to input & label by frame num
         print('=> loading paths to dataset...')
         self.frame_num_tuple_sorted = sorted(
-            self.frame_num_dict.items(), key=lambda x: x[1], reverse=True)
+            self.frame_num_dict.items(), key=lambda x: x[1])
         input_paths, label_main_paths, label_second_paths = [], [], []
         for input_name, frame_num in wrap_iterator(self.frame_num_tuple_sorted,
                                                    self.is_progressbar):
@@ -89,10 +88,6 @@ class DataSet(object):
         self.label_main_paths = np.array(label_main_paths)
         self.label_second_paths = np.array(label_second_paths)
         self.data_num = len(self.input_paths)
-
-        # Divide dataset into some clusters
-        # total: 384198 utterances (train: 240h)
-        # total: 896755 utterances (train_all: 586h)
 
         if (self.num_stack is not None) and (self.num_skip is not None):
             self.input_size = self.input_size * num_stack
@@ -133,7 +128,7 @@ class DataSet(object):
                 else:
                     sorted_indices = list(self.rest)
                     self.rest = set(
-                        [i for i in range(len(self.data_num))])
+                        [i for i in range(self.data_num)])
                     next_epoch_flag = True
                     if self.data_type == 'train':
                         print('---Next epoch---')
@@ -141,7 +136,6 @@ class DataSet(object):
                 # Shuffle selected mini-batch
                 random.shuffle(sorted_indices)
 
-                start = time.time()
                 # Load dataset in mini-batch
                 input_list, label_main_list = [], []
                 label_second_list, input_name_list = [], []
@@ -164,10 +158,7 @@ class DataSet(object):
                 label_main_list = np.array(label_main_list)
                 label_second_list = np.array(label_second_list)
                 input_name_list = np.array(input_name_list)
-                print('load')
-                print(time.time() - start)
 
-                start = time.time()
                 # Frame stacking
                 if (self.num_stack is not None) and (self.num_skip is not None):
                     stacked_input_list = stack_frame(
@@ -178,8 +169,6 @@ class DataSet(object):
                         self.num_skip,
                         is_progressbar=False)
                     input_list = np.array(stacked_input_list)
-                print('stack')
-                print(time.time() - start)
 
                 # Compute max frame num in mini-batch
                 max_frame_num = max(map(lambda x: x.shape[0], input_list))
