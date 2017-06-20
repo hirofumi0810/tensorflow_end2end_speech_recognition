@@ -37,7 +37,7 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
     iteration = dataset.data_num
 
     # Make data generator
-    mini_batch = dataset.next_batch()
+    mini_batch = dataset.next_batch(batch_size=1)
 
     save_path = mkdir_join(save_path, 'ctc_output')
 
@@ -53,10 +53,9 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
         }
 
         # Visualize
-        batch_size_each = len(inputs_seq_len)
         max_frame_num = inputs.shape[1]
         posteriors = session.run(posteriors_op, feed_dict=feed_dict)
-        posteriors_index = np.array([0 + (batch_size_each * j)
+        posteriors_index = np.array([0 + (1 * j)
                                      for j in range(max_frame_num)])
         if label_type != 'character':
             plot_probs_ctc_phone(
@@ -91,7 +90,7 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
     iteration = dataset.data_num
 
     # Make data generator
-    mini_batch = dataset.next_batch()
+    mini_batch = dataset.next_batch(batch_size=1)
 
     save_path = mkdir_join(save_path, 'ctc_output')
 
@@ -107,14 +106,13 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
         }
 
         # Visualize
-        batch_size_each = len(inputs_seq_len)
         max_frame_num = inputs.shape[1]
         posteriors_char = session.run(
             posteriors_op_main, feed_dict=feed_dict)
         posteriors_phone = session.run(
             posteriors_op_second, feed_dict=feed_dict)
 
-        posteriors_index = np.array([0 + (batch_size_each * j)
+        posteriors_index = np.array([0 + (1 * j)
                                      for j in range(max_frame_num)])
 
         plot_probs_ctc_char_phone(

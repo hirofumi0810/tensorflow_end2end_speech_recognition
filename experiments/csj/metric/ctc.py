@@ -44,7 +44,7 @@ def do_eval_per(session, per_op, network, dataset,
     per_global = 0
 
     # Make data generator
-    mini_batch = dataset.next_batch()
+    mini_batch = dataset.next_batch(batch_size=batch_size)
 
     for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini batch
@@ -70,7 +70,7 @@ def do_eval_per(session, per_op, network, dataset,
     return per_global
 
 
-@exception
+# @exception
 def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
                 eval_batch_size=None, is_progressbar=False,
                 is_multitask=False, is_main=False):
@@ -79,10 +79,10 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         session: session of training model
         decode_op: operation for decoding
         network: network to evaluate
-        dataset: Dataset class
-        label_type: character or kanji
+        dataset: An instance of `Dataset` class
+        label_type: string, character or kanji
         is_test: set to True when evaluating by the test set
-        eval_batch_size: batch size on evaluation
+        eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize progressbar
         is_multitask: if True, evaluate the multitask model
         is_main: if True, evaluate the main task
@@ -101,7 +101,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
     cer_sum = 0
 
     # Make data generator
-    mini_batch = dataset.next_batch()
+    mini_batch = dataset.next_batch(batch_size=batch_size)
 
     if label_type == 'character':
         map_file_path = '../metric/mapping_files/ctc/char2num.txt'
@@ -130,12 +130,11 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         labels_true = sparsetensor2list(labels_true_st, batch_size_each)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
         for i_batch in range(batch_size_each):
-
             # Convert from list to string
             str_pred = num2char(labels_pred[i_batch], map_file_path)
             # TODO: change in case of character
             if label_type == 'kanji' and is_test:
-                str_true = labels_true[i_batch]
+                str_true = ''.join(labels_true[i_batch])
                 # NOTE* 漢字の場合はテストデータのラベルはそのまま保存してある
             else:
                 str_true = num2char(labels_true[i_batch], map_file_path)
@@ -147,6 +146,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
             # Compute edit distance
             cer_each = Levenshtein.distance(
                 str_pred, str_true) / len(list(str_true))
+
             cer_sum += cer_each
 
     cer_mean = cer_sum / dataset.data_num

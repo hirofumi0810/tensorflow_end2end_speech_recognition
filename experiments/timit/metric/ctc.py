@@ -51,7 +51,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
     per_global = 0
 
     # Make data generator
-    mini_batch = dataset.next_batch()
+    mini_batch = dataset.next_batch(batch_size=batch_size)
 
     phone2num_map_file_path = '../metric/mapping_files/ctc/phone2num_' + \
         train_label_type[5:7] + '.txt'
@@ -84,33 +84,33 @@ def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
             labels_true = sparsetensor2list(labels_true_st, batch_size_each)
             labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
             for i_batch in range(batch_size_each):
-                # Convert num to phone (list of phone strings)
+                # Convert from num to phone (-> list of phone strings)
                 phone_pred_seq = num2phone(
                     labels_pred[i_batch], phone2num_map_file_path)
                 phone_pred_list = phone_pred_seq.split(' ')
 
-                # Mapping to 39 phones (list of phone strings)
+                # Mapping to 39 phones (-> list of phone strings)
                 phone_pred_list = map_to_39phone(
                     phone_pred_list, train_label_type,
                     phone2phone_map_file_path)
 
-                # Convert phone to num (list of phone indices)
+                # Convert from phone to num (-> list of phone indices)
                 phone_pred_list = phone2num(
                     phone_pred_list, phone2num_39_map_file_path)
                 labels_pred[i_batch] = phone_pred_list
 
                 if data_label_type != 'phone39':
-                    # Convert num to phone (list of phone strings)
+                    # Convert from num to phone (-> list of phone strings)
                     phone_true_seq = num2phone(
                         labels_true[i_batch], phone2num_map_file_path)
                     phone_true_list = phone_true_seq.split(' ')
 
-                    # Mapping to 39 phones (list of phone strings)
+                    # Mapping to 39 phones (-> list of phone strings)
                     phone_true_list = map_to_39phone(
                         phone_true_list, data_label_type,
                         phone2phone_map_file_path)
 
-                    # Convert phone to num (list of phone indices)
+                    # Convert from phone to num (-> list of phone indices)
                     phone_true_list = phone2num(
                         phone_true_list, phone2num_39_map_file_path)
                     labels_true[i_batch] = phone_true_list
@@ -154,7 +154,7 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
     cer_sum = 0
 
     # Make data generator
-    mini_batch = dataset.next_batch()
+    mini_batch = dataset.next_batch(batch_size=batch_size)
 
     map_file_path = '../metric/mapping_files/ctc/char2num.txt'
     for step in wrap_iterator(range(iteration), is_progressbar):

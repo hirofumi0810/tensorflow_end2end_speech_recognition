@@ -42,5 +42,5 @@ if __name__ == '__main__':
     args = sys.argv
     if len(args) != 2:
         raise ValueError(("Set a path to saved model.\n"
-                          "Usase: python plot_loss.py path_to_saved_model"))
+                          "Usase: python plot_ler.py path_to_saved_model"))
     main(model_path=args[1])

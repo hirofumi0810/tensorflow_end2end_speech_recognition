@@ -105,7 +105,7 @@ class ctcBase(object):
             inputs_seq_len: A tensor of size `[batch_size]`
             keep_prob_input:
             keep_prob_hidden:
-            num_gpu: the number of GPUs
+            num_gpu: int, the number of GPUs
         Returns:
             loss: operation for computing ctc loss
             logits:
@@ -123,15 +123,15 @@ class ctcBase(object):
             tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss"):
-            ctc_loss = tf.nn.ctc_loss(labels,
-                                      logits,
-                                      tf.cast(inputs_seq_len, tf.int32),
-                                      preprocess_collapse_repeated=False,
-                                      ctc_merge_repeated=True,
-                                      ignore_longer_outputs_than_inputs=False,
-                                      time_major=True)
-            ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss_mean')
-            tf.add_to_collection('losses', ctc_loss_mean)
+            ctc_losses = tf.nn.ctc_loss(labels,
+                                        logits,
+                                        tf.cast(inputs_seq_len, tf.int32),
+                                        preprocess_collapse_repeated=False,
+                                        ctc_merge_repeated=True,
+                                        ignore_longer_outputs_than_inputs=False,
+                                        time_major=True)
+            ctc_loss = tf.reduce_mean(ctc_losses, name='ctc_loss_mean')
+            tf.add_to_collection('losses', ctc_loss)
 
         # Compute total loss
         loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
@@ -191,9 +191,6 @@ class ctcBase(object):
                                                clip_grad_by_norm,
                                                global_step)
 
-            # TODO: Optionally add noise to weight matrix when training
-            # どっちが先？
-
         else:
             # Use the optimizer to apply the gradients that minimize the loss
             # and also increment the global step counter as a single training
@@ -204,19 +201,20 @@ class ctcBase(object):
 
     def _gradient_clipping(self, loss, optimizer, clip_grad_by_norm,
                            global_step):
-        print('--- Apply gradient clipping ---')
         # Compute gradients
         trainable_vars = tf.trainable_variables()
         grads = tf.gradients(loss, trainable_vars)
 
+        # TODO: Optionally add gradient noise
+
         if clip_grad_by_norm:
             # Clip by norm
-            self.clipped_grads = [tf.clip_by_norm(
+            clipped_grads = [tf.clip_by_norm(
                 g,
                 clip_norm=self.clip_grad) for g in grads]
         else:
             # Clip by absolute values
-            self.clipped_grads = [tf.clip_by_value(
+            clipped_grads = [tf.clip_by_value(
                 g,
                 clip_value_min=-self.clip_grad,
                 clip_value_max=self.clip_grad) for g in grads]
@@ -226,7 +224,7 @@ class ctcBase(object):
 
         # Create gradient updates
         train_op = optimizer.apply_gradients(
-            zip(self.clipped_grads, trainable_vars),
+            zip(clipped_grads, trainable_vars),
             global_step=global_step,
             name='train')
 

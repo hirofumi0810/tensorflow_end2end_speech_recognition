@@ -46,20 +46,16 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                          batch_size=batch_size,
                          num_stack=num_stack, num_skip=num_skip,
                          is_sorted=True)
+    dev_data = DataSet(data_type='dev', label_type=label_type,
+                       batch_size=batch_size,
+                       num_stack=num_stack, num_skip=num_skip,
+                       is_sorted=False)
     if label_type == 'character':
-        dev_data = DataSet(data_type='dev', label_type='character',
-                           batch_size=batch_size,
-                           num_stack=num_stack, num_skip=num_skip,
-                           is_sorted=False)
         test_data = DataSet(data_type='test', label_type='character',
-                            batch_size=batch_size,
+                            batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False)
     else:
-        dev_data = DataSet(data_type='dev', label_type=label_type,
-                           batch_size=1,
-                           num_stack=num_stack, num_skip=num_skip,
-                           is_sorted=False)
         test_data = DataSet(data_type='test', label_type='phone39',
                             batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,

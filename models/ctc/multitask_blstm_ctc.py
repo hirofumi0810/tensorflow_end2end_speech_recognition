@@ -183,7 +183,7 @@ class Multitask_BLSTM_CTC(ctcBase):
             output_node = self.num_proj * 2
         outputs = tf.reshape(outputs, shape=[-1, output_node])
 
-        if self.bottleneck_dim is not None:
+        if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.name_scope('bottleneck'):
                 # Affine
                 W_bottleneck = tf.Variable(tf.truncated_normal(
@@ -241,46 +241,44 @@ class Multitask_BLSTM_CTC(ctcBase):
             tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss_main"):
-            ctc_loss = tf.nn.ctc_loss(labels_main,
-                                      logits_main,
-                                      tf.cast(inputs_seq_len, tf.int32),
-                                      preprocess_collapse_repeated=False,
-                                      ctc_merge_repeated=True,
-                                      ignore_longer_outputs_than_inputs=True,  # changed
-                                      time_major=True)
-            # TODO: Fix bug
-            ctc_loss_mean = tf.reduce_mean(
-                ctc_loss, name='ctc_loss_main_mean')
+            ctc_losses = tf.nn.ctc_loss(labels_main,
+                                        logits_main,
+                                        tf.cast(inputs_seq_len, tf.int32),
+                                        preprocess_collapse_repeated=False,
+                                        ctc_merge_repeated=True,
+                                        ignore_longer_outputs_than_inputs=False,
+                                        time_major=True)
+            ctc_loss = tf.reduce_mean(
+                ctc_losses, name='ctc_loss_main')
             tf.add_to_collection(
-                'losses', ctc_loss_mean * self.main_task_weight)
+                'losses', ctc_loss * self.main_task_weight)
 
             self.summaries_train.append(
-                tf.summary.scalar('ctc_loss_train_main',
-                                  ctc_loss_mean * self.main_task_weight))
+                tf.summary.scalar('ctc_loss_main_train',
+                                  ctc_loss * self.main_task_weight))
             self.summaries_dev.append(
-                tf.summary.scalar('ctc_loss_dev_main',
-                                  ctc_loss_mean * self.main_task_weight))
+                tf.summary.scalar('ctc_loss_main_dev',
+                                  ctc_loss * self.main_task_weight))
 
         with tf.name_scope("ctc_loss_second"):
-            ctc_loss = tf.nn.ctc_loss(labels_second,
-                                      logits_second,
-                                      tf.cast(inputs_seq_len, tf.int32),
-                                      preprocess_collapse_repeated=False,
-                                      ctc_merge_repeated=True,
-                                      ignore_longer_outputs_than_inputs=True,  # changed
-                                      time_major=True)
-            # TODO: Fix bug
-            ctc_loss_mean = tf.reduce_mean(
-                ctc_loss, name='ctc_loss_second_mean')
+            ctc_losses = tf.nn.ctc_loss(labels_second,
+                                        logits_second,
+                                        tf.cast(inputs_seq_len, tf.int32),
+                                        preprocess_collapse_repeated=False,
+                                        ctc_merge_repeated=True,
+                                        ignore_longer_outputs_than_inputs=False,
+                                        time_major=True)
+            ctc_loss = tf.reduce_mean(
+                ctc_losses, name='ctc_loss_second')
             tf.add_to_collection(
-                'losses', ctc_loss_mean * self.second_task_weight)
+                'losses', ctc_loss * self.second_task_weight)
 
             self.summaries_train.append(
-                tf.summary.scalar('ctc_loss_train_second',
-                                  ctc_loss_mean * self.second_task_weight))
+                tf.summary.scalar('ctc_loss_second_train',
+                                  ctc_loss * self.second_task_weight))
             self.summaries_dev.append(
-                tf.summary.scalar('ctc_loss_dev_second',
-                                  ctc_loss_mean * self.second_task_weight))
+                tf.summary.scalar('ctc_loss_second_dev',
+                                  ctc_loss * self.second_task_weight))
 
         # Compute total loss
         loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
@@ -376,12 +374,12 @@ class Multitask_BLSTM_CTC(ctcBase):
         # Add a scalar summary for the snapshot of LER
         with tf.name_scope("ler"):
             self.summaries_train.append(tf.summary.scalar(
-                'ler_train_main', ler_op_main))
+                'ler_main_train', ler_op_main))
             self.summaries_train.append(tf.summary.scalar(
-                'ler_train_second', ler_op_second))
+                'ler_second_train', ler_op_second))
             self.summaries_dev.append(tf.summary.scalar(
-                'ler_dev_main', ler_op_main))
+                'ler_main_dev', ler_op_main))
             self.summaries_dev.append(tf.summary.scalar(
-                'ler_dev_second', ler_op_second))
+                'ler_second_dev', ler_op_second))
 
         return ler_op_main, ler_op_second

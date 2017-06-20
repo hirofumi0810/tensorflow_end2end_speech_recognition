@@ -122,8 +122,8 @@ class DataSet(object):
             # sorted dataset
             #########################
             if self.is_sorted:
-                if len(self.rest) > self.batch_size:
-                    sorted_indices = list(self.rest)[:self.batch_size]
+                if len(self.rest) > batch_size:
+                    sorted_indices = list(self.rest)[:batch_size]
                     self.rest -= set(sorted_indices)
                 else:
                     sorted_indices = list(self.rest)
@@ -204,10 +204,10 @@ class DataSet(object):
             # not sorted dataset
             #########################
             else:
-                if len(self.rest) > self.batch_size:
+                if len(self.rest) > batch_size:
                     # Randomly sample mini-batch
                     random_indices = random.sample(
-                        list(self.rest), self.batch_size)
+                        list(self.rest), batch_size)
                     self.rest -= set(random_indices)
                 else:
                     random_indices = list(self.rest)

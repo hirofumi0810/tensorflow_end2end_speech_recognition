@@ -43,7 +43,7 @@ class DataSet(object):
             raise ValueError(
                 'data_type is "train" or "dev", "eval1" "eval2" "eval3".')
 
-        self.data_type = data_type * num_gpu
+        self.data_type = data_type
         self.train_data_size = train_data_size
         self.label_type = label_type
         self.batch_size = batch_size * num_gpu
@@ -87,6 +87,11 @@ class DataSet(object):
 
         self.rest = set([i for i in range(self.data_num)])
 
+        if data_type in ['eval1', 'eval2', 'eval3'] and label_type == 'kanji':
+            self.is_test = True
+        else:
+            self.is_test = False
+
     def next_batch(self, batch_size=None, session=None):
         """Make mini-batch.
         Args:
@@ -112,8 +117,8 @@ class DataSet(object):
             # sorted dataset
             #########################
             if self.is_sorted:
-                if len(self.rest) > self.batch_size:
-                    sorted_indices = list(self.rest)[:self.batch_size]
+                if len(self.rest) > batch_size:
+                    sorted_indices = list(self.rest)[:batch_size]
                     self.rest -= set(sorted_indices)
                 else:
                     sorted_indices = list(self.rest)
@@ -184,10 +189,10 @@ class DataSet(object):
             # not sorted dataset
             #########################
             else:
-                if len(self.rest) > self.batch_size:
+                if len(self.rest) > batch_size:
                     # Randomly sample mini-batch
                     random_indices = random.sample(
-                        list(self.rest), self.batch_size)
+                        list(self.rest), batch_size)
                     self.rest -= set(random_indices)
                 else:
                     random_indices = list(self.rest)
@@ -241,14 +246,19 @@ class DataSet(object):
                                   * len(random_indices), dtype=int)
                 inputs_seq_len = np.empty((len(random_indices),), dtype=int)
                 input_names = [None] * len(random_indices)
+                if self.is_test:
+                    labels = [None] * len(random_indices)
 
                 # Set values of each data in mini-batch
                 for i_batch in range(len(random_indices)):
                     data_i = input_list[i_batch]
                     frame_num = data_i.shape[0]
                     inputs[i_batch, : frame_num, :] = data_i
-                    labels[i_batch, :len(label_list[i_batch])
-                           ] = label_list[i_batch]
+                    if not self.is_test:
+                        labels[i_batch, :len(label_list[i_batch])
+                               ] = label_list[i_batch]
+                    else:
+                        labels[i_batch] = label_list[i_batch]
                     inputs_seq_len[i_batch] = frame_num
                     input_names[i_batch] = input_name_list[i_batch]
 

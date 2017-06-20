@@ -55,24 +55,24 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                        batch_size=batch_size,
                        num_stack=num_stack, num_skip=num_skip,
                        is_sorted=False)
-    eval1_data = DataSet(data_type='eval1', label_type_main=label_type_main,
-                         label_type_second=label_type_second,
-                         train_data_size=train_data_size,
-                         batch_size=batch_size,
-                         num_stack=num_stack, num_skip=num_skip,
-                         is_sorted=False)
-    eval2_data = DataSet(data_type='eval2', label_type_main=label_type_main,
-                         label_type_second=label_type_second,
-                         train_data_size=train_data_size,
-                         batch_size=batch_size,
-                         num_stack=num_stack, num_skip=num_skip,
-                         is_sorted=False)
-    eval3_data = DataSet(data_type='eval3', label_type_main=label_type_main,
-                         label_type_second=label_type_second,
-                         train_data_size=train_data_size,
-                         batch_size=batch_size,
-                         num_stack=num_stack, num_skip=num_skip,
-                         is_sorted=False)
+    # eval1_data = DataSet(data_type='eval1', label_type_main=label_type_main,
+    #                      label_type_second=label_type_second,
+    #                      train_data_size=train_data_size,
+    #                      batch_size=batch_size,
+    #                      num_stack=num_stack, num_skip=num_skip,
+    #                      is_sorted=False)
+    # eval2_data = DataSet(data_type='eval2', label_type_main=label_type_main,
+    #                      label_type_second=label_type_second,
+    #                      train_data_size=train_data_size,
+    #                      batch_size=batch_size,
+    #                      num_stack=num_stack, num_skip=num_skip,
+    #                      is_sorted=False)
+    # eval3_data = DataSet(data_type='eval3', label_type_main=label_type_main,
+    #                      label_type_second=label_type_second,
+    #                      train_data_size=train_data_size,
+    #                      batch_size=batch_size,
+    #                      num_stack=num_stack, num_skip=num_skip,
+    #                      is_sorted=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -105,7 +105,9 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             network.inputs,
             network.labels,
             network.labels_second,
-            network.inputs_seq_len)
+            network.inputs_seq_len,
+            network.keep_prob_input,
+            network.keep_prob_hidden)
         train_op = network.train(loss_op,
                                  optimizer=optimizer,
                                  learning_rate_init=float(learning_rate),
@@ -243,162 +245,166 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
 
-                    # if epoch >= 5:
-                    start_time_eval = time.time()
-                    print('=== Dev Evaluation ===')
-                    ler_main_dev_epoch = do_eval_cer(
-                        session=sess,
-                        decode_op=decode_op_main,
-                        network=network,
-                        dataset=dev_data,
-                        label_type=label_type_main,
-                        eval_batch_size=batch_size,
-                        is_multitask=True,
-                        is_main=True)
-                    print('  CER (main): %f %%' % (ler_main_dev_epoch * 100))
-                    if label_type_second == 'character':
-                        ler_second_dev_epoch = do_eval_cer(
+                    if epoch >= 5:
+                        start_time_eval = time.time()
+                        print('=== Dev Evaluation ===')
+                        ler_main_dev_epoch = do_eval_cer(
                             session=sess,
-                            decode_op=decode_op_second,
+                            decode_op=decode_op_main,
                             network=network,
                             dataset=dev_data,
-                            label_type=label_type_second,
-                            eval_batch_size=batch_size,
-                            is_multitask=True,
-                            is_main=False)
-                        print('  CER (second): %f %%' %
-                              (ler_second_dev_epoch * 100))
-                    elif label_type_second == 'phone':
-                        ler_second_dev_epoch = do_eval_per(
-                            session=sess,
-                            per_op=ler_op_second,
-                            network=network,
-                            dataset=dev_data,
-                            eval_batch_size=batch_size,
-                            is_multitask=True)
-                        print('  PER (second): %f %%' %
-                              (ler_second_dev_epoch * 100))
-
-                    if ler_main_dev_epoch < ler_main_dev_best:
-                        ler_main_dev_best = ler_main_dev_epoch
-                        print('■■■ ↑Best Score (CER)↑ ■■■')
-
-                        print('=== eval1 Evaluation ===')
-                        ler_main_eval1 = do_eval_cer(
-                            session=sess,
-                            decode_op=decode_op_main,
-                            network=network,
-                            dataset=eval1_data,
                             label_type=label_type_main,
-                            is_test=True,
                             eval_batch_size=batch_size,
                             is_multitask=True,
                             is_main=True)
-                        print('  CER (main): %f %%' % (ler_main_eval1 * 100))
-                        if label_type_second == 'character':
-                            ler_second_eval1_epoch = do_eval_cer(
-                                session=sess,
-                                decode_op=decode_op_second,
-                                network=network,
-                                dataset=eval1_data,
-                                label_type=label_type_second,
-                                eval_batch_size=batch_size,
-                                is_multitask=True,
-                                is_main=False)
-                            print('  CER (second): %f %%' %
-                                  (ler_second_eval1_epoch * 100))
-                        elif label_type_second == 'phone':
-                            ler_second_eval1_epoch = do_eval_per(
-                                session=sess,
-                                per_op=ler_op_second,
-                                network=network,
-                                dataset=eval1_data,
-                                eval_batch_size=batch_size,
-                                is_multitask=True)
-                            print('  PER (second): %f %%' %
-                                  (ler_second_eval1_epoch * 100))
+                        print('  CER (main): %f %%' %
+                              (ler_main_dev_epoch * 100))
+                        # if label_type_second == 'character':
+                        #     ler_second_dev_epoch = do_eval_cer(
+                        #         session=sess,
+                        #         decode_op=decode_op_second,
+                        #         network=network,
+                        #         dataset=dev_data,
+                        #         label_type=label_type_second,
+                        #         eval_batch_size=batch_size,
+                        #         is_multitask=True,
+                        #         is_main=False)
+                        #     print('  CER (second): %f %%' %
+                        #           (ler_second_dev_epoch * 100))
+                        # elif label_type_second == 'phone':
+                        #     ler_second_dev_epoch = do_eval_per(
+                        #         session=sess,
+                        #         per_op=ler_op_second,
+                        #         network=network,
+                        #         dataset=dev_data,
+                        #         eval_batch_size=batch_size,
+                        #         is_multitask=True)
+                        #     print('  PER (second): %f %%' %
+                        #           (ler_second_dev_epoch * 100))
 
-                        print('=== eval2 Evaluation ===')
-                        ler_main_eval2 = do_eval_cer(
-                            session=sess,
-                            decode_op=decode_op_main,
-                            network=network,
-                            dataset=eval2_data,
-                            label_type=label_type_main,
-                            is_test=-True,
-                            eval_batch_size=batch_size,
-                            is_multitask=True,
-                            is_main=True)
-                        print('  CER (main): %f %%' % (ler_main_eval2 * 100))
-                        if label_type_second == 'character':
-                            ler_second_eval2 = do_eval_cer(
-                                session=sess,
-                                decode_op=decode_op_second,
-                                network=network,
-                                dataset=eval2_data,
-                                label_type=label_type_second,
-                                eval_batch_size=batch_size,
-                                is_multitask=True,
-                                is_main=False)
-                            print('  CER (second): %f %%' %
-                                  (ler_second_eval2 * 100))
-                        elif label_type_second == 'phone':
-                            ler_second_eval2 = do_eval_per(
-                                session=sess,
-                                per_op=ler_op_second,
-                                network=network,
-                                dataset=eval2_data,
-                                eval_batch_size=batch_size,
-                                is_multitask=True)
-                            print('  PER (second): %f %%' %
-                                  (ler_second_eval2 * 100))
+                        if ler_main_dev_epoch < ler_main_dev_best:
+                            ler_main_dev_best = ler_main_dev_epoch
+                            print('■■■ ↑Best Score (CER)↑ ■■■')
 
-                        print('=== eval3 Evaluation ===')
-                        ler_main_eval3 = do_eval_cer(
-                            session=sess,
-                            decode_op=decode_op_main,
-                            network=network,
-                            dataset=eval3_data,
-                            label_type=label_type_main,
-                            is_test=True,
-                            eval_batch_size=batch_size,
-                            is_multitask=True,
-                            is_main=True)
-                        print('  CER (main): %f %%' % (ler_main_eval3 * 100))
-                        if label_type_second == 'character':
-                            ler_second_eval3 = do_eval_cer(
-                                session=sess,
-                                decode_op=decode_op_second,
-                                network=network,
-                                dataset=eval3_data,
-                                label_type=label_type_second,
-                                eval_batch_size=batch_size,
-                                is_multitask=True,
-                                is_main=False)
-                            print('  CER (second): %f %%' %
-                                  (ler_second_eval3 * 100))
-                        elif label_type_second == 'phone':
-                            ler_second_eval3 = do_eval_per(
-                                session=sess,
-                                per_op=ler_op_second,
-                                network=network,
-                                dataset=eval3_data,
-                                eval_batch_size=batch_size,
-                                is_multitask=True)
-                            print('  PER (second): %f %%' %
-                                  (ler_second_eval2 * 100))
+                            # print('=== eval1 Evaluation ===')
+                            # ler_main_eval1 = do_eval_cer(
+                            #     session=sess,
+                            #     decode_op=decode_op_main,
+                            #     network=network,
+                            #     dataset=eval1_data,
+                            #     label_type=label_type_main,
+                            #     is_test=True,
+                            #     eval_batch_size=batch_size,
+                            #     is_multitask=True,
+                            #     is_main=True)
+                            # print('  CER (main): %f %%' %
+                            #       (ler_main_eval1 * 100))
+                            # if label_type_second == 'character':
+                            #     ler_second_eval1_epoch = do_eval_cer(
+                            #         session=sess,
+                            #         decode_op=decode_op_second,
+                            #         network=network,
+                            #         dataset=eval1_data,
+                            #         label_type=label_type_second,
+                            #         eval_batch_size=batch_size,
+                            #         is_multitask=True,
+                            #         is_main=False)
+                            #     print('  CER (second): %f %%' %
+                            #           (ler_second_eval1_epoch * 100))
+                            # elif label_type_second == 'phone':
+                            #     ler_second_eval1_epoch = do_eval_per(
+                            #         session=sess,
+                            #         per_op=ler_op_second,
+                            #         network=network,
+                            #         dataset=eval1_data,
+                            #         eval_batch_size=batch_size,
+                            #         is_multitask=True)
+                            #     print('  PER (second): %f %%' %
+                            #           (ler_second_eval1_epoch * 100))
+                            #
+                            # print('=== eval2 Evaluation ===')
+                            # ler_main_eval2 = do_eval_cer(
+                            #     session=sess,
+                            #     decode_op=decode_op_main,
+                            #     network=network,
+                            #     dataset=eval2_data,
+                            #     label_type=label_type_main,
+                            #     is_test=-True,
+                            #     eval_batch_size=batch_size,
+                            #     is_multitask=True,
+                            #     is_main=True)
+                            # print('  CER (main): %f %%' %
+                            #       (ler_main_eval2 * 100))
+                            # if label_type_second == 'character':
+                            #     ler_second_eval2 = do_eval_cer(
+                            #         session=sess,
+                            #         decode_op=decode_op_second,
+                            #         network=network,
+                            #         dataset=eval2_data,
+                            #         label_type=label_type_second,
+                            #         eval_batch_size=batch_size,
+                            #         is_multitask=True,
+                            #         is_main=False)
+                            #     print('  CER (second): %f %%' %
+                            #           (ler_second_eval2 * 100))
+                            # elif label_type_second == 'phone':
+                            #     ler_second_eval2 = do_eval_per(
+                            #         session=sess,
+                            #         per_op=ler_op_second,
+                            #         network=network,
+                            #         dataset=eval2_data,
+                            #         eval_batch_size=batch_size,
+                            #         is_multitask=True)
+                            #     print('  PER (second): %f %%' %
+                            #           (ler_second_eval2 * 100))
+                            #
+                            # print('=== eval3 Evaluation ===')
+                            # ler_main_eval3 = do_eval_cer(
+                            #     session=sess,
+                            #     decode_op=decode_op_main,
+                            #     network=network,
+                            #     dataset=eval3_data,
+                            #     label_type=label_type_main,
+                            #     is_test=True,
+                            #     eval_batch_size=batch_size,
+                            #     is_multitask=True,
+                            #     is_main=True)
+                            # print('  CER (main): %f %%' %
+                            #       (ler_main_eval3 * 100))
+                            # if label_type_second == 'character':
+                            #     ler_second_eval3 = do_eval_cer(
+                            #         session=sess,
+                            #         decode_op=decode_op_second,
+                            #         network=network,
+                            #         dataset=eval3_data,
+                            #         label_type=label_type_second,
+                            #         eval_batch_size=batch_size,
+                            #         is_multitask=True,
+                            #         is_main=False)
+                            #     print('  CER (second): %f %%' %
+                            #           (ler_second_eval3 * 100))
+                            # elif label_type_second == 'phone':
+                            #     ler_second_eval3 = do_eval_per(
+                            #         session=sess,
+                            #         per_op=ler_op_second,
+                            #         network=network,
+                            #         dataset=eval3_data,
+                            #         eval_batch_size=batch_size,
+                            #         is_multitask=True)
+                            #     print('  PER (second): %f %%' %
+                            #           (ler_second_eval2 * 100))
+                            #
+                            # ler_main_mean = (
+                            #     ler_main_eval1 + ler_main_eval2 + ler_main_eval3) / 3.
+                            # print('=== eval Mean ===')
+                            # print('  CER: %f %%' % (ler_main_mean * 100))
 
-                        ler_main_mean = (ler_main_eval1 + ler_main_eval2 +
-                                         ler_main_eval3) / 3.
-                        print('=== eval Mean ===')
-                        print('  CER: %f %%' % (ler_main_mean * 100))
+                        duration_eval = time.time() - start_time_eval
+                        print('Evaluation time: %.3f min' %
+                              (duration_eval / 60))
 
-                    duration_eval = time.time() - start_time_eval
-                    print('Evaluation time: %.3f min' %
-                          (duration_eval / 60))
-
-                    start_time_epoch = time.time()
-                    start_time_step = time.time()
+                        start_time_epoch = time.time()
+                        start_time_step = time.time()
 
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))

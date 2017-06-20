@@ -54,11 +54,17 @@ def do_eval(network, label_type, num_stack, num_skip, epoch=None):
     network.inputs_seq_len = tf.placeholder(tf.int64,
                                             shape=[None],
                                             name='inputs_seq_len')
+    network.keep_prob_input = tf.placeholder(tf.float32,
+                                             name='keep_prob_input')
+    network.keep_prob_hidden = tf.placeholder(tf.float32,
+                                              name='keep_prob_hidden')
 
     # Add to the graph each operation (including model definition)
     _, logits = network.compute_loss(network.inputs,
                                      network.labels,
-                                     network.inputs_seq_len)
+                                     network.inputs_seq_len,
+                                     network.keep_prob_input,
+                                     network.keep_prob_hidden)
     decode_op = network.decoder(logits,
                                 network.inputs_seq_len,
                                 decode_type='beam_search',
@@ -132,6 +138,7 @@ def main(model_path):
         num_unit=param['num_unit'],
         num_layer=param['num_layer'],
         output_size=output_size,
+        parameter_init=param['weight_init'],
         clip_grad=param['clip_grad'],
         clip_activation=param['clip_activation'],
         dropout_ratio_input=param['dropout_input'],
@@ -154,5 +161,5 @@ if __name__ == '__main__':
     if len(args) != 2:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python restore_ctc.py path_to_saved_model"))
+             "Usase: python eval_ctc.py path_to_saved_model"))
     main(model_path=args[1])

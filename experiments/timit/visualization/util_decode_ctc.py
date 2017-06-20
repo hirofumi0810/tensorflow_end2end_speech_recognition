@@ -30,7 +30,7 @@ def decode_test(session, decode_op, network, dataset, label_type,
     iteration = dataset.data_num
 
     # Make data generator
-    mini_batch = dataset.next_batch()
+    mini_batch = dataset.next_batch(batch_size=1)
 
     if label_type == 'character':
         map_file_path = '../metric/mapping_files/ctc/char2num.txt'
@@ -65,7 +65,6 @@ def decode_test(session, decode_op, network, dataset, label_type,
                 labels_pred[0], map_file_path))
 
         else:
-            # Decode (mapped to 39 phones)
             print('----- wav: %s -----' % input_names[0])
             print('True: %s' % num2phone(
                 labels_true[0], map_file_path))
@@ -90,7 +89,7 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
     iteration = dataset.data_num
 
     # Make data generator
-    mini_batch = dataset.next_batch()
+    mini_batch = dataset.next_batch(batch_size=1)
 
     if save_path is not None:
         sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
@@ -114,7 +113,6 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
         labels_true = sparsetensor2list(labels_true_st, batch_size=1)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
 
-        # Decode
         print('----- wav: %s -----' % input_names[0])
         print('True: %s' % num2char(
             labels_true[0], map_file_path))
@@ -141,7 +139,6 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
         labels_true = sparsetensor2list(labels_true_st, batch_size=1)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
 
-        # Decode (mapped to 39 phones)
         print('----- wav: %s -----' % input_names[0])
         print('True: %s' % num2phone(
             labels_true[0], map_file_path))

@@ -145,6 +145,7 @@ def main(model_path):
         output_size_main=30,
         output_size_second=output_size_second,
         main_task_weight=param['main_task_weight'],
+        parameter_init=param['weight_init'],
         clip_grad=param['clip_grad'],
         clip_activation=param['clip_activation'],
         dropout_ratio_input=param['dropout_input'],
@@ -167,5 +168,5 @@ if __name__ == '__main__':
     if len(args) != 2:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python restore_ctc.py path_to_saved_model"))
+             "Usase: python eval_multitask_ctc.py path_to_saved_model"))
     main(model_path=args[1])

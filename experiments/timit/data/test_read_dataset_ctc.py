@@ -71,7 +71,7 @@ class TestReadDatasetCTC(unittest.TestCase):
                 labels = sparsetensor2list(
                     labels_st, batch_size=len(inputs))
 
-                if num_gpu < 1:
+                if num_gpu == 1:
                     for inputs_i, labels_i in zip(inputs, labels):
                         if len(inputs_i) < len(labels_i):
                             print(len(inputs_i))

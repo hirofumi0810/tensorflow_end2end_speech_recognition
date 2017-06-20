@@ -30,7 +30,7 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
         epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = DataSet(data_type='test', label_type_second='phone61',
+    test_data = DataSet(data_type='test', label_type_second=label_type_second,
                         batch_size=1,
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False, is_progressbar=True)
@@ -154,5 +154,5 @@ if __name__ == '__main__':
     if len(args) != 2:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python restore_ctc.py path_to_saved_model"))
+             "Usase: python decode_multitask_ctc.py path_to_saved_model"))
     main(model_path=args[1])

@@ -30,16 +30,10 @@ def do_plot(network, label_type, num_stack, num_skip, epoch=None):
         epoch: epoch to restore
     """
     # Load dataset
-    if label_type == 'character':
-        test_data = DataSet(data_type='test', label_type='character',
-                            batch_size=1,
-                            num_stack=num_stack, num_skip=num_skip,
-                            is_sorted=False, is_progressbar=True)
-    else:
-        test_data = DataSet(data_type='test', label_type='phone61',
-                            batch_size=1,
-                            num_stack=num_stack, num_skip=num_skip,
-                            is_sorted=False, is_progressbar=True)
+    test_data = DataSet(data_type='test', label_type=label_type,
+                        batch_size=1,
+                        num_stack=num_stack, num_skip=num_skip,
+                        is_sorted=False, is_progressbar=True)
 
     # Define placeholders
     network.inputs = tf.placeholder(
@@ -142,5 +136,5 @@ if __name__ == '__main__':
     if len(args) != 2:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python restore_ctc.py path_to_saved_model"))
+             "Usase: python plot_ctc_posterior.py path_to_saved_model"))
     main(model_path=args[1])

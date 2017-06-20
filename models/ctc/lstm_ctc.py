@@ -117,7 +117,7 @@ class LSTM_CTC(ctcBase):
         # `[batch_size, max_time, input_size_splice]`
         batch_size = tf.shape(inputs)[0]
 
-        if self.bottleneck_dim is not None:
+        if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.name_scope('bottleneck'):
                 # Affine
                 W_bottleneck = tf.Variable(tf.truncated_normal(

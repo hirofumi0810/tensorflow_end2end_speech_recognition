@@ -16,6 +16,7 @@ from ctc.multitask_blstm_ctc import Multitask_BLSTM_CTC
 from util import measure_time
 from data import generate_data, num2alpha, num2phone
 from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.parameter import count_total_parameters
 
 
 class TestCTC(tf.test.TestCase):
@@ -102,6 +103,16 @@ class TestCTC(tf.test.TestCase):
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
+
+            # Count total parameters
+            parameters_dict, total_parameters = count_total_parameters(
+                tf.trainable_variables())
+            for parameter_name in sorted(parameters_dict.keys()):
+                print("%s %d" %
+                      (parameter_name, parameters_dict[parameter_name]))
+            print("Total %d variables, %s M parameters" %
+                  (len(parameters_dict.keys()),
+                   "{:,}".format(total_parameters / 1000000)))
 
             # Make feed dict
             feed_dict = {

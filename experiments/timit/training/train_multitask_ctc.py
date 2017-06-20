@@ -156,7 +156,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_char_st, labels_phone_st, inputs_seq_len, _ = mini_batch_train.__next__()
+                inputs, labels_char_st, labels_phone_st, inputs_seq_len, input_names = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
                     network.labels: labels_char_st,
