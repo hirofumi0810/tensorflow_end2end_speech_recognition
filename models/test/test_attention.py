@@ -7,7 +7,6 @@ from __future__ import print_function
 
 import sys
 import time
-import unittest
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
@@ -17,6 +16,7 @@ from attention.blstm_attention_seq2seq import BLSTMAttetion
 from util import measure_time
 from data import generate_data, num2alpha, num2phone
 from experiments.utils.sparsetensor import list2sparsetensor
+from experiments.utils.parameter import count_total_parameters
 
 
 class TestAttention(tf.test.TestCase):
@@ -24,7 +24,7 @@ class TestAttention(tf.test.TestCase):
     @measure_time
     def test_attention(self):
         print("Attention Working check.")
-        self.check_training(model_type='attention', label_type='phone')
+        # self.check_training(model_type='attention', label_type='phone')
         self.check_training(model_type='attention', label_type='character')
 
     def check_training(self, model_type, label_type):
@@ -38,11 +38,43 @@ class TestAttention(tf.test.TestCase):
                 model='attention',
                 batch_size=batch_size)
 
-            # Define model
-            if label_type == 'character':
-                output_size = 26 + 2
-            else:
-                output_size = 61 + 2
+            # Define placeholders
+            inputs_pl = tf.placeholder(tf.float32,
+                                       shape=[batch_size, None,
+                                              inputs.shape[-1]],
+                                       name='input')
+
+            # `[batch_size, max_time]`
+            labels_pl = tf.placeholder(tf.int32,
+                                       shape=[None, None],
+                                       name='label')
+
+            # These are prepared for computing LER
+            indices_true_pl = tf.placeholder(tf.int64, name='indices')
+            values_true_pl = tf.placeholder(tf.int32, name='values')
+            shape_true_pl = tf.placeholder(tf.int64, name='shape')
+            labels_st_true_pl = tf.SparseTensor(indices_true_pl,
+                                                values_true_pl,
+                                                shape_true_pl)
+            indices_pred_pl = tf.placeholder(tf.int64, name='indices')
+            values_pred_pl = tf.placeholder(tf.int32, name='values')
+            shape_pred_pl = tf.placeholder(tf.int64, name='shape')
+            labels_st_pred_pl = tf.SparseTensor(indices_pred_pl,
+                                                values_pred_pl,
+                                                shape_pred_pl)
+            inputs_seq_len_pl = tf.placeholder(tf.int32,
+                                               shape=[None],
+                                               name='inputs_seq_len')
+            labels_seq_len_pl = tf.placeholder(tf.int32,
+                                               shape=[None],
+                                               name='labels_seq_len')
+            keep_prob_input_pl = tf.placeholder(tf.float32,
+                                                name='keep_prob_input')
+            keep_prob_hidden_pl = tf.placeholder(tf.float32,
+                                                 name='keep_prob_hidden')
+
+            # Define model graph
+            output_size = 26 + 2 if label_type == 'character' else 61 + 2
             # model = load(model_type=model_type)
             network = BLSTMAttetion(
                 batch_size=batch_size,
@@ -52,39 +84,68 @@ class TestAttention(tf.test.TestCase):
                 attention_dim=128,
                 decoder_num_unit=256,
                 decoder_num_layer=1,
-                embedding_dim=50,
+                embedding_dim=20,
                 output_size=output_size,
                 sos_index=output_size - 2,
                 eos_index=output_size - 1,
                 max_decode_length=50,
-                attention_weights_tempareture=0.5,
-                logits_tempareture=4,
+                attention_weights_tempareture=1,
+                logits_tempareture=1,
                 parameter_init=0.1,
                 clip_grad=5.0,
                 clip_activation_encoder=50,
                 clip_activation_decoder=50,
                 dropout_ratio_input=1.0,
                 dropout_ratio_hidden=1.0,
-                weight_decay=1e-6,
-                beam_width=0)
-
-            network.define()
-            # NOTE: define model under tf.Graph()
+                weight_decay=0,
+                beam_width=0,
+                time_major=False)
 
             # Add to the graph each operation
-            loss_op = network.compute_loss()
+            loss_op, logits, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
+                inputs_pl,
+                labels_pl,
+                inputs_seq_len_pl,
+                labels_seq_len_pl,
+                keep_prob_input_pl,
+                keep_prob_hidden_pl)
             learning_rate = 1e-3
-            train_op = network.train(optimizer='adam',
+            train_op = network.train(loss_op,
+                                     optimizer='rmsprop',
                                      learning_rate_init=learning_rate,
                                      is_scheduled=False)
-
             decode_op_train, decode_op_infer = network.decoder(
+                decoder_outputs_train,
+                decoder_outputs_infer,
                 decode_type='greedy',
-                beam_width=20)
-            ler_op = network.compute_ler()
+                beam_width=1)
+            ler_op = network.compute_ler(labels_st_true_pl,
+                                         labels_st_pred_pl)
+            attention_weights = decoder_outputs_infer.attention_scores
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
+
+            # Count total parameters
+            parameters_dict, total_parameters = count_total_parameters(
+                tf.trainable_variables())
+            for parameter_name in sorted(parameters_dict.keys()):
+                print("%s %d" %
+                      (parameter_name, parameters_dict[parameter_name]))
+            print("Total %d variables, %s M parameters" %
+                  (len(parameters_dict.keys()),
+                   "{:,}".format(total_parameters / 1000000)))
+
+            # Make feed dict
+            feed_dict = {
+                inputs_pl: inputs,
+                labels_pl: labels,
+                inputs_seq_len_pl: inputs_seq_len,
+                labels_seq_len_pl: labels_seq_len,
+                keep_prob_input_pl: network.dropout_ratio_input,
+                keep_prob_hidden_pl: network.dropout_ratio_hidden,
+                network.lr: learning_rate
+            }
 
             with tf.Session() as sess:
 
@@ -102,20 +163,9 @@ class TestAttention(tf.test.TestCase):
                 not_improved_count = 0
                 for step in range(max_steps):
 
-                    feed_dict = {
-                        network.inputs: inputs,
-                        network.labels: labels,
-                        network.inputs_seq_len: inputs_seq_len,
-                        network.labels_seq_len: labels_seq_len,
-                        network.keep_prob_input: network.dropout_ratio_input,
-                        network.keep_prob_hidden: network.dropout_ratio_hidden,
-                        network.learning_rate: learning_rate
-                    }
-
                     # Compute loss
                     _, loss_train = sess.run(
-                        [train_op, loss_op],
-                        feed_dict=feed_dict)
+                        [train_op, loss_op], feed_dict=feed_dict)
 
                     # Gradient check
                     # grads = sess.run(network.clipped_grads,
@@ -124,30 +174,20 @@ class TestAttention(tf.test.TestCase):
                     #     print(np.max(grad))
 
                     if (step + 1) % 10 == 0:
-                        # Change feed dict for evaluation
-                        feed_dict[network.keep_prob_input] = 1.0
-                        feed_dict[network.keep_prob_hidden] = 1.0
+                        # Change to evaluation mode
+                        feed_dict[keep_prob_input_pl] = 1.0
+                        feed_dict[keep_prob_hidden_pl] = 1.0
 
-                        # Predict ids
+                        # Predict class ids
                         predicted_ids_train, predicted_ids_infer = sess.run(
                             [decode_op_train, decode_op_infer],
                             feed_dict=feed_dict)
 
-                        # Convert to sparsetensor to compute LER
-                        indices, values, shape = list2sparsetensor(labels)
-                        indices_infer, values_infer, shape_infer = list2sparsetensor(
-                            predicted_ids_infer)
-
-                        feed_dict_ler = {
-                            network.label_indices_true: indices,
-                            network.label_values_true:  values,
-                            network.label_shape_true: shape,
-                            network.label_indices_pred: indices_infer,
-                            network.label_values_pred:  values_infer,
-                            network.label_shape_pred: shape_infer
-                        }
-
                         # Compute accuracy
+                        feed_dict_ler = {
+                            labels_st_true_pl: list2sparsetensor(labels),
+                            labels_st_pred_pl: list2sparsetensor(predicted_ids_infer)
+                        }
                         ler_train = sess.run(ler_op, feed_dict=feed_dict_ler)
 
                         duration_step = time.time() - start_time_step
@@ -175,7 +215,7 @@ class TestAttention(tf.test.TestCase):
                             not_improved_count += 1
                         else:
                             not_improved_count = 0
-                        if not_improved_count >= 3:
+                        if not_improved_count >= 5:
                             print('Model is Converged.')
                             break
                         ler_train_pre = ler_train

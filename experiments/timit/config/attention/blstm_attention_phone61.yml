@@ -1,0 +1,29 @@
+model_name: blstm_attention_seq2seq
+corpus:
+    name: timit
+    label_type: phone61
+feature:
+    name: fbank
+    input_size: 123
+    splice: 0
+param:
+    encoder_num_unit: 256
+    encoder_num_layer: 4
+    attention_dim: 128
+    decoder_num_unit: 256
+    decoder_num_layer: 1
+    embedding_dim: 30
+    max_decode_length: 50
+    attention_weights_tempareture: 1
+    logits_tempareture: 1
+    batch_size: 64
+    optimizer: rmsprop
+    learning_rate: 0.001
+    num_epoch: 50
+    weight_init: 0.1
+    clip_grad: 5.0
+    clip_activation_encoder: 50
+    clip_activation_decoder: 50
+    dropout_input: 1.0
+    dropout_hidden: 0.8
+    weight_decay: 1e-6

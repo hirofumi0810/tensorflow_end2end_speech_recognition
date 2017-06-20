@@ -9,14 +9,14 @@ from __future__ import print_function
 
 import re
 import Levenshtein
-from tqdm import tqdm
 
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone, phone2num
 from .mapping import map_to_39phone
 from .edit_distance import compute_edit_distance
+from utils.labels.character import num2char
+from utils.labels.phone import num2phone, phone2num
 from utils.sparsetensor import list2sparsetensor
 from utils.exception_func import exception
+from utils.progressbar import wrap_iterator
 
 
 @exception
@@ -36,17 +36,12 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     Returns:
         per_global: An average of PER
     """
-    if label_type not in ['phone39', 'phone48', 'phone61']:
-        raise ValueError(
-            'data_type is "phone39" or "phone48" or "phone61".')
-
     if eval_batch_size is not None:
         batch_size = eval_batch_size
     else:
         batch_size = dataset.batch_size
 
-    # Change to training mode
-    # network.is_training = True
+    data_label_type = dataset.label_type
 
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
@@ -54,30 +49,28 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         iteration += 1
     per_global = 0
 
+    # Make data generator
+    mini_batch = dataset.next_batch(batch_size=batch_size)
+
     phone2num_map_file_path = '../metric/mapping_files/attention/phone2num_' + \
         label_type[5:7] + '.txt'
     phone2num_39_map_file_path = '../metric/mapping_files/attention/phone2num_39.txt'
     phone2phone_map_file_path = '../metric/mapping_files/phone2phone.txt'
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-    for step in iterator:
+    for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, inputs_seq_len, labels_seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            inputs, labels_true, inputs_seq_len, _, _ = mini_batch.__next__()
         else:
-            inputs, _, labels_true, inputs_seq_len, labels_seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            inputs, _, labels_true, inputs_seq_len, _, _ = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,
-            network.labels: labels_true,
             network.inputs_seq_len: inputs_seq_len,
-            network.labels_seq_len: labels_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
 
-        batch_size_each = len(labels_true)
+        batch_size_each = len(inputs_seq_len)
 
         if False:
             # Evaluate by 61 phones
@@ -87,24 +80,28 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         else:
             # Evaluate by 39 phones
             predicted_ids = session.run(decode_op, feed_dict=feed_dict)
+            predicted_ids_39 = []
             for i_batch in range(batch_size_each):
-                # Convert num to phone (list of phone strings)
+                # Convert from num to phone (-> list of phone strings)
                 phone_pred_seq = num2phone(
                     predicted_ids[i_batch], phone2num_map_file_path)
                 phone_pred_list = phone_pred_seq.split(' ')
 
-                # Mapping to 39 phones (list of phone strings)
+                # Mapping to 39 phones (-> list of phone strings)
                 phone_pred_list = map_to_39phone(
                     phone_pred_list, label_type, phone2phone_map_file_path)
 
-                # Convert phone to num (list of phone indices)
+                # Convert from phone to num (-> list of phone indices)
                 phone_pred_list = phone2num(
                     phone_pred_list, phone2num_39_map_file_path)
-                predicted_ids[i_batch] = phone_pred_list
+                predicted_ids_39.append(phone_pred_list)
+
+                if data_label_type != 'phone39':
+                    pass
 
             # Compute edit distance
             labels_true_st = list2sparsetensor(labels_true)
-            labels_pred_st = list2sparsetensor(predicted_ids)
+            labels_pred_st = list2sparsetensor(predicted_ids_39)
             per_local = compute_edit_distance(
                 session, labels_true_st, labels_pred_st)
             per_global += per_local * batch_size_each
@@ -134,8 +131,8 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
     else:
         batch_size = dataset.batch_size
 
-    # Change to training mode
-    # network.is_training = True
+    # Make data generator
+    mini_batch = dataset.next_batch(batch_size=batch_size)
 
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
@@ -144,26 +141,22 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
     cer_sum = 0
 
     map_file_path = '../metric/mapping_files/attention/char2num.txt'
-    iterator = tqdm(range(iteration)) if is_progressbar else range(iteration)
-    for step in iterator:
+    for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, inputs_seq_len, labels_seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            inputs, labels_true, inputs_seq_len, _, _ = mini_batch.__next__()
         else:
-            inputs, labels_true, _, inputs_seq_len, labels_seq_len, _ = dataset.next_batch(
-                batch_size=batch_size)
+            inputs, labels_true, _, inputs_seq_len, _, _ = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,
-            network.labels: labels_true,
             network.inputs_seq_len: inputs_seq_len,
-            network.labels_seq_len: labels_seq_len,
             network.keep_prob_input: 1.0,
             network.keep_prob_hidden: 1.0
         }
 
-        batch_size_each = len(labels_true)
+        batch_size_each = len(inputs_seq_len)
+
         predicted_ids = session.run(decode_op, feed_dict=feed_dict)
         for i_batch in range(batch_size_each):
 

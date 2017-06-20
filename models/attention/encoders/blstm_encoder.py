@@ -61,7 +61,7 @@ class BLSTMEncoder(EncoderBase):
 
         # Hidden layers
         for i_layer in range(self.num_layer):
-            with tf.name_scope('BiLSTM_encoder_hidden' + str(i_layer + 1)):
+            with tf.name_scope('blstm_encoder_hidden' + str(i_layer + 1)):
 
                 initializer = tf.random_uniform_initializer(
                     minval=-self.parameter_init,
@@ -106,7 +106,7 @@ class BLSTMEncoder(EncoderBase):
                     inputs=outputs,
                     sequence_length=inputs_seq_len,
                     dtype=tf.float32,
-                    scope='BiLSTM_' + str(i_layer + 1))
+                    scope='blstm_dynamic' + str(i_layer + 1))
 
                 # Concatenate each direction
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])

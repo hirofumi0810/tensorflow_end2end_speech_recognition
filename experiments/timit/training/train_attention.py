@@ -44,34 +44,73 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
     """
     # Load dataset
     train_data = DataSet(data_type='train', label_type=label_type,
+                         batch_size=batch_size,
                          eos_index=eos_index, is_sorted=True)
+    dev_data = DataSet(data_type='dev', label_type=label_type,
+                       batch_size=batch_size,
+                       eos_index=eos_index, is_sorted=False)
     if label_type == 'character':
-        dev_data = DataSet(data_type='dev', label_type='character',
-                           eos_index=eos_index, is_sorted=False)
         test_data = DataSet(data_type='test', label_type='character',
+                            batch_size=batch_size,
                             eos_index=eos_index, is_sorted=False)
     else:
-        dev_data = DataSet(data_type='dev', label_type='phone39',
-                           eos_index=eos_index, is_sorted=False)
         test_data = DataSet(data_type='test', label_type='phone39',
+                            batch_size=batch_size,
                             eos_index=eos_index, is_sorted=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
 
-        # Define model
-        network.define()
-        # NOTE: define model under tf.Graph()
+        # Define placeholders
+        network.inputs = tf.placeholder(tf.float32,
+                                        shape=[None, None, network.input_size],
+                                        name='input')
+        network.labels = tf.placeholder(tf.int32,
+                                        shape=[None, None],
+                                        name='label')
+        # These are prepared for computing LER
+        indices_true_pl = tf.placeholder(tf.int64, name='indices_pred')
+        values_true_pl = tf.placeholder(tf.int32, name='values_pred')
+        shape_true_pl = tf.placeholder(tf.int64, name='shape_pred')
+        network.labels_st_true = tf.SparseTensor(indices_true_pl,
+                                                 values_true_pl,
+                                                 shape_true_pl)
+        indices_pred_pl = tf.placeholder(tf.int64, name='indices_pred')
+        values_pred_pl = tf.placeholder(tf.int32, name='values_pred')
+        shape_pred_pl = tf.placeholder(tf.int64, name='shape_pred')
+        network.labels_st_pred = tf.SparseTensor(indices_pred_pl,
+                                                 values_pred_pl,
+                                                 shape_pred_pl)
+        network.inputs_seq_len = tf.placeholder(tf.int32,
+                                                shape=[None],
+                                                name='inputs_seq_len')
+        network.labels_seq_len = tf.placeholder(tf.int32,
+                                                shape=[None],
+                                                name='labels_seq_len')
+        network.keep_prob_input = tf.placeholder(tf.float32,
+                                                 name='keep_prob_input')
+        network.keep_prob_hidden = tf.placeholder(tf.float32,
+                                                  name='keep_prob_hidden')
 
-        # Add to the graph each operation
-        loss_op = network.compute_loss()
-        train_op = network.train(optimizer=optimizer,
-                                 learning_rate_init=learning_rate,
+        # Add to the graph each operation (including model definition)
+        loss_op, logits, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
+            network.inputs,
+            network.labels,
+            network.inputs_seq_len,
+            network.labels_seq_len,
+            network.keep_prob_input,
+            network.keep_prob_hidden)
+        train_op = network.train(loss_op,
+                                 optimizer=optimizer,
+                                 learning_rate_init=float(learning_rate),
                                  is_scheduled=False)
         decode_op_train, decode_op_infer = network.decoder(
+            decoder_outputs_train,
+            decoder_outputs_infer,
             decode_type='greedy',
             beam_width=20)
-        ler_op = network.compute_ler()
+        ler_op = network.compute_ler(network.labels_st_true,
+                                     network.labels_st_pred)
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -92,6 +131,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         print("Total %d variables, %s M parameters" %
               (len(parameters_dict.keys()),
                "{:,}".format(total_parameters / 1000000)))
+
+        # Make mini-batch generator
+        mini_batch_train = train_data.next_batch()
+        mini_batch_dev = dev_data.next_batch()
 
         csv_steps, csv_loss_train, csv_loss_dev = [], [], []
         csv_ler_train, csv_ler_dev = [], []
@@ -118,8 +161,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_train, inputs_seq_len, labels_seq_len, _ = train_data.next_batch(
-                    batch_size=batch_size)
+                inputs, labels_train, inputs_seq_len, labels_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
                     network.labels: labels_train,
@@ -127,12 +169,11 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     network.labels_seq_len: labels_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.learning_rate: learning_rate
+                    network.lr: learning_rate
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels_dev, inputs_seq_len, labels_seq_len, _ = dev_data.next_batch(
-                    batch_size=batch_size)
+                inputs, labels_dev, inputs_seq_len, labels_seq_len, _ = mini_batch_dev.__next__()
                 feed_dict_dev = {
                     network.inputs: inputs,
                     network.labels: labels_dev,
@@ -143,9 +184,10 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                 }
 
                 # Update parameters
-                _ = sess.run(train_op, feed_dict=feed_dict_train)
+                sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % 10 == 0:
+
                     # Compute loss
                     loss_train = sess.run(loss_op, feed_dict=feed_dict_train)
                     loss_dev = sess.run(loss_op, feed_dict=feed_dict_dev)
@@ -153,59 +195,44 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     csv_loss_train.append(loss_train)
                     csv_loss_dev.append(loss_dev)
 
-                    # Change feed dict for evaluation
+                    # Change to evaluation mode
                     feed_dict_train[network.keep_prob_input] = 1.0
                     feed_dict_train[network.keep_prob_hidden] = 1.0
                     feed_dict_dev[network.keep_prob_input] = 1.0
                     feed_dict_dev[network.keep_prob_hidden] = 1.0
 
-                    # Predict ids
-                    predicted_ids_train = sess.run(
-                        [decode_op_infer], feed_dict=feed_dict_train)
-                    predicted_ids_dev = sess.run(
-                        [decode_op_infer], feed_dict=feed_dict_dev)
+                    # Predict class ids &  update event file
+                    predicted_ids_train, summary_str_train = sess.run(
+                        [decode_op_infer, summary_train],
+                        feed_dict=feed_dict_train)
+                    predicted_ids_dev, summary_str_dev = sess.run(
+                        [decode_op_infer, summary_dev],
+                        feed_dict=feed_dict_dev)
+                    summary_writer.add_summary(summary_str_train, step + 1)
+                    summary_writer.add_summary(summary_str_dev, step + 1)
+                    summary_writer.flush()
 
                     # Convert to sparsetensor to compute LER
-                    indices_true, values_true, shape_true = list2sparsetensor(
-                        labels_train)
-                    indices_pred, values_pred, shape_pred = list2sparsetensor(
-                        predicted_ids_train)
                     feed_dict_ler_train = {
-                        network.label_indices_true: indices_true,
-                        network.label_values_true:  values_true,
-                        network.label_shape_true: shape_true,
-                        network.label_indices_pred: indices_pred,
-                        network.label_values_pred:  values_pred,
-                        network.label_shape_pred: shape_pred
+                        network.labels_st_true: list2sparsetensor(labels_train),
+                        network.labels_st_pred: list2sparsetensor(predicted_ids_train)
                     }
-
-                    indices_true, values_true, shape_true = list2sparsetensor(
-                        labels_dev)
-                    indices_pred, values_pred, shape_pred = list2sparsetensor(
-                        predicted_ids_dev)
                     feed_dict_ler_dev = {
-                        network.label_indices_true: indices_true,
-                        network.label_values_true:  values_true,
-                        network.label_shape_true: shape_true,
-                        network.label_indices_pred: indices_pred,
-                        network.label_values_pred:  values_pred,
-                        network.label_shape_pred: shape_pred
+                        network.labels_st_true: list2sparsetensor(labels_dev),
+                        network.labels_st_pred: list2sparsetensor(predicted_ids_dev)
                     }
 
-                    # Compute accuracy & update event file
-                    # ler_train, summary_str_train = sess.run(
-                    #     [ler_op, summary_train], feed_dict=feed_dict_ler_train)
-                    # ler_dev, summary_str_dev = sess.run(
-                    #     [ler_op, summary_dev], feed_dict=feed_dict_ler_dev)
-                    # csv_ler_train.append(ler_train)
-                    # csv_ler_dev.append(ler_dev)
-                    # summary_writer.add_summary(summary_str_train, step + 1)
-                    # summary_writer.add_summary(summary_str_dev, step + 1)
-                    # summary_writer.flush()
+                    # Compute accuracy
+                    ler_train = sess.run(
+                        ler_op, feed_dict=feed_dict_ler_train)
+                    ler_dev = sess.run(
+                        ler_op, feed_dict=feed_dict_ler_dev)
+                    csv_ler_train.append(ler_train)
+                    csv_ler_dev.append(ler_dev)
 
                     duration_step = time.time() - start_time_step
                     print("Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) (%.3f min)" %
-                          (step + 1, loss_train, loss_dev, 1, 1,
+                          (step + 1, loss_train, loss_dev, ler_train, ler_dev,
                            duration_step / 60))
                     sys.stdout.flush()
                     start_time_step = time.time()
@@ -223,65 +250,65 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
 
-                #     if epoch >= 10:
-                #         start_time_eval = time.time()
-                #         if label_type == 'character':
-                #             print('=== Dev Data Evaluation ===')
-                #             error_dev_epoch = do_eval_cer(
-                #                 session=sess,
-                #                 decode_op=decode_op,
-                #                 network=network,
-                #                 dataset=dev_data,
-                #                 eval_batch_size=1)
-                #             print('  CER: %f %%' % (error_dev_epoch * 100))
-                #
-                #             if error_dev_epoch < error_best:
-                #                 error_best = error_dev_epoch
-                #                 print('■■■ ↑Best Score (CER)↑ ■■■')
-                #
-                #                 print('=== Test Data Evaluation ===')
-                #                 error_test_epoch = do_eval_cer(
-                #                     session=sess,
-                #                     decode_op=decode_op,
-                #                     network=network,
-                #                     dataset=test_data,
-                #                     eval_batch_size=1)
-                #                 print('  CER: %f %%' %
-                #                       (error_test_epoch * 100))
-                #
-                #         else:
-                #             print('=== Dev Data Evaluation ===')
-                #             error_dev_epoch = do_eval_per(
-                #                 session=sess,
-                #                 decode_op=decode_op,
-                #                 per_op=ler_op,
-                #                 network=network,
-                #                 dataset=dev_data,
-                #                 label_type=label_type,
-                #                 eval_batch_size=1)
-                #             print('  PER: %f %%' % (error_dev_epoch * 100))
-                #
-                #             if error_dev_epoch < error_best:
-                #                 error_best = error_dev_epoch
-                #                 print('■■■ ↑Best Score (PER)↑ ■■■')
-                #
-                #                 print('=== Test Data Evaluation ===')
-                #                 error_test_epoch = do_eval_per(
-                #                     session=sess,
-                #                     decode_op=decode_op,
-                #                     per_op=ler_op,
-                #                     network=network,
-                #                     dataset=test_data,
-                #                     label_type=label_type,
-                #                     eval_batch_size=1)
-                #                 print('  PER: %f %%' % (error_dev_epoch * 100))
-                #
-                #         duration_eval = time.time() - start_time_eval
-                #         print('Evaluation time: %.3f min' %
-                #               (duration_eval / 60))
-                #
-                # start_time_epoch = time.time()
-                # start_time_step = time.time()
+                    if epoch >= 10:
+                        start_time_eval = time.time()
+                        if label_type == 'character':
+                            print('=== Dev Data Evaluation ===')
+                            error_dev_epoch = do_eval_cer(
+                                session=sess,
+                                decode_op=decode_op_infer,
+                                network=network,
+                                dataset=dev_data,
+                                eval_batch_size=1)
+                            print('  CER: %f %%' % (error_dev_epoch * 100))
+
+                            if error_dev_epoch < error_best:
+                                error_best = error_dev_epoch
+                                print('■■■ ↑Best Score (CER)↑ ■■■')
+
+                                print('=== Test Data Evaluation ===')
+                                error_test_epoch = do_eval_cer(
+                                    session=sess,
+                                    decode_op=decode_op_infer,
+                                    network=network,
+                                    dataset=test_data,
+                                    eval_batch_size=1)
+                                print('  CER: %f %%' %
+                                      (error_test_epoch * 100))
+
+                        else:
+                            print('=== Dev Data Evaluation ===')
+                            error_dev_epoch = do_eval_per(
+                                session=sess,
+                                decode_op=decode_op_infer,
+                                per_op=ler_op,
+                                network=network,
+                                dataset=dev_data,
+                                label_type=label_type,
+                                eval_batch_size=1)
+                            print('  PER: %f %%' % (error_dev_epoch * 100))
+
+                            if error_dev_epoch < error_best:
+                                error_best = error_dev_epoch
+                                print('■■■ ↑Best Score (PER)↑ ■■■')
+
+                                print('=== Test Data Evaluation ===')
+                                error_test_epoch = do_eval_per(
+                                    session=sess,
+                                    decode_op=decode_op_infer,
+                                    per_op=ler_op,
+                                    network=network,
+                                    dataset=test_data,
+                                    label_type=label_type,
+                                    eval_batch_size=1)
+                                print('  PER: %f %%' % (error_dev_epoch * 100))
+
+                        duration_eval = time.time() - start_time_eval
+                        print('Evaluation time: %.3f min' %
+                              (duration_eval / 60))
+
+                start_time_epoch = time.time()
+                start_time_step = time.time()
 
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))

@@ -7,9 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import namedtuple, OrderedDict
 import tensorflow as tf
-# from .decoders.decoder_util import transpose_batch_time, flatten_dict
 # from .decoders.beam_search_decoder_from_seq2seq import BeamSearchDecoder
 
 
@@ -38,7 +36,6 @@ class AttentionBase(object):
         embedding_dim:
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
-        logits_tempareture:
         clip_grad: A float value. Range of gradient clipping (> 0)
         weight_decay: A float value. Regularization parameter for weight decay
         beam_width: if 0, use greedy decoding
@@ -52,7 +49,6 @@ class AttentionBase(object):
                  output_size,
                  sos_index,
                  eos_index,
-                 logits_tempareture,
                  clip_grad,
                  weight_decay,
                  beam_width,
@@ -67,12 +63,11 @@ class AttentionBase(object):
 
         # Regularization
         self.clip_grad = clip_grad
-        self.weight_decay = weight_decay
+        self.weight_decay = float(weight_decay)
 
         # Setting for seq2seq
         self.sos_index = sos_index
         self.eos_index = eos_index
-        self.logits_tempareture = logits_tempareture
         self.beam_width = beam_width
 
         # Summaries for TensorBoard
@@ -80,59 +75,6 @@ class AttentionBase(object):
         self.summaries_dev = []
 
         self.name = name
-
-    def __call__(self, inputs, labels, labels_seq_len):
-        """Creates the model graph. See the model_fn documentation in
-           tf.contrib.learn.Estimator class for a more detailed explanation."""
-        with tf.variable_scope("model"):
-            with tf.variable_scope(self.name):
-                return self._build(inputs, labels, labels_seq_len)
-
-    def _generate_placeholer(self):
-        """Generate placeholders."""
-        # `[batch_size, max_time, input_size]`
-        self.inputs = tf.placeholder(tf.float32,
-                                     shape=[None, None, self.input_size],
-                                     name='input')
-
-        # `[batch_size, max_time]`
-        self.labels = tf.placeholder(tf.int32,
-                                     shape=[None, None],
-                                     name='label')
-
-        # These are prepared for computing LER
-        self.label_indices_true = tf.placeholder(tf.int64, name='indices')
-        self.label_values_true = tf.placeholder(tf.int32, name='values')
-        self.label_shape_true = tf.placeholder(tf.int64, name='shape')
-        self.labels_sparse_true = tf.SparseTensor(self.label_indices_true,
-                                                  self.label_values_true,
-                                                  self.label_shape_true)
-        self.label_indices_pred = tf.placeholder(tf.int64, name='indices')
-        self.label_values_pred = tf.placeholder(tf.int32, name='values')
-        self.label_shape_pred = tf.placeholder(tf.int64, name='shape')
-        self.labels_sparse_pred = tf.SparseTensor(self.label_indices_pred,
-                                                  self.label_values_pred,
-                                                  self.label_shape_pred)
-
-        # The length of input features
-        self.inputs_seq_len = tf.placeholder(tf.int32,
-                                             shape=[None],  # `[batch_size]`
-                                             name='inputs_seq_len')
-        # NOTE: change to tf.int64 if you use the bidirectional model
-
-        # The length of target labels
-        self.labels_seq_len = tf.placeholder(tf.int32,
-                                             shape=[None],  # `[batch_size]`
-                                             name='labels_seq_len')
-
-        # For dropout
-        self.keep_prob_input = tf.placeholder(tf.float32,
-                                              name='keep_prob_input')
-        self.keep_prob_hidden = tf.placeholder(tf.float32,
-                                               name='keep_prob_hidden')
-
-        # Learning rate
-        self.learning_rate = tf.placeholder(tf.float32, name='learning_rate')
 
     def _generate_target_embedding(self, reuse):
         """Returns the embedding used for the target sequence."""
@@ -144,18 +86,6 @@ class AttentionBase(object):
                     -self.parameter_init,
                     self.parameter_init))
         # TODO: Consider shape of target_embedding
-
-    def _encode(self):
-        """Encode input features."""
-        NotImplementedError
-
-    def _create_decoder(self):
-        """Create attention decoder."""
-        NotImplementedError
-
-    def define(self):
-        """Define model graph."""
-        NotImplementedError
 
     def choose_top_k(scores_flat, config):
         """Chooses the top-k beams as successors.
@@ -241,6 +171,7 @@ class AttentionBase(object):
             initial_state=decoder_initial_state,
             helper=helper_train,
             mode=tf.contrib.learn.ModeKeys.TRAIN)
+        # NOTE: They are time-major if self.time_major is True
 
         return (decoder_outputs, final_state)
 
@@ -249,10 +180,16 @@ class AttentionBase(object):
         Args:
             decoder: An instance of the decoder class
             bridge:
+            encoder_outputs: A namedtuple of
+                outputs
+                final_state
+                attention_values
+                attention_values_length
         Returns:
             decoder_outputs: A tuple of `(AttentionDecoderOutput, final_state)`
         """
-        batch_size = tf.shape(self.inputs)[0]
+        batch_size = tf.shape(encoder_outputs.outputs)[0]
+
         # if self.use_beam_search:
         #     batch_size = self.beam_width
         # TODO: why?
@@ -278,52 +215,81 @@ class AttentionBase(object):
             initial_state=decoder_initial_state,
             helper=helper_infer,
             mode=tf.contrib.learn.ModeKeys.INFER)
+        # NOTE: They are time-major if self.time_major is True
 
         return (decoder_outputs, final_state)
 
-    def compute_loss(self):
+    def compute_loss(self, inputs, labels, inputs_seq_len, labels_seq_len,
+                     keep_prob_input, keep_prob_hidden, num_gpu=1, scope=None):
         """Operation for computing cross entropy sequence loss.
+        Args:
+            inputs: A tensor of `[batch_size, time, input_size]`
+            labels: A tensor of `[batch_size, time]`
+            inputs_seq_len: A tensor of `[batch_size]`
+            labels_seq_len: A tensor of `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
+            num_gpu: int, the number of GPUs
         Returns:
             loss: operation for computing cross entropy sequence loss.
                   This is a single scalar tensor to minimize.
+            logits:
+            decoder_outputs_train:
+            decoder_outputs_infer:
         """
-        # Calculate loss per example
-        logits = self.decoder_outputs_train.logits / self.logits_tempareture
-        # NOTE: This is done for better decoding.
-        # See details in ??
+        # Build model graph
+        logits, decoder_outputs_train, decoder_outputs_infer = self._build(
+            inputs, labels, inputs_seq_len, labels_seq_len,
+            keep_prob_input, keep_prob_hidden)
 
-        max_time = tf.shape(self.labels[:, 1:])[1]
-        loss_mask = tf.sequence_mask(tf.to_int32(self.labels_seq_len - 1),
-                                     maxlen=max_time,
-                                     dtype=tf.float32)
-        losses = tf.contrib.seq2seq.sequence_loss(
-            logits=logits,
-            targets=self.labels[:, 1:],
-            weights=loss_mask,
-            average_across_timesteps=True,
-            average_across_batch=False,
-            softmax_loss_function=None)
+        # Weight decay
+        with tf.name_scope("weight_decay_loss"):
+            weight_sum = 0
+            for var in tf.trainable_variables():
+                if 'bias' not in var.name.lower():
+                    weight_sum += tf.nn.l2_loss(var)
+            tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
-        # Calculate the average log perplexity
-        # self.loss = tf.reduce_sum(losses) / tf.to_float(
-        #     tf.reduce_sum(self.labels_seq_len - 1))
-        self.loss = tf.reduce_sum(losses)
+        with tf.name_scope("sequence_loss"):
+            max_time = tf.shape(labels[:, 1:])[1]
+            loss_mask = tf.sequence_mask(tf.to_int32(labels_seq_len - 1),
+                                         maxlen=max_time,
+                                         dtype=tf.float32)
+            sequence_losses = tf.contrib.seq2seq.sequence_loss(
+                logits=logits,
+                targets=labels[:, 1:],
+                weights=loss_mask,
+                average_across_timesteps=True,
+                average_across_batch=False,
+                softmax_loss_function=None)
 
-        # Add a scalar summary for the snapshot of loss
-        self.summaries_train.append(
-            tf.summary.scalar('loss_train', self.loss))
-        self.summaries_dev.append(
-            tf.summary.scalar('loss_dev', self.loss))
+            # Calculate the average log perplexity
+            # self.loss = tf.reduce_sum(losses) / tf.to_float(
+            #     tf.reduce_sum(self.labels_seq_len - 1))
+            sequence_loss = tf.reduce_sum(sequence_losses,
+                                          name='sequence_loss_mean')
+            tf.add_to_collection('losses', sequence_loss)
 
-        return self.loss
+        # Compute total loss
+        loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
-    def train(self, optimizer, learning_rate_init=None,
-              clip_gradients_by_norm=None, is_scheduled=False):
+        if num_gpu == 1:
+            # Add a scalar summary for the snapshot of loss
+            self.summaries_train.append(
+                tf.summary.scalar('loss_train', loss))
+            self.summaries_dev.append(
+                tf.summary.scalar('loss_dev', loss))
+
+        return loss, logits, decoder_outputs_train, decoder_outputs_infer
+
+    def train(self, loss, optimizer, learning_rate_init=None,
+              clip_grad_by_norm=None, is_scheduled=False):
         """Operation for training.
         Args:
+            loss: An operation for computing loss
             optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
             learning_rate_init: initial learning rate
-            clip_gradients_by_norm: if True, clip gradients by norm of the
+            clip_grad_by_norm: if True, clip gradients by norm of the
                 value of self.clip_grad
             is_scheduled: if True, schedule learning rate at each epoch
         Returns:
@@ -337,19 +303,19 @@ class AttentionBase(object):
         if learning_rate_init < 0.0:
             raise ValueError("Invalid learning_rate %s.", learning_rate_init)
 
-        # Select parameter update method
+        self.lr = tf.placeholder(tf.float32, name='learning_rate')
+
+        # Select optimizer
         if is_scheduled:
-            learning_rate = self.learning_rate
-        else:
-            learning_rate = learning_rate_init
+            learning_rate_init = self.lr
 
         if optimizer == 'momentum':
-            self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate,
+            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
+                learning_rate=learning_rate_init,
                 momentum=0.9)
         else:
-            self.optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate)
+            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
+                learning_rate=learning_rate_init)
 
         # TODO: Optionally wrap with SyncReplicasOptimizer
         # TODO: create_learning_rate_decay_fn
@@ -357,37 +323,53 @@ class AttentionBase(object):
         # Create a variable to track the global step
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        # Gradient clipping
         if self.clip_grad is not None:
-            # Compute gradients
-            trainable_vars = tf.trainable_variables()
-            grads = tf.gradients(self.loss, trainable_vars)
-            # TODO: Optionally add gradient noise
+            # Gradient clipping
+            train_op = self._gradient_clipping(loss,
+                                               optimizer,
+                                               clip_grad_by_norm,
+                                               global_step)
+        else:
+            # Use the optimizer to apply the gradients that minimize the loss
+            # and also increment the global step counter as a single training
+            # step
+            train_op = optimizer.minimize(loss, global_step=global_step)
 
-            if clip_gradients_by_norm:
-                # Clip by norm
-                self.clipped_grads = [tf.clip_by_norm(
-                    g,
-                    clip_norm=self.clip_grad) for g in grads if g is not None]
-            else:
-                # Clip by absolute values
-                self.clipped_grads = [tf.clip_by_value(
-                    g,
-                    clip_value_min=-self.clip_grad,
-                    clip_value_max=self.clip_grad) for g in grads if g is not None]
+        return train_op
 
-            # TODO: Add histograms for variables, gradients (norms)
-            # TODO: なんでNoneが発生した？
+    def _gradient_clipping(self, loss, optimizer, clip_grad_by_norm,
+                           global_step):
+        # Compute gradients
+        trainable_vars = tf.trainable_variables()
+        grads = tf.gradients(loss, trainable_vars)
 
-            # Create gradient updates
-            train_op = self.optimizer.apply_gradients(
-                zip(self.clipped_grads, trainable_vars),
-                global_step=global_step,
-                name='train')
+        # TODO: Optionally add gradient noise
 
-        # Use the optimizer to apply the gradients that minimize the loss
-        # and also increment the global step counter as a single training step
-        train_op = self.optimizer.minimize(self.loss, global_step=global_step)
+        if clip_grad_by_norm:
+            # Clip by norm
+            clipped_grads = [tf.clip_by_norm(
+                g,
+                clip_norm=self.clip_grad) for g in grads]
+        else:
+            # Clip by absolute values
+            # clipped_grads = [tf.clip_by_value(
+            #     g,
+            #     clip_value_min=-self.clip_grad,
+            #     clip_value_max=self.clip_grad) for g in grads]
+            clipped_grads = [tf.clip_by_value(
+                g,
+                clip_value_min=-self.clip_grad,
+                clip_value_max=self.clip_grad) for g in grads if g is not None]
+            # TODO: Why None occured?
+
+        # TODO: Add histograms for variables, gradients (norms)
+        # self._tensorboard_statistics(trainable_vars)
+
+        # Create gradient updates
+        train_op = optimizer.apply_gradients(
+            zip(clipped_grads, trainable_vars),
+            global_step=global_step,
+            name='train')
 
         return train_op
 
@@ -395,9 +377,12 @@ class AttentionBase(object):
         """Adds scaled noise from a 0-mean normal distribution to gradients."""
         raise NotImplementedError
 
-    def decoder(self, decode_type, beam_width=None):
+    def decoder(self, decoder_outputs_train, decoder_outputs_infer,
+                decode_type, beam_width=None):
         """Operation for decoding.
         Args:
+            decoder_outputs_train:
+            decoder_outputs_infer:
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
         Return:
@@ -408,35 +393,36 @@ class AttentionBase(object):
             raise ValueError('decode_type is "greedy" or "beam_search".')
 
         if decode_type == 'greedy':
-            decoded_train = self.decoder_outputs_train.predicted_ids
-            decoded_infer = self.decoder_outputs_infer.predicted_ids
+            decoded_train = decoder_outputs_train.predicted_ids
+            decoded_infer = decoder_outputs_infer.predicted_ids
 
         elif decode_type == 'beam_search':
             if beam_width is None:
                 raise ValueError('Set beam_width.')
-            NotImplementedError
+            raise NotImplementedError
 
         return decoded_train, decoded_infer
 
-    def compute_ler(self):
+    def compute_ler(self, labels_true, labels_pred):
         """Operation for computing LER (Label Error Rate).
-        Return:
+        Args:
+            labels_true: A SparseTensor
+            labels_pred: A SparseTensor
+        Returns:
             ler_op: operation for computing LER
         """
         # Compute LER (normalize by label length)
         ler_op = tf.reduce_mean(tf.edit_distance(
-            self.labels_sparse_pred, self.labels_sparse_true, normalize=True))
+            labels_pred, labels_true, normalize=True))
         # TODO: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
         # TODO: パディングを考慮して計算する
 
         # Add a scalar summary for the snapshot of LER
-        with tf.name_scope("ler"):
-            self.summaries_train.append(tf.summary.scalar(
-                'ler_train', ler_op))
-            self.summaries_dev.append(tf.summary.scalar(
-                'ler_dev', ler_op))
+        # with tf.name_scope("ler"):
+        #     self.summaries_train.append(tf.summary.scalar(
+        #         'ler_train', ler_op))
+        #     self.summaries_dev.append(tf.summary.scalar(
+        #         'ler_dev', ler_op))
+        # TODO: feed_dictのタイミング違うからエラーになる
 
         return ler_op
-
-    def attention_weights(self):
-        return self.decoder_outputs_infer.attention_scores

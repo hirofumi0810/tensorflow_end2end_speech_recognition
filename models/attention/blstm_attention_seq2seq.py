@@ -12,6 +12,8 @@ from .encoders.load_encoder import load as load_encoder
 from .decoders.load_decoder import load as load_decoder
 from .decoders.attention_layer import AttentionLayer
 from .decoders.attention_decoder import AttentionDecoder
+from .decoders.attention_decoder import AttentionDecoderOutput
+from .decoders.dynamic_decoder import _transpose_batch_time as time2batch
 from .bridge import InitialStateBridge
 
 
@@ -44,7 +46,8 @@ class BLSTMAttetion(AttentionBase):
             layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
             layers
-        weight_decay:
+        weight_decay: A float value. Regularization parameter for weight decay
+        time-major:
     """
 
     def __init__(self,
@@ -70,12 +73,12 @@ class BLSTMAttetion(AttentionBase):
                  dropout_ratio_hidden=1.0,
                  weight_decay=0.0,
                  beam_width=0,
+                 time_major=True,
                  name='blstm_attention_seq2seq'):
 
         AttentionBase.__init__(self, batch_size, input_size,
                                attention_dim, embedding_dim,
                                output_size, sos_index, eos_index,
-                               logits_tempareture,
                                clip_grad, weight_decay, beam_width, name)
 
         # Network size
@@ -98,22 +101,28 @@ class BLSTMAttetion(AttentionBase):
         # Setting for se2seq
         self.max_decode_length = max_decode_length
         self.attention_weights_tempareture = attention_weights_tempareture
+        self.logits_tempareture = logits_tempareture
         # NOTE: attention_weights_tempareture is good for narrow focus.
-        # Assume that β = 1 / attention_weights_tempareture, β=2 is recommended.
+        # Assume that β = 1 / attention_weights_tempareture, β=2 is
+        # recommended
+        self.time_major = time_major
 
-    def _encode(self, inputs, inputs_seq_len):
+    def _encode(self, inputs, inputs_seq_len,
+                keep_prob_input, keep_prob_hidden):
         """Encode input features.
         Args:
-            inputs:
-            inputs_seq_len:
+            inputs: A tensor of `[batch_size, time, input_size]`
+            inputs_seq_len: A tensor of `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
         Returns:
             encoder_outputs: A namedtaple of
             `(outputs final_state attention_values attention_values_length)`
         """
         # Define encoder
         encoder = load_encoder(model_type='blstm_encoder')(
-            keep_prob_input=self.keep_prob_input,
-            keep_prob_hidden=self.keep_prob_hidden,
+            keep_prob_input=keep_prob_input,
+            keep_prob_hidden=keep_prob_hidden,
             num_unit=self.encoder_num_unit,
             num_layer=self.encoder_num_layer,
             parameter_init=self.parameter_init,
@@ -129,7 +138,7 @@ class BLSTMAttetion(AttentionBase):
         """Create attention decoder.
         Args:
             encoder_outputs: A tuple of `()`
-            labels: Target labels of sise `[]`
+            labels: Target labels of size `[batch_size, time]`
         Returns:
             decoder: The decoder class instance
         """
@@ -154,22 +163,31 @@ class BLSTMAttetion(AttentionBase):
             attention_encoder_states=encoder_outputs.outputs,
             attention_values=encoder_outputs.attention_values,
             attention_values_length=encoder_outputs.attention_values_length,
-            attention_layer=self.attention_layer)
+            attention_layer=self.attention_layer,
+            time_major=self.time_major)
 
         return decoder
 
-    def define(self):
-        """Define model graph."""
-
-        # Generate placeholders
-        self._generate_placeholer()
-
+    def _build(self, inputs, labels, inputs_seq_len, labels_seq_len,
+               keep_prob_input, keep_prob_hidden):
+        """Define model graph.
+        Args:
+            inputs: A tensor of `[batch_size, time, input_size]`
+            labels: A tensor of `[batch_size, time]`
+            inputs_seq_len: A tensor of `[batch_size]`
+            labels_seq_len: A tensor of `[batch_size]`
+            keep_prob_input:
+            keep_prob_hidden:
+        Returns:
+            logits:
+        """
         # Encode input features
-        encoder_outputs = self._encode(self.inputs, self.inputs_seq_len)
+        encoder_outputs = self._encode(
+            inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden)
 
         # Define decoder (initialization)
-        decoder_train = self._create_decoder(encoder_outputs, self.labels)
-        decoder_infer = self._create_decoder(encoder_outputs, self.labels)
+        decoder_train = self._create_decoder(encoder_outputs, labels)
+        decoder_infer = self._create_decoder(encoder_outputs, labels)
         # NOTE: initial_state and helper will be substituted in
         # self._decode_train() or self._decode_infer()
 
@@ -186,15 +204,57 @@ class BLSTMAttetion(AttentionBase):
 
         # Call decoder (divide into training and inference)
         # Training
-        self.decoder_outputs_train, _ = self._decode_train(
+        decoder_outputs_train, _ = self._decode_train(
             decoder=decoder_train,
             bridge=bridge,
             encoder_outputs=encoder_outputs,
-            labels=self.labels,
-            labels_seq_len=self.labels_seq_len)
+            labels=labels,
+            labels_seq_len=labels_seq_len)
 
         # Inference
-        self.decoder_outputs_infer, _ = self._decode_infer(
+        decoder_outputs_infer, _ = self._decode_infer(
             decoder=decoder_infer,
             bridge=bridge,
             encoder_outputs=encoder_outputs)
+        # NOTE: decoder_outputs are time-major
+
+        # Transpose to batch-major
+        if self.time_major:
+            logits = time2batch(decoder_outputs_train.logits)
+            predicted_ids = time2batch(decoder_outputs_train.predicted_ids)
+            cell_output = time2batch(decoder_outputs_train.cell_output)
+            attention_scores = time2batch(
+                decoder_outputs_train.attention_scores)
+            attention_context = time2batch(
+                decoder_outputs_train.attention_context)
+            decoder_outputs_train = AttentionDecoderOutput(
+                logits=logits,
+                predicted_ids=predicted_ids,
+                cell_output=cell_output,
+                attention_scores=attention_scores,
+                attention_context=attention_context)
+
+            logits = time2batch(decoder_outputs_infer.logits)
+            predicted_ids = time2batch(decoder_outputs_infer.predicted_ids)
+            cell_output = time2batch(decoder_outputs_infer.cell_output)
+            attention_scores = time2batch(
+                decoder_outputs_infer.attention_scores)
+            attention_context = time2batch(
+                decoder_outputs_infer.attention_context)
+            decoder_outputs_infer = AttentionDecoderOutput(
+                logits=logits,
+                predicted_ids=predicted_ids,
+                cell_output=cell_output,
+                attention_scores=attention_scores,
+                attention_context=attention_context)
+
+        # Calculate loss per example
+        logits = decoder_outputs_train.logits / self.logits_tempareture
+        # NOTE: This is for better decoding.
+        # See details in
+        # https://arxiv.org/abs/1612.02695.
+        # Chorowski, Jan, and Navdeep Jaitly.
+        # "Towards better decoding and language model integration in sequence
+        # to sequence models." arXiv preprint arXiv:1612.02695 (2016).
+
+        return logits, decoder_outputs_train, decoder_outputs_infer

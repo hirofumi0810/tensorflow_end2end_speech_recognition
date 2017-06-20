@@ -62,13 +62,13 @@ class GRUEncoder(EncoderBase):
         # Hidden layers
         gru_list = []
         for i_layer in range(self.num_layer):
-            with tf.name_scope('GRU_encoder_hidden' + str(i_layer + 1)):
+            with tf.name_scope('gru_encoder_hidden' + str(i_layer + 1)):
 
                 initializer = tf.random_uniform_initializer(
                     minval=-self.parameter_init,
                     maxval=self.parameter_init)
 
-                with tf.variable_scope('GRU', initializer=initializer):
+                with tf.variable_scope('gru', initializer=initializer):
                     gru = tf.contrib.rnn.GRUCell(self.num_unit)
 
                 # Dropout (output)

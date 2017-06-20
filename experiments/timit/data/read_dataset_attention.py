@@ -25,7 +25,7 @@ class DataSet(object):
                  is_sorted=True, is_progressbar=False, num_gpu=1):
         """
         Args:
-            data_type: train or dev or test
+            data_type: string, train or dev or test
             label_type: string, phone39 or phone48 or phone61 or character
             eos_index: int , the index of <EOS> class
             is_sorted: if True, sort dataset by frame num
@@ -127,8 +127,8 @@ class DataSet(object):
                 # Initialization
                 inputs = np.zeros(
                     (len(sorted_indices), max_frame_num, self.input_size))
-                # Padding with <EOS>
-                labels = np.array([[self.eos_index] * max_seq_len]
+                # Padding with -1
+                labels = np.array([[-1] * max_seq_len]
                                   * len(sorted_indices), dtype=int)
                 inputs_seq_len = np.zeros((len(sorted_indices),), dtype=int)
                 labels_seq_len = np.zeros((len(sorted_indices),), dtype=int)
@@ -176,8 +176,8 @@ class DataSet(object):
                 # Initialization
                 inputs = np.zeros(
                     (len(random_indices), max_frame_num, self.input_size))
-                # Padding with <EOS>
-                labels = np.array([[self.eos_index] * max_seq_len]
+                # Padding with -1
+                labels = np.array([[-1] * max_seq_len]
                                   * len(random_indices), dtype=int)
                 inputs_seq_len = np.zeros((len(random_indices),), dtype=int)
                 labels_seq_len = np.zeros((len(random_indices),), dtype=int)

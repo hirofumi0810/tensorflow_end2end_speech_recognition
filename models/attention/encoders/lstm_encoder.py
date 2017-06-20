@@ -61,7 +61,7 @@ class LSTMEncoder(EncoderBase):
         # Hidden layers
         lstm_list = []
         for i_layer in range(self.num_layer):
-            with tf.name_scope('LSTM_encoder_hidden' + str(i_layer + 1)):
+            with tf.name_scope('lstm_encoder_hidden' + str(i_layer + 1)):
 
                 initializer = tf.random_uniform_initializer(
                     minval=-self.parameter_init,

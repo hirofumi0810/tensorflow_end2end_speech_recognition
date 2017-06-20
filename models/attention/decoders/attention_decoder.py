@@ -52,6 +52,7 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         attention_layer: The attention function to use. This function map from
             `(state, inputs)` to `(attention_weights, attention_context)`.
             For an example, see `decoders.attention_layer.AttentionLayer`.
+        time-major:
     """
 
     def __init__(self,
@@ -63,6 +64,7 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
                  attention_values,
                  attention_values_length,
                  attention_layer,
+                 time_major,
                  name='attention_decoder'):
         # param
         self.cell = cell
@@ -74,6 +76,7 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         self.attention_values = attention_values
         self.attention_values_length = attention_values_length
         self.attention_layer = attention_layer  # AttentionLayer class
+        self.time_major = time_major
         self.name = name
 
         # Not initialized yet
@@ -116,6 +119,8 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
             mode:
         Returns:
             A tuple of `(outputs, final_state)`
+                outputs: A tensor of `[time, batch_size, ??]`
+                final_state: A tensor of `[time, batch_size, ??]`
             attention_weights_list: list of attention weights in each time
         """
         self.mode = mode
@@ -138,14 +143,10 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
             maximum_iterations = self.max_decode_length
 
         # outputs, final_state = tf.contrib.seq2seq.dynamic_decode(
-        #     decoder=self,
-        #     output_time_major=False,  # changed
-        #     impute_finished=True,  # changed
-        #     maximum_iterations=maximum_iterations)
         outputs, final_state = dynamic_decode(
             decoder=self,
-            output_time_major=False,  # changed
-            impute_finished=True,  # changed
+            output_time_major=self.time_major,
+            impute_finished=True,
             maximum_iterations=maximum_iterations)
         return self.finalize(outputs, final_state)
 
