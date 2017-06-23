@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Train CTC network (TIMIT corpus)."""
+"""Train the CTC model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -26,7 +26,7 @@ from utils.parameter import count_total_parameters
 from utils.csv import save_loss, save_ler
 
 
-def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
+def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
              label_type, num_stack, num_skip):
     """Run training. If target labels are phone, the model is evaluated by PER
     with 39 phones.
@@ -36,7 +36,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             ex.) adam, rmsprop
         learning_rate: A float value, the initial learning rate
         batch_size: int, the size of mini-batch
-        epoch_num: int, the number of epochs to train
+        num_epoch: int, the number of epochs to train
         label_type: string, phone39 or phone48 or phone61 or character
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
@@ -138,7 +138,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             train_step = train_data.data_num / batch_size
             if train_step != int(train_step):
                 iter_per_epoch += 1
-            max_steps = iter_per_epoch * epoch_num
+            max_steps = iter_per_epoch * num_epoch
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
@@ -296,14 +296,15 @@ def main(config_path):
         feature = config['feature']
         param = config['param']
 
+    # Except for a blank class
     if corpus['label_type'] == 'phone61':
-        output_size = 61
+        num_classes = 61
     elif corpus['label_type'] == 'phone48':
-        output_size = 48
+        num_classes = 48
     elif corpus['label_type'] == 'phone39':
-        output_size = 39
+        num_classes = 39
     elif corpus['label_type'] == 'character':
-        output_size = 30
+        num_classes = 30
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -311,7 +312,7 @@ def main(config_path):
                        input_size=feature['input_size'] * feature['num_stack'],
                        num_unit=param['num_unit'],
                        num_layer=param['num_layer'],
-                       output_size=output_size,
+                       num_classes=num_classes,
                        parameter_init=param['weight_init'],
                        clip_grad=param['clip_grad'],
                        clip_activation=param['clip_activation'],
@@ -357,7 +358,7 @@ def main(config_path):
              optimizer=param['optimizer'],
              learning_rate=param['learning_rate'],
              batch_size=param['batch_size'],
-             epoch_num=param['num_epoch'],
+             num_epoch=param['num_epoch'],
              label_type=corpus['label_type'],
              num_stack=feature['num_stack'],
              num_skip=feature['num_skip'])

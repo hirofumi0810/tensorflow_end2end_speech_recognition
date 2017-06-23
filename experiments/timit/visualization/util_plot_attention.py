@@ -26,7 +26,7 @@ green = '#006400'
 
 
 def attention_test(session, decode_op, attention_weights_op, network, dataset,
-                   label_type, save_path=None):
+                   label_type, save_path=None, show=False):
     """Visualize attention weights of Attetnion-based model.
     Args:
         session: session of training model
@@ -36,6 +36,7 @@ def attention_test(session, decode_op, attention_weights_op, network, dataset,
         dataset: An instance of a `Dataset` class
         label_type: string, phone39 or phone48 or phone61 or character
         save_path: path to save attention weights plotting
+        show: if True, show each figure
     """
     # Batch size is expected to be 1
     iteration = dataset.data_num
@@ -93,7 +94,8 @@ def attention_test(session, decode_op, attention_weights_op, network, dataset,
 
         plt.xlabel('Input frames', fontsize=12)
         plt.ylabel('Output labels (top to bottom)', fontsize=12)
-        plt.show()
+        if show:
+            plt.show()
 
         # Save as a png file
         if save_path is not None:

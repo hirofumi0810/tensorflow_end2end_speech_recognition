@@ -54,8 +54,6 @@ class DatasetBase(object):
         self.data_num = None
 
         # 3. Load all dataset in advance
-        self.input_list = None
-        self.label_list = None
         self.rest = set([i for i in range(self.data_num)])
 
         def next_batch(self, batch_size=None, session=None):

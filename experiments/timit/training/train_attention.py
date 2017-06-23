@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Train Attention-based model (TIMIT corpus)."""
+"""Train the Attention model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -28,7 +28,7 @@ from utils.parameter import count_total_parameters
 from utils.csv import save_loss, save_ler
 
 
-def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
+def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
              label_type, eos_index):
     """Run training. If target labels are phone, the model is evaluated by PER
     with 39 phones.
@@ -38,7 +38,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             ex.) adam, rmsprop
         learning_rate: initial learning rate
         batch_size: int, the size of mini-batch
-        epoch_num: int, the number of epochs to train
+        num_epoch: int, the number of epochs to train
         label_type: string, phone39 or phone48 or phone61 or character
         eos_index: int, the index of <EOS> class. This is used for padding.
     """
@@ -64,21 +64,21 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         # Define placeholders
         network.inputs = tf.placeholder(tf.float32,
                                         shape=[None, None, network.input_size],
-                                        name='input')
+                                        name='inputs')
         network.labels = tf.placeholder(tf.int32,
                                         shape=[None, None],
-                                        name='label')
+                                        name='labels')
         # These are prepared for computing LER
-        indices_true_pl = tf.placeholder(tf.int64, name='indices_pred')
-        values_true_pl = tf.placeholder(tf.int32, name='values_pred')
-        shape_true_pl = tf.placeholder(tf.int64, name='shape_pred')
-        network.labels_st_true = tf.SparseTensor(indices_true_pl,
+        indices_true_pl = tf.placeholder(tf.int64, name='indices_true')
+        values_true_pl = tf.placeholder(tf.int32, name='values_true')
+        shape_true_pl = tf.placeholder(tf.int64, name='shape_true')
+        network.labels_true_st = tf.SparseTensor(indices_true_pl,
                                                  values_true_pl,
                                                  shape_true_pl)
         indices_pred_pl = tf.placeholder(tf.int64, name='indices_pred')
         values_pred_pl = tf.placeholder(tf.int32, name='values_pred')
         shape_pred_pl = tf.placeholder(tf.int64, name='shape_pred')
-        network.labels_st_pred = tf.SparseTensor(indices_pred_pl,
+        network.labels_pred_st = tf.SparseTensor(indices_pred_pl,
                                                  values_pred_pl,
                                                  shape_pred_pl)
         network.inputs_seq_len = tf.placeholder(tf.int32,
@@ -104,13 +104,14 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                                  optimizer=optimizer,
                                  learning_rate_init=float(learning_rate),
                                  is_scheduled=False)
-        decode_op_train, decode_op_infer = network.decoder(
+        print(float(learning_rate))
+        _, decode_op_infer = network.decoder(
             decoder_outputs_train,
             decoder_outputs_infer,
             decode_type='greedy',
             beam_width=20)
-        ler_op = network.compute_ler(network.labels_st_true,
-                                     network.labels_st_pred)
+        ler_op = network.compute_ler(network.labels_true_st,
+                                     network.labels_pred_st)
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -153,7 +154,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             train_step = train_data.data_num / batch_size
             if train_step != int(train_step):
                 iter_per_epoch += 1
-            max_steps = iter_per_epoch * epoch_num
+            max_steps = iter_per_epoch * num_epoch
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
@@ -214,12 +215,12 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
 
                     # Convert to sparsetensor to compute LER
                     feed_dict_ler_train = {
-                        network.labels_st_true: list2sparsetensor(labels_train),
-                        network.labels_st_pred: list2sparsetensor(predicted_ids_train)
+                        network.labels_true_st: list2sparsetensor(labels_train),
+                        network.labels_pred_st: list2sparsetensor(predicted_ids_train)
                     }
                     feed_dict_ler_dev = {
-                        network.labels_st_true: list2sparsetensor(labels_dev),
-                        network.labels_st_pred: list2sparsetensor(predicted_ids_dev)
+                        network.labels_true_st: list2sparsetensor(labels_dev),
+                        network.labels_pred_st: list2sparsetensor(predicted_ids_dev)
                     }
 
                     # Compute accuracy
@@ -234,7 +235,6 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     print("Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) (%.3f min)" %
                           (step + 1, loss_train, loss_dev, ler_train, ler_dev,
                            duration_step / 60))
-                    print(loss_train)
                     sys.stdout.flush()
                     start_time_step = time.time()
 
@@ -335,13 +335,13 @@ def main(config_path):
         param = config['param']
 
     if corpus['label_type'] == 'phone61':
-        output_size = 63
+        num_classes = 63
     elif corpus['label_type'] == 'phone48':
-        output_size = 50
+        num_classes = 50
     elif corpus['label_type'] == 'phone39':
-        output_size = 41
+        num_classes = 41
     elif corpus['label_type'] == 'character':
-        output_size = 33
+        num_classes = 33
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
@@ -351,12 +351,13 @@ def main(config_path):
         encoder_num_unit=param['encoder_num_unit'],
         encoder_num_layer=param['encoder_num_layer'],
         attention_dim=param['attention_dim'],
+        attention_type=param['attention_type'],
         decoder_num_unit=param['decoder_num_unit'],
         decoder_num_layer=param['decoder_num_layer'],
         embedding_dim=param['embedding_dim'],
-        output_size=output_size,
-        sos_index=output_size - 2,
-        eos_index=output_size - 1,
+        num_classes=num_classes,
+        sos_index=num_classes - 2,
+        eos_index=num_classes - 1,
         max_decode_length=param['max_decode_length'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
         logits_tempareture=param['logits_tempareture'],
@@ -380,7 +381,8 @@ def main(config_path):
         network.model_name += '_weightdecay' + str(param['weight_decay'])
 
     # Set save path
-    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/attention/')
+    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/')
+    network.model_dir = mkdir_join(network.model_dir, 'attention')
     network.model_dir = mkdir_join(network.model_dir, corpus['label_type'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
@@ -403,9 +405,9 @@ def main(config_path):
              optimizer=param['optimizer'],
              learning_rate=param['learning_rate'],
              batch_size=param['batch_size'],
-             epoch_num=param['num_epoch'],
+             num_epoch=param['num_epoch'],
              label_type=corpus['label_type'],
-             eos_index=output_size - 1)
+             eos_index=num_classes - 1)
     sys.stdout = sys.__stdout__
 
 

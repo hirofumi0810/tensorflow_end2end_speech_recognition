@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate trained Multi-task CTC network (TIMIT corpus)."""
+"""Evaluate trained the multi-task CTC model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -127,12 +127,13 @@ def main(model_path):
         feature = config['feature']
         param = config['param']
 
+    # Except for a blank label
     if corpus['label_type_second'] == 'phone61':
-        output_size_second = 61
+        num_classes_second = 61
     elif corpus['label_type_second'] == 'phone48':
-        output_size_second = 48
+        num_classes_second = 48
     elif corpus['label_type_second'] == 'phone39':
-        output_size_second = 39
+        num_classes_second = 39
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -142,8 +143,8 @@ def main(model_path):
         num_unit=param['num_unit'],
         num_layer_main=param['num_layer_main'],
         num_layer_second=param['num_layer_second'],
-        output_size_main=30,
-        output_size_second=output_size_second,
+        num_classes_main=30,
+        num_classes_second=num_classes_second,
         main_task_weight=param['main_task_weight'],
         parameter_init=param['weight_init'],
         clip_grad=param['clip_grad'],

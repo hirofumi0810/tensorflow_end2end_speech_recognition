@@ -14,7 +14,7 @@ from os.path import join
 import pickle
 import numpy as np
 
-from utils.frame_stack import stack_frame
+from utils.data.frame_stack import stack_frame
 from utils.progressbar import wrap_iterator
 from utils.data.multitask_ctc_all_load import DatasetBase
 

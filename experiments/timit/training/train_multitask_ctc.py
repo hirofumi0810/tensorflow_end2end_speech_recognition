@@ -27,7 +27,7 @@ from utils.parameter import count_total_parameters
 from utils.csv import save_loss, save_ler
 
 
-def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
+def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
              label_type_second, num_stack, num_skip):
     """Run multi-task training. The target labels in the main task is
     characters and those in the second task is 61 phones. The model is
@@ -38,7 +38,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             ex.) adam, rmsprop
         learning_rate: A float value, the initial learning rate
         batch_size: int, the size of mini-batch
-        epoch_num: int, the epoch num to train
+        num_epoch: int, the epoch num to train
         label_type_second: string, phone39 or phone48 or phone61
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
@@ -148,7 +148,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             train_step = train_data.data_num / batch_size
             if train_step != int(train_step):
                 iter_per_epoch += 1
-            max_steps = iter_per_epoch * epoch_num
+            max_steps = iter_per_epoch * num_epoch
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
@@ -307,11 +307,11 @@ def main(config_path):
         param = config['param']
 
     if corpus['label_type_second'] == 'phone61':
-        output_size_second = 61
+        num_classes_second = 61
     elif corpus['label_type_second'] == 'phone48':
-        output_size_second = 48
+        num_classes_second = 48
     elif corpus['label_type_second'] == 'phone39':
-        output_size_second = 39
+        num_classes_second = 39
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -321,8 +321,8 @@ def main(config_path):
                        num_layer_main=param['num_layer_main'],
                        num_layer_second=param['num_layer_second'],
                        #    bottleneck_dim=param['bottleneck_dim'],
-                       output_size_main=30,
-                       output_size_second=output_size_second,
+                       num_classes_main=30,
+                       num_classes_second=num_classes_second,
                        main_task_weight=param['main_task_weight'],
                        parameter_init=param['weight_init'],
                        clip_grad=param['clip_grad'],
@@ -372,7 +372,7 @@ def main(config_path):
              optimizer=param['optimizer'],
              learning_rate=param['learning_rate'],
              batch_size=param['batch_size'],
-             epoch_num=param['num_epoch'],
+             num_epoch=param['num_epoch'],
              label_type_second=corpus['label_type_second'],
              num_stack=feature['num_stack'],
              num_skip=feature['num_skip'])

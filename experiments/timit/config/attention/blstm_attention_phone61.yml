@@ -10,20 +10,22 @@ param:
     encoder_num_unit: 256
     encoder_num_layer: 4
     attention_dim: 128
+    attention_type: content
     decoder_num_unit: 256
     decoder_num_layer: 1
-    embedding_dim: 30
+    embedding_dim: 40
     max_decode_length: 50
     attention_weights_tempareture: 1
     logits_tempareture: 1
     batch_size: 64
-    optimizer: rmsprop
-    learning_rate: 0.001
+    optimizer: adam
+    learning_rate: 1e-3
     num_epoch: 50
-    weight_init: 0.1
+    weight_init: 0.01
     clip_grad: 5.0
     clip_activation_encoder: 50
     clip_activation_decoder: 50
     dropout_input: 1.0
     dropout_hidden: 0.8
-    weight_decay: 1e-6
+    # weight_decay: 1e-8
+    weight_decay: 0

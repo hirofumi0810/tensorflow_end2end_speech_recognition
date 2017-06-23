@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate trained CTC network (TIMIT corpus)."""
+"""Evaluate trained the CTC model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -121,14 +121,15 @@ def main(model_path):
         feature = config['feature']
         param = config['param']
 
+    # Except for a blank label
     if corpus['label_type'] == 'phone61':
-        output_size = 61
+        num_classes = 61
     elif corpus['label_type'] == 'phone48':
-        output_size = 48
+        num_classes = 48
     elif corpus['label_type'] == 'phone39':
-        output_size = 39
+        num_classes = 39
     elif corpus['label_type'] == 'character':
-        output_size = 30
+        num_classes = 30
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -137,7 +138,7 @@ def main(model_path):
         input_size=feature['input_size'] * feature['num_stack'],
         num_unit=param['num_unit'],
         num_layer=param['num_layer'],
-        output_size=output_size,
+        num_classes=num_classes,
         parameter_init=param['weight_init'],
         clip_grad=param['clip_grad'],
         clip_activation=param['clip_activation'],

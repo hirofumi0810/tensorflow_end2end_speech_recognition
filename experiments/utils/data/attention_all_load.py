@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Base class for laoding dataset for the Attention-based model.
+"""Base class for laoding dataset for the Attention model.
    You can use the multi-GPU version.
 """
 
@@ -60,8 +60,7 @@ class DatasetBase(object):
             session:
         Returns:
             inputs: list of input data, size `[batch_size]`
-            labels: list of tuple `(indices, values, shape)` of size
-                `[batch_size]`
+            labels: list of target labels, size `[batch_size]`
             inputs_seq_len: list of length of inputs of size `[batch_size]`
             labels_seq_len: list of length of target labels of size
                 `[batch_size]`

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Load dataset for Attention-based model (TIMIT corpus).
+"""Load dataset for Attention model (TIMIT corpus).
    You can use the multi-GPU version.
 """
 
@@ -47,7 +47,7 @@ class Dataset(DatasetBase):
             label_type, data_type)
 
         # Load the frame number dictionary
-        with open(join(self.dataset_path, 'frame_num_dict.pickle'), 'rb') as f:
+        with open(join(self.dataset_path, 'frame_num.pickle'), 'rb') as f:
             self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label by frame num

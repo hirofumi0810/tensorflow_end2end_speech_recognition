@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Decode the trained Multi-task CTC outputs (TIMIT corpus)."""
+"""Decode the trained multi-task CTC outputs (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -100,7 +100,8 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
                               network=network,
                               dataset=test_data,
                               label_type_second=label_type_second,
-                              save_path=network.model_dir)
+                              save_path=network.model_dir,
+                              show=False)
 
 
 def main(model_path):
@@ -114,12 +115,13 @@ def main(model_path):
         feature = config['feature']
         param = config['param']
 
+    # Except for a blank label
     if corpus['label_type_second'] == 'phone61':
-        output_size_second = 61
+        num_classes_second = 61
     elif corpus['label_type_second'] == 'phone48':
-        output_size_second = 48
+        num_classes_second = 48
     elif corpus['label_type_second'] == 'phone39':
-        output_size_second = 39
+        num_classes_second = 39
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -129,8 +131,8 @@ def main(model_path):
         num_unit=param['num_unit'],
         num_layer_main=param['num_layer_main'],
         num_layer_second=param['num_layer_second'],
-        output_size_main=30,
-        output_size_second=output_size_second,
+        num_classes_main=30,
+        num_classes_second=num_classes_second,
         main_task_weight=param['main_task_weight'],
         clip_grad=param['clip_grad'],
         clip_activation=param['clip_activation'],

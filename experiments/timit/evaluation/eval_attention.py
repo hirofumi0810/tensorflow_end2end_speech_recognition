@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate trained Attention-based model (TIMIT corpus)."""
+"""Evaluate trained Attention model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -139,13 +139,13 @@ def main(model_path):
         param = config['param']
 
     if corpus['label_type'] == 'phone61':
-        output_size = 63
+        num_classes = 63
     elif corpus['label_type'] == 'phone48':
-        output_size = 50
+        num_classes = 50
     elif corpus['label_type'] == 'phone39':
-        output_size = 41
+        num_classes = 41
     elif corpus['label_type'] == 'character':
-        output_size = 33
+        num_classes = 33
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
@@ -155,12 +155,13 @@ def main(model_path):
         encoder_num_unit=param['encoder_num_unit'],
         encoder_num_layer=param['encoder_num_layer'],
         attention_dim=param['attention_dim'],
+        attention_type=param['attention_type'],
         decoder_num_unit=param['decoder_num_unit'],
         decoder_num_layer=param['decoder_num_layer'],
         embedding_dim=param['embedding_dim'],
-        output_size=output_size,
-        sos_index=output_size - 2,
-        eos_index=output_size - 1,
+        num_classes=num_classes,
+        sos_index=num_classes - 2,
+        eos_index=num_classes - 1,
         max_decode_length=param['max_decode_length'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
         logits_tempareture=param['logits_tempareture'],
@@ -176,7 +177,7 @@ def main(model_path):
     print(network.model_dir)
     do_eval(network=network,
             label_type=corpus['label_type'],
-            eos_index=output_size - 1,
+            eos_index=num_classes - 1,
             epoch=epoch)
 
 
