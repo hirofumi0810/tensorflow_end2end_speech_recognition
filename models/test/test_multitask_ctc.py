@@ -23,11 +23,11 @@ class TestCTC(tf.test.TestCase):
 
     @measure_time
     def test_ctc(self):
-        print("CTC Working check.")
+        print("Multitask CTC Working check.")
         self.check_training()
 
     def check_training(self):
-        print('----- multitask -----')
+
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
@@ -40,7 +40,7 @@ class TestCTC(tf.test.TestCase):
             # Define placeholders
             inputs_pl = tf.placeholder(tf.float32,
                                        shape=[None, None, inputs.shape[-1]],
-                                       name='input')
+                                       name='inputs')
             indices_pl = tf.placeholder(tf.int64, name='indices')
             values_pl = tf.placeholder(tf.int32, name='values')
             shape_pl = tf.placeholder(tf.int64, name='shape')
@@ -60,16 +60,16 @@ class TestCTC(tf.test.TestCase):
                                                  name='keep_prob_hidden')
 
             # Define model graph
-            output_size_main = 26
-            output_size_second = 61
+            num_classes_main = 26
+            num_classes_second = 61
             network = Multitask_BLSTM_CTC(
                 batch_size=batch_size,
                 input_size=inputs[0].shape[1],
                 num_unit=256,
                 num_layer_main=2,
                 num_layer_second=1,
-                output_size_main=output_size_main,
-                output_size_second=output_size_second,
+                num_classes_main=num_classes_main,
+                num_classes_second=num_classes_second,
                 main_task_weight=0.8,
                 parameter_init=0.1,
                 clip_grad=5.0,
@@ -77,7 +77,7 @@ class TestCTC(tf.test.TestCase):
                 dropout_ratio_input=1.0,
                 dropout_ratio_hidden=1.0,
                 num_proj=None,
-                weight_decay=1e-6)
+                weight_decay=1e-8)
 
             # Add to the graph each operation
             loss_op, logits_main, logits_second = network.compute_loss(

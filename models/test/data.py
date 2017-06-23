@@ -179,7 +179,29 @@ def generate_data(label_type, model, batch_size=1):
                     inputs_seq_len, target_len_char, target_len_phone)
 
     elif model == 'joint_ctc_attention':
-        NotImplementedError
+        if label_type == 'character':
+            transcript = read_text('./sample/LDC93S1.txt')
+            att_transcript = '<' + transcript.replace('.', '') + '>'
+            ctc_transcript = ' ' + transcript.replace('.', '') + ' '
+            att_labels = [alpha2num(att_transcript)] * batch_size
+            labels_seq_len = [len(att_labels[0])] * batch_size
+            ctc_labels = [alpha2num(ctc_transcript)] * batch_size
+
+            # Convert to SparseTensor
+            ctc_labels = list2sparsetensor(ctc_labels)
+            return inputs, att_labels, inputs_seq_len, labels_seq_len, ctc_labels
+
+        elif label_type == 'phone':
+            transcript = read_phone('./sample/LDC93S1.phn')
+            att_transcript = '< ' + transcript + ' >'
+            att_labels = [phone2num(att_transcript)] * batch_size
+            labels_seq_len = [len(att_labels[0])] * batch_size
+            ctc_labels = [phone2num(transcript)] * batch_size
+
+            # Convert to SparseTensor
+            ctc_labels = list2sparsetensor(ctc_labels)
+
+            return inputs, att_labels, inputs_seq_len, labels_seq_len, ctc_labels
 
 
 def phone2num(transcript):

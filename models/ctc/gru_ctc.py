@@ -14,8 +14,8 @@ class GRU_CTC(ctcBase):
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
-        output_size: int, the number of nodes in softmax layer
-            (except for blank class)
+        num_classes: int, the number of classes of target labels
+            (except for a blank label)
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
@@ -34,7 +34,7 @@ class GRU_CTC(ctcBase):
                  input_size,
                  num_unit,
                  num_layer,
-                 output_size,
+                 num_classes=,
                  parameter_init=0.1,
                  clip_grad=None,
                  clip_activation=None,
@@ -46,7 +46,7 @@ class GRU_CTC(ctcBase):
                  name='gru_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
-                         output_size, parameter_init,
+                         num_classes=, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          weight_decay, name)
@@ -92,12 +92,12 @@ class GRU_CTC(ctcBase):
             gru_list, state_is_tuple=True)
 
         # Ignore 2nd return (the last state)
-        outputs, _ = tf.nn.dynamic_rnn(cell=stacked_gru,
-                                       inputs=inputs,
-                                       sequence_length=inputs_seq_len,
-                                       dtype=tf.float32)
+        outputs, final_state = tf.nn.dynamic_rnn(cell=stacked_gru,
+                                                 inputs=inputs,
+                                                 sequence_length=inputs_seq_len,
+                                                 dtype=tf.float32)
 
-        # `[batch_size, max_time, input_size_splice]`
+        # inputs: `[batch_size, max_time, input_size_splice]`
         batch_size = tf.shape(inputs)[0]
 
         # Reshape to apply the same weights over the timesteps
@@ -125,10 +125,10 @@ class GRU_CTC(ctcBase):
             logits_2d = tf.matmul(outputs, W_output) + b_output
 
             # Reshape back to the original shape
-            logits_3d = tf.reshape(
+            logits = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to `[max_time, batch_size, num_classes]'
-            logits = tf.transpose(logits_3d, (1, 0, 2))
+            # Convert to time-major: `[max_time, batch_size, num_classes]'
+            logits = tf.transpose(logits, (1, 0, 2))
 
             return logits

@@ -27,8 +27,8 @@ class CNN_CTC(ctcBase):
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
-        output_size: int, the number of nodes in softmax layer
-            (except for blank class)
+        num_classes: int, the number of classes of target labels
+            (except for a blank label)
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
@@ -47,7 +47,7 @@ class CNN_CTC(ctcBase):
                  input_size,
                  num_unit,  # TODO: not used
                  num_layer,
-                 output_size,
+                 num_classes,
                  parameter_init=0.1,
                  clip_grad=None,
                  clip_activation=None,
@@ -59,7 +59,7 @@ class CNN_CTC(ctcBase):
                  name='cnn_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
-                         output_size, parameter_init,
+                         num_classes, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          weight_decay, name)

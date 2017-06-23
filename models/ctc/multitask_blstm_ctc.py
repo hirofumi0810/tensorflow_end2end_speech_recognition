@@ -20,10 +20,10 @@ class Multitask_BLSTM_CTC(ctcBase):
         num_layer_main: int, the number of layers of the main task
         num_layer_second: int, the number of layers of the second task. Set
             between 1 to num_layer_main
-        output_size_main: int, the number of nodes in softmax layer of the main
-            task (except for blank class)
-        output_size_second: int, the number of nodes in softmax layer of the
-            second task (except for blank class)
+        num_classes_main: int, the number of classes of target labels in the
+            main task (except for a blank label)
+        num_classes_second: int, the number of classes of target labels in the
+            second task (except for a blank label)
         main_task_weight: A float value. The weight of loss of the main task.
             Set between 0 to 1
         parameter_init: A float value. Range of uniform distribution to
@@ -45,8 +45,8 @@ class Multitask_BLSTM_CTC(ctcBase):
                  num_unit,
                  num_layer_main,
                  num_layer_second,
-                 output_size_main,
-                 output_size_second,
+                 num_classes_main,
+                 num_classes_second,
                  main_task_weight,
                  parameter_init=0.1,
                  clip_grad=None,
@@ -59,7 +59,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                  name='multitask_blstm_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_unit,
-                         num_layer_main, output_size_main, parameter_init,
+                         num_layer_main, num_classes_main, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          weight_decay, name)
@@ -71,7 +71,7 @@ class Multitask_BLSTM_CTC(ctcBase):
             raise ValueError(
                 'Set num_layer_second between 1 to num_layer_main.')
         self.num_layer_second = num_layer_second
-        self.num_classes_second = output_size_second + 1  # plus blank label
+        self.num_classes_second = num_classes_second + 1  # plus blank label
 
         if main_task_weight < 0 or main_task_weight > 1:
             raise ValueError('Set main_task_weight between 0 to 1.')
@@ -87,14 +87,14 @@ class Multitask_BLSTM_CTC(ctcBase):
             keep_prob_input:
             keep_prob_hidden:
         Returns:
-            logits:
+            logits: A tensor of size `[max_time, batch_size, input_size]`
         """
         # Dropout for inputs
         outputs = tf.nn.dropout(inputs,
                                 keep_prob_input,
                                 name='dropout_input')
 
-        # `[batch_size, max_time, input_size_splice]`
+        # inputs: `[batch_size, max_time, input_size_splice]`
         batch_size = tf.shape(inputs)[0]
 
         # Hidden layers
@@ -138,7 +138,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                 # initial_state_bw=_init_state_bw,
 
                 # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(
+                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
                     inputs=outputs,
@@ -159,22 +159,23 @@ class Multitask_BLSTM_CTC(ctcBase):
 
                     with tf.name_scope('output_second'):
                         # Affine
-                        W_output = tf.Variable(tf.truncated_normal(
+                        W_output_second = tf.Variable(tf.truncated_normal(
                             shape=[output_node, self.num_classes_second],
                             stddev=0.1, name='W_output_second'))
-                        b_output = tf.Variable(tf.zeros(
+                        b_output_second = tf.Variable(tf.zeros(
                             shape=[self.num_classes_second],
                             name='b_output_second'))
-                        logits_2d = tf.matmul(
-                            outputs_hidden, W_output) + b_output
+                        logits_second_2d = tf.matmul(
+                            outputs_hidden, W_output_second) + b_output_second
 
                         # Reshape back to the original shape
-                        logits_3d = tf.reshape(
-                            logits_2d,
+                        logits_second = tf.reshape(
+                            logits_second_2d,
                             shape=[batch_size, -1, self.num_classes_second])
 
-                        # Convert to `[max_time, batch_size, num_classes]`
-                        logits_second = tf.transpose(logits_3d, (1, 0, 2))
+                        # Convert to time-major:
+                        # `[max_time, batch_size, num_classes]`
+                        logits_second = tf.transpose(logits_second, (1, 0, 2))
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
@@ -196,19 +197,19 @@ class Multitask_BLSTM_CTC(ctcBase):
 
         with tf.name_scope('output_main'):
             # Affine
-            W_output = tf.Variable(tf.truncated_normal(
+            W_output_main = tf.Variable(tf.truncated_normal(
                 shape=[output_node, self.num_classes],
                 stddev=0.1, name='W_output_main'))
-            b_output = tf.Variable(tf.zeros(
+            b_output_main = tf.Variable(tf.zeros(
                 shape=[self.num_classes], name='b_output_main'))
-            logits_2d = tf.matmul(outputs, W_output) + b_output
+            logits_main_2d = tf.matmul(outputs, W_output_main) + b_output_main
 
             # Reshape back to the original shape
-            logits_3d = tf.reshape(
-                logits_2d, shape=[batch_size, -1, self.num_classes])
+            logits_main = tf.reshape(
+                logits_main_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to `[max_time, batch_size, num_classes]'
-            logits_main = tf.transpose(logits_3d, (1, 0, 2))
+            # Convert to time-major: `[max_time, batch_size, num_classes]'
+            logits_main = tf.transpose(logits_main, (1, 0, 2))
 
             return logits_main, logits_second
 
@@ -220,13 +221,15 @@ class Multitask_BLSTM_CTC(ctcBase):
             labels_main: A SparseTensor of target labels in the main task
             labels_second: A SparseTensor of target labels in the second task
             inputs_seq_len: A tensor of size `[batch_size]`
-            keep_prob_input:
-            keep_prob_hidden:
+            keep_prob_input: A float value. A probability to keep nodes in
+                input-hidden layers
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                hidden-hidden layers
             num_gpu: the number of GPUs
         Returns:
             loss: operation for computing ctc loss
-            logits_main:
-            logits_second:
+            logits_main: A tensor of size `[max_time, batch_size, input_size]`
+            logits_second: A tensor of size `[max_time, batch_size, input_size]`
         """
         # Build model graph
         logits_main, logits_second = self._build(
@@ -296,8 +299,8 @@ class Multitask_BLSTM_CTC(ctcBase):
                 beam_width=None):
         """Operation for decoding.
         Args:
-            logits_main:
-            logits_second:
+            logits_main: A tensor of size `[max_time, batch_size, input_size]`
+            logits_second: A tensor of size `[max_time, batch_size, input_size]`
             inputs_seq_len: A tensor of size `[batch_size]`
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
@@ -333,15 +336,18 @@ class Multitask_BLSTM_CTC(ctcBase):
     def posteriors(self, logits_main, logits_second):
         """Operation for computing posteriors of each time steps.
         Args:
-            logits_main:
-            logits_second:
+            logits_main: A tensor of size `[max_time, batch_size, input_size]`
+            logits_second: A tensor of size `[max_time, batch_size, input_size]`
         Return:
             posteriors_op_main: operation for computing posteriors for each
                 class in the main task
             posteriors_op_second: operation for computing posteriors for each
                 class in the second task
         """
-        # logits_3d : (max_time, batch_size, num_classes)
+        # Convert to batch-major: `[batch_size, max_time, num_classes]'
+        logits_main = tf.transpose(logits_main, (1, 0, 2))
+        logits_second = tf.transpose(logits_second, (1, 0, 2))
+
         logits_2d_main = tf.reshape(logits_main,
                                     shape=[-1, self.num_classes])
         posteriors_op_main = tf.nn.softmax(logits_2d_main)

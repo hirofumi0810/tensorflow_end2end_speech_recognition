@@ -49,7 +49,7 @@ class TestCTC(tf.test.TestCase):
             # Define placeholders
             inputs_pl = tf.placeholder(tf.float32,
                                        shape=[None, None, inputs.shape[-1]],
-                                       name='input')
+                                       name='inputs')
             indices_pl = tf.placeholder(tf.int64, name='indices')
             values_pl = tf.placeholder(tf.int32, name='values')
             shape_pl = tf.placeholder(tf.int64, name='shape')
@@ -63,14 +63,14 @@ class TestCTC(tf.test.TestCase):
                                                  name='keep_prob_hidden')
 
             # Define model graph
-            output_size = 26 if label_type == 'character' else 61
+            num_classes = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
             network = model(batch_size=batch_size,
                             input_size=inputs[0].shape[1],
                             num_unit=256,
                             num_layer=2,
                             bottleneck_dim=0,
-                            output_size=output_size,
+                            num_classes=num_classes,
                             parameter_init=0.1,
                             clip_grad=5.0,
                             clip_activation=50,
@@ -175,7 +175,7 @@ class TestCTC(tf.test.TestCase):
                             not_improved_count += 1
                         else:
                             not_improved_count = 0
-                        if not_improved_count >= 3:
+                        if not_improved_count >= 5:
                             print('Modle is Converged.')
                             break
                         ler_train_pre = ler_train

@@ -27,8 +27,8 @@ class ctcBase(object):
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
-        output_size: int, the number of nodes in softmax layer
-            (except for blank class)
+        num_classes: int, the number of classes of target labels
+            (except for a blank label)
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
@@ -45,7 +45,7 @@ class ctcBase(object):
                  input_size,
                  num_unit,
                  num_layer,
-                 output_size,
+                 num_classes,
                  parameter_init,
                  clip_grad,
                  clip_activation,
@@ -57,10 +57,10 @@ class ctcBase(object):
         # Network size
         self.batch_size = batch_size
         self.input_size = input_size
-        self.output_size = output_size
+        self.num_classes = num_classes
         self.num_unit = num_unit
         self.num_layer = num_layer
-        self.num_classes = output_size + 1  # plus blank label
+        self.num_classes = num_classes + 1  # plus blank label
 
         # Regularization
         self.parameter_init = parameter_init
@@ -103,24 +103,27 @@ class ctcBase(object):
             inputs: A tensor of size `[batch_size, max_time, input_size]`
             labels: A SparseTensor of target labels
             inputs_seq_len: A tensor of size `[batch_size]`
-            keep_prob_input:
-            keep_prob_hidden:
+            keep_prob_input: A float value. A probability to keep nodes in
+                input-hidden layers
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                hidden-hidden layers
             num_gpu: int, the number of GPUs
         Returns:
             loss: operation for computing ctc loss
-            logits:
+            logits: A tensor of size `[max_time, batch_size, input_size]`
         """
         # Build model graph
         logits = self._build(
             inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden)
 
         # Weight decay
-        with tf.name_scope("weight_decay_loss"):
-            weight_sum = 0
-            for var in tf.trainable_variables():
-                if 'bias' not in var.name.lower():
-                    weight_sum += tf.nn.l2_loss(var)
-            tf.add_to_collection('losses', weight_sum * self.weight_decay)
+        if self.weight_decay > 0:
+            with tf.name_scope("weight_decay_loss"):
+                weight_sum = 0
+                for var in tf.trainable_variables():
+                    if 'bias' not in var.name.lower():
+                        weight_sum += tf.nn.l2_loss(var)
+                tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss"):
             ctc_losses = tf.nn.ctc_loss(labels,
@@ -233,7 +236,7 @@ class ctcBase(object):
     def decoder(self, logits, inputs_seq_len, decode_type, beam_width=None):
         """Operation for decoding.
         Args:
-            logits:
+            logits: A tensor of size `[max_time, batch_size, input_size]`
             inputs_seq_len: A tensor of size `[batch_size]`
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
@@ -262,11 +265,13 @@ class ctcBase(object):
     def posteriors(self, logits):
         """Operation for computing posteriors of each time steps.
         Args:
-            logits:
+            logits: A tensor of size `[max_time, batch_size, input_size]`
         Return:
             posteriors_op: operation for computing posteriors for each class
         """
-        # logits_3d : (max_time, batch_size, num_classes)
+        # Convert to batch-major: `[batch_size, max_time, num_classes]'
+        logits = tf.transpose(logits, (1, 0, 2))
+
         logits_2d = tf.reshape(logits, [-1, self.num_classes])
         posteriors_op = tf.nn.softmax(logits_2d)
 
