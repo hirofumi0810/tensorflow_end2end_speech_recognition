@@ -14,20 +14,17 @@ from .encoder_base import EncoderOutput, EncoderBase
 class PyramidalBLSTMEncoder(EncoderBase):
     """Pyramidal Bidirectional LSTM Encoder.
     Args:
-        num_unit:
-        num_layer:
-        keep_prob_input:
-        keep_prob_hidden:
-        parameter_init:
-        clip_activation:
-        num_proj:
+        num_unit: int, the number of units in each layer
+        num_layer: int, the number of layers
+        parameter_init: A float value. Range of uniform distribution to
+            initialize weight parameters
+        clip_activation: A float value. Range of activation clipping (> 0)
+        num_proj: not used
     """
 
     def __init__(self,
                  num_unit,
                  num_layer,
-                 keep_prob_input=1.0,
-                 keep_prob_hidden=1.0,
                  parameter_init=0.1,
                  clip_activation=50,
                  num_proj=None,
@@ -36,17 +33,22 @@ class PyramidalBLSTMEncoder(EncoderBase):
         if num_unit % 2 != 0:
             raise ValueError('num_unit should be even number.')
 
-        EncoderBase.__init__(self, num_unit, num_layer, keep_prob_input,
-                             keep_prob_hidden, parameter_init, clip_activation,
+        EncoderBase.__init__(self, num_unit, num_layer,
+                             parameter_init, clip_activation,
                              num_proj, name)
 
-    def _build(self, inputs, inputs_seq_len):
+    def _build(self, inputs, inputs_seq_len,
+               keep_prob_input, keep_prob_hidden):
         """Construct Pyramidal Bidirectional LSTM encoder.
         Args:
-            inputs:
-            inputs_seq_len:
+            inputs: A tensor of `[batch_size, max_time, input_dim]`
+            inputs_seq_len: A tensor of `[batch_size]`
+            keep_prob_input: A float value. A probability to keep nodes in
+                input-hidden layers
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                hidden-hidden layers
         Returns:
-            EncoderOutput: A tuple of
+            EncoderOutput: A namedtuple of
                 `(outputs, final_state,
                         attention_values, attention_values_length)`
                 outputs:
@@ -59,7 +61,7 @@ class PyramidalBLSTMEncoder(EncoderBase):
 
         # Input dropout
         outputs = tf.nn.dropout(inputs,
-                                self.keep_prob_input,
+                                keep_prob_input,
                                 name='dropout_input')
 
         # Hidden layers
@@ -90,10 +92,10 @@ class PyramidalBLSTMEncoder(EncoderBase):
                 # Dropout (output)
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
                     lstm_fw,
-                    output_keep_prob=self.keep_prob_hidden)
+                    output_keep_prob=keep_prob_hidden)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(
                     lstm_bw,
-                    output_keep_prob=self.keep_prob_hidden)
+                    output_keep_prob=keep_prob_hidden)
 
                 # _init_state_fw = lstm_fw.zero_state(self.batch_size,
                 #                                     tf.float32)

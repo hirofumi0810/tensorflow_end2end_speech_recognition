@@ -42,12 +42,12 @@ class TestAttention(tf.test.TestCase):
             inputs_pl = tf.placeholder(tf.float32,
                                        shape=[batch_size, None,
                                               inputs.shape[-1]],
-                                       name='input')
+                                       name='inputs')
 
             # `[batch_size, max_time]`
             labels_pl = tf.placeholder(tf.int32,
                                        shape=[None, None],
-                                       name='label')
+                                       name='labels')
 
             # These are prepared for computing LER
             indices_true_pl = tf.placeholder(tf.int64, name='indices')
@@ -74,7 +74,7 @@ class TestAttention(tf.test.TestCase):
                                                  name='keep_prob_hidden')
 
             # Define model graph
-            output_size = 26 + 2 if label_type == 'character' else 61 + 2
+            num_classes = 26 + 2 if label_type == 'character' else 61 + 2
             # model = load(model_type=model_type)
             network = BLSTMAttetion(
                 batch_size=batch_size,
@@ -85,9 +85,9 @@ class TestAttention(tf.test.TestCase):
                 decoder_num_unit=256,
                 decoder_num_layer=1,
                 embedding_dim=20,
-                output_size=output_size,
-                sos_index=output_size - 2,
-                eos_index=output_size - 1,
+                num_classes=num_classes,
+                sos_index=num_classes - 2,
+                eos_index=num_classes - 1,
                 max_decode_length=50,
                 attention_weights_tempareture=1,
                 logits_tempareture=1,
@@ -121,7 +121,6 @@ class TestAttention(tf.test.TestCase):
                 beam_width=1)
             ler_op = network.compute_ler(labels_st_true_pl,
                                          labels_st_pred_pl)
-            attention_weights = decoder_outputs_infer.attention_scores
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
@@ -215,7 +214,7 @@ class TestAttention(tf.test.TestCase):
                             not_improved_count += 1
                         else:
                             not_improved_count = 0
-                        if not_improved_count >= 5:
+                        if not_improved_count >= 10:
                             print('Model is Converged.')
                             break
                         ler_train_pre = ler_train

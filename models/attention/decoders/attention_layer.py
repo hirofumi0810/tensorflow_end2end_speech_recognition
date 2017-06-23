@@ -19,11 +19,11 @@ class AttentionLayer(object):
             arXiv preprint arXiv:1409.0473 (2014).
     Args:
         num_unit: Number of units used in the attention layer
-        attention_type: bahdanau or layer_dot
+        attention_type: string, content or location or hybrid or layer_dot
     """
 
     def __init__(self, num_unit, attention_weights_tempareture,
-                 attention_type='bahdanau', name='attention_layer'):
+                 attention_type='content', name='attention_layer'):
         self.num_unit = num_unit
         self.attention_weights_tempareture = attention_weights_tempareture
         self.attention_type = attention_type
@@ -76,9 +76,6 @@ class AttentionLayer(object):
             activation_fn=None,
             # reuse=True,
             scope="att_decoder_state")
-        # TODO: Divide self.num_unit into encoder_num_units and
-        # decoder_num_units
-        # NOTE: エンコーダがBidirectionalのときユニット数を2倍にすることに注意??
 
         # Compute attention scores over encoder outputs (energy: e_ij)
         # v_a = f(U_a * h_j, W_a * s_{i-1})
@@ -101,10 +98,10 @@ class AttentionLayer(object):
         # Normalize the scores (attention_weights: α_ij (j=0,1,...))
         # attention_weights = tf.nn.softmax(
         #     scores, name="attention_weights")
-        attention_weights = tf.exp(scores / self.attention_weights_tempareture) / \
-            tf.reduce_sum(tf.exp(scores / self.attention_weights_tempareture),
-                          axis=-1,
-                          keep_dims=True)
+        scores /= self.attention_weights_tempareture
+        attention_weights = tf.exp(scores) / tf.reduce_sum(tf.exp(scores),
+                                                           axis=-1,
+                                                           keep_dims=True)
 
         # Calculate the weighted average of the attention inputs
         # according to the scores
@@ -128,10 +125,14 @@ class AttentionLayer(object):
                 A tensor of shape `[batch_size, decoder_num_units]`
         Returns:
             attention_sum: The summation of attention scores (energy: e_ij)
-            A tensor of shape `[batch_size, max_time, ?]`
+                A tensor of shape `[batch_size, max_time, ?]`
         """
-        if self.attention_type == 'bahdanau':
-            # with tf.variable_scope("bahdanau", reuse=True):
+        if self.attention_type == 'content':
+            ##############################
+            # content-based attention
+            ##############################
+
+            # with tf.variable_scope("content", reuse=True):
             v_att = tf.get_variable("v_att",
                                     shape=[self.num_unit],
                                     dtype=tf.float32)
@@ -149,6 +150,18 @@ class AttentionLayer(object):
 
             # TODO: what does [2] mean? axis?
 
+        elif self.attention_type == 'location':
+            ##############################
+            # location-based attention
+            ##############################
+            raise NotImplementedError
+
+        elif self.attention_type == 'hybrid':
+            ############################################################
+            # hybrid attention (content-based + location-based)
+            ############################################################
+            raise NotImplementedError
+
         elif self.attention_type == 'layer_dot':
             # calculates a batch- and time-wise dot product
             attention_sum = tf.reduce_sum(
@@ -156,7 +169,8 @@ class AttentionLayer(object):
                 encoder_states, [2])
 
         else:
-            # TODO: Add other versions
-            raise ValueError('attention_type is "bahdanau" or "layer_dot".')
+            raise ValueError(
+                'attention_type is "content" or "location" or ' +
+                '"hybrid" or "layer_dot".')
 
         return attention_sum

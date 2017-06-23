@@ -31,14 +31,14 @@ class AttentionBase(object):
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimension of input vectors
-        attention_dim:
-        output_size: int, the number of nodes in output layer
-        embedding_dim:
+        attention_dim: int, the dimension of attention vecors
+        num_classes: int, the number of nodes in output layer
+        embedding_dim: int, the dimension of target embedding
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
         clip_grad: A float value. Range of gradient clipping (> 0)
         weight_decay: A float value. Regularization parameter for weight decay
-        beam_width: if 0, use greedy decoding
+        beam_width: if equal to 1, use greedy decoding
     """
 
     def __init__(self,
@@ -46,7 +46,7 @@ class AttentionBase(object):
                  input_size,
                  attention_dim,
                  embedding_dim,
-                 output_size,
+                 num_classes,
                  sos_index,
                  eos_index,
                  clip_grad,
@@ -59,7 +59,7 @@ class AttentionBase(object):
         self.input_size = input_size
         self.attention_dim = attention_dim
         self.embedding_dim = embedding_dim
-        self.num_classes = output_size
+        self.num_classes = num_classes
 
         # Regularization
         self.clip_grad = clip_grad
@@ -227,12 +227,14 @@ class AttentionBase(object):
             labels: A tensor of `[batch_size, time]`
             inputs_seq_len: A tensor of `[batch_size]`
             labels_seq_len: A tensor of `[batch_size]`
-            keep_prob_input:
-            keep_prob_hidden:
+            keep_prob_input: A float value. A probability to keep nodes in
+                input-hidden layers
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                hidden-hidden layers
             num_gpu: int, the number of GPUs
         Returns:
-            loss: operation for computing cross entropy sequence loss.
-                  This is a single scalar tensor to minimize.
+            loss: operation for computing total loss (cross entropy sequence
+                loss + L2). This is a single scalar tensor to minimize.
             logits:
             decoder_outputs_train:
             decoder_outputs_infer:
@@ -242,13 +244,17 @@ class AttentionBase(object):
             inputs, labels, inputs_seq_len, labels_seq_len,
             keep_prob_input, keep_prob_hidden)
 
+        # For prevent 0 * log(0) in crossentropy loss
+        # logits = tf.clip_by_value(logits, 1e-10, 1.0)
+
         # Weight decay
-        with tf.name_scope("weight_decay_loss"):
-            weight_sum = 0
-            for var in tf.trainable_variables():
-                if 'bias' not in var.name.lower():
-                    weight_sum += tf.nn.l2_loss(var)
-            tf.add_to_collection('losses', weight_sum * self.weight_decay)
+        if self.weight_decay > 0:
+            with tf.name_scope("weight_decay_loss"):
+                weight_sum = 0
+                for var in tf.trainable_variables():
+                    if 'bias' not in var.name.lower():
+                        weight_sum += tf.nn.l2_loss(var)
+                tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("sequence_loss"):
             max_time = tf.shape(labels[:, 1:])[1]

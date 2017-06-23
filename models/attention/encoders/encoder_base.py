@@ -19,20 +19,17 @@ class EncoderOutput(
 class EncoderBase(object):
     """Base class of the encoder.
     Args:
-        num_unit:
-        num_layer:
-        keep_prob_input:
-        keep_prob_hidden:
-        parameter_init:
-        clip_activation:
-        num_proj:
+        num_unit: int, the number of units in each layer
+        num_layer: int, the number of layers
+        parameter_init: A float value. Range of uniform distribution to
+            initialize weight parameters
+        clip_activation: A float value. Range of activation clipping (> 0)
+        num_proj: int, the number of nodes in recurrent projection layer
     """
 
     def __init__(self,
                  num_unit,
                  num_layer,
-                 keep_prob_input,
-                 keep_prob_hidden,
                  parameter_init,
                  clip_activation,
                  num_proj,
@@ -40,8 +37,6 @@ class EncoderBase(object):
 
         self.num_unit = num_unit
         self.num_layer = num_layer
-        self.keep_prob_input = keep_prob_input
-        self.keep_prob_hidden = keep_prob_hidden
         self.parameter_init = parameter_init
         self.clip_activation = clip_activation
         self.num_proj = num_proj

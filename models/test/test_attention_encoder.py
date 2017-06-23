@@ -40,10 +40,15 @@ class TestAttentionEncoder(unittest.TestCase):
             frame_num = inputs[0].shape[0]
             input_size = inputs[0].shape[1]
             inputs_pl = tf.placeholder(tf.float32,
-                                       shape=[None, None, input_size])
-            seq_len_pl = tf.placeholder(tf.int64, shape=[None])
-            keep_prob_input_pl = tf.placeholder(tf.float32)
-            keep_prob_hidden_pl = tf.placeholder(tf.float32)
+                                       shape=[None, None, input_size],
+                                       name='inputs')
+            inputs_seq_len_pl = tf.placeholder(tf.int64,
+                                               shape=[None],
+                                               name='inputs_seq_len')
+            keep_prob_input_pl = tf.placeholder(tf.float32,
+                                                name='keep_prob_input')
+            keep_prob_hidden_pl = tf.placeholder(tf.float32,
+                                                 name='keep_prob_hidden')
 
             encoder = load(model_type)(num_unit=256,
                                        num_layer=5,
@@ -53,7 +58,7 @@ class TestAttentionEncoder(unittest.TestCase):
                                        clip_activation=5.0,
                                        num_proj=None)
             encoder_outputs_op = encoder(inputs=inputs_pl,
-                                         inputs_seq_len=seq_len_pl)
+                                         inputs_seq_len=inputs_seq_len_pl)
 
             feed_dict = {
                 encoder.inputs: inputs,

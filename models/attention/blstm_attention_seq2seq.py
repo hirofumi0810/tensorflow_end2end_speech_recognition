@@ -14,7 +14,7 @@ from .decoders.attention_layer import AttentionLayer
 from .decoders.attention_decoder import AttentionDecoder
 from .decoders.attention_decoder import AttentionDecoderOutput
 from .decoders.dynamic_decoder import _transpose_batch_time as time2batch
-from .bridge import InitialStateBridge
+from .bridge import InitialStateBridge, PassThroughBridge
 
 
 class BLSTMAttetion(AttentionBase):
@@ -30,7 +30,7 @@ class BLSTMAttetion(AttentionBase):
             decoder
         decoder_num_layer: int, the number of layers of the decoder
         embedding_dim: int, the dimension of the embedding in target spaces
-        output_size: int, the number of nodes in softmax layer
+        num_classes: int, the number of nodes in softmax layer
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
         max_decode_length:
@@ -59,7 +59,7 @@ class BLSTMAttetion(AttentionBase):
                  decoder_num_unit,
                  decoder_num_layer,
                  embedding_dim,
-                 output_size,
+                 num_classes,
                  sos_index,
                  eos_index,
                  max_decode_length,
@@ -73,12 +73,12 @@ class BLSTMAttetion(AttentionBase):
                  dropout_ratio_hidden=1.0,
                  weight_decay=0.0,
                  beam_width=0,
-                 time_major=True,
+                 time_major=False,
                  name='blstm_attention_seq2seq'):
 
         AttentionBase.__init__(self, batch_size, input_size,
                                attention_dim, embedding_dim,
-                               output_size, sos_index, eos_index,
+                               num_classes, sos_index, eos_index,
                                clip_grad, weight_decay, beam_width, name)
 
         # Network size
@@ -103,8 +103,7 @@ class BLSTMAttetion(AttentionBase):
         self.attention_weights_tempareture = attention_weights_tempareture
         self.logits_tempareture = logits_tempareture
         # NOTE: attention_weights_tempareture is good for narrow focus.
-        # Assume that β = 1 / attention_weights_tempareture, β=2 is
-        # recommended
+        # Assume that β = 1 / attention_weights_tempareture, β=2 is recommended
         self.time_major = time_major
 
     def _encode(self, inputs, inputs_seq_len,
@@ -113,16 +112,16 @@ class BLSTMAttetion(AttentionBase):
         Args:
             inputs: A tensor of `[batch_size, time, input_size]`
             inputs_seq_len: A tensor of `[batch_size]`
-            keep_prob_input:
-            keep_prob_hidden:
+            keep_prob_input: A float value. A probability to keep nodes in
+                input-hidden layers
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                hidden-hidden layers
         Returns:
-            encoder_outputs: A namedtaple of
+            encoder_outputs: A namedtuple of
             `(outputs final_state attention_values attention_values_length)`
         """
         # Define encoder
         encoder = load_encoder(model_type='blstm_encoder')(
-            keep_prob_input=keep_prob_input,
-            keep_prob_hidden=keep_prob_hidden,
             num_unit=self.encoder_num_unit,
             num_layer=self.encoder_num_layer,
             parameter_init=self.parameter_init,
@@ -130,7 +129,9 @@ class BLSTMAttetion(AttentionBase):
             num_proj=None)
 
         encoder_outputs = encoder(inputs=inputs,
-                                  inputs_seq_len=inputs_seq_len)
+                                  inputs_seq_len=inputs_seq_len,
+                                  keep_prob_input=keep_prob_input,
+                                  keep_prob_hidden=keep_prob_hidden)
 
         return encoder_outputs
 
@@ -176,10 +177,14 @@ class BLSTMAttetion(AttentionBase):
             labels: A tensor of `[batch_size, time]`
             inputs_seq_len: A tensor of `[batch_size]`
             labels_seq_len: A tensor of `[batch_size]`
-            keep_prob_input:
-            keep_prob_hidden:
+            keep_prob_input: A float value. A probability to keep nodes in
+                input-hidden layers
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                hidden-hidden layers
         Returns:
             logits:
+            decoder_outputs_train:
+            decoder_outputs_infer:
         """
         # Encode input features
         encoder_outputs = self._encode(
@@ -198,6 +203,7 @@ class BLSTMAttetion(AttentionBase):
         #                                                   beam_width=20)
 
         # Connect between encoder and decoder
+        # bridge = PassThroughBridge(
         bridge = InitialStateBridge(
             encoder_outputs=encoder_outputs,
             decoder_state_size=decoder_train.cell.state_size)
@@ -218,7 +224,7 @@ class BLSTMAttetion(AttentionBase):
             encoder_outputs=encoder_outputs)
         # NOTE: decoder_outputs are time-major
 
-        # Transpose to batch-major
+        # Transpose from time-major to batch-major
         if self.time_major:
             logits = time2batch(decoder_outputs_train.logits)
             predicted_ids = time2batch(decoder_outputs_train.predicted_ids)
