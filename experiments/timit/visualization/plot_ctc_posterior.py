@@ -15,7 +15,7 @@ import yaml
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_ctc import DataSet
+from data.load_dataset_ctc import Dataset
 from models.ctc.load_model import load
 from util_plot_ctc import posterior_test
 
@@ -30,7 +30,7 @@ def do_plot(network, label_type, num_stack, num_skip, epoch=None):
         epoch: epoch to restore
     """
     # Load dataset
-    test_data = DataSet(data_type='test', label_type=label_type,
+    test_data = Dataset(data_type='test', label_type=label_type,
                         batch_size=1,
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False, is_progressbar=True)

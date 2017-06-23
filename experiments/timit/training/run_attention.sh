@@ -19,7 +19,7 @@ gpu_index=$2
 filename=$(basename $config_path | awk -F. '{print $1}')
 
 # Background job version
-# CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_attention.py $config_path > log/$filename".log" &
+CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_attention.py $config_path > log/$filename".log" &
 
 # Standard output version
-CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_attention.py $config_path
+# CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_attention.py $config_path

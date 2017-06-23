@@ -15,7 +15,7 @@ import yaml
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_attention import DataSet
+from data.load_dataset_attention import Dataset
 # from models.attention.load_model import load
 from models.attention import blstm_attention_seq2seq
 from util_decode_attention import decode_test
@@ -30,7 +30,7 @@ def do_decode(network, label_type, eos_index, epoch=None):
         eos_index: int, the index of <EOS> class. This is used for padding.
     """
     # Load dataset
-    test_data = DataSet(data_type='test', label_type=label_type,
+    test_data = Dataset(data_type='test', label_type=label_type,
                         batch_size=1,
                         eos_index=eos_index,
                         is_sorted=False, is_progressbar=True)

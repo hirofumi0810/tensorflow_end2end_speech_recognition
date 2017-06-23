@@ -18,7 +18,7 @@ import shutil
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_multitask_ctc import DataSet
+from data.load_dataset_multitask_ctc import Dataset
 from models.ctc.load_model_multitask import load
 from metric.ctc import do_eval_per, do_eval_cer
 from utils.sparsetensor import list2sparsetensor
@@ -44,16 +44,16 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         num_skip: int, the number of frames to skip
     """
     # Load dataset
-    train_data = DataSet(data_type='train',
+    train_data = Dataset(data_type='train',
                          label_type_second=label_type_second,
                          batch_size=batch_size,
                          num_stack=num_stack, num_skip=num_skip,
                          is_sorted=True)
-    dev_data = DataSet(data_type='dev', label_type_second=label_type_second,
+    dev_data = Dataset(data_type='dev', label_type_second=label_type_second,
                        batch_size=batch_size,
                        num_stack=num_stack, num_skip=num_skip,
                        is_sorted=False)
-    test_data = DataSet(data_type='test', label_type_second='phone39',
+    test_data = Dataset(data_type='test', label_type_second='phone39',
                         batch_size=1,
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False)

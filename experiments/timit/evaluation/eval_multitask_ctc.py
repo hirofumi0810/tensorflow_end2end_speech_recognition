@@ -15,7 +15,7 @@ import yaml
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_multitask_ctc import DataSet
+from data.load_dataset_multitask_ctc import Dataset
 from models.ctc.load_model_multitask import load
 from metric.ctc import do_eval_per, do_eval_cer
 
@@ -31,12 +31,12 @@ def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
     """
     # Load dataset
     if label_type_second == 'character':
-        test_data = DataSet(data_type='test', label_type_second='character',
+        test_data = Dataset(data_type='test', label_type_second='character',
                             batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)
     else:
-        test_data = DataSet(data_type='test', label_type_second='phone39',
+        test_data = Dataset(data_type='test', label_type_second='phone39',
                             batch_size=1,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, is_progressbar=True)

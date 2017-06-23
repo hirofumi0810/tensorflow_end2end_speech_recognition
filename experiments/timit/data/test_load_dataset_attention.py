@@ -12,32 +12,33 @@ import tensorflow as tf
 
 sys.path.append('../../')
 sys.path.append('../../../')
-from read_dataset_attention import DataSet
+from load_dataset_attention import Dataset
 from utils.labels.character import num2char
 from utils.labels.phone import num2phone
 
 
-class TestReadDatasetAttention(unittest.TestCase):
+class TestLoadDatasetAttention(unittest.TestCase):
 
     def test(self):
-        self.check_reading(label_type='character', num_gpu=1, is_sorted=True)
-        self.check_reading(label_type='character', num_gpu=1, is_sorted=False)
-        self.check_reading(label_type='character', num_gpu=2, is_sorted=True)
-        self.check_reading(label_type='character', num_gpu=2, is_sorted=False)
-        self.check_reading(label_type='phone61', num_gpu=1, is_sorted=True)
-        self.check_reading(label_type='phone61', num_gpu=1, is_sorted=False)
-        self.check_reading(label_type='phone61', num_gpu=2, is_sorted=True)
-        self.check_reading(label_type='phone61', num_gpu=2, is_sorted=False)
+        self.check_loading(label_type='character', num_gpu=1, is_sorted=True)
+        self.check_loading(label_type='character', num_gpu=1, is_sorted=False)
+        self.check_loading(label_type='phone61', num_gpu=1, is_sorted=True)
+        self.check_loading(label_type='phone61', num_gpu=1, is_sorted=False)
+
+        # self.check_loading(label_type='character', num_gpu=2, is_sorted=True)
+        # self.check_loading(label_type='character', num_gpu=2, is_sorted=False)
+        # self.check_loading(label_type='phone61', num_gpu=2, is_sorted=True)
+        # self.check_loading(label_type='phone61', num_gpu=2, is_sorted=False)
 
         # For many GPUs
-        self.check_reading(label_type='character', num_gpu=7, is_sorted=True)
+        # self.check_loading(label_type='character', num_gpu=7, is_sorted=True)
 
-    def check_reading(self, label_type, num_gpu, is_sorted):
+    def check_loading(self, label_type, num_gpu, is_sorted):
         print('----- label_type: ' + label_type + ', num_gpu: ' +
               str(num_gpu) + ', is_sorted: ' + str(is_sorted) + ' -----')
 
         batch_size = 64
-        dataset = DataSet(data_type='train', label_type=label_type,
+        dataset = Dataset(data_type='train', label_type=label_type,
                           batch_size=batch_size, eos_index=32,
                           is_sorted=is_sorted, is_progressbar=True,
                           num_gpu=num_gpu)

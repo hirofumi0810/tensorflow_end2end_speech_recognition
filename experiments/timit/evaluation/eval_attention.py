@@ -15,7 +15,7 @@ import yaml
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_attention import DataSet
+from data.load_dataset_attention import Dataset
 # from models.attention.load_model import load
 from models.attention import blstm_attention_seq2seq
 from metric.attention import do_eval_per, do_eval_cer
@@ -31,12 +31,12 @@ def do_eval(network, label_type, eos_index, epoch=None):
     """
     # Load dataset
     if label_type == 'character':
-        test_data = DataSet(data_type='test', label_type='character',
+        test_data = Dataset(data_type='test', label_type='character',
                             batch_size=1,
                             eos_index=eos_index,
                             is_sorted=False, is_progressbar=True)
     else:
-        test_data = DataSet(data_type='test', label_type='phone39',
+        test_data = Dataset(data_type='test', label_type='phone39',
                             batch_size=1,
                             eos_index=eos_index,
                             is_sorted=False, is_progressbar=True)

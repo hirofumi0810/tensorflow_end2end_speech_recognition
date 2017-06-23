@@ -18,7 +18,7 @@ import shutil
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_attention import DataSet
+from data.load_dataset_attention import Dataset
 # from models.attention.load_model import load
 from models.attention import blstm_attention_seq2seq
 from metric.attention import do_eval_per, do_eval_cer
@@ -37,24 +37,24 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         optimizer: string, the name of optimizer.
             ex.) adam, rmsprop
         learning_rate: initial learning rate
-        batch_size: size of mini batch
-        epoch_num: epoch num to train
-        label_type: phone39 or phone48 or phone61 or character
+        batch_size: int, the size of mini-batch
+        epoch_num: int, the number of epochs to train
+        label_type: string, phone39 or phone48 or phone61 or character
         eos_index: int, the index of <EOS> class. This is used for padding.
     """
     # Load dataset
-    train_data = DataSet(data_type='train', label_type=label_type,
+    train_data = Dataset(data_type='train', label_type=label_type,
                          batch_size=batch_size,
                          eos_index=eos_index, is_sorted=True)
-    dev_data = DataSet(data_type='dev', label_type=label_type,
+    dev_data = Dataset(data_type='dev', label_type=label_type,
                        batch_size=batch_size,
                        eos_index=eos_index, is_sorted=False)
     if label_type == 'character':
-        test_data = DataSet(data_type='test', label_type='character',
+        test_data = Dataset(data_type='test', label_type='character',
                             batch_size=batch_size,
                             eos_index=eos_index, is_sorted=False)
     else:
-        test_data = DataSet(data_type='test', label_type='phone39',
+        test_data = Dataset(data_type='test', label_type='phone39',
                             batch_size=batch_size,
                             eos_index=eos_index, is_sorted=False)
 
@@ -234,6 +234,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     print("Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) (%.3f min)" %
                           (step + 1, loss_train, loss_dev, ler_train, ler_dev,
                            duration_step / 60))
+                    print(loss_train)
                     sys.stdout.flush()
                     start_time_step = time.time()
 
@@ -250,7 +251,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
 
-                    if epoch >= 10:
+                    if epoch >= 20:
                         start_time_eval = time.time()
                         if label_type == 'character':
                             print('=== Dev Data Evaluation ===')

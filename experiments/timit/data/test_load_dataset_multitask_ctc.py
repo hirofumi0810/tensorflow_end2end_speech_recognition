@@ -12,29 +12,30 @@ import tensorflow as tf
 
 sys.path.append('../../')
 sys.path.append('../../../')
-from read_dataset_multitask_ctc import DataSet
+from load_dataset_multitask_ctc import Dataset
 from utils.labels.character import num2char
 from utils.labels.phone import num2phone
 from utils.sparsetensor import sparsetensor2list
 
 
-class TestReadDatasetMultitaskCTC(unittest.TestCase):
+class TestLoadDatasetMultitaskCTC(unittest.TestCase):
 
     def test(self):
-        self.check_reading(num_gpu=1, is_sorted=True)
-        self.check_reading(num_gpu=1, is_sorted=False)
-        self.check_reading(num_gpu=2, is_sorted=True)
-        self.check_reading(num_gpu=2, is_sorted=False)
+        self.check_loading(num_gpu=1, is_sorted=True)
+        self.check_loading(num_gpu=1, is_sorted=False)
+
+        # self.check_loading(num_gpu=2, is_sorted=True)
+        # self.check_loading(num_gpu=2, is_sorted=False)
 
         # For many GPUs
-        self.check_reading(num_gpu=7, is_sorted=True)
+        # self.check_loading(num_gpu=7, is_sorted=True)
 
-    def check_reading(self, num_gpu, is_sorted):
+    def check_loading(self, num_gpu, is_sorted):
         print('----- num_gpu: ' + str(num_gpu) +
               ', is_sorted: ' + str(is_sorted) + ' -----')
 
         batch_size = 64
-        dataset = DataSet(data_type='train', label_type_second='phone61',
+        dataset = Dataset(data_type='train', label_type_second='phone61',
                           batch_size=batch_size,
                           num_stack=3, num_skip=3,
                           is_sorted=is_sorted, is_progressbar=True,

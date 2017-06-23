@@ -18,7 +18,7 @@ import shutil
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_ctc import DataSet
+from data.load_dataset_ctc import Dataset
 from models.ctc.load_model import load
 from metric.ctc import do_eval_per, do_eval_cer
 from utils.sparsetensor import list2sparsetensor
@@ -57,8 +57,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         network: network to train
         optimizer: string, the name of optimizer.
             ex.) adam, rmsprop
-        learning_rate: A flaot value, the initial learning rate
-        batch_size: int, teh the size of mini-batch
+        learning_rate: A flaotDataSethe size of mini-batch
         epoch_num: int, the number of epochs to train
         label_type: string, phone39 or phone48 or phone61 or character
         num_stack: int, the number of frames to stack
@@ -66,23 +65,23 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
         gpu_indices: list of integer
     """
     # Load dataset
-    train_data = DataSet(data_type='train', label_type=label_type,
+    train_data = Dataset(data_type='train', label_type=label_type,
                          batch_size=batch_size,
                          num_stack=num_stack, num_skip=num_skip,
                          is_sorted=True, num_gpu=len(gpu_indices))
-    dev_data = DataSet(data_type='dev', label_type=label_type,
+    dev_data = Dataset(data_type='dev', label_type=label_type,
                        batch_size=batch_size,
                        num_stack=num_stack, num_skip=num_skip,
                        is_sorted=False, num_gpu=len(gpu_indices))
     if label_type == 'character':
         # TODO: evaluationのときはどうする？
-        test_data = DataSet(data_type='test', label_type='character',
+        test_data = Dataset(data_type='test', label_type='character',
                             batch_size=batch_size,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, num_gpu=1)
     else:
 
-        test_data = DataSet(data_type='test', label_type='phone39',
+        test_data = Dataset(data_type='test', label_type='phone39',
                             batch_size=batch_size,
                             num_stack=num_stack, num_skip=num_skip,
                             is_sorted=False, num_gpu=1)

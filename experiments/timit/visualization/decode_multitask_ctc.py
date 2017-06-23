@@ -15,7 +15,7 @@ import yaml
 sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_multitask_ctc import DataSet
+from data.load_dataset_multitask_ctc import Dataset
 from models.ctc.load_model_multitask import load
 from util_decode_ctc import decode_test_multitask
 
@@ -30,7 +30,7 @@ def do_decode(network, label_type_second, num_stack, num_skip, epoch=None):
         epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = DataSet(data_type='test', label_type_second=label_type_second,
+    test_data = Dataset(data_type='test', label_type_second=label_type_second,
                         batch_size=1,
                         num_stack=num_stack, num_skip=num_skip,
                         is_sorted=False, is_progressbar=True)
