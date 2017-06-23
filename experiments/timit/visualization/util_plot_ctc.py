@@ -23,7 +23,7 @@ green = '#006400'
 
 
 def posterior_test(session, posteriors_op, network, dataset, label_type,
-                   save_path=None):
+                   save_path=None, show=False):
     """Visualize label posteriors of CTC model.
     Args:
         session: session of training model
@@ -32,6 +32,7 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
         dataset: An instance of a `Dataset` class
         label_type: string, phone39 or phone48 or phone61 or character
         save_path: path to save ctc outputs
+        show: if True, show each figure
     """
     # Batch size is expected to be 1
     iteration = dataset.data_num
@@ -55,27 +56,32 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
         # Visualize
         max_frame_num = inputs.shape[1]
         posteriors = session.run(posteriors_op, feed_dict=feed_dict)
-        posteriors_index = np.array([0 + (1 * j)
-                                     for j in range(max_frame_num)])
+
+        i_batch = 0  # index in mini-batch
+        posteriors_index = np.array(
+            [i_batch * max_frame_num + i for i in range(max_frame_num)])
+
         if label_type != 'character':
             plot_probs_ctc_phone(
                 probs=posteriors[posteriors_index][:int(
                     inputs_seq_len[0]), :],
                 wav_index=input_names[0],
                 label_type=label_type,
-                save_path=save_path)
+                save_path=save_path,
+                show=show)
         else:
             plot_probs_ctc_char(
                 probs=posteriors[posteriors_index][:int(
                     inputs_seq_len[0]), :],
                 wav_index=input_names[0],
-                save_path=save_path)
+                save_path=save_path,
+                show=show)
 
 
 def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
                              network, dataset, label_type_second,
-                             save_path=None):
-    """Visualize label posteriors of Multi-task CTC model.
+                             save_path=None, show=False):
+    """Visualize label posteriors of the multi-task CTC model.
     Args:
         session: session of training model
         posteriois_op_main: operation for computing posteriors in the main task
@@ -85,6 +91,7 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
         dataset: An instance of a `Dataset` class
         label_type_second: string, phone39 or phone48 or phone61
         save_path: path to save ctc outpus
+        show: if True, show each figure
     """
     # Batch size is expected to be 1
     iteration = dataset.data_num
@@ -112,8 +119,9 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
         posteriors_phone = session.run(
             posteriors_op_second, feed_dict=feed_dict)
 
-        posteriors_index = np.array([0 + (1 * j)
-                                     for j in range(max_frame_num)])
+        i_batch = 0  # index in mini-batch
+        posteriors_index = np.array(
+            [i_batch * max_frame_num + i for i in range(max_frame_num)])
 
         plot_probs_ctc_char_phone(
             probs_char=posteriors_char[posteriors_index][:int(
@@ -122,16 +130,18 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
                 inputs_seq_len[0]), :],
             wav_index=input_names[0],
             label_type_second=label_type_second,
-            save_path=save_path)
+            save_path=save_path,
+            show=show)
 
 
-def plot_probs_ctc_phone(probs, wav_index, label_type, save_path=None):
+def plot_probs_ctc_phone(probs, wav_index, label_type, save_path, show):
     """Plot posteriors of phones.
     Args:
         probs:
         wav_index: int,
         label_type: string, phone39 or phone48 or phone61
         save_path: path to save ctc outpus
+        show: if True, show each figure
     """
     duration = probs.shape[0]
     times_probs = np.arange(len(probs))
@@ -160,7 +170,8 @@ def plot_probs_ctc_phone(probs, wav_index, label_type, save_path=None):
     plt.xticks(list(range(0, int(len(probs) / 100) + 1, 1)))
     plt.yticks(list(range(0, 2, 1)))
     plt.legend(loc="upper right", fontsize=12)
-    # plt.show()
+    if show:
+        plt.show()
 
     # Save as a png file
     if save_path is not None:
@@ -168,12 +179,13 @@ def plot_probs_ctc_phone(probs, wav_index, label_type, save_path=None):
         plt.savefig(save_path, dvi=500)
 
 
-def plot_probs_ctc_char(probs, wav_index, save_path=None):
+def plot_probs_ctc_char(probs, wav_index, save_path, show):
     """Plot posteriors of characters.
     Args:
         probs:
         wav_index: int,
         save_path: path to save ctc outpus
+        show: if True, show each figure
     """
     duration = probs.shape[0]
     times_probs = np.arange(len(probs))
@@ -197,7 +209,8 @@ def plot_probs_ctc_char(probs, wav_index, save_path=None):
     plt.xticks(list(range(0, int(len(probs) / 100) + 1, 1)))
     plt.yticks(list(range(0, 2, 1)))
     plt.legend(loc="upper right", fontsize=12)
-    # plt.show()
+    if show:
+        plt.show()
 
     # Save as a png file
     if save_path is not None:
@@ -206,7 +219,7 @@ def plot_probs_ctc_char(probs, wav_index, save_path=None):
 
 
 def plot_probs_ctc_char_phone(probs_char, probs_phone, wav_index,
-                              label_type_second, save_path=None):
+                              label_type_second, save_path, show):
     """Plot posteriors of characters and phones.
     Args:
         probs_char:
@@ -214,6 +227,7 @@ def plot_probs_ctc_char_phone(probs_char, probs_phone, wav_index,
         wav_index: int
         label_type_second: string, phone39 or phone48, phone61
         save_path:
+        show: if True, show each figure
     """
     duration = probs_char.shape[0]
     times_probs = np.arange(len(probs_char))
@@ -260,7 +274,8 @@ def plot_probs_ctc_char_phone(probs_char, probs_phone, wav_index,
     plt.xticks(list(range(0, int(len(probs_phone) / 100) + 1, 1)))
     plt.yticks(list(range(0, 2, 1)))
     plt.legend(loc="upper right", fontsize=12)
-    # plt.show()
+    if show:
+        plt.show()
 
     # Save as a png file
     if save_path is not None:

@@ -14,7 +14,7 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from ..frame_stack import stack_frame
+from .frame_stack import stack_frame
 from ..sparsetensor import list2sparsetensor
 
 

@@ -6,7 +6,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-from .progressbar import wrap_iterator
+from ..progressbar import wrap_iterator
 
 
 def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is_progressbar=False):

@@ -34,7 +34,7 @@ class GRU_CTC(ctcBase):
                  input_size,
                  num_unit,
                  num_layer,
-                 num_classes=,
+                 num_classes,
                  parameter_init=0.1,
                  clip_grad=None,
                  clip_activation=None,
@@ -46,7 +46,7 @@ class GRU_CTC(ctcBase):
                  name='gru_ctc'):
 
         ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
-                         num_classes=, parameter_init,
+                         num_classes, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          weight_decay, name)
