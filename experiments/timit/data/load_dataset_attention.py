@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Load dataset for Attention model (TIMIT corpus).
+"""Load dataset for the Attention model (TIMIT corpus).
    You can use the multi-GPU version.
 """
 

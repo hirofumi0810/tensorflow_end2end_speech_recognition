@@ -33,9 +33,9 @@ def decode_test(session, decode_op, network, dataset, label_type,
     mini_batch = dataset.next_batch(batch_size=1)
 
     if label_type == 'character':
-        map_file_path = '../metric/mapping_files/ctc/char2num.txt'
+        map_file_path = '../metrics/mapping_files/ctc/char2num.txt'
     else:
-        map_file_path = '../metric/mapping_files/ctc/phone2num_' + \
+        map_file_path = '../metrics/mapping_files/ctc/phone2num_' + \
             label_type[5:7] + '.txt'
 
     if save_path is not None:
@@ -96,7 +96,7 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
 
     # Decode character
     print('===== character =====')
-    map_file_path = '../metric/mapping_files/ctc/char2num.txt'
+    map_file_path = '../metrics/mapping_files/ctc/char2num.txt'
     for step in range(iteration):
         # Create feed dictionary for next mini batch
         inputs, labels_true_st, _, inputs_seq_len, input_names = mini_batch.__next__()
@@ -121,7 +121,7 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
 
     # Decode phone
     print('\n===== phone =====')
-    map_file_path = '../metric/mapping_files/ctc/phone2num_' + \
+    map_file_path = '../metrics/mapping_files/ctc/phone2num_' + \
         label_type_second[5:7] + '.txt'
     for step in range(iteration):
         # Create feed dictionary for next mini batch

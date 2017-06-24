@@ -49,10 +49,10 @@ class TestLoadDatasetCTC(unittest.TestCase):
         with tf.Session().as_default() as sess:
             print('=> Reading mini-batch...')
             if label_type == 'character':
-                map_file_path = '../metric/mapping_files/ctc/char2num.txt'
+                map_file_path = '../metrics/mapping_files/ctc/char2num.txt'
                 map_fn = num2char
             else:
-                map_file_path = '../metric/mapping_files/ctc/phone2num_' + \
+                map_file_path = '../metrics/mapping_files/ctc/phone2num_' + \
                     label_type[5:7] + '.txt'
                 map_fn = num2phone
 

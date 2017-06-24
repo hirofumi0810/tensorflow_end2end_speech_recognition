@@ -44,8 +44,8 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
             print('=> Reading mini-batch...')
-            map_file_path_char = '../metric/mapping_files/ctc/char2num.txt'
-            map_file_path_phone = '../metric/mapping_files/ctc/phone2num_61.txt'
+            map_file_path_char = '../metrics/mapping_files/ctc/char2num.txt'
+            map_file_path_phone = '../metrics/mapping_files/ctc/phone2num_61.txt'
 
             mini_batch = dataset.next_batch(session=sess)
 

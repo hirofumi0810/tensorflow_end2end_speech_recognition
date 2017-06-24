@@ -47,9 +47,9 @@ def attention_test(session, decode_op, attention_weights_op, network, dataset,
     save_path = mkdir_join(save_path, 'attention_weights')
 
     if label_type == 'character':
-        map_file_path = '../metric/mapping_files/attention/char2num.txt'
+        map_file_path = '../metrics/mapping_files/attention/char2num.txt'
     else:
-        map_file_path = '../metric/mapping_files/attention/phone2num_' + \
+        map_file_path = '../metrics/mapping_files/attention/phone2num_' + \
             label_type[5:7] + '.txt'
 
     # Load mapping file

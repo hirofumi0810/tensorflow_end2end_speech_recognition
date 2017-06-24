@@ -20,7 +20,7 @@ sys.path.append('../../')
 sys.path.append('../../../')
 from data.load_dataset_multitask_ctc import Dataset
 from models.ctc.load_model_multitask import load
-from metric.ctc import do_eval_per, do_eval_cer
+from metrics.ctc import do_eval_per, do_eval_cer
 from utils.sparsetensor import list2sparsetensor
 from utils.directory import mkdir, mkdir_join
 from utils.parameter import count_total_parameters

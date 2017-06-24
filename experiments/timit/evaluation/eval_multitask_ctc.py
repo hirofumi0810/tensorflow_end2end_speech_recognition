@@ -17,7 +17,7 @@ sys.path.append('../../')
 sys.path.append('../../../')
 from data.load_dataset_multitask_ctc import Dataset
 from models.ctc.load_model_multitask import load
-from metric.ctc import do_eval_per, do_eval_cer
+from metrics.ctc import do_eval_per, do_eval_cer
 
 
 def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):

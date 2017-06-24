@@ -21,7 +21,7 @@ sys.path.append('../../../')
 from data.load_dataset_attention import Dataset
 # from models.attention.load_model import load
 from models.attention import blstm_attention_seq2seq
-from metric.attention import do_eval_per, do_eval_cer
+from metrics.attention import do_eval_per, do_eval_cer
 from utils.sparsetensor import list2sparsetensor
 from utils.directory import mkdir, mkdir_join
 from utils.parameter import count_total_parameters
@@ -104,7 +104,6 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                                  optimizer=optimizer,
                                  learning_rate_init=float(learning_rate),
                                  is_scheduled=False)
-        print(float(learning_rate))
         _, decode_op_infer = network.decoder(
             decoder_outputs_train,
             decoder_outputs_infer,
@@ -336,12 +335,20 @@ def main(config_path):
 
     if corpus['label_type'] == 'phone61':
         num_classes = 63
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'phone48':
         num_classes = 50
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'phone39':
         num_classes = 41
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'character':
         num_classes = 33
+        sos_index = 1
+        eos_index = 2
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
@@ -356,8 +363,8 @@ def main(config_path):
         decoder_num_layer=param['decoder_num_layer'],
         embedding_dim=param['embedding_dim'],
         num_classes=num_classes,
-        sos_index=num_classes - 2,
-        eos_index=num_classes - 1,
+        sos_index=sos_index,
+        eos_index=eos_index,
         max_decode_length=param['max_decode_length'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
         logits_tempareture=param['logits_tempareture'],
@@ -394,7 +401,7 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('attention_timit_' + corpus['label_type'])
+    setproctitle('timit_attention' + corpus['label_type'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
@@ -407,7 +414,7 @@ def main(config_path):
              batch_size=param['batch_size'],
              num_epoch=param['num_epoch'],
              label_type=corpus['label_type'],
-             eos_index=num_classes - 1)
+             eos_index=eos_index)
     sys.stdout = sys.__stdout__
 
 

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate trained Attention model (TIMIT corpus)."""
+"""Evaluate the trained Attention model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -18,15 +18,15 @@ sys.path.append('../../../')
 from data.load_dataset_attention import Dataset
 # from models.attention.load_model import load
 from models.attention import blstm_attention_seq2seq
-from metric.attention import do_eval_per, do_eval_cer
+from metrics.attention import do_eval_per, do_eval_cer
 
 
 def do_eval(network, label_type, eos_index, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
-        label_type: phone39 or phone48 or phone61 or character
-        epoch: epoch to restore
+        label_type: string, phone39 or phone48 or phone61 or character
+        epoch: int the epoch to restore
         eos_index: int, the index of <EOS> class. This is used for padding.
     """
     # Load dataset
@@ -140,12 +140,20 @@ def main(model_path):
 
     if corpus['label_type'] == 'phone61':
         num_classes = 63
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'phone48':
         num_classes = 50
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'phone39':
         num_classes = 41
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'character':
         num_classes = 33
+        sos_index = 1
+        eos_index = 2
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
@@ -160,8 +168,8 @@ def main(model_path):
         decoder_num_layer=param['decoder_num_layer'],
         embedding_dim=param['embedding_dim'],
         num_classes=num_classes,
-        sos_index=num_classes - 2,
-        eos_index=num_classes - 1,
+        sos_index=sos_index,
+        eos_index=eos_index,
         max_decode_length=param['max_decode_length'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
         logits_tempareture=param['logits_tempareture'],
@@ -177,7 +185,7 @@ def main(model_path):
     print(network.model_dir)
     do_eval(network=network,
             label_type=corpus['label_type'],
-            eos_index=num_classes - 1,
+            eos_index=eos_index,
             epoch=epoch)
 
 
@@ -187,5 +195,5 @@ if __name__ == '__main__':
     if len(args) != 2:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python restore_ctc.py path_to_saved_model"))
+             "Usase: python eval_attention.py path_to_saved_model"))
     main(model_path=args[1])

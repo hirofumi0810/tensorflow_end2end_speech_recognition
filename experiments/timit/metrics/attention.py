@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Define evaluation method for Attention-based model (TIMIT corpus)."""
+"""Define evaluation method for the Attention model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -41,6 +41,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     else:
         batch_size = dataset.batch_size
 
+    train_label_type = label_type
     data_label_type = dataset.label_type
 
     num_examples = dataset.data_num
@@ -52,12 +53,12 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     # Make data generator
     mini_batch = dataset.next_batch(batch_size=batch_size)
 
-    phone2num_map_file_path = '../metric/mapping_files/attention/phone2num_' + \
-        label_type[5:7] + '.txt'
-    phone2num_39_map_file_path = '../metric/mapping_files/attention/phone2num_39.txt'
-    phone2phone_map_file_path = '../metric/mapping_files/phone2phone.txt'
+    phone2num_map_file_path = '../metrics/mapping_files/attention/phone2num_' + \
+        train_label_type[5:7] + '.txt'
+    phone2num_39_map_file_path = '../metrics/mapping_files/attention/phone2num_39.txt'
+    phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     for step in wrap_iterator(range(iteration), is_progressbar):
-        # Create feed dictionary for next mini batch
+        # Create feed dictionary for next mini-batch
         if not is_multitask:
             inputs, labels_true, inputs_seq_len, _, _ = mini_batch.__next__()
         else:
@@ -80,7 +81,8 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         else:
             # Evaluate by 39 phones
             predicted_ids = session.run(decode_op, feed_dict=feed_dict)
-            predicted_ids_39 = []
+            predicted_ids_phone39 = []
+            labels_true_phone39 = []
             for i_batch in range(batch_size_each):
                 # Convert from num to phone (-> list of phone strings)
                 phone_pred_seq = num2phone(
@@ -89,19 +91,35 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
                 # Mapping to 39 phones (-> list of phone strings)
                 phone_pred_list = map_to_39phone(
-                    phone_pred_list, label_type, phone2phone_map_file_path)
+                    phone_pred_list, train_label_type,
+                    phone2phone_map_file_path)
 
                 # Convert from phone to num (-> list of phone indices)
                 phone_pred_list = phone2num(
                     phone_pred_list, phone2num_39_map_file_path)
-                predicted_ids_39.append(phone_pred_list)
+                predicted_ids_phone39.append(phone_pred_list)
 
                 if data_label_type != 'phone39':
-                    pass
+                    # Convert from num to phone (-> list of phone strings)
+                    phone_true_seq = num2phone(
+                        labels_true[i_batch], phone2num_map_file_path)
+                    phone_true_list = phone_true_seq.split(' ')
+
+                    # Mapping to 39 phones (-> list of phone strings)
+                    phone_true_list = map_to_39phone(
+                        phone_true_list, train_label_type,
+                        phone2phone_map_file_path)
+
+                    # Convert from phone to num (-> list of phone indices)
+                    phone_true_list = phone2num(
+                        phone_true_list, phone2num_39_map_file_path)
+                    labels_true_phone39.append(phone_true_list)
+                else:
+                    labels_true_phone39 = labels_true
 
             # Compute edit distance
-            labels_true_st = list2sparsetensor(labels_true)
-            labels_pred_st = list2sparsetensor(predicted_ids_39)
+            labels_true_st = list2sparsetensor(labels_true_phone39)
+            labels_pred_st = list2sparsetensor(predicted_ids_phone39)
             per_local = compute_edit_distance(
                 session, labels_true_st, labels_pred_st)
             per_global += per_local * batch_size_each
@@ -140,9 +158,9 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
         iteration += 1
     cer_sum = 0
 
-    map_file_path = '../metric/mapping_files/attention/char2num.txt'
+    map_file_path = '../metrics/mapping_files/attention/char2num.txt'
     for step in wrap_iterator(range(iteration), is_progressbar):
-        # Create feed dictionary for next mini batch
+        # Create feed dictionary for next mini-batch
         if not is_multitask:
             inputs, labels_true, inputs_seq_len, _, _ = mini_batch.__next__()
         else:
@@ -167,8 +185,6 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
             # Remove silence(_) labels
             str_true = re.sub(r'[_<>]+', "", str_true)
             str_pred = re.sub(r'[_]+', "", str_pred)
-            print(str_true)
-            print(str_pred)
 
             # Compute edit distance
             cer_each = Levenshtein.distance(

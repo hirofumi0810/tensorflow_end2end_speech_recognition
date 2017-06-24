@@ -110,12 +110,20 @@ def main(model_path):
 
     if corpus['label_type'] == 'phone61':
         num_classes = 63
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'phone48':
         num_classes = 50
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'phone39':
         num_classes = 41
+        sos_index = 0
+        eos_index = 1
     elif corpus['label_type'] == 'character':
         num_classes = 33
+        sos_index = 1
+        eos_index = 2
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
@@ -130,8 +138,8 @@ def main(model_path):
         decoder_num_layer=param['decoder_num_layer'],
         embedding_dim=param['embedding_dim'],
         num_classes=num_classes,
-        sos_index=num_classes - 2,
-        eos_index=num_classes - 1,
+        sos_index=sos_index,
+        eos_index=eos_index,
         max_decode_length=param['max_decode_length'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
         logits_tempareture=param['logits_tempareture'],
@@ -147,7 +155,7 @@ def main(model_path):
     print(network.model_dir)
     do_plot(network=network,
             label_type=corpus['label_type'],
-            eos_index=num_classes - 1,
+            eos_index=eos_index,
             epoch=epoch)
 
 
