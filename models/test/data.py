@@ -215,7 +215,7 @@ def phone2num(transcript):
 
     # Read mapping file from phone to number
     phone_dict = {}
-    with open('../../experiments/timit/metric/mapping_files/ctc/phone2num_61.txt') as f:
+    with open('../../experiments/timit/metrics/mapping_files/ctc/phone2num_61.txt') as f:
         for line in f:
             line = line.strip().split()
             phone_dict[line[0]] = int(line[1])
@@ -239,7 +239,7 @@ def num2phone(index_list):
     """
     # Read a phone mapping file
     phone_dict = {}
-    with open('../../experiments/timit/metric/mapping_files/ctc/phone2num_61.txt') as f:
+    with open('../../experiments/timit/metrics/mapping_files/ctc/phone2num_61.txt') as f:
         for line in f:
             line = line.strip().split()
             phone_dict[int(line[1])] = line[0]

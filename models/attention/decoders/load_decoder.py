@@ -11,7 +11,7 @@ import tensorflow as tf
 
 
 class load(object):
-    """Select & load model.
+    """Select & load decoder.
     Args:
         model_type: string, lstm or gru
     Returns:

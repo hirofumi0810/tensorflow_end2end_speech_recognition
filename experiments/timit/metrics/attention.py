@@ -20,7 +20,7 @@ from utils.progressbar import wrap_iterator
 
 
 @exception
-def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
+def do_eval_per(session, decode_op, per_op, network, dataset, param,
                 eval_batch_size=None, is_progressbar=False, is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
     Args:
@@ -29,7 +29,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         per_op: operation for computing phone error rate
         network: network to evaluate
         dataset: An instance of a `Dataset' class
-        label_type: string, phone39 or phone48 or phone61 or character
+        param: A dictionary of parameters
         eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
@@ -41,9 +41,9 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     else:
         batch_size = dataset.batch_size
 
-    train_label_type = label_type
+    train_label_type = param['label_type']
     data_label_type = dataset.label_type
-    eos_index = network.eos_index
+    eos_index = param['eos_index']
 
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)

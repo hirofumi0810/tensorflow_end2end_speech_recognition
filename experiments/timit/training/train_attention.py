@@ -28,36 +28,30 @@ from utils.parameter import count_total_parameters
 from utils.csv import save_loss, save_ler
 
 
-def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
-             label_type):
+def do_train(network, param):
     """Run training. If target labels are phone, the model is evaluated by PER
     with 39 phones.
     Args:
         network: network to train
-        optimizer: string, the name of optimizer.
-            ex.) adam, rmsprop
-        learning_rate: initial learning rate
-        batch_size: int, the size of mini-batch
-        num_epoch: int, the number of epochs to train
-        label_type: string, phone39 or phone48 or phone61 or character
+        param: A dictionary of parameters
     """
     eos_index = network.eos_index
 
     # Load dataset
-    train_data = Dataset(data_type='train', label_type=label_type,
-                         batch_size=batch_size,
+    train_data = Dataset(data_type='train', label_type=param['label_type'],
+                         batch_size=param['batch_size'],
                          eos_index=eos_index, is_sorted=True)
-    dev_data = Dataset(data_type='dev', label_type=label_type,
-                       batch_size=batch_size,
-                       eos_index=eos_index, is_sorted=False)
-    if label_type == 'character':
+    dev_data = Dataset(data_type='dev', label_type=param['label_type'],
+                       batch_size=param['batch_size'],
+                       eos_index=param['eos_index'], is_sorted=False)
+    if param['label_type'] == 'character':
         test_data = Dataset(data_type='test', label_type='character',
                             batch_size=1,
-                            eos_index=eos_index, is_sorted=False)
+                            eos_index=param['eos_index'], is_sorted=False)
     else:
         test_data = Dataset(data_type='test', label_type='phone39',
                             batch_size=1,
-                            eos_index=eos_index, is_sorted=False)
+                            eos_index=param['eos_index'], is_sorted=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -101,10 +95,11 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
             network.labels_seq_len,
             network.keep_prob_input,
             network.keep_prob_hidden)
-        train_op = network.train(loss_op,
-                                 optimizer=optimizer,
-                                 learning_rate_init=float(learning_rate),
-                                 is_scheduled=False)
+        train_op = network.train(
+            loss_op,
+            optimizer=param['optimizer'],
+            learning_rate_init=float(param['learning_rate']),
+            is_scheduled=False)
         _, decode_op_infer = network.decoder(
             decoder_outputs_train,
             decoder_outputs_infer,
@@ -124,12 +119,12 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
         # Create a saver for writing training checkpoints
         saver = tf.train.Saver(max_to_keep=None)
 
-        # Count total parameters
+        # Count total param
         parameters_dict, total_parameters = count_total_parameters(
             tf.trainable_variables())
         for parameter_name in sorted(parameters_dict.keys()):
             print("%s %d" % (parameter_name, parameters_dict[parameter_name]))
-        print("Total %d variables, %s M parameters" %
+        print("Total %d variables, %s M param" %
               (len(parameters_dict.keys()),
                "{:,}".format(total_parameters / 1000000)))
 
@@ -146,15 +141,15 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
             summary_writer = tf.summary.FileWriter(
                 network.model_dir, sess.graph)
 
-            # Initialize parameters
+            # Initialize param
             sess.run(init_op)
 
             # Train model
-            iter_per_epoch = int(train_data.data_num / batch_size)
-            train_step = train_data.data_num / batch_size
+            iter_per_epoch = int(train_data.data_num / param['batch_size'])
+            train_step = train_data.data_num / param['batch_size']
             if train_step != int(train_step):
                 iter_per_epoch += 1
-            max_steps = iter_per_epoch * num_epoch
+            max_steps = iter_per_epoch * param['num_epoch']
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
@@ -170,7 +165,7 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                     network.labels_seq_len: labels_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.lr: learning_rate
+                    network.lr: param['learning_rate']
                 }
 
                 # Create feed dictionary for next mini batch (dev)
@@ -184,7 +179,7 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                     network.keep_prob_hidden: network.dropout_ratio_hidden
                 }
 
-                # Update parameters
+                # Update param
                 sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % 10 == 0:
@@ -257,7 +252,7 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
 
                     if epoch >= 20:
                         start_time_eval = time.time()
-                        if label_type == 'character':
+                        if param['label_type'] == 'character':
                             print('=== Dev Data Evaluation ===')
                             error_dev_epoch = do_eval_cer(
                                 session=sess,
@@ -289,7 +284,7 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                                 per_op=ler_op,
                                 network=network,
                                 dataset=dev_data,
-                                label_type=label_type,
+                                param=param,
                                 eval_batch_size=1)
                             print('  PER: %f %%' % (error_dev_epoch * 100))
 
@@ -304,7 +299,7 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                                     per_op=ler_op,
                                     network=network,
                                     dataset=test_data,
-                                    label_type=label_type,
+                                    param=param,
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (error_dev_epoch * 100))
 
@@ -334,32 +329,30 @@ def main(config_path):
     # Load a config file (.yml)
     with open(config_path, "r") as f:
         config = yaml.load(f)
-        corpus = config['corpus']
-        feature = config['feature']
         param = config['param']
 
-    if corpus['label_type'] == 'phone61':
-        num_classes = 63
-        sos_index = 0
-        eos_index = 1
-    elif corpus['label_type'] == 'phone48':
-        num_classes = 50
-        sos_index = 0
-        eos_index = 1
-    elif corpus['label_type'] == 'phone39':
-        num_classes = 41
-        sos_index = 0
-        eos_index = 1
-    elif corpus['label_type'] == 'character':
-        num_classes = 33
-        sos_index = 1
-        eos_index = 2
+    if param['label_type'] == 'phone61':
+        param['num_classes'] = 63
+        param['sos_index'] = 0
+        param['eos_index'] = 1
+    elif param['label_type'] == 'phone48':
+        param['num_classes'] = 50
+        param['sos_index'] = 0
+        param['eos_index'] = 1
+    elif param['label_type'] == 'phone39':
+        param['num_classes'] = 41
+        param['sos_index'] = 0
+        param['eos_index'] = 1
+    elif param['label_type'] == 'character':
+        param['num_classes'] = 33
+        param['sos_index'] = 1
+        param['eos_index'] = 2
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
     network = blstm_attention_seq2seq.BLSTMAttetion(
         batch_size=param['batch_size'],
-        input_size=feature['input_size'],
+        input_size=param['input_size'],
         encoder_num_unit=param['encoder_num_unit'],
         encoder_num_layer=param['encoder_num_layer'],
         attention_dim=param['attention_dim'],
@@ -367,10 +360,11 @@ def main(config_path):
         decoder_num_unit=param['decoder_num_unit'],
         decoder_num_layer=param['decoder_num_layer'],
         embedding_dim=param['embedding_dim'],
-        num_classes=num_classes,
-        sos_index=sos_index,
-        eos_index=eos_index,
+        num_classes=param['num_classes'],
+        sos_index=param['sos_index'],
+        eos_index=param['eos_index'],
         max_decode_length=param['max_decode_length'],
+        attention_smoothing=param['attention_smoothing'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
         logits_tempareture=param['logits_tempareture'],
         parameter_init=param['weight_init'],
@@ -381,7 +375,7 @@ def main(config_path):
         dropout_ratio_hidden=param['dropout_hidden'],
         weight_decay=param['weight_decay'])
 
-    network.model_name = config['model_name'].upper()
+    network.model_name = param['model']
     network.model_name += '_encoder' + str(param['encoder_num_unit'])
     network.model_name += '_' + str(param['encoder_num_layer'])
     network.model_name += '_attdim' + str(param['attention_dim'])
@@ -390,6 +384,8 @@ def main(config_path):
     network.model_name += '_' + param['optimizer']
     network.model_name += '_lr' + str(param['learning_rate'])
     network.model_name += '_' + param['attention_type']
+    if bool(param['attention_smoothing']):
+        network.model_name += '_smoothing'
     if param['attention_weights_tempareture'] != 1:
         network.model_name += '_sharpening' + \
             str(param['attention_weights_tempareture'])
@@ -399,7 +395,7 @@ def main(config_path):
     # Set save path
     network.model_dir = mkdir('/n/sd8/inaguma/result/timit/')
     network.model_dir = mkdir_join(network.model_dir, 'attention')
-    network.model_dir = mkdir_join(network.model_dir, corpus['label_type'])
+    network.model_dir = mkdir_join(network.model_dir, param['label_type'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
@@ -410,19 +406,14 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('timit_att_' + corpus['label_type'])
+    setproctitle('timit_att_' + param['label_type'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
     sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
-    do_train(network=network,
-             optimizer=param['optimizer'],
-             learning_rate=param['learning_rate'],
-             batch_size=param['batch_size'],
-             num_epoch=param['num_epoch'],
-             label_type=corpus['label_type'])
+    do_train(network=network, param=param)
     sys.stdout = sys.__stdout__
 
 

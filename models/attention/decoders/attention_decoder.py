@@ -44,9 +44,9 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
              i.e. number of units in the softmax layer
         attention_encoder_states: The sequence used to calculate attention
             scores. A tensor of shape
-            `[batch_size, max_time, encoder_num_unit]`.
+            `[batch_size, input_time, encoder_num_unit]`.
         attention_values: The sequence to attend over.
-            A tensor of shape `[batch_size, max_time, encoder_num_unit]`.
+            A tensor of shape `[batch_size, input_time, encoder_num_unit]`.
         attention_values_length: Sequence length of the attention values.
             An int32 Tensor of shape `[batch_size]`.
         attention_layer: The attention function to use. This function map from
@@ -121,7 +121,6 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
             A tuple of `(outputs, final_state)`
                 outputs: A tensor of `[time, batch_size, ??]`
                 final_state: A tensor of `[time, batch_size, ??]`
-            attention_weights_list: list of attention weights in each time
         """
         self.mode = mode
         if mode == tf.contrib.learn.ModeKeys.TRAIN:
@@ -142,22 +141,27 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         if self.mode == tf.contrib.learn.ModeKeys.INFER:
             maximum_iterations = self.max_decode_length
 
-        # outputs, final_state = tf.contrib.seq2seq.dynamic_decode(
+        # outputs, final_state, final_seq_len = tf.contrib.seq2seq.dynamic_decode(
         outputs, final_state = dynamic_decode(
             decoder=self,
             output_time_major=self.time_major,
             impute_finished=True,
-            maximum_iterations=maximum_iterations)
-        return self.finalize(outputs, final_state)
+            maximum_iterations=maximum_iterations,
+            scope='dynamic_decoder')
 
-    def finalize(self, outputs, final_state):
+        # return self.finalize(outputs, final_state, final_seq_len)
+        return self.finalize(outputs, final_state, None)
+
+    def finalize(self, outputs, final_state, final_seq_len):
         """Applies final transformation to the decoder output once decoding is
            finished.
         Args: outputs:
               final_state:
+              final_seq_len:
         Returns:
             A tuple of `(outputs, final_state)`
         """
+        print('===== finalize =====')
         return (outputs, final_state)
 
     def initialize(self, name=None):
@@ -169,6 +173,7 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
             first_inputs:
             initial_state:
         """
+        print('=== initialize =====')
         # Create inputs for the first time step
         finished, first_inputs = self.helper.initialize()
         # NOTE: first_inputs: `[batch_size, embedding_dim]`
@@ -177,10 +182,12 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         batch_size = tf.shape(first_inputs)[0]
         encoder_num_unit = self.attention_values.get_shape().as_list()[-1]
         attention_context = tf.zeros(shape=[batch_size, encoder_num_unit])
+        self.attention_weights = tf.zeros(
+            shape=[batch_size, tf.shape(self.attention_values)[1]])
 
         # Create first inputs
         first_inputs = tf.concat([first_inputs, attention_context], axis=1)
-        # ex.)
+        # ex.) tf.concat
         # tensor t3 with shape [2, 3]
         # tensor t4 with shape [2, 3]
         # tf.shape(tf.concat([t3, t4], 0)) ==> [4, 3]
@@ -188,22 +195,25 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
 
         return finished, first_inputs, self.initial_state
 
-    def compute_output(self, cell_output):
+    def compute_output(self, cell_output, attention_weights):
         """Computes the decoder outputs at each time.
         Args:
             cell_output: The previous state of the decoder
-        Returns:
-            softmax_input:
-            logits:
             attention_weights:
-            attention_context:
+        Returns:
+            softmax_input: A tensor of size `[]`
+            logits: A tensor of size `[]`
+            attention_weights: A tensor of size `[]`
+            attention_context: A tensor of szie `[]`
         """
+        print('===== compute_output =====')
         # Compute attention weights & context
         attention_weights, attention_context = self.attention_layer(
             encoder_states=self.attention_encoder_states,
             current_decoder_state=cell_output,
             values=self.attention_values,
-            values_length=self.attention_values_length)
+            values_length=self.attention_values_length,
+            attention_weights=attention_weights)
 
         # TODO: Make this a parameter: We may or may not want this.
         # Transform attention context.
@@ -211,13 +221,13 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         # information between decoder state and attention context
         # see https://arxiv.org/abs/1508.04025v5
         # g_i = tanh(W_s * s_{i-1} + W_c * c_i + b (+ W_o * y_{i-1}))
+        # TODO: y_i-1も入力にするのは冗長らしいが，自分で確かめる
         self.softmax_input = tf.contrib.layers.fully_connected(
             inputs=tf.concat([cell_output, attention_context], axis=1),
             num_outputs=self.cell.output_size,
             activation_fn=tf.nn.tanh,
             # reuse=True,
             scope="attention_mix")
-        # TODO: y_i-1も入力にするのは冗長らしいが，自分で確かめる
 
         # Softmax computation
         # P(y_i|s_i, c_i, y_{i-1}) = softmax(W_g * g_i + b)
@@ -281,11 +291,14 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
                 finished: A boolean tensor telling whether the sequence is
                     complete, for each sequence in the batch.
         """
+        print('===== step =====')
         with tf.variable_scope("step", reuse=self.reuse):
             # Call LSTMCell
             cell_output_prev, cell_state_prev = self.cell(inputs, state)
-            cell_output, logits, attention_weights, attention_context = \
-                self.compute_output(cell_output_prev)
+            attention_weights_prev = self.attention_weights
+            cell_output, logits, attention_weights, attention_context = self.compute_output(
+                cell_output_prev, attention_weights_prev)
+            self.attention_weights = attention_weights
 
             sample_ids = self.helper.sample(time=time,
                                             outputs=logits,

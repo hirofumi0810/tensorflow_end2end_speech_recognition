@@ -14,7 +14,7 @@ from .decoders.attention_layer import AttentionLayer
 from .decoders.attention_decoder import AttentionDecoder
 from .decoders.attention_decoder import AttentionDecoderOutput
 from .decoders.dynamic_decoder import _transpose_batch_time as time2batch
-from .bridge import InitialStateBridge, PassThroughBridge
+from .bridge import InitialStateBridge
 
 
 class BLSTMAttetion(AttentionBase):
@@ -25,7 +25,8 @@ class BLSTMAttetion(AttentionBase):
         encoder_num_unit: int, the number of units in each layer of the
             encoder
         encoder_num_layer: int, the number of layers of the encoder
-        attention_dim: int,
+        attention_dim: int, the dimension of the attention layer
+        attention_type: string, content or location or hybrid or layer_dot
         decoder_num_unit: int, the number of units in each layer of the
             decoder
         decoder_num_layer: int, the number of layers of the decoder
@@ -33,9 +34,11 @@ class BLSTMAttetion(AttentionBase):
         num_classes: int, the number of nodes in softmax layer
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
-        max_decode_length:
-        attention_weights_tempareture:
-        logits_tempareture:
+        max_decode_length: int,
+        attention_smoothing: bool, if True, replace exp to sigmoid function in
+            the softmax layer of computing attention weights
+        attention_weights_tempareture: A float value,
+        logits_tempareture: A float value,
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (non-negative)
@@ -56,6 +59,7 @@ class BLSTMAttetion(AttentionBase):
                  encoder_num_unit,
                  encoder_num_layer,
                  attention_dim,
+                 attention_type,
                  decoder_num_unit,
                  decoder_num_layer,
                  embedding_dim,
@@ -63,8 +67,9 @@ class BLSTMAttetion(AttentionBase):
                  sos_index,
                  eos_index,
                  max_decode_length,
-                 attention_weights_tempareture=1,
-                 logits_tempareture=1,
+                 attention_smoothing=False,
+                 attention_weights_tempareture=1.0,
+                 logits_tempareture=1.0,
                  parameter_init=0.1,
                  clip_grad=5.0,
                  clip_activation_encoder=50,
@@ -72,39 +77,47 @@ class BLSTMAttetion(AttentionBase):
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
                  weight_decay=0.0,
-                 beam_width=0,
+                 beam_width=1,
                  time_major=False,
                  name='blstm_attention_seq2seq'):
 
-        AttentionBase.__init__(self, batch_size, input_size,
-                               attention_dim, embedding_dim,
-                               num_classes, sos_index, eos_index,
-                               clip_grad, weight_decay, beam_width, name)
+        # AttentionBase.__init__(self)
 
-        # Network size
-        self.encoder_num_unit = encoder_num_unit
-        self.encoder_num_layer = encoder_num_layer
-        self.decoder_num_unit = decoder_num_unit
-        self.decoder_num_layer = decoder_num_layer
-
-        # Regularization
-        self.parameter_init = parameter_init
-        self.clip_activation_encoder = clip_activation_encoder
-        self.clip_activation_decoder = clip_activation_decoder
-        if dropout_ratio_input == 1.0 and dropout_ratio_hidden == 1.0:
-            self.dropout = False
-        else:
-            self.dropout = True
-        self.dropout_ratio_input = dropout_ratio_input
-        self.dropout_ratio_hidden = dropout_ratio_hidden
-
-        # Setting for se2seq
-        self.max_decode_length = max_decode_length
-        self.attention_weights_tempareture = attention_weights_tempareture
-        self.logits_tempareture = logits_tempareture
-        # NOTE: attention_weights_tempareture is good for narrow focus.
-        # Assume that β = 1 / attention_weights_tempareture, β=2 is recommended
+        self.batch_size = int(batch_size)
+        self.input_size = int(input_size)
+        self.encoder_num_unit = int(encoder_num_unit)
+        self.encoder_num_layer = int(encoder_num_layer)
+        self.attention_dim = int(attention_dim)
+        self.attention_type = attention_type
+        self.decoder_num_unit = int(decoder_num_unit)
+        self.decoder_num_layer = int(decoder_num_layer)
+        self.embedding_dim = int(embedding_dim)
+        self.num_classes = int(num_classes)
+        self.sos_index = int(sos_index)
+        self.eos_index = int(eos_index)
+        self.max_decode_length = int(max_decode_length)
+        self.attention_smoothing = bool(attention_smoothing)
+        self.attention_weights_tempareture = float(
+            attention_weights_tempareture)
+        self.logits_tempareture = float(logits_tempareture)
+        self.parameter_init = float(parameter_init)
+        self.clip_grad = float(clip_grad)
+        self.clip_activation_encoder = float(clip_activation_encoder)
+        self.clip_activation_decoder = float(clip_activation_decoder)
+        self.dropout_ratio_input = float(dropout_ratio_input)
+        self.dropout_ratio_hidden = float(dropout_ratio_hidden)
+        self.weight_decay = float(weight_decay)
+        self.beam_width = int(beam_width)
         self.time_major = time_major
+        self.name = name
+
+        # NOTE: attention_weights_tempareture is good for narrow focus.
+        # Assume that β = 1 / attention_weights_tempareture,
+        # and β=2 is recommended
+
+        # Summaries for TensorBoard
+        self.summaries_train = []
+        self.summaries_dev = []
 
     def _encode(self, inputs, inputs_seq_len,
                 keep_prob_input, keep_prob_hidden):
@@ -138,16 +151,18 @@ class BLSTMAttetion(AttentionBase):
     def _create_decoder(self, encoder_outputs, labels):
         """Create attention decoder.
         Args:
-            encoder_outputs: A tuple of `()`
+            encoder_outputs: A namedtuple of `(outputs, final_state,
+                attention_values, attention_values_length)`
             labels: Target labels of size `[batch_size, time]`
         Returns:
-            decoder: The decoder class instance
+            decoder: An instance of the decoder class
         """
         # Define attention layer (calculate attention weights)
         self.attention_layer = AttentionLayer(
             num_unit=self.attention_dim,
+            attention_smoothing=self.attention_smoothing,
             attention_weights_tempareture=self.attention_weights_tempareture,
-            attention_type='bahdanau')
+            attention_type=self.attention_type)
 
         # Define RNN decoder
         rnn_decoder = load_decoder(model_type='lstm_decoder')
@@ -203,7 +218,6 @@ class BLSTMAttetion(AttentionBase):
         #                                                   beam_width=20)
 
         # Connect between encoder and decoder
-        # bridge = PassThroughBridge(
         bridge = InitialStateBridge(
             encoder_outputs=encoder_outputs,
             decoder_state_size=decoder_train.cell.state_size)

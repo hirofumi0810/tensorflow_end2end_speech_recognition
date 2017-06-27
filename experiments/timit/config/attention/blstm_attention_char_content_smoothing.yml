@@ -1,6 +1,6 @@
 param:
   model: blstm_attention
-  corpus:: timit
+  corpus: timit
   label_type: character
   feature: fbank
   input_size: 123
@@ -12,8 +12,8 @@ param:
   decoder_num_layer: 1
   embedding_dim: 20
   max_decode_length: 50
-  attention_smoothing: False
-  attention_weights_tempareture: 0.5
+  attention_smoothing: True
+  attention_weights_tempareture: 1.0
   logits_tempareture: 1.0
   batch_size: 64
   optimizer: rmsprop

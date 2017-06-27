@@ -1,3 +1,6 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """Seq2seq layer operations for use in neural networks.
 """
 
@@ -24,11 +27,11 @@ def _transpose_batch_time(x):
     """Transpose the batch and time dimensions of a Tensor.
     Retains as much of the static shape information as possible.
     Args:
-      x: A tensor of rank 2 or higher.
+        x: A tensor of rank 2 or higher.
     Returns:
-      x transposed along the first two dimensions.
+        x transposed along the first two dimensions.
     Raises:
-      ValueError: if `x` is rank 1 or lower.
+        ValueError: if `x` is rank 1 or lower.
     """
     x_static_shape = x.get_shape()
     if x_static_shape.ndims is not None and x_static_shape.ndims < 2:
@@ -71,27 +74,27 @@ def dynamic_decode(decoder,
                    scope=None):
     """Perform dynamic decoding with `decoder`.
     Args:
-      decoder: A `Decoder` instance.
-      output_time_major: Python boolean.  Default: `False` (batch major).  If
-        `True`, outputs are returned as time major tensors (this mode is faster).
-        Otherwise, outputs are returned as batch major tensors (this adds extra
-        time to the computation).
-      impute_finished: Python boolean.  If `True`, then states for batch
-        entries which are marked as finished get copied through and the
-        corresponding outputs get zeroed out.  This causes some slowdown at
-        each time step, but ensures that the final state and outputs have
-        the correct values and that backprop ignores time steps that were
-        marked as finished.
-      maximum_iterations: `int32` scalar, maximum allowed number of decoding
-         steps.  Default is `None` (decode until the decoder is fully done).
-      parallel_iterations: Argument passed to `tf.while_loop`.
-      swap_memory: Argument passed to `tf.while_loop`.
-      scope: Optional variable scope to use.
+        decoder: A `Decoder` instance.
+        output_time_major: Python boolean.  Default: `False` (batch major).  If
+            `True`, outputs are returned as time major tensors (this mode is faster).
+            Otherwise, outputs are returned as batch major tensors (this adds extra
+            time to the computation).
+        impute_finished: Python boolean.  If `True`, then states for batch
+            entries which are marked as finished get copied through and the
+            corresponding outputs get zeroed out.  This causes some slowdown at
+            each time step, but ensures that the final state and outputs have
+            the correct values and that backprop ignores time steps that were
+            marked as finished.
+        maximum_iterations: `int32` scalar, maximum allowed number of decoding
+            steps.  Default is `None` (decode until the decoder is fully done).
+        parallel_iterations: Argument passed to `tf.while_loop`.
+        swap_memory: Argument passed to `tf.while_loop`.
+        scope: Optional variable scope to use.
     Returns:
-      `(final_outputs, final_state)`.
+        `(final_outputs, final_state)`.
     Raises:
-      TypeError: if `decoder` is not an instance of `Decoder`.
-      ValueError: if maximum_iterations is provided but is not a scalar.
+        TypeError: if `decoder` is not an instance of `Decoder`.
+        ValueError: if maximum_iterations is provided but is not a scalar.
     """
     if not isinstance(decoder, tf.contrib.seq2seq.Decoder):
         raise TypeError("Expected decoder to be type Decoder, but saw: %s" %
@@ -145,13 +148,13 @@ def dynamic_decode(decoder,
         def body(time, outputs_ta, state, inputs, finished):
             """Internal while_loop body.
             Args:
-              time: scalar int32 tensor.
-              outputs_ta: structure of TensorArray.
-              state: (structure of) state tensors and TensorArrays.
-              inputs: (structure of) input tensors.
-              finished: 1-D bool tensor.
+                time: scalar int32 tensor.
+                outputs_ta: structure of TensorArray.
+                state: (structure of) state tensors and TensorArrays.
+                inputs: (structure of) input tensors.
+                finished: 1-D bool tensor.
             Returns:
-              `(time + 1, outputs_ta, next_state, next_inputs, next_finished)`.
+                `(time + 1, outputs_ta, next_state, next_inputs, next_finished)`.
             """
             (next_outputs, decoder_state, next_inputs,
              decoder_finished) = decoder.step(time, inputs, state)

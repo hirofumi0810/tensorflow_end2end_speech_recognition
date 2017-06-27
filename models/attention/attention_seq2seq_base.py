@@ -41,40 +41,8 @@ class AttentionBase(object):
         beam_width: if equal to 1, use greedy decoding
     """
 
-    def __init__(self,
-                 batch_size,
-                 input_size,
-                 attention_dim,
-                 embedding_dim,
-                 num_classes,
-                 sos_index,
-                 eos_index,
-                 clip_grad,
-                 weight_decay,
-                 beam_width,
-                 name=None):
-
-        # Network size
-        self.batch_size = batch_size
-        self.input_size = input_size
-        self.attention_dim = attention_dim
-        self.embedding_dim = embedding_dim
-        self.num_classes = num_classes
-
-        # Regularization
-        self.clip_grad = clip_grad
-        self.weight_decay = float(weight_decay)
-
-        # Setting for seq2seq
-        self.sos_index = sos_index
-        self.eos_index = eos_index
-        self.beam_width = beam_width
-
-        # Summaries for TensorBoard
-        self.summaries_train = []
-        self.summaries_dev = []
-
-        self.name = name
+    def __init__(self):
+        pass
 
     def _generate_target_embedding(self, reuse):
         """Returns the embedding used for the target sequence."""
@@ -161,8 +129,9 @@ class AttentionBase(object):
         helper_train = tf.contrib.seq2seq.TrainingHelper(
             inputs=target_embedded[:, :-1, :],  # embedding of target labels
             # inputs=labels[:, :-1, :],
-            sequence_length=labels_seq_len - 1,
-            time_major=False)
+            sequence_length=labels_seq_len - 1,  # include <SOS>, exclude <EOS>
+            time_major=False)  # self.time_major??
+        # target_embedded: `[batch_size, time, embedding_dim]`
 
         decoder_initial_state = bridge(reuse=False)
 
@@ -199,8 +168,8 @@ class AttentionBase(object):
         helper_infer = tf.contrib.seq2seq.GreedyEmbeddingHelper(
             # embedding=self.decoder_outputs_train.logits,
             embedding=target_embedding,  # embedding of predicted labels
-            # start_tokens=tf.fill([batch_size], self.sos_index),
-            start_tokens=tf.tile([self.sos_index], [batch_size]),
+            start_tokens=tf.fill([batch_size], self.sos_index),
+            # start_tokens=tf.tile([self.sos_index], [batch_size]),
             end_token=self.eos_index)
         # ex.)
         # Output tensor has shape [2, 3].
@@ -245,7 +214,8 @@ class AttentionBase(object):
             keep_prob_input, keep_prob_hidden)
 
         # For prevent 0 * log(0) in crossentropy loss
-        # logits = tf.clip_by_value(logits, 1e-10, 1.0)
+        epsilon = tf.constant(value=1e-10)  # shope??
+        logits = logits + epsilon
 
         # Weight decay
         if self.weight_decay > 0:
@@ -289,7 +259,7 @@ class AttentionBase(object):
         return loss, logits, decoder_outputs_train, decoder_outputs_infer
 
     def train(self, loss, optimizer, learning_rate_init=None,
-              clip_grad_by_norm=None, is_scheduled=False):
+              clip_grad_by_norm=False, is_scheduled=False):
         """Operation for training.
         Args:
             loss: An operation for computing loss
@@ -353,23 +323,34 @@ class AttentionBase(object):
 
         if clip_grad_by_norm:
             # Clip by norm
-            clipped_grads = [tf.clip_by_norm(
-                g,
-                clip_norm=self.clip_grad) for g in grads]
+            clipped_grads = []
+            for grad, var in zip(grads, trainable_vars):
+                if grad is not None:
+                    grad = tf.clip_by_norm(grad,
+                                           clip_norm=self.clip_grad)
+                    clipped_grads.append(grad)
+
+                    # Add histograms for gradients.
+                    # self.summaries_train.append(
+                    # tf.summary.histogram(var.op.name + '/gradients', grad))
+
         else:
             # Clip by absolute values
-            # clipped_grads = [tf.clip_by_value(
-            #     g,
-            #     clip_value_min=-self.clip_grad,
-            #     clip_value_max=self.clip_grad) for g in grads]
-            clipped_grads = [tf.clip_by_value(
-                g,
-                clip_value_min=-self.clip_grad,
-                clip_value_max=self.clip_grad) for g in grads if g is not None]
-            # TODO: Why None occured?
+            clipped_grads = []
+            for grad, var in zip(grads, trainable_vars):
+                if grad is not None:
+                    grad = tf.clip_by_value(
+                        grad,
+                        clip_value_min=-self.clip_grad,
+                        clip_value_max=self.clip_grad)
+                    clipped_grads.append(grad)
 
-        # TODO: Add histograms for variables, gradients (norms)
-        # self._tensorboard_statistics(trainable_vars)
+                    # Add histograms for gradients.
+                    # self.summaries_train.append(
+                    #     tf.summary.histogram(var.op.name + '/gradients', grad))
+                    # TODO: Why None occured?
+
+                    # self._tensorboard_statistics(trainable_vars)
 
         # Create gradient updates
         train_op = optimizer.apply_gradients(

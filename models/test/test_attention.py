@@ -24,11 +24,23 @@ class TestAttention(tf.test.TestCase):
     @measure_time
     def test_attention(self):
         print("Attention Working check.")
-        # self.check_training(model_type='attention', label_type='phone')
-        self.check_training(model_type='attention', label_type='character')
+        # self.check_training(attention_type='hybrid', label_type='phone')
+        # self.check_training(attention_type='hybrid', label_type='character')
 
-    def check_training(self, model_type, label_type):
-        print('----- ' + model_type + ', ' + label_type + ' -----')
+        self.check_training(attention_type='content', label_type='phone')
+        self.check_training(attention_type='content', label_type='character')
+
+        self.check_training(attention_type='layer_dot', label_type='phone')
+        self.check_training(attention_type='layer_dot', label_type='character')
+
+        # self.check_training(attention_type='location', label_type='phone')
+        # self.check_training(attention_type='location', label_type='character')
+
+    def check_training(self, attention_type, label_type):
+
+        print('----- attention_type: ' + attention_type + ', label_type: ' +
+              label_type + ' -----')
+
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
@@ -82,6 +94,7 @@ class TestAttention(tf.test.TestCase):
                 encoder_num_unit=256,
                 encoder_num_layer=2,
                 attention_dim=128,
+                attention_type=attention_type,
                 decoder_num_unit=256,
                 decoder_num_layer=1,
                 embedding_dim=20,
@@ -89,6 +102,7 @@ class TestAttention(tf.test.TestCase):
                 sos_index=num_classes - 2,
                 eos_index=num_classes - 1,
                 max_decode_length=50,
+                attention_smoothing=True,
                 attention_weights_tempareture=1,
                 logits_tempareture=1,
                 parameter_init=0.1,
@@ -183,9 +197,14 @@ class TestAttention(tf.test.TestCase):
                             feed_dict=feed_dict)
 
                         # Compute accuracy
+                        print(labels)
                         feed_dict_ler = {
-                            labels_st_true_pl: list2sparsetensor(labels),
-                            labels_st_pred_pl: list2sparsetensor(predicted_ids_infer)
+                            labels_st_true_pl: list2sparsetensor(
+                                labels,
+                                padded_value=0),
+                            labels_st_pred_pl: list2sparsetensor(
+                                predicted_ids_infer,
+                                padded_value=0)
                         }
                         ler_train = sess.run(ler_op, feed_dict=feed_dict_ler)
 

@@ -38,7 +38,7 @@ class BGRUEncoder(EncoderBase):
                keep_prob_input, keep_prob_hidden):
         """Construct Bidirectional GRU encoder.
         Args:
-            inputs: A tensor of `[batch_size, max_time, input_dim]`
+            inputs: A tensor of `[batch_size, time, input_dim]`
             inputs_seq_len: A tensor of `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
                 input-hidden layers

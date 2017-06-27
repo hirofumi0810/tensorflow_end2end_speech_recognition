@@ -31,9 +31,10 @@ class Bridge(object):
     All logic is contained in the `_create` method, which returns an
     initial state for the decoder.
     Args:
-      encoder_outputs: A namedtuple that corresponds to the the encoder outputs.
-      decoder_state_size: An integer or tuple of integers defining the
-        state size of the decoder.
+        encoder_outputs: A namedtuple that corresponds to the the encoder
+            outputs.
+        decoder_state_size: An integer or tuple of integers defining the
+            state size of the decoder.
     """
 
     def __init__(self, encoder_outputs, decoder_state_size):
@@ -45,7 +46,7 @@ class Bridge(object):
     def __call__(self):
         """Runs the bridge function.
         Returns:
-          An initial decoder_state tensor or tuple of tensors.
+            An initial decoder_state tensor or tuple of tensors.
         """
         return self._create()
 
@@ -54,14 +55,15 @@ class Bridge(object):
         """ Implements the logic for this bridge.
         This function should be implemented by child classes.
         Returns:
-          A tuple initial_decoder_state tensor or tuple of tensors.
+            A tuple initial_decoder_state tensor or tuple of tensors.
         """
         raise NotImplementedError("Must be implemented by child class")
 
 
 class ZeroBridge(Bridge):
     """A bridge that does not pass any information between encoder and decoder
-    and sets the initial decoder state to 0. The input function is not modified.
+    and sets the initial decoder state to 0. The input function is not
+    modified.
     """
 
     @staticmethod
@@ -77,8 +79,8 @@ class ZeroBridge(Bridge):
 
 class PassThroughBridge(Bridge):
     """Passes the encoder state through to the decoder as-is. This bridge
-    can only be used if encoder and decoder have the exact same state size, i.e.
-    use the same RNN cell.
+    can only be used if encoder and decoder have the exact same state size,
+    i.e. use the same RNN cell.
     """
 
     @staticmethod
@@ -97,15 +99,16 @@ class InitialStateBridge(Bridge):
     through an additional layer to match them to the decoder state size.
     The input function remains unmodified.
     Args:
-      encoder_outputs: A namedtuple that corresponds to the the encoder outputs.
-      decoder_state_size: An integer or tuple of integers defining the
-        state size of the decoder.
-      bridge_input: Which attribute of the `encoder_outputs` to use for the
-        initial state calculation. For example, "final_state" means that
-        `encoder_outputs.final_state` will be used.
-      activation_fn: An optional activation function for the extra
-        layer inserted between encoder and decoder. A string for a function
-        name contained in `tf.nn`, e.g. "tanh".
+        encoder_outputs: A namedtuple that corresponds to the the encoder
+            outputs.
+        decoder_state_size: An integer or tuple of integers defining the
+            state size of the decoder.
+        bridge_input: Which attribute of the `encoder_outputs` to use for the
+            initial state calculation. For example, "final_state" means that
+            `encoder_outputs.final_state` will be used.
+        activation_fn: An optional activation function for the extra
+            layer inserted between encoder and decoder. A string for a function
+            name contained in `tf.nn`, e.g. "tanh".
     """
 
     def __init__(self, encoder_outputs, decoder_state_size):
@@ -123,7 +126,7 @@ class InitialStateBridge(Bridge):
         Args:
             reuse:
         Returns:
-          An initial decoder_state tensor or tuple of tensors.
+            An initial decoder_state tensor or tuple of tensors.
         """
         self.reuse = reuse
         return self._create()

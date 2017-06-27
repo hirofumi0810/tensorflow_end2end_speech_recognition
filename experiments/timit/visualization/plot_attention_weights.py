@@ -98,9 +98,7 @@ def do_plot(network, label_type, epoch=None):
                        show=True)
 
 
-def main(model_path):
-
-    epoch = None  # if None, restore the final epoch
+def main(model_path, epoch):
 
     # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
@@ -142,6 +140,7 @@ def main(model_path):
         sos_index=sos_index,
         eos_index=eos_index,
         max_decode_length=param['max_decode_length'],
+        attention_smoothing=param['attention_smoothing'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
         logits_tempareture=param['logits_tempareture'],
         parameter_init=param['weight_init'],
@@ -162,8 +161,14 @@ def main(model_path):
 if __name__ == '__main__':
 
     args = sys.argv
-    if len(args) != 2:
+    if len(args) == 2:
+        model_path = args[1]
+        epoch = None:
+    elif len(args) == 3:
+        model_path = args[1]
+        epoch = args[2]
+    else:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python plot_attention_weights.py path_to_saved_model"))
-    main(model_path=args[1])
+             "Usase: python plot_attention_weights.py path_to_saved_model (epoch)"))
+    main(model_path=model_path, epoch=epoch)

@@ -139,6 +139,7 @@ def main(model_path):
         sos_index=sos_index,
         eos_index=eos_index,
         max_decode_length=param['max_decode_length'],
+        attention_smoothing=param['attention_smoothing'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
         logits_tempareture=param['logits_tempareture'],
         parameter_init=param['weight_init'],
