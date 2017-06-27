@@ -38,14 +38,15 @@ class TestLoadDatasetAttention(unittest.TestCase):
               str(num_gpu) + ', is_sorted: ' + str(is_sorted) + ' -----')
 
         batch_size = 64
+        eos_index = 2 if label_type == 'character' else 1
         dataset = Dataset(data_type='train', label_type=label_type,
-                          batch_size=batch_size, eos_index=32,
+                          batch_size=batch_size, eos_index=eos_index,
                           is_sorted=is_sorted, is_progressbar=True,
                           num_gpu=num_gpu)
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
-            print('=> Reading mini-batch...')
+            print('=> Loading mini-batch...')
             if label_type == 'character':
                 map_file_path = '../metrics/mapping_files/attention/char2num.txt'
                 map_fn = num2char
@@ -59,7 +60,10 @@ class TestLoadDatasetAttention(unittest.TestCase):
             iter_per_epoch = int(dataset.data_num /
                                  (batch_size * num_gpu)) + 1
             for i in range(iter_per_epoch + 1):
-                inputs, labels, inputs_seq_len, labels_seq_len, input_names = mini_batch.__next__()
+                return_tuple = mini_batch.__next__()
+                inputs = return_tuple[0]
+                labels = return_tuple[1]
+                labels_seq_len = return_tuple[3]
 
                 if num_gpu > 1:
                     for inputs_gpu in inputs:

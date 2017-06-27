@@ -47,7 +47,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
-            print('=> Reading mini-batch...')
+            print('=> Loading mini-batch...')
             if label_type == 'character':
                 map_file_path = '../metrics/mapping_files/ctc/char2num.txt'
                 map_fn = num2char
@@ -61,7 +61,9 @@ class TestLoadDatasetCTC(unittest.TestCase):
             iter_per_epoch = int(dataset.data_num /
                                  (batch_size * num_gpu)) + 1
             for i in range(iter_per_epoch + 1):
-                inputs, labels_st, inputs_seq_len, input_names = mini_batch.__next__()
+                return_tuple = mini_batch.__next__()
+                inputs = return_tuple[0]
+                labels_st = return_tuple[1]
 
                 if num_gpu > 1:
                     for inputs_gpu in inputs:

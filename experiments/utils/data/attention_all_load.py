@@ -37,7 +37,6 @@ class DatasetBase(object):
         self.num_gpu = num_gpu
 
         self.input_size = None
-        self.dataset_path = None
 
         # Step
         # 1. Load the frame number dictionary
@@ -65,6 +64,8 @@ class DatasetBase(object):
             labels_seq_len: list of length of target labels of size
                 `[batch_size]`
             input_names: list of file name of input data of size `[batch_size]`
+
+            If num_gpu > 1, each return is divide into list of size `[num_gpu]`.
         """
         if session is None and self.num_gpu != 1:
             raise ValueError('Set session when using multiple GPUs.')
@@ -101,8 +102,8 @@ class DatasetBase(object):
                 # Initialization
                 inputs = np.zeros(
                     (len(sorted_indices), max_frame_num, self.input_size))
-                # Padding with -1
-                labels = np.array([[-1] * max_seq_len]
+                # Padding with <EOS>
+                labels = np.array([[self.eos_index] * max_seq_len]
                                   * len(sorted_indices), dtype=int)
                 inputs_seq_len = np.zeros((len(sorted_indices),), dtype=int)
                 labels_seq_len = np.zeros((len(sorted_indices),), dtype=int)
@@ -150,8 +151,8 @@ class DatasetBase(object):
                 # Initialization
                 inputs = np.zeros(
                     (len(random_indices), max_frame_num, self.input_size))
-                # Padding with -1
-                labels = np.array([[-1] * max_seq_len]
+                # Padding with <EOS>
+                labels = np.array([[self.eos_index] * max_seq_len]
                                   * len(random_indices), dtype=int)
                 inputs_seq_len = np.zeros((len(random_indices),), dtype=int)
                 labels_seq_len = np.zeros((len(random_indices),), dtype=int)

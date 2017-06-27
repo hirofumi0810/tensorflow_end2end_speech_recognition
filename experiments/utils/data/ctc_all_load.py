@@ -41,7 +41,6 @@ class DatasetBase(object):
         self.num_gpu = num_gpu
 
         self.input_size = None
-        self.dataset_path = None
 
         # Step
         # 1. Load the frame number dictionary
@@ -64,10 +63,11 @@ class DatasetBase(object):
             session:
         Returns:
             inputs: list of input data, size `[batch_size]`
-            labels_st: list of SparseTensor of labels
-                if num_gpu > 1, list of labels_st, size of num_gpu
+            labels_st: list of SparseTensor of target labels
             inputs_seq_len: list of length of inputs of size `[batch_size]`
             input_names: list of file name of input data of size `[batch_size]`
+
+            If num_gpu > 1, each return is divide into list of size `[num_gpu]`.
         """
         if session is None and self.num_gpu != 1:
             raise ValueError('Set session when using multiple GPUs.')
@@ -76,6 +76,7 @@ class DatasetBase(object):
             batch_size = self.batch_size
 
         next_epoch_flag = False
+        padded_value = -1
 
         while True:
             #########################
@@ -104,8 +105,7 @@ class DatasetBase(object):
                 # Initialization
                 inputs = np.zeros(
                     (len(sorted_indices), max_frame_num, self.input_size))
-                # Padding with -1
-                labels = np.array([[-1] * max_seq_len]
+                labels = np.array([[padded_value] * max_seq_len]
                                   * len(sorted_indices), dtype=int)
                 inputs_seq_len = np.empty((len(sorted_indices),), dtype=int)
                 input_names = [None] * len(sorted_indices)
@@ -150,8 +150,7 @@ class DatasetBase(object):
                 # Initialization
                 inputs = np.zeros(
                     (len(random_indices), max_frame_num, self.input_size))
-                # Padding with -1
-                labels = np.array([[-1] * max_seq_len]
+                labels = np.array([[padded_value] * max_seq_len]
                                   * len(random_indices), dtype=int)
                 inputs_seq_len = np.empty((len(random_indices),), dtype=int)
                 input_names = [None] * len(random_indices)
@@ -185,10 +184,12 @@ class DatasetBase(object):
                 # Convert from SparseTensor to numpy.ndarray
                 inputs = list(map(session.run, inputs))
                 labels = list(map(session.run, labels))
-                labels_st = list(map(list2sparsetensor, labels))
+                labels_st = list(map(list2sparsetensor,
+                                     zip(labels, [padded_value] * len(labels))))
                 inputs_seq_len = list(map(session.run, inputs_seq_len))
                 input_names = list(map(session.run, input_names))
             else:
-                labels_st = list2sparsetensor(labels)
+                labels_st = list2sparsetensor(labels,
+                                              padded_value=padded_value)
 
             yield inputs, labels_st, inputs_seq_len, input_names

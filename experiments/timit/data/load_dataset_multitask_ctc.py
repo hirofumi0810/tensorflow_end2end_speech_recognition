@@ -49,14 +49,17 @@ class Dataset(DatasetBase):
         self.num_gpu = num_gpu
 
         self.input_size = 123
-        self.dataset_main_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/ctc/character', data_type)
-        self.dataset_second_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/ctc/',
+        input_path = join(
+            '/n/sd8/inaguma/corpus/timit/dataset/inputs/', data_type)
+        label_main_path = join(
+            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc/character/',
+            data_type)
+        label_second_path = join(
+            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc/',
             label_type_second, data_type)
 
         # Load the frame number dictionary
-        with open(join(self.dataset_main_path, 'frame_num.pickle'), 'rb') as f:
+        with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
             self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label by frame num
@@ -64,12 +67,10 @@ class Dataset(DatasetBase):
                                         key=lambda x: x[1])
         input_paths, label_main_paths, label_second_paths = [], [], []
         for input_name, frame_num in frame_num_tuple_sorted:
-            input_paths.append(join(
-                self.dataset_main_path, 'input', input_name + '.npy'))
-            label_main_paths.append(join(
-                self.dataset_main_path, 'label', input_name + '.npy'))
-            label_second_paths.append(join(
-                self.dataset_second_path, 'label', input_name + '.npy'))
+            input_paths.append(join(input_path, input_name + '.npy'))
+            label_main_paths.append(join(label_main_path, input_name + '.npy'))
+            label_second_paths.append(
+                join(label_second_path,  input_name + '.npy'))
         if len(label_main_paths) != len(label_second_paths):
             raise ValueError(
                 'The numbers of labels between ' +

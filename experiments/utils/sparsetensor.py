@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 
-def list2sparsetensor(labels, padded_value=-1):
+def list2sparsetensor(labels, padded_value):
     """Convert labels from list to sparse tensor.
     Args:
         labels: list of labels

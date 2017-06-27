@@ -20,7 +20,7 @@ from utils.progressbar import wrap_iterator
 
 
 @exception
-def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
+def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                 eval_batch_size=None, is_progressbar=False,
                 is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
@@ -30,7 +30,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
         per_op: operation for computing phone error rate
         network: network to evaluate
         dataset: An instance of a `Dataset' class
-        train_label_type: string, phone39 or phone48 or phone61
+        label_type: string, phone39 or phone48 or phone61
         eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
@@ -42,6 +42,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
     else:
         batch_size = dataset.batch_size
 
+    train_label_type = label_type
     data_label_type = dataset.label_type
 
     num_examples = dataset.data_num
@@ -114,10 +115,13 @@ def do_eval_per(session, decode_op, per_op, network, dataset, train_label_type,
                     phone_true_list = phone2num(
                         phone_true_list, phone2num_39_map_file_path)
                     labels_true[i_batch] = phone_true_list
+                else:
+                    pass
+                    # TODO: change
 
             # Compute edit distance
-            labels_true_st = list2sparsetensor(labels_true)
-            labels_pred_st = list2sparsetensor(labels_pred)
+            labels_true_st = list2sparsetensor(labels_true, padded_value=-1)
+            labels_pred_st = list2sparsetensor(labels_pred, padded_value=-1)
             per_local = compute_edit_distance(
                 session, labels_true_st, labels_pred_st)
             per_global += per_local * batch_size_each
@@ -183,8 +187,8 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
             str_pred = num2char(labels_pred[i_batch], map_file_path)
 
             # Remove silence(_) labels
-            str_true = re.sub(r'[_]+', "", str_true)
-            str_pred = re.sub(r'[_]+', "", str_pred)
+            str_true = re.sub(r'[_,.\'-?!]+', "", str_true)
+            str_pred = re.sub(r'[_,.\'-?!]+', "", str_pred)
 
             # Compute edit distance
             cer_each = Levenshtein.distance(

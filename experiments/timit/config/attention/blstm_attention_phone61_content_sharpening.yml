@@ -15,7 +15,7 @@ param:
     decoder_num_layer: 1
     embedding_dim: 30
     max_decode_length: 50
-    attention_weights_tempareture: 1.0
+    attention_weights_tempareture: 0.5
     logits_tempareture: 1.0
     batch_size: 64
     optimizer: rmsprop

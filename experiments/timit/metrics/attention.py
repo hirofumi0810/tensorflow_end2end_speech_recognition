@@ -43,6 +43,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
     train_label_type = label_type
     data_label_type = dataset.label_type
+    eos_index = network.eos_index
 
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
@@ -118,8 +119,10 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                     labels_true_phone39 = labels_true
 
             # Compute edit distance
-            labels_true_st = list2sparsetensor(labels_true_phone39)
-            labels_pred_st = list2sparsetensor(predicted_ids_phone39)
+            labels_true_st = list2sparsetensor(
+                labels_true_phone39, padded_value=eos_index)
+            labels_pred_st = list2sparsetensor(
+                predicted_ids_phone39, padded_value=eos_index)
             per_local = compute_edit_distance(
                 session, labels_true_st, labels_pred_st)
             per_global += per_local * batch_size_each
@@ -183,8 +186,8 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
             str_pred = num2char(predicted_ids[i_batch], map_file_path)
 
             # Remove silence(_) labels
-            str_true = re.sub(r'[_<>]+', "", str_true)
-            str_pred = re.sub(r'[_]+', "", str_pred)
+            str_true = re.sub(r'[_<>,.\'-?!]+', "", str_true)
+            str_pred = re.sub(r'[_<>,.\'-?!]+', "", str_pred)
 
             # Compute edit distance
             cer_each = Levenshtein.distance(

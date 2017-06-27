@@ -224,7 +224,8 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                                 session=sess,
                                 decode_op=decode_op,
                                 network=network,
-                                dataset=dev_data)
+                                dataset=dev_data,
+                                eval_batch_size=1)
                             print('  CER: %f %%' % (cer_dev_epoch * 100))
 
                             if cer_dev_epoch < error_best:
@@ -248,7 +249,8 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                                 per_op=ler_op,
                                 network=network,
                                 dataset=dev_data,
-                                train_label_type=label_type)
+                                label_type=label_type,
+                                eval_batch_size=1)
                             print('  PER: %f %%' % (per_dev_epoch * 100))
 
                             if per_dev_epoch < error_best:
@@ -262,7 +264,7 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                                     per_op=ler_op,
                                     network=network,
                                     dataset=test_data,
-                                    train_label_type=label_type,
+                                    label_type=label_type,
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (per_test * 100))
 
@@ -304,7 +306,7 @@ def main(config_path):
     elif corpus['label_type'] == 'phone39':
         num_classes = 39
     elif corpus['label_type'] == 'character':
-        num_classes = 30
+        num_classes = 33
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -347,7 +349,7 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('ctc_timit_' + corpus['label_type'])
+    setproctitle('timit_ctc_' + corpus['label_type'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))

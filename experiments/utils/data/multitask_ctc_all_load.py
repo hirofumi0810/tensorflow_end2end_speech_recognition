@@ -39,7 +39,6 @@ class DatasetBase(object):
         self.num_gpu = num_gpu
 
         self.input_size = None
-        self.dataset_path = None
 
         # Step
         # 1. Load the frame number dictionary
@@ -65,11 +64,13 @@ class DatasetBase(object):
         Returns:
             inputs: list of input data, size `[batch_size]`
             labels_main_st: list of SparseTensor of target labels in the main
-                task. if num_gpu > 1, list of labels_main_st, size of num_gpu
+                task
             labels_second_st: A SparseTensor of the target labels in the second
-                task. if num_gpu > 1, list of labels_second_st, size of num_gpu
+                task
             inputs_seq_len: list of length of inputs of size `[batch_size]`
             input_names: list of file name of input data of size `[batch_size]`
+
+            If num_gpu > 1, each return is divide into list of size `[num_gpu]`.
         """
         if session is None and self.num_gpu != 1:
             raise ValueError('Set session when using multiple GPUs.')
@@ -78,6 +79,7 @@ class DatasetBase(object):
             batch_size = self.batch_size
 
         next_epoch_flag = False
+        padded_value = -1
 
         while True:
             #########################
@@ -109,10 +111,9 @@ class DatasetBase(object):
                 # Initialization
                 inputs = np.zeros(
                     (len(sorted_indices), max_frame_num, self.input_size))
-                # Padding with -1
-                labels_main = np.array([[-1] * max_seq_len_main]
+                labels_main = np.array([[padded_value] * max_seq_len_main]
                                        * len(sorted_indices), dtype=int)
-                labels_second = np.array([[-1] * max_seq_len_second]
+                labels_second = np.array([[padded_value] * max_seq_len_second]
                                          * len(sorted_indices), dtype=int)
                 inputs_seq_len = np.empty((len(sorted_indices),), dtype=int)
                 input_names = [None] * len(sorted_indices)
@@ -162,10 +163,9 @@ class DatasetBase(object):
                 # Initialization
                 inputs = np.zeros(
                     (len(random_indices), max_frame_num, self.input_size))
-                # Padding with -1
-                labels_main = np.array([[-1] * max_seq_len_main]
+                labels_main = np.array([[padded_value] * max_seq_len_main]
                                        * len(random_indices), dtype=int)
-                labels_second = np.array([[-1] * max_seq_len_second]
+                labels_second = np.array([[padded_value] * max_seq_len_second]
                                          * len(random_indices), dtype=int)
                 inputs_seq_len = np.empty((len(random_indices),), dtype=int)
                 input_names = [None] * len(random_indices)
@@ -203,13 +203,21 @@ class DatasetBase(object):
                 inputs = list(map(session.run, inputs))
                 labels_main = list(map(session.run, labels_main))
                 labels_second = list(map(session.run, labels_second))
-                labels_main_st = list(map(list2sparsetensor, labels_main))
-                labels_second_st = list(map(list2sparsetensor, labels_second))
+                labels_main_st = list(
+                    map(list2sparsetensor,
+                        zip(labels_main,
+                            [padded_value] * len(labels_main))))
+                labels_second_st = list(
+                    map(list2sparsetensor,
+                        zip(labels_second,
+                            [padded_value] * len(labels_second))))
                 inputs_seq_len = list(map(session.run, inputs_seq_len))
                 input_names = list(map(session.run, input_names))
             else:
-                labels_main_st = list2sparsetensor(labels_main)
-                labels_second_st = list2sparsetensor(labels_second)
+                labels_main_st = list2sparsetensor(labels_main,
+                                                   padded_value=padded_value)
+                labels_second_st = list2sparsetensor(labels_second,
+                                                     padded_value=padded_value)
 
             yield (inputs, labels_main_st, labels_second_st, inputs_seq_len,
                    input_names)

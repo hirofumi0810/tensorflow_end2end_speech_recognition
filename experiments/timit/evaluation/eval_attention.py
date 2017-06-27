@@ -21,14 +21,15 @@ from models.attention import blstm_attention_seq2seq
 from metrics.attention import do_eval_per, do_eval_cer
 
 
-def do_eval(network, label_type, eos_index, epoch=None):
+def do_eval(network, label_type, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
         label_type: string, phone39 or phone48 or phone61 or character
         epoch: int the epoch to restore
-        eos_index: int, the index of <EOS> class. This is used for padding.
     """
+    eos_index = network.eos_index
+
     # Load dataset
     if label_type == 'character':
         test_data = Dataset(data_type='test', label_type='character',
@@ -185,7 +186,6 @@ def main(model_path):
     print(network.model_dir)
     do_eval(network=network,
             label_type=corpus['label_type'],
-            eos_index=eos_index,
             epoch=epoch)
 
 

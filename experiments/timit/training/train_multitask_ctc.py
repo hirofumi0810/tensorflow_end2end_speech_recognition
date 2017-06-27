@@ -238,6 +238,7 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                             decode_op=decode_op_main,
                             network=network,
                             dataset=dev_data,
+                            eval_batch_size=1,
                             is_multitask=True)
                         print('  CER: %f %%' % (cer_dev_epoch * 100))
                         per_dev_epoch = do_eval_per(
@@ -246,7 +247,8 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                             per_op=ler_op_second,
                             network=network,
                             dataset=dev_data,
-                            train_label_type=label_type_second,
+                            label_type=label_type_second,
+                            eval_batch_size=1,
                             is_multitask=True)
                         print('  PER: %f %%' % (per_dev_epoch * 100))
 
@@ -269,7 +271,7 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                                 per_op=ler_op_second,
                                 network=network,
                                 dataset=test_data,
-                                train_label_type=label_type_second,
+                                label_type=label_type_second,
                                 eval_batch_size=1,
                                 is_multitask=True)
                             print('  PER: %f %%' % (per_test * 100))
@@ -321,7 +323,7 @@ def main(config_path):
                        num_layer_main=param['num_layer_main'],
                        num_layer_second=param['num_layer_second'],
                        #    bottleneck_dim=param['bottleneck_dim'],
-                       num_classes_main=30,
+                       num_classes_main=33,
                        num_classes_second=num_classes_second,
                        main_task_weight=param['main_task_weight'],
                        parameter_init=param['weight_init'],
@@ -361,7 +363,7 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('multitaskctc_timit')
+    setproctitle('timit_multictc')
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))

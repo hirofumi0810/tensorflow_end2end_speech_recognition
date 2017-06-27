@@ -43,7 +43,7 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
-            print('=> Reading mini-batch...')
+            print('=> Loading mini-batch...')
             map_file_path_char = '../metrics/mapping_files/ctc/char2num.txt'
             map_file_path_phone = '../metrics/mapping_files/ctc/phone2num_61.txt'
 
@@ -52,7 +52,10 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
             iter_per_epoch = int(dataset.data_num /
                                  (batch_size * num_gpu)) + 1
             for i in range(iter_per_epoch + 1):
-                inputs, labels_char_st, labels_phone_st, inputs_seq_len, input_names = mini_batch.__next__()
+                return_tuple = mini_batch.__next__()
+                inputs = return_tuple[0]
+                labels_char_st = return_tuple[1]
+                labels_phone_st = return_tuple[2]
 
                 if num_gpu > 1:
                     for inputs_gpu in inputs:

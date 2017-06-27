@@ -1,4 +1,4 @@
-model_name: blstm_attention_seq2seq
+model_name: blstm_attention
 corpus:
     name: timit
     label_type: character

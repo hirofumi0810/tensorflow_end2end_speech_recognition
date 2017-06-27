@@ -29,7 +29,7 @@ from utils.csv import save_loss, save_ler
 
 
 def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
-             label_type, eos_index):
+             label_type):
     """Run training. If target labels are phone, the model is evaluated by PER
     with 39 phones.
     Args:
@@ -40,8 +40,9 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
         batch_size: int, the size of mini-batch
         num_epoch: int, the number of epochs to train
         label_type: string, phone39 or phone48 or phone61 or character
-        eos_index: int, the index of <EOS> class. This is used for padding.
     """
+    eos_index = network.eos_index
+
     # Load dataset
     train_data = Dataset(data_type='train', label_type=label_type,
                          batch_size=batch_size,
@@ -51,11 +52,11 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
                        eos_index=eos_index, is_sorted=False)
     if label_type == 'character':
         test_data = Dataset(data_type='test', label_type='character',
-                            batch_size=batch_size,
+                            batch_size=1,
                             eos_index=eos_index, is_sorted=False)
     else:
         test_data = Dataset(data_type='test', label_type='phone39',
-                            batch_size=batch_size,
+                            batch_size=1,
                             eos_index=eos_index, is_sorted=False)
 
     # Tell TensorFlow that the model will be built into the default graph
@@ -214,12 +215,16 @@ def do_train(network, optimizer, learning_rate, batch_size, num_epoch,
 
                     # Convert to sparsetensor to compute LER
                     feed_dict_ler_train = {
-                        network.labels_true_st: list2sparsetensor(labels_train),
-                        network.labels_pred_st: list2sparsetensor(predicted_ids_train)
+                        network.labels_true_st: list2sparsetensor(
+                            labels_train, padded_value=eos_index),
+                        network.labels_pred_st: list2sparsetensor(
+                            predicted_ids_train, padded_value=eos_index)
                     }
                     feed_dict_ler_dev = {
-                        network.labels_true_st: list2sparsetensor(labels_dev),
-                        network.labels_pred_st: list2sparsetensor(predicted_ids_dev)
+                        network.labels_true_st: list2sparsetensor(
+                            labels_dev, padded_value=eos_index),
+                        network.labels_pred_st: list2sparsetensor(
+                            predicted_ids_dev, padded_value=eos_index)
                     }
 
                     # Compute accuracy
@@ -384,6 +389,10 @@ def main(config_path):
     network.model_name += '_' + str(param['decoder_num_layer'])
     network.model_name += '_' + param['optimizer']
     network.model_name += '_lr' + str(param['learning_rate'])
+    network.model_name += '_' + param['attention_type']
+    if param['attention_weights_tempareture'] != 1:
+        network.model_name += '_sharpening' + \
+            str(param['attention_weights_tempareture'])
     if param['weight_decay'] != 0:
         network.model_name += '_weightdecay' + str(param['weight_decay'])
 
@@ -401,7 +410,7 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('timit_attention' + corpus['label_type'])
+    setproctitle('timit_att_' + corpus['label_type'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
@@ -413,8 +422,7 @@ def main(config_path):
              learning_rate=param['learning_rate'],
              batch_size=param['batch_size'],
              num_epoch=param['num_epoch'],
-             label_type=corpus['label_type'],
-             eos_index=eos_index)
+             label_type=corpus['label_type'])
     sys.stdout = sys.__stdout__
 
 
