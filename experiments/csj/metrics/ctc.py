@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Define evaluation method for CTC network (CSJ corpus)."""
+"""Define evaluation method for the CTC model (CSJ corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -33,7 +33,7 @@ def do_eval_per(session, per_op, network, dataset,
         per_global: An average of PER
     """
     if eval_batch_size is None:
-        batch_size = network.batch_size
+        batch_size = dataset.batch_size
     else:
         batch_size = eval_batch_size
 
@@ -70,7 +70,7 @@ def do_eval_per(session, per_op, network, dataset,
     return per_global
 
 
-# @exception
+@exception
 def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
                 eval_batch_size=None, is_progressbar=False,
                 is_multitask=False, is_main=False):
@@ -80,7 +80,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of `Dataset` class
-        label_type: string, character or kanji
+        label_type: string, kana or kanji
         is_test: set to True when evaluating by the test set
         eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize progressbar
@@ -90,7 +90,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         cer_mean: An average of CER
     """
     if eval_batch_size is None:
-        batch_size = network.batch_size
+        batch_size = dataset.batch_size
     else:
         batch_size = eval_batch_size
 
@@ -103,19 +103,19 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
     # Make data generator
     mini_batch = dataset.next_batch(batch_size=batch_size)
 
-    if label_type == 'character':
-        map_file_path = '../metric/mapping_files/ctc/char2num.txt'
+    if label_type == 'kana':
+        map_file_path = '../metrics/mapping_files/ctc/kana2num.txt'
     elif label_type == 'kanji':
-        map_file_path = '../metric/mapping_files/ctc/kanji2num.txt'
+        map_file_path = '../metrics/mapping_files/ctc/kanji2num.txt'
     for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true_st, inputs_seq_len, _ = mini_batch.__next__()
+            inputs, labels_true, inputs_seq_len, _ = mini_batch.__next__()
         else:
             if is_main:
-                inputs, labels_true_st, _, inputs_seq_len, _ = mini_batch.__next__()
+                inputs, labels_true, _, inputs_seq_len, _ = mini_batch.__next__()
             else:
-                inputs, _, labels_true_st, inputs_seq_len, _ = mini_batch.__next__()
+                inputs, _, labels_true, inputs_seq_len, _ = mini_batch.__next__()
 
         feed_dict = {
             network.inputs: inputs,
@@ -127,17 +127,17 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         batch_size_each = len(inputs_seq_len)
 
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_true = sparsetensor2list(labels_true_st, batch_size_each)
+        if not is_test:
+            labels_true = sparsetensor2list(labels_true, batch_size_each)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
         for i_batch in range(batch_size_each):
             # Convert from list to string
-            str_pred = num2char(labels_pred[i_batch], map_file_path)
-            # TODO: change in case of character
-            if label_type == 'kanji' and is_test:
+            if label_type != 'phone' and is_test:
                 str_true = ''.join(labels_true[i_batch])
-                # NOTE* 漢字の場合はテストデータのラベルはそのまま保存してある
+                # NOTE* 漢字とかなの場合はテストデータのラベルはそのまま保存してある
             else:
                 str_true = num2char(labels_true[i_batch], map_file_path)
+            str_pred = num2char(labels_pred[i_batch], map_file_path)
 
             # Remove silence(_) labels
             str_true = re.sub(r'[_]+', "", str_true)

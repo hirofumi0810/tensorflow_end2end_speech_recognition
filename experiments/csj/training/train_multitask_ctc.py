@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Train Multi-task CTC network (CSJ corpus)."""
+"""Train the multi-task CTC model (CSJ corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -15,64 +15,39 @@ from setproctitle import setproctitle
 import yaml
 import shutil
 
-sys.path.append('../')
 sys.path.append('../../')
 sys.path.append('../../../')
-from data.read_dataset_multitask_ctc import DataSet
+from csj.data.load_dataset_multitask_ctc import Dataset
+from csj.metrics.ctc import do_eval_per, do_eval_cer
 from models.ctc.load_model_multitask import load
-from metric.ctc import do_eval_per, do_eval_cer
 from utils.directory import mkdir, mkdir_join
 from utils.parameter import count_total_parameters
 from utils.csv import save_loss, save_ler
 
 
-def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
-             label_type_main, label_type_second, num_stack, num_skip,
-             train_data_size):
+def do_train(network, param):
     """Run training.
     Args:
         network: network to train
-        optimizer: string, the name of optimizer. ex.) adam, rmsprop
-        learning_rate: A float value, the initial learning rate
-        batch_size: int, the size of mini batch
-        epoch_num: int, the epoch num to train
-        label_type_main: string, kanji or character
-        label_type_second: string, character or phone
-        num_stack: int, the number of frames to stack
-        num_skip: int, the number of frames to skip
-        train_data_size: string, default or large
+        param: A dictionary of parameters
     """
     # Load dataset
-    train_data = DataSet(data_type='train', label_type_main=label_type_main,
-                         label_type_second=label_type_second,
-                         train_data_size=train_data_size,
-                         batch_size=batch_size,
-                         num_stack=num_stack, num_skip=num_skip,
+    train_data = Dataset(data_type='train',
+                         label_type_main=param['label_type_main'],
+                         label_type_second=param['label_type_second'],
+                         train_data_size=param['train_data_size'],
+                         batch_size=param['batch_size'],
+                         num_stack=param['num_stack'],
+                         num_skip=param['num_skip'],
                          is_sorted=True)
-    dev_data = DataSet(data_type='dev', label_type_main=label_type_main,
-                       label_type_second=label_type_second,
-                       train_data_size=train_data_size,
-                       batch_size=batch_size,
-                       num_stack=num_stack, num_skip=num_skip,
+    dev_data = Dataset(data_type='dev',
+                       label_type_main=param['label_type_main'],
+                       label_type_second=param['label_type_second'],
+                       train_data_size=param['train_data_size'],
+                       batch_size=param['batch_size'],
+                       num_stack=param['num_stack'],
+                       num_skip=param['num_skip'],
                        is_sorted=False)
-    # eval1_data = DataSet(data_type='eval1', label_type_main=label_type_main,
-    #                      label_type_second=label_type_second,
-    #                      train_data_size=train_data_size,
-    #                      batch_size=batch_size,
-    #                      num_stack=num_stack, num_skip=num_skip,
-    #                      is_sorted=False)
-    # eval2_data = DataSet(data_type='eval2', label_type_main=label_type_main,
-    #                      label_type_second=label_type_second,
-    #                      train_data_size=train_data_size,
-    #                      batch_size=batch_size,
-    #                      num_stack=num_stack, num_skip=num_skip,
-    #                      is_sorted=False)
-    # eval3_data = DataSet(data_type='eval3', label_type_main=label_type_main,
-    #                      label_type_second=label_type_second,
-    #                      train_data_size=train_data_size,
-    #                      batch_size=batch_size,
-    #                      num_stack=num_stack, num_skip=num_skip,
-    #                      is_sorted=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -108,10 +83,11 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             network.inputs_seq_len,
             network.keep_prob_input,
             network.keep_prob_hidden)
-        train_op = network.train(loss_op,
-                                 optimizer=optimizer,
-                                 learning_rate_init=float(learning_rate),
-                                 is_scheduled=False)
+        train_op = network.train(
+            loss_op,
+            optimizer=param['optimizer'],
+            learning_rate_init=float(param['learning_rate']),
+            is_scheduled=False)
         decode_op_main, decode_op_second = network.decoder(
             logits_main,
             logits_second,
@@ -160,10 +136,11 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
             mini_batch_dev = dev_data.next_batch()
 
             # Train model
-            iter_per_epoch = int(train_data.data_num / batch_size)
-            if (train_data.data_num / batch_size) != int(train_data.data_num / batch_size):
+            iter_per_epoch = int(train_data.data_num / param['batch_size'])
+            train_step = train_data.data_num / param['batch_size']
+            if (train_step) != int(train_step):
                 iter_per_epoch += 1
-            max_steps = iter_per_epoch * epoch_num
+            max_steps = iter_per_epoch * param['num_epoch']
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
@@ -179,7 +156,7 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.lr: learning_rate
+                    network.lr: float(param['learning_rate'])
                 }
 
                 # Create feed dictionary for next mini batch (dev)
@@ -253,151 +230,39 @@ def do_train(network, optimizer, learning_rate, batch_size, epoch_num,
                             decode_op=decode_op_main,
                             network=network,
                             dataset=dev_data,
-                            label_type=label_type_main,
-                            eval_batch_size=batch_size,
+                            label_type=param['label_type_main'],
+                            eval_batch_size=param['batch_size'],
                             is_multitask=True,
                             is_main=True)
                         print('  CER (main): %f %%' %
                               (ler_main_dev_epoch * 100))
-                        # if label_type_second == 'character':
-                        #     ler_second_dev_epoch = do_eval_cer(
-                        #         session=sess,
-                        #         decode_op=decode_op_second,
-                        #         network=network,
-                        #         dataset=dev_data,
-                        #         label_type=label_type_second,
-                        #         eval_batch_size=batch_size,
-                        #         is_multitask=True,
-                        #         is_main=False)
-                        #     print('  CER (second): %f %%' %
-                        #           (ler_second_dev_epoch * 100))
-                        # elif label_type_second == 'phone':
-                        #     ler_second_dev_epoch = do_eval_per(
-                        #         session=sess,
-                        #         per_op=ler_op_second,
-                        #         network=network,
-                        #         dataset=dev_data,
-                        #         eval_batch_size=batch_size,
-                        #         is_multitask=True)
-                        #     print('  PER (second): %f %%' %
-                        #           (ler_second_dev_epoch * 100))
+
+                        if param['label_type_second'] == 'kana':
+                            ler_second_dev_epoch = do_eval_cer(
+                                session=sess,
+                                decode_op=decode_op_second,
+                                network=network,
+                                dataset=dev_data,
+                                label_type=param['label_type_second'],
+                                eval_batch_size=param['batch_size'],
+                                is_multitask=True,
+                                is_main=False)
+                            print('  CER (second): %f %%' %
+                                  (ler_second_dev_epoch * 100))
+                        elif param['label_type_second'] == 'phone':
+                            ler_second_dev_epoch = do_eval_per(
+                                session=sess,
+                                per_op=ler_op_second,
+                                network=network,
+                                dataset=dev_data,
+                                eval_batch_size=param['batch_size'],
+                                is_multitask=True)
+                            print('  PER (second): %f %%' %
+                                  (ler_second_dev_epoch * 100))
 
                         if ler_main_dev_epoch < ler_main_dev_best:
                             ler_main_dev_best = ler_main_dev_epoch
                             print('■■■ ↑Best Score (CER)↑ ■■■')
-
-                            # print('=== eval1 Evaluation ===')
-                            # ler_main_eval1 = do_eval_cer(
-                            #     session=sess,
-                            #     decode_op=decode_op_main,
-                            #     network=network,
-                            #     dataset=eval1_data,
-                            #     label_type=label_type_main,
-                            #     is_test=True,
-                            #     eval_batch_size=batch_size,
-                            #     is_multitask=True,
-                            #     is_main=True)
-                            # print('  CER (main): %f %%' %
-                            #       (ler_main_eval1 * 100))
-                            # if label_type_second == 'character':
-                            #     ler_second_eval1_epoch = do_eval_cer(
-                            #         session=sess,
-                            #         decode_op=decode_op_second,
-                            #         network=network,
-                            #         dataset=eval1_data,
-                            #         label_type=label_type_second,
-                            #         eval_batch_size=batch_size,
-                            #         is_multitask=True,
-                            #         is_main=False)
-                            #     print('  CER (second): %f %%' %
-                            #           (ler_second_eval1_epoch * 100))
-                            # elif label_type_second == 'phone':
-                            #     ler_second_eval1_epoch = do_eval_per(
-                            #         session=sess,
-                            #         per_op=ler_op_second,
-                            #         network=network,
-                            #         dataset=eval1_data,
-                            #         eval_batch_size=batch_size,
-                            #         is_multitask=True)
-                            #     print('  PER (second): %f %%' %
-                            #           (ler_second_eval1_epoch * 100))
-                            #
-                            # print('=== eval2 Evaluation ===')
-                            # ler_main_eval2 = do_eval_cer(
-                            #     session=sess,
-                            #     decode_op=decode_op_main,
-                            #     network=network,
-                            #     dataset=eval2_data,
-                            #     label_type=label_type_main,
-                            #     is_test=-True,
-                            #     eval_batch_size=batch_size,
-                            #     is_multitask=True,
-                            #     is_main=True)
-                            # print('  CER (main): %f %%' %
-                            #       (ler_main_eval2 * 100))
-                            # if label_type_second == 'character':
-                            #     ler_second_eval2 = do_eval_cer(
-                            #         session=sess,
-                            #         decode_op=decode_op_second,
-                            #         network=network,
-                            #         dataset=eval2_data,
-                            #         label_type=label_type_second,
-                            #         eval_batch_size=batch_size,
-                            #         is_multitask=True,
-                            #         is_main=False)
-                            #     print('  CER (second): %f %%' %
-                            #           (ler_second_eval2 * 100))
-                            # elif label_type_second == 'phone':
-                            #     ler_second_eval2 = do_eval_per(
-                            #         session=sess,
-                            #         per_op=ler_op_second,
-                            #         network=network,
-                            #         dataset=eval2_data,
-                            #         eval_batch_size=batch_size,
-                            #         is_multitask=True)
-                            #     print('  PER (second): %f %%' %
-                            #           (ler_second_eval2 * 100))
-                            #
-                            # print('=== eval3 Evaluation ===')
-                            # ler_main_eval3 = do_eval_cer(
-                            #     session=sess,
-                            #     decode_op=decode_op_main,
-                            #     network=network,
-                            #     dataset=eval3_data,
-                            #     label_type=label_type_main,
-                            #     is_test=True,
-                            #     eval_batch_size=batch_size,
-                            #     is_multitask=True,
-                            #     is_main=True)
-                            # print('  CER (main): %f %%' %
-                            #       (ler_main_eval3 * 100))
-                            # if label_type_second == 'character':
-                            #     ler_second_eval3 = do_eval_cer(
-                            #         session=sess,
-                            #         decode_op=decode_op_second,
-                            #         network=network,
-                            #         dataset=eval3_data,
-                            #         label_type=label_type_second,
-                            #         eval_batch_size=batch_size,
-                            #         is_multitask=True,
-                            #         is_main=False)
-                            #     print('  CER (second): %f %%' %
-                            #           (ler_second_eval3 * 100))
-                            # elif label_type_second == 'phone':
-                            #     ler_second_eval3 = do_eval_per(
-                            #         session=sess,
-                            #         per_op=ler_op_second,
-                            #         network=network,
-                            #         dataset=eval3_data,
-                            #         eval_batch_size=batch_size,
-                            #         is_multitask=True)
-                            #     print('  PER (second): %f %%' %
-                            #           (ler_second_eval2 * 100))
-                            #
-                            # ler_main_mean = (
-                            #     ler_main_eval1 + ler_main_eval2 + ler_main_eval3) / 3.
-                            # print('=== eval Mean ===')
-                            # print('  CER: %f %%' % (ler_main_mean * 100))
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -431,15 +296,16 @@ def main(config_path):
         feature = config['feature']
         param = config['param']
 
-    if corpus['label_type_main'] == 'character':
-        output_size_main = 147
+    # Except for a blank label
+    if corpus['label_type_main'] == 'kana':
+        param['num_classes_main'] = 147
     elif corpus['label_type_main'] == 'kanji':
-        output_size_main = 3386
+        param['num_classes_main'] = 3386
 
     if corpus['label_type_second'] == 'phone':
-        output_size_second = 38
-    elif corpus['label_type_second'] == 'character':
-        output_size_second = 147
+        param['num_classes_second'] = 38
+    elif corpus['label_type_second'] == 'kana':
+        param['num_classes_second'] = 147
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -449,8 +315,8 @@ def main(config_path):
                        num_layer_main=param['num_layer_main'],
                        num_layer_second=param['num_layer_second'],
                        #    bottleneck_dim=param['bottleneck_dim'],
-                       output_size_main=output_size_main,
-                       output_size_second=output_size_second,
+                       num_classes_main=param['num_classes_main'],
+                       num_classes_second=param['num_classes_second'],
                        main_task_weight=param['main_task_weight'],
                        parameter_init=param['weight_init'],
                        clip_grad=param['clip_grad'],
@@ -460,7 +326,7 @@ def main(config_path):
                        num_proj=param['num_proj'],
                        weight_decay=param['weight_decay'])
 
-    network.model_name = config['model_name'].upper()
+    network.model_name = param['model']
     network.model_name += '_' + str(param['num_unit'])
     network.model_name += '_main' + str(param['num_layer_main'])
     network.model_name += '_second' + str(param['num_layer_second'])
@@ -479,10 +345,11 @@ def main(config_path):
         network.model_name += '_large'
 
     # Set save path
-    network.model_dir = mkdir('/n/sd8/inaguma/result/csj/monolog/')
+    network.model_dir = mkdir('/n/sd8/inaguma/result/csj/')
     network.model_dir = mkdir_join(network.model_dir, 'ctc')
     network.model_dir = mkdir_join(
-        network.model_dir, corpus['label_type_main'] + '_' + corpus['label_type_second'])
+        network.model_dir,
+        corpus['label_type_main'] + '_' + corpus['label_type_second'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
@@ -493,7 +360,7 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('multitaskctc_csj_' + corpus['label_type_main'] + '_' +
+    setproctitle('multictc_csj_' + corpus['label_type_main'] + '_' +
                  corpus['label_type_second'] + '_' + corpus['train_data_size'])
 
     # Save config file
@@ -501,16 +368,7 @@ def main(config_path):
 
     sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
-    do_train(network=network,
-             optimizer=param['optimizer'],
-             learning_rate=param['learning_rate'],
-             batch_size=param['batch_size'],
-             epoch_num=param['num_epoch'],
-             label_type_main=corpus['label_type_main'],
-             label_type_second=corpus['label_type_second'],
-             num_stack=feature['num_stack'],
-             num_skip=feature['num_skip'],
-             train_data_size=corpus['train_data_size'])
+    do_train(network=network, param=param)
     sys.stdout = sys.__stdout__
 
 
