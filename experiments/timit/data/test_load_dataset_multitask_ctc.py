@@ -10,12 +10,12 @@ import sys
 import unittest
 import tensorflow as tf
 
-sys.path.append('../../')
 sys.path.append('../../../')
-from load_dataset_multitask_ctc import Dataset
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
-from utils.sparsetensor import sparsetensor2list
+from experiments.timit.data.load_dataset_multitask_ctc import Dataset
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone
+from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetMultitaskCTC(unittest.TestCase):
@@ -30,12 +30,15 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
         # For many GPUs
         # self.check_loading(num_gpu=7, is_sorted=True)
 
+    @measure_time
     def check_loading(self, num_gpu, is_sorted):
         print('----- num_gpu: ' + str(num_gpu) +
               ', is_sorted: ' + str(is_sorted) + ' -----')
 
         batch_size = 64
-        dataset = Dataset(data_type='train', label_type_second='phone61',
+        dataset = Dataset(data_type='train',
+                          label_type_main='character',
+                          label_type_sub='phone61',
                           batch_size=batch_size,
                           num_stack=3, num_skip=3,
                           is_sorted=is_sorted, is_progressbar=True,
@@ -84,9 +87,9 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
                 str_true_char = re.sub(r'_', ' ', str_true_char)
                 str_true_phone = num2phone(
                     labels_phone[0], map_file_path_phone)
-                print(str_true_char)
-                print(str_true_phone)
-                print('-----')
+                # print(str_true_char)
+                # print(str_true_phone)
+                # print('-----')
 
 
 if __name__ == '__main__':

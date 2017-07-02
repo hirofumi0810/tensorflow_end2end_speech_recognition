@@ -44,12 +44,12 @@ class TestCTC(tf.test.TestCase):
             values_pl = tf.placeholder(tf.int32, name='values')
             shape_pl = tf.placeholder(tf.int64, name='shape')
             labels_pl = tf.SparseTensor(indices_pl, values_pl, shape_pl)
-            indices_second_pl = tf.placeholder(tf.int64, name='indices_second')
-            values_second_pl = tf.placeholder(tf.int32, name='values_second')
-            shape_second_pl = tf.placeholder(tf.int64, name='shape_second')
-            labels_second_pl = tf.SparseTensor(indices_second_pl,
-                                               values_second_pl,
-                                               shape_second_pl)
+            indices_sub_pl = tf.placeholder(tf.int64, name='indices_sub')
+            values_sub_pl = tf.placeholder(tf.int32, name='values_sub')
+            shape_sub_pl = tf.placeholder(tf.int64, name='shape_sub')
+            labels_sub_pl = tf.SparseTensor(indices_sub_pl,
+                                            values_sub_pl,
+                                            shape_sub_pl)
             inputs_seq_len_pl = tf.placeholder(tf.int64,
                                                shape=[None],
                                                name='inputs_seq_len')
@@ -60,15 +60,15 @@ class TestCTC(tf.test.TestCase):
 
             # Define model graph
             num_classes_main = 26
-            num_classes_second = 61
+            num_classes_sub = 61
             network = Multitask_BLSTM_CTC(
                 batch_size=batch_size,
                 input_size=inputs[0].shape[1],
                 num_unit=256,
                 num_layer_main=2,
-                num_layer_second=1,
+                num_layer_sub=1,
                 num_classes_main=num_classes_main,
-                num_classes_second=num_classes_second,
+                num_classes_sub=num_classes_sub,
                 main_task_weight=0.8,
                 parameter_init=0.1,
                 clip_grad=5.0,
@@ -79,10 +79,10 @@ class TestCTC(tf.test.TestCase):
                 weight_decay=1e-8)
 
             # Add to the graph each operation
-            loss_op, logits_main, logits_second = network.compute_loss(
+            loss_op, logits_main, logits_sub = network.compute_loss(
                 inputs_pl,
                 labels_pl,
-                labels_second_pl,
+                labels_sub_pl,
                 inputs_seq_len_pl,
                 keep_prob_input_pl,
                 keep_prob_hidden_pl)
@@ -91,14 +91,14 @@ class TestCTC(tf.test.TestCase):
                                      optimizer='rmsprop',
                                      learning_rate_init=learning_rate,
                                      is_scheduled=False)
-            decode_op_main, decode_op_second = network.decoder(
+            decode_op_main, decode_op_sub = network.decoder(
                 logits_main,
-                logits_second,
+                logits_sub,
                 inputs_seq_len_pl,
                 decode_type='beam_search',
                 beam_width=20)
-            ler_op_main, ler_op_second = network.compute_ler(
-                decode_op_main, decode_op_second, labels_pl, labels_second_pl)
+            ler_op_main, ler_op_sub = network.compute_ler(
+                decode_op_main, decode_op_sub, labels_pl, labels_sub_pl)
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
@@ -117,7 +117,7 @@ class TestCTC(tf.test.TestCase):
             feed_dict = {
                 inputs_pl: inputs,
                 labels_pl: labels_true_char_st,
-                labels_second_pl: labels_true_phone_st,
+                labels_sub_pl: labels_true_phone_st,
                 inputs_seq_len_pl: inputs_seq_len,
                 keep_prob_input_pl: network.dropout_ratio_input,
                 keep_prob_hidden_pl: network.dropout_ratio_hidden,
@@ -155,7 +155,7 @@ class TestCTC(tf.test.TestCase):
 
                         # Compute accuracy
                         ler_train_char, ler_train_phone = sess.run(
-                            [ler_op_main, ler_op_second], feed_dict=feed_dict)
+                            [ler_op_main, ler_op_sub], feed_dict=feed_dict)
 
                         duration_step = time.time() - start_time_step
                         print('Step %d: loss = %.3f / cer = %.4f / per = %.4f (%.3f sec)\n' %
@@ -165,7 +165,7 @@ class TestCTC(tf.test.TestCase):
 
                         # Visualize
                         labels_pred_char_st, labels_pred_phone_st = sess.run(
-                            [decode_op_main, decode_op_second],
+                            [decode_op_main, decode_op_sub],
                             feed_dict=feed_dict)
                         labels_true_char = sparsetensor2list(
                             labels_true_char_st, batch_size=batch_size)

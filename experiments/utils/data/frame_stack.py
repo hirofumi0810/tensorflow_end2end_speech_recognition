@@ -5,8 +5,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from os.path import basename
 import numpy as np
-from ..progressbar import wrap_iterator
+from experiments.utils.progressbar import wrap_iterator
 
 
 def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is_progressbar=False):
@@ -36,7 +37,7 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
     stacked_input_list = []
     for i_utt in wrap_iterator(range(utt_num), is_progressbar):
         # Per utterance
-        input_name = input_paths[i_utt].split('/')[-1].split('.')[0]
+        input_name = basename(input_paths[i_utt]).split('.')[0]
         frame_num = frame_num_dict[input_name]
         frame_num_decimated = frame_num / num_skip
         if frame_num_decimated != int(frame_num_decimated):
@@ -87,4 +88,4 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
 
         stacked_input_list.append(stacked_frames)
 
-    return stacked_input_list
+    return np.array(stacked_input_list)

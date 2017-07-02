@@ -10,18 +10,19 @@ from __future__ import print_function
 import re
 import Levenshtein
 
-from .mapping import map_to_39phone
-from .edit_distance import compute_edit_distance
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone, phone2num
-from utils.sparsetensor import list2sparsetensor
-from utils.exception_func import exception
-from utils.progressbar import wrap_iterator
+from experiments.timit.metrics.mapping import map_to_39phone
+from experiments.timit.metrics.edit_distance import compute_edit_distance
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone, phone2num
+from experiments.utils.sparsetensor import list2sparsetensor
+from experiments.utils.exception_func import exception
+from experiments.utils.progressbar import wrap_iterator
 
 
 @exception
-def do_eval_per(session, decode_op, per_op, network, dataset, param,
-                eval_batch_size=None, is_progressbar=False, is_multitask=False):
+def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
+                eos_index, eval_batch_size=None, is_progressbar=False,
+                is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
     Args:
         session: session of training model
@@ -29,7 +30,8 @@ def do_eval_per(session, decode_op, per_op, network, dataset, param,
         per_op: operation for computing phone error rate
         network: network to evaluate
         dataset: An instance of a `Dataset' class
-        param: A dictionary of parameters
+        label_type: string, phone39 or phone48 or phone61
+        eos_index: int, the index of <EOS> class
         eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
@@ -41,9 +43,8 @@ def do_eval_per(session, decode_op, per_op, network, dataset, param,
     else:
         batch_size = dataset.batch_size
 
-    train_label_type = param['label_type']
+    train_label_type = label_type
     data_label_type = dataset.label_type
-    eos_index = param['eos_index']
 
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)

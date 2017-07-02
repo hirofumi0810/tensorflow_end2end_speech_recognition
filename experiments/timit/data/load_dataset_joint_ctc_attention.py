@@ -13,8 +13,8 @@ from os.path import join
 import pickle
 import numpy as np
 
-from utils.progressbar import wrap_iterator
-from utils.data.joint_ctc_attention_all_load import DatasetBase
+from experiments.utils.progressbar import wrap_iterator
+from experiments.utils.data.joint_ctc_attention_all_load import DatasetBase
 
 
 class Dataset(DatasetBase):
@@ -79,4 +79,4 @@ class Dataset(DatasetBase):
         self.att_label_list = np.array(att_label_list)
         self.ctc_label_list = np.array(ctc_label_list)
 
-        self.rest = set([i for i in range(self.data_num)])
+        self.rest = set(range(0, self.data_num, 1))

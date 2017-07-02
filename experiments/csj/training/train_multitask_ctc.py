@@ -34,7 +34,7 @@ def do_train(network, param):
     # Load dataset
     train_data = Dataset(data_type='train',
                          label_type_main=param['label_type_main'],
-                         label_type_second=param['label_type_second'],
+                         label_type_sub=param['label_type_sub'],
                          train_data_size=param['train_data_size'],
                          batch_size=param['batch_size'],
                          num_stack=param['num_stack'],
@@ -42,7 +42,7 @@ def do_train(network, param):
                          is_sorted=True)
     dev_data = Dataset(data_type='dev',
                        label_type_main=param['label_type_main'],
-                       label_type_second=param['label_type_second'],
+                       label_type_sub=param['label_type_sub'],
                        train_data_size=param['train_data_size'],
                        batch_size=param['batch_size'],
                        num_stack=param['num_stack'],
@@ -61,12 +61,12 @@ def do_train(network, param):
         values_pl = tf.placeholder(tf.int32, name='values')
         shape_pl = tf.placeholder(tf.int64, name='shape')
         network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
-        indices_second_pl = tf.placeholder(tf.int64, name='indices_second')
-        values_second_pl = tf.placeholder(tf.int32, name='values_second')
-        shape_second_pl = tf.placeholder(tf.int64, name='shape_second')
-        network.labels_second = tf.SparseTensor(indices_second_pl,
-                                                values_second_pl,
-                                                shape_second_pl)
+        indices_sub_pl = tf.placeholder(tf.int64, name='indices_sub')
+        values_sub_pl = tf.placeholder(tf.int32, name='values_sub')
+        shape_sub_pl = tf.placeholder(tf.int64, name='shape_sub')
+        network.labels_sub = tf.SparseTensor(indices_sub_pl,
+                                             values_sub_pl,
+                                             shape_sub_pl)
         network.inputs_seq_len = tf.placeholder(tf.int64,
                                                 shape=[None],
                                                 name='inputs_seq_len')
@@ -76,10 +76,10 @@ def do_train(network, param):
                                                   name='keep_prob_hidden')
 
         # Add to the graph each operation
-        loss_op, logits_main, logits_second = network.compute_loss(
+        loss_op, logits_main, logits_sub = network.compute_loss(
             network.inputs,
             network.labels,
-            network.labels_second,
+            network.labels_sub,
             network.inputs_seq_len,
             network.keep_prob_input,
             network.keep_prob_hidden)
@@ -88,15 +88,15 @@ def do_train(network, param):
             optimizer=param['optimizer'],
             learning_rate_init=float(param['learning_rate']),
             is_scheduled=False)
-        decode_op_main, decode_op_second = network.decoder(
+        decode_op_main, decode_op_sub = network.decoder(
             logits_main,
-            logits_second,
+            logits_sub,
             network.inputs_seq_len,
             decode_type='beam_search',
             beam_width=20)
-        ler_op_main, ler_op_second = network.compute_ler(
-            decode_op_main, decode_op_second,
-            network.labels, network.labels_second)
+        ler_op_main, ler_op_sub = network.compute_ler(
+            decode_op_main, decode_op_sub,
+            network.labels, network.labels_sub)
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -120,7 +120,7 @@ def do_train(network, param):
 
         csv_steps, csv_loss_train, csv_loss_dev = [], [], []
         csv_ler_main_train, csv_ler_main_dev = [], []
-        csv_ler_second_train, csv_ler_second_dev = [], []
+        csv_ler_sub_train, csv_ler_sub_dev = [], []
         # Create a session for running operation on the graph
         with tf.Session() as sess:
 
@@ -148,11 +148,11 @@ def do_train(network, param):
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_main_st, labels_second_st, inputs_seq_len, _ = mini_batch_train.__next__()
+                inputs, labels_main_st, labels_sub_st, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
                     network.labels: labels_main_st,
-                    network.labels_second: labels_second_st,
+                    network.labels_sub: labels_sub_st,
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
@@ -160,11 +160,11 @@ def do_train(network, param):
                 }
 
                 # Create feed dictionary for next mini batch (dev)
-                inputs, labels_main, labels_second, inputs_seq_len, _ = mini_batch_dev.__next__()
+                inputs, labels_main, labels_sub, inputs_seq_len, _ = mini_batch_dev.__next__()
                 feed_dict_dev = {
                     network.inputs: inputs,
                     network.labels: labels_main_st,
-                    network.labels_second: labels_second_st,
+                    network.labels_sub: labels_sub_st,
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden
@@ -188,24 +188,24 @@ def do_train(network, param):
                     feed_dict_dev[network.keep_prob_hidden] = 1.0
 
                     # Compute accuracy & update event file
-                    ler_main_train, ler_second_train, summary_str_train = sess.run(
-                        [ler_op_main, ler_op_second, summary_train],
+                    ler_main_train, ler_sub_train, summary_str_train = sess.run(
+                        [ler_op_main, ler_op_sub, summary_train],
                         feed_dict=feed_dict_train)
-                    ler_main_dev, ler_second_dev, summary_str_dev = sess.run(
-                        [ler_op_main, ler_op_second,  summary_dev],
+                    ler_main_dev, ler_sub_dev, summary_str_dev = sess.run(
+                        [ler_op_main, ler_op_sub,  summary_dev],
                         feed_dict=feed_dict_dev)
                     csv_ler_main_train.append(ler_main_train)
                     csv_ler_main_dev.append(ler_main_dev)
-                    csv_ler_second_train.append(ler_second_train)
-                    csv_ler_second_dev.append(ler_second_dev)
+                    csv_ler_sub_train.append(ler_sub_train)
+                    csv_ler_sub_dev.append(ler_sub_dev)
                     summary_writer.add_summary(summary_str_train, step + 1)
                     summary_writer.add_summary(summary_str_dev, step + 1)
                     summary_writer.flush()
 
                     duration_step = time.time() - start_time_step
-                    print('Step %d: loss = %.3f (%.3f) / ler_main = %.4f (%.4f) / ler_second = %.4f (%.4f) (%.3f min)' %
+                    print('Step %d: loss = %.3f (%.3f) / ler_main = %.4f (%.4f) / ler_sub = %.4f (%.4f) (%.3f min)' %
                           (step + 1, loss_train, loss_dev, ler_main_train, ler_main_dev,
-                           ler_second_train, ler_second_dev, duration_step / 60))
+                           ler_sub_train, ler_sub_dev, duration_step / 60))
                     sys.stdout.flush()
                     start_time_step = time.time()
 
@@ -237,28 +237,28 @@ def do_train(network, param):
                         print('  CER (main): %f %%' %
                               (ler_main_dev_epoch * 100))
 
-                        if param['label_type_second'] == 'kana':
-                            ler_second_dev_epoch = do_eval_cer(
+                        if param['label_type_sub'] == 'kana':
+                            ler_sub_dev_epoch = do_eval_cer(
                                 session=sess,
-                                decode_op=decode_op_second,
+                                decode_op=decode_op_sub,
                                 network=network,
                                 dataset=dev_data,
-                                label_type=param['label_type_second'],
+                                label_type=param['label_type_sub'],
                                 eval_batch_size=param['batch_size'],
                                 is_multitask=True,
                                 is_main=False)
-                            print('  CER (second): %f %%' %
-                                  (ler_second_dev_epoch * 100))
-                        elif param['label_type_second'] == 'phone':
-                            ler_second_dev_epoch = do_eval_per(
+                            print('  CER (sub): %f %%' %
+                                  (ler_sub_dev_epoch * 100))
+                        elif param['label_type_sub'] == 'phone':
+                            ler_sub_dev_epoch = do_eval_per(
                                 session=sess,
-                                per_op=ler_op_second,
+                                per_op=ler_op_sub,
                                 network=network,
                                 dataset=dev_data,
                                 eval_batch_size=param['batch_size'],
                                 is_multitask=True)
-                            print('  PER (second): %f %%' %
-                                  (ler_second_dev_epoch * 100))
+                            print('  PER (sub): %f %%' %
+                                  (ler_sub_dev_epoch * 100))
 
                         if ler_main_dev_epoch < ler_main_dev_best:
                             ler_main_dev_best = ler_main_dev_epoch
@@ -277,9 +277,9 @@ def do_train(network, param):
             # Save train & dev loss, ler
             save_loss(csv_steps, csv_loss_train, csv_loss_dev,
                       save_path=network.model_dir)
-            save_ler(csv_steps, csv_ler_main_train, csv_ler_second_dev,
+            save_ler(csv_steps, csv_ler_main_train, csv_ler_sub_dev,
                      save_path=network.model_dir)
-            save_ler(csv_steps, csv_ler_second_train, csv_ler_second_dev,
+            save_ler(csv_steps, csv_ler_sub_train, csv_ler_sub_dev,
                      save_path=network.model_dir)
 
             # Training was finished correctly
@@ -302,10 +302,10 @@ def main(config_path):
     elif corpus['label_type_main'] == 'kanji':
         param['num_classes_main'] = 3386
 
-    if corpus['label_type_second'] == 'phone':
-        param['num_classes_second'] = 38
-    elif corpus['label_type_second'] == 'kana':
-        param['num_classes_second'] = 147
+    if corpus['label_type_sub'] == 'phone':
+        param['num_classes_sub'] = 38
+    elif corpus['label_type_sub'] == 'kana':
+        param['num_classes_sub'] = 147
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -313,10 +313,10 @@ def main(config_path):
                        input_size=feature['input_size'] * feature['num_stack'],
                        num_unit=param['num_unit'],
                        num_layer_main=param['num_layer_main'],
-                       num_layer_second=param['num_layer_second'],
+                       num_layer_sub=param['num_layer_sub'],
                        #    bottleneck_dim=param['bottleneck_dim'],
                        num_classes_main=param['num_classes_main'],
-                       num_classes_second=param['num_classes_second'],
+                       num_classes_sub=param['num_classes_sub'],
                        main_task_weight=param['main_task_weight'],
                        parameter_init=param['weight_init'],
                        clip_grad=param['clip_grad'],
@@ -329,7 +329,7 @@ def main(config_path):
     network.model_name = param['model']
     network.model_name += '_' + str(param['num_unit'])
     network.model_name += '_main' + str(param['num_layer_main'])
-    network.model_name += '_second' + str(param['num_layer_second'])
+    network.model_name += '_sub' + str(param['num_layer_sub'])
     network.model_name += '_' + param['optimizer']
     network.model_name += '_lr' + str(param['learning_rate'])
     if param['bottleneck_dim'] != 0:
@@ -349,7 +349,7 @@ def main(config_path):
     network.model_dir = mkdir_join(network.model_dir, 'ctc')
     network.model_dir = mkdir_join(
         network.model_dir,
-        corpus['label_type_main'] + '_' + corpus['label_type_second'])
+        corpus['label_type_main'] + '_' + corpus['label_type_sub'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
@@ -361,7 +361,7 @@ def main(config_path):
 
     # Set process name
     setproctitle('multictc_csj_' + corpus['label_type_main'] + '_' +
-                 corpus['label_type_second'] + '_' + corpus['train_data_size'])
+                 corpus['label_type_sub'] + '_' + corpus['train_data_size'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))

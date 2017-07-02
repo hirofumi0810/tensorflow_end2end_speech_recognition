@@ -12,27 +12,24 @@ import sys
 import tensorflow as tf
 import yaml
 
-sys.path.append('../')
-sys.path.append('../../')
 sys.path.append('../../../')
-from data.load_dataset_ctc import Dataset
+from experiments.timit.data.load_dataset_ctc import Dataset
+from experiments.timit.visualization.util_plot_ctc import posterior_test
 from models.ctc.load_model import load
-from util_plot_ctc import posterior_test
 
 
-def do_plot(network, label_type, num_stack, num_skip, epoch=None):
+def do_plot(network, param, epoch=None):
     """Plot the CTC posteriors.
     Args:
         network: model to restore
-        label_type: phone39 or phone48 or phone61 or character
-        num_stack: int, the number of frames to stack
-        num_skip: int, the number of frames to skip
+        param: A dictionary of parameters
         epoch: epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test', label_type=label_type,
+    test_data = Dataset(data_type='test', label_type=param['label_type'],
                         batch_size=1,
-                        num_stack=num_stack, num_skip=num_skip,
+                        num_stack=param['num_stack'],
+                        num_skip=param['num_skip'],
                         is_sorted=False, is_progressbar=True)
 
     # Define placeholders
@@ -82,40 +79,37 @@ def do_plot(network, label_type, num_stack, num_skip, epoch=None):
                        posteriors_op=posteriors_op,
                        network=network,
                        dataset=test_data,
-                       label_type=label_type,
+                       label_type=param['label_type'],
                        save_path=network.model_dir,
-                       show=False)
+                       show=True)
 
 
-def main(model_path):
-
-    epoch = None  # if None, restore the final epoch
+def main(model_path, epoch):
 
     # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
-        corpus = config['corpus']
-        feature = config['feature']
         param = config['param']
 
     # Except for a blank label
-    if corpus['label_type'] == 'phone61':
-        num_classes = 61
-    elif corpus['label_type'] == 'phone48':
-        num_classes = 48
-    elif corpus['label_type'] == 'phone39':
-        num_classes = 39
-    elif corpus['label_type'] == 'character':
-        num_classes = 30
+    if param['label_type'] == 'phone61':
+        param['num_classes'] = 61
+    elif param['label_type'] == 'phone48':
+        param['num_classes'] = 48
+    elif param['label_type'] == 'phone39':
+        param['num_classes'] = 39
+    elif param['label_type'] == 'character':
+        param['num_classes'] = 33
 
     # Model setting
-    CTCModel = load(model_type=config['model_name'])
+    CTCModel = load(model_type=param['model'])
     network = CTCModel(
         batch_size=1,
-        input_size=feature['input_size'] * feature['num_stack'],
+        input_size=param['input_size'] * param['num_stack'],
         num_unit=param['num_unit'],
         num_layer=param['num_layer'],
-        num_classes=num_classes,
+        num_classes=param['num_classes'],
+        parameter_init=param['weight_init'],
         clip_grad=param['clip_grad'],
         clip_activation=param['clip_activation'],
         dropout_ratio_input=param['dropout_input'],
@@ -125,18 +119,20 @@ def main(model_path):
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_plot(network=network,
-            label_type=corpus['label_type'],
-            num_stack=feature['num_stack'],
-            num_skip=feature['num_skip'],
-            epoch=epoch)
+    do_plot(network=network, param=param, epoch=epoch)
 
 
 if __name__ == '__main__':
 
     args = sys.argv
-    if len(args) != 2:
+    if len(args) == 2:
+        model_path = args[1]
+        epoch = None
+    elif len(args) == 3:
+        model_path = args[1]
+        epoch = args[2]
+    else:
         raise ValueError(
             ("Set a path to saved model.\n"
              "Usase: python plot_ctc_posterior.py path_to_saved_model"))
-    main(model_path=args[1])
+    main(model_path=model_path, epoch=epoch)

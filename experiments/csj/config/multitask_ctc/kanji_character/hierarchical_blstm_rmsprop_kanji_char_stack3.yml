@@ -2,7 +2,7 @@ param:
   model: multitask_blstm_ctc
   corpus: csj
   label_type_main: kanji
-  label_type_second: kana
+  label_type_sub: kana
   train_data_size: default
   feature: fbank
   input_size: 123

@@ -14,8 +14,8 @@ from os.path import join
 import pickle
 import numpy as np
 
-from utils.progressbar import wrap_iterator
-from utils.data.ctc_each_load import DatasetBase
+from experiments.utils.progressbar import wrap_iterator
+from experiments.utils.data.ctc_each_load import DatasetBase
 
 
 class Dataset(DatasetBase):
@@ -56,7 +56,7 @@ class Dataset(DatasetBase):
                           train_data_size, label_type, data_type)
 
         # Load the frame number dictionary
-        with open(join(self.dataset_path, 'frame_num.pickle'), 'rb') as f:
+        with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
             self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label by frame num
@@ -79,7 +79,7 @@ class Dataset(DatasetBase):
             self.input_size = self.input_size * num_stack
         # NOTE: Not load dataset yet
 
-        self.rest = set([i for i in range(self.data_num)])
+        self.rest = set(range(0, self.data_num, 1))
 
         if data_type in ['eval1', 'eval2', 'eval3'] and label_type != 'phone':
             self.is_test = True

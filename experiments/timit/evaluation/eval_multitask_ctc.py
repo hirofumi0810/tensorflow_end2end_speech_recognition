@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate trained the multi-task CTC model (TIMIT corpus)."""
+"""Evaluate the trained multi-task CTC model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -12,34 +12,28 @@ import sys
 import tensorflow as tf
 import yaml
 
-sys.path.append('../')
-sys.path.append('../../')
 sys.path.append('../../../')
-from data.load_dataset_multitask_ctc import Dataset
+from experiments.timit.data.load_dataset_multitask_ctc import Dataset
+from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from models.ctc.load_model_multitask import load
-from metrics.ctc import do_eval_per, do_eval_cer
 
 
-def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
+def do_eval(network, label_type_sub, num_stack, num_skip, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
-        label_type_second: string, phone39 or phone48 or phone61
+        label_type_sub: string, phone39 or phone48 or phone61
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
         epoch: int, the epoch to restore
     """
     # Load dataset
-    if label_type_second == 'character':
-        test_data = Dataset(data_type='test', label_type_second='character',
-                            batch_size=1,
-                            num_stack=num_stack, num_skip=num_skip,
-                            is_sorted=False, is_progressbar=True)
-    else:
-        test_data = Dataset(data_type='test', label_type_second='phone39',
-                            batch_size=1,
-                            num_stack=num_stack, num_skip=num_skip,
-                            is_sorted=False, is_progressbar=True)
+    test_data = Dataset(data_type='test',
+                        label_type_main='character',
+                        label_type_sub='phone39',
+                        batch_size=1,
+                        num_stack=num_stack, num_skip=num_skip,
+                        is_sorted=False, is_progressbar=True)
 
     # Define placeholders
     network.inputs = tf.placeholder(
@@ -50,31 +44,31 @@ def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
     values_pl = tf.placeholder(tf.int32, name='values')
     shape_pl = tf.placeholder(tf.int64, name='shape')
     network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
-    indices_second_pl = tf.placeholder(tf.int64, name='indices_second')
-    values_second_pl = tf.placeholder(tf.int32, name='values_second')
-    shape_second_pl = tf.placeholder(tf.int64, name='shape_second')
-    network.labels_second = tf.SparseTensor(indices_second_pl,
-                                            values_second_pl,
-                                            shape_second_pl)
+    indices_sub_pl = tf.placeholder(tf.int64, name='indices_sub')
+    values_sub_pl = tf.placeholder(tf.int32, name='values_sub')
+    shape_sub_pl = tf.placeholder(tf.int64, name='shape_sub')
+    network.labels_sub = tf.SparseTensor(indices_sub_pl,
+                                         values_sub_pl,
+                                         shape_sub_pl)
     network.inputs_seq_len = tf.placeholder(tf.int64,
                                             shape=[None],
                                             name='inputs_seq_len')
 
     # Add to the graph each operation
-    _, logits_main, logits_second = network.compute_loss(
+    _, logits_main, logits_sub = network.compute_loss(
         network.inputs,
         network.labels,
-        network.labels_second,
+        network.labels_sub,
         network.inputs_seq_len)
-    decode_op_main, decode_op_second = network.decoder(
+    decode_op_main, decode_op_sub = network.decoder(
         logits_main,
-        logits_second,
+        logits_sub,
         network.inputs_seq_len,
         decode_type='beam_search',
         beam_width=20)
-    per_op_main, per_op_second = network.compute_ler(
-        decode_op_main, decode_op_second,
-        network.labels, network.labels_second)
+    per_op_main, per_op_sub = network.compute_ler(
+        decode_op_main, decode_op_sub,
+        network.labels, network.labels_sub)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -106,11 +100,11 @@ def do_eval(network, label_type_second, num_stack, num_skip, epoch=None):
 
         per_test = do_eval_per(
             session=sess,
-            decode_op=decode_op_second,
-            per_op=per_op_second,
+            decode_op=decode_op_sub,
+            per_op=per_op_sub,
             network=network,
             dataset=test_data,
-            train_label_type=label_type_second,
+            train_label_type=label_type_sub,
             is_progressbar=True,
             is_multitask=True)
         print('  PER: %f %%' % (per_test * 100))
@@ -128,12 +122,12 @@ def main(model_path):
         param = config['param']
 
     # Except for a blank label
-    if corpus['label_type_second'] == 'phone61':
-        num_classes_second = 61
-    elif corpus['label_type_second'] == 'phone48':
-        num_classes_second = 48
-    elif corpus['label_type_second'] == 'phone39':
-        num_classes_second = 39
+    if corpus['label_type_sub'] == 'phone61':
+        num_classes_sub = 61
+    elif corpus['label_type_sub'] == 'phone48':
+        num_classes_sub = 48
+    elif corpus['label_type_sub'] == 'phone39':
+        num_classes_sub = 39
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
@@ -142,9 +136,9 @@ def main(model_path):
         input_size=feature['input_size'] * feature['num_stack'],
         num_unit=param['num_unit'],
         num_layer_main=param['num_layer_main'],
-        num_layer_second=param['num_layer_second'],
+        num_layer_sub=param['num_layer_sub'],
         num_classes_main=30,
-        num_classes_second=num_classes_second,
+        num_classes_sub=num_classes_sub,
         main_task_weight=param['main_task_weight'],
         parameter_init=param['weight_init'],
         clip_grad=param['clip_grad'],
@@ -157,7 +151,7 @@ def main(model_path):
     network.model_dir = model_path
     print(network.model_dir)
     do_eval(network=network,
-            label_type_second=corpus['label_type_second'],
+            label_type_sub=corpus['label_type_sub'],
             num_stack=feature['num_stack'],
             num_skip=feature['num_skip'],
             epoch=epoch)

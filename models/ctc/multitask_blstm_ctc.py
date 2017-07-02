@@ -18,12 +18,12 @@ class Multitask_BLSTM_CTC(ctcBase):
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer_main: int, the number of layers of the main task
-        num_layer_second: int, the number of layers of the second task. Set
+        num_layer_sub: int, the number of layers of the sub task. Set
             between 1 to num_layer_main
         num_classes_main: int, the number of classes of target labels in the
             main task (except for a blank label)
-        num_classes_second: int, the number of classes of target labels in the
-            second task (except for a blank label)
+        num_classes_sub: int, the number of classes of target labels in the
+            sub task (except for a blank label)
         main_task_weight: A float value. The weight of loss of the main task.
             Set between 0 to 1
         parameter_init: A float value. Range of uniform distribution to
@@ -44,9 +44,9 @@ class Multitask_BLSTM_CTC(ctcBase):
                  input_size,
                  num_unit,
                  num_layer_main,
-                 num_layer_second,
+                 num_layer_sub,
                  num_classes_main,
-                 num_classes_second,
+                 num_classes_sub,
                  main_task_weight,
                  parameter_init=0.1,
                  clip_grad=None,
@@ -67,16 +67,16 @@ class Multitask_BLSTM_CTC(ctcBase):
         self.num_proj = None if num_proj == 0 else num_proj
         self.bottleneck_dim = bottleneck_dim
 
-        if num_layer_second < 1 or num_layer_second > num_layer_main:
+        if num_layer_sub < 1 or num_layer_sub > num_layer_main:
             raise ValueError(
-                'Set num_layer_second between 1 to num_layer_main.')
-        self.num_layer_second = num_layer_second
-        self.num_classes_second = num_classes_second + 1  # plus blank label
+                'Set num_layer_sub between 1 to num_layer_main.')
+        self.num_layer_sub = num_layer_sub
+        self.num_classes_sub = num_classes_sub + 1  # plus blank label
 
         if main_task_weight < 0 or main_task_weight > 1:
             raise ValueError('Set main_task_weight between 0 to 1.')
         self.main_task_weight = main_task_weight
-        self.second_task_weight = 1 - main_task_weight
+        self.sub_task_weight = 1 - main_task_weight
 
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
                keep_prob_hidden):
@@ -148,7 +148,7 @@ class Multitask_BLSTM_CTC(ctcBase):
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
-                if i_layer == self.num_layer_second - 1:
+                if i_layer == self.num_layer_sub - 1:
                     # Reshape to apply the same weights over the timesteps
                     if self.num_proj is None:
                         output_node = self.num_unit * 2
@@ -157,25 +157,25 @@ class Multitask_BLSTM_CTC(ctcBase):
                     outputs_hidden = tf.reshape(
                         outputs, shape=[-1, output_node])
 
-                    with tf.name_scope('output_second'):
+                    with tf.name_scope('output_sub'):
                         # Affine
-                        W_output_second = tf.Variable(tf.truncated_normal(
-                            shape=[output_node, self.num_classes_second],
-                            stddev=0.1, name='W_output_second'))
-                        b_output_second = tf.Variable(tf.zeros(
-                            shape=[self.num_classes_second],
-                            name='b_output_second'))
-                        logits_second_2d = tf.matmul(
-                            outputs_hidden, W_output_second) + b_output_second
+                        W_output_sub = tf.Variable(tf.truncated_normal(
+                            shape=[output_node, self.num_classes_sub],
+                            stddev=0.1, name='W_output_sub'))
+                        b_output_sub = tf.Variable(tf.zeros(
+                            shape=[self.num_classes_sub],
+                            name='b_output_sub'))
+                        logits_sub_2d = tf.matmul(
+                            outputs_hidden, W_output_sub) + b_output_sub
 
                         # Reshape back to the original shape
-                        logits_second = tf.reshape(
-                            logits_second_2d,
-                            shape=[batch_size, -1, self.num_classes_second])
+                        logits_sub = tf.reshape(
+                            logits_sub_2d,
+                            shape=[batch_size, -1, self.num_classes_sub])
 
                         # Convert to time-major:
                         # `[max_time, batch_size, num_classes]`
-                        logits_second = tf.transpose(logits_second, (1, 0, 2))
+                        logits_sub = tf.transpose(logits_sub, (1, 0, 2))
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
@@ -211,15 +211,15 @@ class Multitask_BLSTM_CTC(ctcBase):
             # Convert to time-major: `[max_time, batch_size, num_classes]'
             logits_main = tf.transpose(logits_main, (1, 0, 2))
 
-            return logits_main, logits_second
+            return logits_main, logits_sub
 
-    def compute_loss(self, inputs, labels_main, labels_second, inputs_seq_len,
+    def compute_loss(self, inputs, labels_main, labels_sub, inputs_seq_len,
                      keep_prob_input, keep_prob_hidden, num_gpu=1, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[batch_size, max_time, input_size]`
             labels_main: A SparseTensor of target labels in the main task
-            labels_second: A SparseTensor of target labels in the second task
+            labels_sub: A SparseTensor of target labels in the sub task
             inputs_seq_len: A tensor of size `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
                 input-hidden layers
@@ -229,10 +229,10 @@ class Multitask_BLSTM_CTC(ctcBase):
         Returns:
             loss: operation for computing ctc loss
             logits_main: A tensor of size `[max_time, batch_size, input_size]`
-            logits_second: A tensor of size `[max_time, batch_size, input_size]`
+            logits_sub: A tensor of size `[max_time, batch_size, input_size]`
         """
         # Build model graph
-        logits_main, logits_second = self._build(
+        logits_main, logits_sub = self._build(
             inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden)
 
         # Weight decay
@@ -263,25 +263,25 @@ class Multitask_BLSTM_CTC(ctcBase):
                 tf.summary.scalar('ctc_loss_main_dev',
                                   ctc_loss * self.main_task_weight))
 
-        with tf.name_scope("ctc_loss_second"):
-            ctc_losses = tf.nn.ctc_loss(labels_second,
-                                        logits_second,
+        with tf.name_scope("ctc_loss_sub"):
+            ctc_losses = tf.nn.ctc_loss(labels_sub,
+                                        logits_sub,
                                         tf.cast(inputs_seq_len, tf.int32),
                                         preprocess_collapse_repeated=False,
                                         ctc_merge_repeated=True,
                                         ignore_longer_outputs_than_inputs=False,
                                         time_major=True)
             ctc_loss = tf.reduce_mean(
-                ctc_losses, name='ctc_loss_second')
+                ctc_losses, name='ctc_loss_sub')
             tf.add_to_collection(
-                'losses', ctc_loss * self.second_task_weight)
+                'losses', ctc_loss * self.sub_task_weight)
 
             self.summaries_train.append(
-                tf.summary.scalar('ctc_loss_second_train',
-                                  ctc_loss * self.second_task_weight))
+                tf.summary.scalar('ctc_loss_sub_train',
+                                  ctc_loss * self.sub_task_weight))
             self.summaries_dev.append(
-                tf.summary.scalar('ctc_loss_second_dev',
-                                  ctc_loss * self.second_task_weight))
+                tf.summary.scalar('ctc_loss_sub_dev',
+                                  ctc_loss * self.sub_task_weight))
 
         # Compute total loss
         loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
@@ -293,20 +293,20 @@ class Multitask_BLSTM_CTC(ctcBase):
             self.summaries_dev.append(
                 tf.summary.scalar('total_loss_dev', loss))
 
-        return loss, logits_main, logits_second
+        return loss, logits_main, logits_sub
 
-    def decoder(self, logits_main, logits_second, inputs_seq_len, decode_type,
+    def decoder(self, logits_main, logits_sub, inputs_seq_len, decode_type,
                 beam_width=None):
         """Operation for decoding.
         Args:
             logits_main: A tensor of size `[max_time, batch_size, input_size]`
-            logits_second: A tensor of size `[max_time, batch_size, input_size]`
+            logits_sub: A tensor of size `[max_time, batch_size, input_size]`
             inputs_seq_len: A tensor of size `[batch_size]`
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
         Return:
             decode_op_main: operation for decoding of the main task
-            decode_op_second: operation for decoding of the second task
+            decode_op_sub: operation for decoding of the sub task
         """
         if decode_type not in ['greedy', 'beam_search']:
             raise ValueError('decode_type is "greedy" or "beam_search".')
@@ -314,8 +314,8 @@ class Multitask_BLSTM_CTC(ctcBase):
         if decode_type == 'greedy':
             decoded_main, _ = tf.nn.ctc_greedy_decoder(
                 logits_main, tf.cast(inputs_seq_len, tf.int32))
-            decoded_second, _ = tf.nn.ctc_greedy_decoder(
-                logits_second, tf.cast(inputs_seq_len, tf.int32))
+            decoded_sub, _ = tf.nn.ctc_greedy_decoder(
+                logits_sub, tf.cast(inputs_seq_len, tf.int32))
 
         elif decode_type == 'beam_search':
             if beam_width is None:
@@ -324,57 +324,57 @@ class Multitask_BLSTM_CTC(ctcBase):
             decoded_main, _ = tf.nn.ctc_beam_search_decoder(
                 logits_main, tf.cast(inputs_seq_len, tf.int32),
                 beam_width=beam_width)
-            decoded_second, _ = tf.nn.ctc_beam_search_decoder(
-                logits_second, tf.cast(inputs_seq_len, tf.int32),
+            decoded_sub, _ = tf.nn.ctc_beam_search_decoder(
+                logits_sub, tf.cast(inputs_seq_len, tf.int32),
                 beam_width=beam_width)
 
         decode_op_main = tf.to_int32(decoded_main[0])
-        decode_op_second = tf.to_int32(decoded_second[0])
+        decode_op_sub = tf.to_int32(decoded_sub[0])
 
-        return decode_op_main, decode_op_second
+        return decode_op_main, decode_op_sub
 
-    def posteriors(self, logits_main, logits_second):
+    def posteriors(self, logits_main, logits_sub):
         """Operation for computing posteriors of each time steps.
         Args:
             logits_main: A tensor of size `[max_time, batch_size, input_size]`
-            logits_second: A tensor of size `[max_time, batch_size, input_size]`
+            logits_sub: A tensor of size `[max_time, batch_size, input_size]`
         Return:
             posteriors_op_main: operation for computing posteriors for each
                 class in the main task
-            posteriors_op_second: operation for computing posteriors for each
-                class in the second task
+            posteriors_op_sub: operation for computing posteriors for each
+                class in the sub task
         """
         # Convert to batch-major: `[batch_size, max_time, num_classes]'
         logits_main = tf.transpose(logits_main, (1, 0, 2))
-        logits_second = tf.transpose(logits_second, (1, 0, 2))
+        logits_sub = tf.transpose(logits_sub, (1, 0, 2))
 
         logits_2d_main = tf.reshape(logits_main,
                                     shape=[-1, self.num_classes])
         posteriors_op_main = tf.nn.softmax(logits_2d_main)
 
-        logits_2d_second = tf.reshape(logits_second,
-                                      shape=[-1, self.num_classes_second])
-        posteriors_op_second = tf.nn.softmax(logits_2d_second)
+        logits_2d_sub = tf.reshape(logits_sub,
+                                   shape=[-1, self.num_classes_sub])
+        posteriors_op_sub = tf.nn.softmax(logits_2d_sub)
 
-        return posteriors_op_main, posteriors_op_second
+        return posteriors_op_main, posteriors_op_sub
 
-    def compute_ler(self, decode_op_main, decode_op_second,
-                    labels_main, labels_second):
+    def compute_ler(self, decode_op_main, decode_op_sub,
+                    labels_main, labels_sub):
         """Operation for computing LER (Label Error Rate).
         Args:
             decode_op_main: operation for decoding of the main task
-            decode_op_second: operation for decoding of the second task
+            decode_op_sub: operation for decoding of the sub task
             labels_main: A SparseTensor of target labels in the main task
-            labels_second: A SparseTensor of target labels in the second task
+            labels_sub: A SparseTensor of target labels in the sub task
         Return:
             ler_op_main: operation for computing LER of the main task
-            ler_op_second: operation for computing LER of the second task
+            ler_op_sub: operation for computing LER of the sub task
         """
         # Compute LER (normalize by label length)
         ler_op_main = tf.reduce_mean(tf.edit_distance(
             decode_op_main, labels_main, normalize=True))
-        ler_op_second = tf.reduce_mean(tf.edit_distance(
-            decode_op_second, labels_second, normalize=True))
+        ler_op_sub = tf.reduce_mean(tf.edit_distance(
+            decode_op_sub, labels_sub, normalize=True))
         # NOTE: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
 
         # Add a scalar summary for the snapshot of LER
@@ -382,10 +382,10 @@ class Multitask_BLSTM_CTC(ctcBase):
             self.summaries_train.append(tf.summary.scalar(
                 'ler_main_train', ler_op_main))
             self.summaries_train.append(tf.summary.scalar(
-                'ler_second_train', ler_op_second))
+                'ler_sub_train', ler_op_sub))
             self.summaries_dev.append(tf.summary.scalar(
                 'ler_main_dev', ler_op_main))
             self.summaries_dev.append(tf.summary.scalar(
-                'ler_second_dev', ler_op_second))
+                'ler_sub_dev', ler_op_sub))
 
-        return ler_op_main, ler_op_second
+        return ler_op_main, ler_op_sub

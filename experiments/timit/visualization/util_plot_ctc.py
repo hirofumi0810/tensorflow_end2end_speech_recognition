@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from utils.directory import mkdir_join
+from experiments.utils.directory import mkdir_join
 
 plt.style.use('ggplot')
 sns.set_style("white")

@@ -10,12 +10,12 @@ import sys
 import unittest
 import tensorflow as tf
 
-sys.path.append('../../')
 sys.path.append('../../../')
-from load_dataset_ctc import Dataset
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
-from utils.sparsetensor import sparsetensor2list
+from experiments.timit.data.load_dataset_ctc import Dataset
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone
+from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetCTC(unittest.TestCase):
@@ -34,6 +34,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
         # For many GPUs
         # self.check_loading(label_type='character', num_gpu=7, is_sorted=True)
 
+    @measure_time
     def check_loading(self, label_type, num_gpu, is_sorted):
         print('----- label_type: ' + label_type + ', num_gpu: ' +
               str(num_gpu) + ', is_sorted: ' + str(is_sorted) + ' -----')
@@ -82,7 +83,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
                 str_true = map_fn(labels[0], map_file_path)
                 str_true = re.sub(r'_', ' ', str_true)
-                print(str_true)
+                # print(str_true)
 
 
 if __name__ == '__main__':

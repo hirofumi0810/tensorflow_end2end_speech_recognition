@@ -10,13 +10,13 @@ from __future__ import print_function
 import re
 import Levenshtein
 
-from .mapping import map_to_39phone
-from .edit_distance import compute_edit_distance
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone, phone2num
-from utils.sparsetensor import list2sparsetensor, sparsetensor2list
-from utils.exception_func import exception
-from utils.progressbar import wrap_iterator
+from experiments.timit.metrics.mapping import map_to_39phone
+from experiments.timit.metrics.edit_distance import compute_edit_distance
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone, phone2num
+from experiments.utils.sparsetensor import list2sparsetensor, sparsetensor2list
+from experiments.utils.exception_func import exception
+from experiments.utils.progressbar import wrap_iterator
 
 
 @exception

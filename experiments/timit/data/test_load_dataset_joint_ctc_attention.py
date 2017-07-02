@@ -10,12 +10,12 @@ import sys
 import unittest
 import tensorflow as tf
 
-sys.path.append('../../')
 sys.path.append('../../../')
-from load_dataset_joint_ctc_attention import Dataset
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
-from utils.sparsetensor import sparsetensor2list
+from experiments.timit.data.load_dataset_joint_ctc_attention import Dataset
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone
+from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetJointCTCAttention(unittest.TestCase):
@@ -93,9 +93,9 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
                 ctc_str_true = map_fn(ctc_labels[0], ctc_map_file_path)
                 att_str_true = re.sub(r'_', ' ', att_str_true)
                 ctc_str_true = re.sub(r'_', ' ', ctc_str_true)
-                print(att_str_true)
-                print(ctc_str_true)
-                print('-----')
+                # print(att_str_true)
+                # print(ctc_str_true)
+                # print('-----')
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@ param:
   model: multitask_blstm_ctc
   corpus: csj
   label_type_main: kanji
-  label_type_second: phone
+  label_type_sub: phone
   train_data_size: large
   feature: fbank
   input_size: 123

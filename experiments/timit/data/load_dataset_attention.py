@@ -13,8 +13,8 @@ from os.path import join
 import pickle
 import numpy as np
 
-from utils.progressbar import wrap_iterator
-from utils.data.attention_all_load import DatasetBase
+from experiments.utils.progressbar import wrap_iterator
+from experiments.utils.data.attention_all_load import DatasetBase
 
 
 class Dataset(DatasetBase):
@@ -72,4 +72,4 @@ class Dataset(DatasetBase):
         self.input_list = np.array(input_list)
         self.label_list = np.array(label_list)
 
-        self.rest = set([i for i in range(self.data_num)])
+        self.rest = set(range(0, self.data_num, 1))

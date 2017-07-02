@@ -10,11 +10,11 @@ import sys
 import unittest
 import tensorflow as tf
 
-sys.path.append('../../')
 sys.path.append('../../../')
-from load_dataset_attention import Dataset
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
+from experiments.timit.data.load_dataset_attention import Dataset
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone
+from experiments.utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetAttention(unittest.TestCase):
@@ -33,6 +33,7 @@ class TestLoadDatasetAttention(unittest.TestCase):
         # For many GPUs
         # self.check_loading(label_type='character', num_gpu=7, is_sorted=True)
 
+    @measure_time
     def check_loading(self, label_type, num_gpu, is_sorted):
         print('----- label_type: ' + label_type + ', num_gpu: ' +
               str(num_gpu) + ', is_sorted: ' + str(is_sorted) + ' -----')
@@ -60,10 +61,7 @@ class TestLoadDatasetAttention(unittest.TestCase):
             iter_per_epoch = int(dataset.data_num /
                                  (batch_size * num_gpu)) + 1
             for i in range(iter_per_epoch + 1):
-                return_tuple = mini_batch.__next__()
-                inputs = return_tuple[0]
-                labels = return_tuple[1]
-                labels_seq_len = return_tuple[3]
+                inputs, labels, inputs_seq_len, labels_seq_len, _ = mini_batch.__next__()
 
                 if num_gpu > 1:
                     for inputs_gpu in inputs:
@@ -75,7 +73,7 @@ class TestLoadDatasetAttention(unittest.TestCase):
                 str_true = map_fn(
                     labels[0][0: labels_seq_len[0]], map_file_path)
                 str_true = re.sub(r'_', ' ', str_true)
-                print(str_true)
+                # print(str_true)
 
 
 if __name__ == '__main__':

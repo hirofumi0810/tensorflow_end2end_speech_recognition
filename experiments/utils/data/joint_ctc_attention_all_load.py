@@ -9,12 +9,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+from os.path import basename
 import random
 import numpy as np
 import tensorflow as tf
 
-from ..sparsetensor import list2sparsetensor
+from experiments.utils.sparsetensor import list2sparsetensor
 
 
 class DatasetBase(object):
@@ -54,7 +54,7 @@ class DatasetBase(object):
         self.input_list = None
         self.att_label_list = None
         self.ctc_label_list = None
-        self.rest = set([i for i in range(self.data_num)])
+        self.rest = set(range(0, self.data_num, 1))
 
     def next_batch(self, batch_size=None, session=None):
         """Make mini-batch.
@@ -82,116 +82,75 @@ class DatasetBase(object):
         ctc_padded_value = -1
 
         while True:
-            #########################
             # sorted dataset
-            #########################
             if self.is_sorted:
                 if len(self.rest) > batch_size:
-                    sorted_indices = list(self.rest)[:batch_size]
-                    self.rest -= set(sorted_indices)
+                    data_indices = list(self.rest)[:batch_size]
+                    self.rest -= set(data_indices)
                 else:
-                    sorted_indices = list(self.rest)
-                    self.rest = set([i for i in range(self.data_num)])
+                    data_indices = list(self.rest)
+                    self.rest = set(range(0, self.data_num, 1))
                     next_epoch_flag = True
                     if self.data_type == 'train':
                         print('---Next epoch---')
 
-                # Compute max frame num in mini-batch
-                max_frame_num = self.input_list[sorted_indices[-1]].shape[0]
-
-                # Compute max target label length in mini-batch
-                att_max_seq_len = max(
-                    map(len, self.att_label_list[sorted_indices]))
-                ctc_max_seq_len = max(
-                    map(len, self.ctc_label_list[sorted_indices]))
-
-                # Shuffle selected mini-batch
-                random.shuffle(sorted_indices)
-
-                # Initialization
-                inputs = np.zeros(
-                    (len(sorted_indices), max_frame_num, self.input_size))
-                # Padding with <EOS>
-                att_labels = np.array([[self.eos_index] * att_max_seq_len]
-                                      * len(sorted_indices), dtype=int)
-                ctc_labels = np.array([[ctc_padded_value] * ctc_max_seq_len]
-                                      * len(sorted_indices), dtype=int)
-                inputs_seq_len = np.zeros((len(sorted_indices),), dtype=int)
-                att_labels_seq_len = np.zeros(
-                    (len(sorted_indices),), dtype=int)
-                input_names = [None] * len(sorted_indices)
-
-                # Set values of each data in mini-batch
-                for i_batch, x in enumerate(sorted_indices):
-                    data_i = self.input_list[x]
-                    frame_num = data_i.shape[0]
-                    inputs[i_batch, :frame_num, :] = data_i
-                    att_labels[i_batch, :len(self.att_label_list[x])
-                               ] = self.att_label_list[x]
-                    ctc_labels[i_batch, :len(self.ctc_label_list[x])
-                               ] = self.ctc_label_list[x]
-                    inputs_seq_len[i_batch] = frame_num
-                    att_labels_seq_len[i_batch] = len(self.att_label_list[x])
-                    input_names[i_batch] = os.path.basename(
-                        self.input_paths[x]).split('.')[0]
-
-            #########################
             # not sorted dataset
-            #########################
             else:
                 if len(self.rest) > batch_size:
                     # Randomly sample mini-batch
-                    random_indices = random.sample(list(self.rest), batch_size)
-                    self.rest -= set(random_indices)
+                    data_indices = random.sample(list(self.rest), batch_size)
+                    self.rest -= set(data_indices)
                 else:
-                    random_indices = list(self.rest)
-                    self.rest = set([i for i in range(self.data_num)])
+                    data_indices = list(self.rest)
+                    self.rest = set(range(0, self.data_num, 1))
                     next_epoch_flag = True
                     if self.data_type == 'train':
                         print('---Next epoch---')
 
                     # Shuffle selected mini-batch
-                    random.shuffle(random_indices)
+                    random.shuffle(data_indices)
 
-                # Compute max frame num in mini-batch
-                frame_num_list = []
-                for data_i in self.input_list[random_indices]:
-                    frame_num_list.append(data_i.shape[0])
-                max_frame_num = max(frame_num_list)
+            # Compute max frame num in mini-batch
+            max_frame_num = max(map(lambda x: x.shape[0],
+                                    self.input_list[data_indices]))
 
-                # Compute max target label length in mini-batch
-                att_max_seq_len = max(
-                    map(len, self.att_label_list[random_indices]))
-                ctc_max_seq_len = max(
-                    map(len, self.ctc_label_list[random_indices]))
+            # Compute max target label length in mini-batch
+            att_max_seq_len = max(
+                map(len, self.att_label_list[data_indices]))
+            ctc_max_seq_len = max(
+                map(len, self.ctc_label_list[data_indices]))
 
-                # Initialization
-                inputs = np.zeros(
-                    (len(random_indices), max_frame_num, self.input_size))
-                # Padding with <EOS>
-                att_labels = np.array([[self.eos_index] * att_max_seq_len]
-                                      * len(random_indices), dtype=int)
-                ctc_labels = np.array([[ctc_padded_value] * ctc_max_seq_len]
-                                      * len(random_indices), dtype=int)
-                inputs_seq_len = np.zeros((len(random_indices),), dtype=int)
-                att_labels_seq_len = np.zeros(
-                    (len(random_indices),), dtype=int)
-                input_names = [None] * len(random_indices)
+            # Initialization
+            inputs = np.zeros(
+                (len(data_indices), max_frame_num, self.input_size),
+                dtype=np.int32)
+            # Padding with <EOS>
+            att_labels = np.array([[self.eos_index] * att_max_seq_len]
+                                  * len(data_indices), dtype=np.int32)
+            ctc_labels = np.array([[ctc_padded_value] * ctc_max_seq_len]
+                                  * len(data_indices), dtype=np.int32)
+            inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
+            att_labels_seq_len = np.zeros(
+                (len(data_indices),), dtype=np.int32)
+            input_names = list(
+                map(lambda path: basename(path).split('.')[0],
+                    np.take(self.input_paths, data_indices, axis=0)))
 
-                # Set values of each data in mini-batch
-                for i_batch, x in enumerate(random_indices):
-                    data_i = self.input_list[x]
-                    frame_num = data_i.shape[0]
-                    inputs[i_batch, :frame_num, :] = data_i
-                    att_labels[i_batch, :len(self.att_label_list[x])
-                               ] = self.att_label_list[x]
-                    ctc_labels[i_batch, :len(
-                        self.ctc_label_list[x])] = self.ctc_label_list[x]
-                    inputs_seq_len[i_batch] = frame_num
-                    att_labels_seq_len[i_batch] = len(self.att_label_list[x])
-                    input_names[i_batch] = os.path.basename(
-                        self.input_paths[x]).split('.')[0]
+            # Set values of each data in mini-batch
+            for i_batch, x in enumerate(data_indices):
+                data_i = self.input_list[x]
+                frame_num = data_i.shape[0]
+                inputs[i_batch, :frame_num, :] = data_i
+                att_labels[i_batch, :len(self.att_label_list[x])
+                           ] = self.att_label_list[x]
+                ctc_labels[i_batch, :len(
+                    self.ctc_label_list[x])] = self.ctc_label_list[x]
+                inputs_seq_len[i_batch] = frame_num
+                att_labels_seq_len[i_batch] = len(self.att_label_list[x])
 
+            ##########
+            # GPU
+            ##########
             if self.num_gpu > 1:
                 divide_num = self.num_gpu
                 if next_epoch_flag:
@@ -216,7 +175,7 @@ class DatasetBase(object):
                 ctc_labels = list(map(session.run, ctc_labels))
                 ctc_labels_st = list(
                     map(list2sparsetensor,
-                        zip(ctc_labels, [ctc_padded_value] * len(ctc_labels))))
+                        ctc_labels, [ctc_padded_value] * len(ctc_labels)))
                 inputs_seq_len = list(map(session.run, inputs_seq_len))
                 att_labels_seq_len = list(map(session.run, att_labels_seq_len))
                 input_names = list(map(session.run, input_names))

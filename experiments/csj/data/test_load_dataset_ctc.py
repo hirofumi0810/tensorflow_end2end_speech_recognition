@@ -10,11 +10,12 @@ import sys
 import unittest
 import tensorflow as tf
 
-sys.path.append('../../')
-from csj.data.load_dataset_ctc import Dataset
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
-from utils.sparsetensor import sparsetensor2list
+sys.path.append('../../../')
+from experiments.csj.data.load_dataset_ctc import Dataset
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone
+from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetCTC(unittest.TestCase):
@@ -36,6 +37,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
         # For many GPUs
         # self.check_loading(label_type='kanji', num_gpu=7, is_sorted=True)
 
+    @measure_time
     def check_loading(self, label_type, num_gpu, is_sorted):
         print('----- label_type: ' + label_type + ', num_gpu: ' +
               str(num_gpu) + ', is_sorted: ' + str(is_sorted) + ' -----')
@@ -49,7 +51,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
-            print('=> Reading mini-batch...')
+            print('=> Loading mini-batch...')
             if label_type == 'kanji':
                 map_file_path = '../metrics/mapping_files/ctc/kanji2num.txt'
                 map_fn = num2char
@@ -85,7 +87,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
                 str_true = map_fn(labels[0], map_file_path)
                 str_true = re.sub(r'_', ' ', str_true)
-                print(str_true)
+                # print(str_true)
 
 
 if __name__ == '__main__':

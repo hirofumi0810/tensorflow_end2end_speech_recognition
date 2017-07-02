@@ -10,9 +10,9 @@ from __future__ import print_function
 from os.path import join
 import sys
 
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
-from utils.sparsetensor import sparsetensor2list
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone
+from experiments.utils.sparsetensor import sparsetensor2list
 
 
 def decode_test(session, decode_op, network, dataset, label_type,

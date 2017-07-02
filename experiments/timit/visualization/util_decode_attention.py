@@ -7,8 +7,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone
 
 
 def decode_test(session, decode_op, network, dataset, label_type,

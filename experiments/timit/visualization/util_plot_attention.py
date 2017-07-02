@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-from utils.labels.character import num2char
-from utils.labels.phone import num2phone
-from utils.directory import mkdir_join
+from experiments.utils.labels.character import num2char
+from experiments.utils.labels.phone import num2phone
+from experiments.utils.directory import mkdir_join
 
 plt.style.use('ggplot')
 sns.set_style("white")

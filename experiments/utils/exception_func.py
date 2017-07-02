@@ -12,6 +12,7 @@ def exception(func):
             return func(*args, **kwargs)
         except IndexError:
             print('Output Error')
+            raise
         except:
             print('Unexpected Error')
             raise

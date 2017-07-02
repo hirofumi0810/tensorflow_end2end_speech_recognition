@@ -12,34 +12,29 @@ import sys
 import tensorflow as tf
 import yaml
 
-sys.path.append('../')
-sys.path.append('../../')
 sys.path.append('../../../')
-from data.load_dataset_attention import Dataset
-# from models.attention.load_model import load
+from experiments.timit.data.load_dataset_attention import Dataset
+from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
 from models.attention import blstm_attention_seq2seq
-from metrics.attention import do_eval_per, do_eval_cer
 
 
-def do_eval(network, label_type, epoch=None):
+def do_eval(network, param, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
-        label_type: string, phone39 or phone48 or phone61 or character
+        param: A dictionary of parameters
         epoch: int the epoch to restore
     """
-    eos_index = network.eos_index
-
     # Load dataset
-    if label_type == 'character':
+    if param['label_type'] == 'character':
         test_data = Dataset(data_type='test', label_type='character',
                             batch_size=1,
-                            eos_index=eos_index,
+                            eos_index=param['eos_index'],
                             is_sorted=False, is_progressbar=True)
     else:
         test_data = Dataset(data_type='test', label_type='phone39',
                             batch_size=1,
-                            eos_index=eos_index,
+                            eos_index=param['eos_index'],
                             is_sorted=False, is_progressbar=True)
 
     # Define placeholders
@@ -108,7 +103,7 @@ def do_eval(network, label_type, epoch=None):
             raise ValueError('There are not any checkpoints.')
 
         print('Test Data Evaluation:')
-        if label_type == 'character':
+        if param['label_type'] == 'character':
             cer_test = do_eval_cer(
                 session=sess,
                 decode_op=decode_op_infer,
@@ -123,7 +118,8 @@ def do_eval(network, label_type, epoch=None):
                 per_op=per_op,
                 network=network,
                 dataset=test_data,
-                label_type=label_type,
+                label_type=param['label_type'],
+                eos_index=param['eos_index'],
                 is_progressbar=True)
             print('  PER: %f %%' % (per_test * 100))
 
@@ -133,32 +129,30 @@ def main(model_path, epoch):
     # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
-        corpus = config['corpus']
-        feature = config['feature']
         param = config['param']
 
-    if corpus['label_type'] == 'phone61':
-        num_classes = 63
-        sos_index = 0
-        eos_index = 1
-    elif corpus['label_type'] == 'phone48':
-        num_classes = 50
-        sos_index = 0
-        eos_index = 1
-    elif corpus['label_type'] == 'phone39':
-        num_classes = 41
-        sos_index = 0
-        eos_index = 1
-    elif corpus['label_type'] == 'character':
-        num_classes = 33
-        sos_index = 1
-        eos_index = 2
+    if param['label_type'] == 'phone61':
+        param['num_classes'] = 63
+        param['sos_index'] = 0
+        param['eos_index'] = 1
+    elif param['label_type'] == 'phone48':
+        param['num_classes'] = 50
+        param['sos_index'] = 0
+        param['eos_index'] = 1
+    elif param['label_type'] == 'phone39':
+        param['num_classes'] = 41
+        param['sos_index'] = 0
+        param['eos_index'] = 1
+    elif param['label_type'] == 'character':
+        param['num_classes'] = 35
+        param['sos_index'] = 1
+        param['eos_index'] = 2
 
     # Model setting
-    # AttentionModel = load(model_type=config['model_name'])
+    # AttentionModel = load(model_type=param['model'])
     network = blstm_attention_seq2seq.BLSTMAttetion(
         batch_size=1,
-        input_size=feature['input_size'],
+        input_size=param['input_size'],
         encoder_num_unit=param['encoder_num_unit'],
         encoder_num_layer=param['encoder_num_layer'],
         attention_dim=param['attention_dim'],
@@ -166,9 +160,9 @@ def main(model_path, epoch):
         decoder_num_unit=param['decoder_num_unit'],
         decoder_num_layer=param['decoder_num_layer'],
         embedding_dim=param['embedding_dim'],
-        num_classes=num_classes,
-        sos_index=sos_index,
-        eos_index=eos_index,
+        num_classes=param['num_classes'],
+        sos_index=param['sos_index'],
+        eos_index=param['eos_index'],
         max_decode_length=param['max_decode_length'],
         attention_smoothing=param['attention_smoothing'],
         attention_weights_tempareture=param['attention_weights_tempareture'],
@@ -183,9 +177,7 @@ def main(model_path, epoch):
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_eval(network=network,
-            label_type=corpus['label_type'],
-            epoch=epoch)
+    do_eval(network=network, param=param, epoch=epoch)
 
 
 if __name__ == '__main__':

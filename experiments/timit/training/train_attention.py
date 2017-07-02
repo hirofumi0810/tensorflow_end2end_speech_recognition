@@ -15,17 +15,14 @@ from setproctitle import setproctitle
 import yaml
 import shutil
 
-sys.path.append('../')
-sys.path.append('../../')
 sys.path.append('../../../')
-from data.load_dataset_attention import Dataset
-# from models.attention.load_model import load
+from experiments.timit.data.load_dataset_attention import Dataset
+from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
+from experiments.utils.sparsetensor import list2sparsetensor
+from experiments.utils.directory import mkdir, mkdir_join
+from experiments.utils.parameter import count_total_parameters
+from experiments.utils.csv import save_loss, save_ler
 from models.attention import blstm_attention_seq2seq
-from metrics.attention import do_eval_per, do_eval_cer
-from utils.sparsetensor import list2sparsetensor
-from utils.directory import mkdir, mkdir_join
-from utils.parameter import count_total_parameters
-from utils.csv import save_loss, save_ler
 
 
 def do_train(network, param):
@@ -35,12 +32,10 @@ def do_train(network, param):
         network: network to train
         param: A dictionary of parameters
     """
-    eos_index = network.eos_index
-
     # Load dataset
     train_data = Dataset(data_type='train', label_type=param['label_type'],
                          batch_size=param['batch_size'],
-                         eos_index=eos_index, is_sorted=True)
+                         eos_index=param['eos_index'], is_sorted=True)
     dev_data = Dataset(data_type='dev', label_type=param['label_type'],
                        batch_size=param['batch_size'],
                        eos_index=param['eos_index'], is_sorted=False)
@@ -165,7 +160,7 @@ def do_train(network, param):
                     network.labels_seq_len: labels_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.lr: param['learning_rate']
+                    network.lr: float(param['learning_rate'])
                 }
 
                 # Create feed dictionary for next mini batch (dev)
@@ -211,15 +206,19 @@ def do_train(network, param):
                     # Convert to sparsetensor to compute LER
                     feed_dict_ler_train = {
                         network.labels_true_st: list2sparsetensor(
-                            labels_train, padded_value=eos_index),
+                            labels_train,
+                            padded_value=param['eos_index']),
                         network.labels_pred_st: list2sparsetensor(
-                            predicted_ids_train, padded_value=eos_index)
+                            predicted_ids_train,
+                            padded_value=param['eos_index'])
                     }
                     feed_dict_ler_dev = {
                         network.labels_true_st: list2sparsetensor(
-                            labels_dev, padded_value=eos_index),
+                            labels_dev,
+                            padded_value=param['eos_index']),
                         network.labels_pred_st: list2sparsetensor(
-                            predicted_ids_dev, padded_value=eos_index)
+                            predicted_ids_dev,
+                            padded_value=param['eos_index'])
                     }
 
                     # Compute accuracy
@@ -254,54 +253,57 @@ def do_train(network, param):
                         start_time_eval = time.time()
                         if param['label_type'] == 'character':
                             print('=== Dev Data Evaluation ===')
-                            error_dev_epoch = do_eval_cer(
+                            cer_dev_epoch = do_eval_cer(
                                 session=sess,
                                 decode_op=decode_op_infer,
                                 network=network,
                                 dataset=dev_data,
                                 eval_batch_size=1)
-                            print('  CER: %f %%' % (error_dev_epoch * 100))
+                            print('  CER: %f %%' % (cer_dev_epoch * 100))
 
-                            if error_dev_epoch < error_best:
-                                error_best = error_dev_epoch
+                            if cer_dev_epoch < error_best:
+                                error_best = cer_dev_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
                                 print('=== Test Data Evaluation ===')
-                                error_test_epoch = do_eval_cer(
+                                cer_test = do_eval_cer(
                                     session=sess,
                                     decode_op=decode_op_infer,
                                     network=network,
                                     dataset=test_data,
                                     eval_batch_size=1)
                                 print('  CER: %f %%' %
-                                      (error_test_epoch * 100))
+                                      (cer_test * 100))
 
                         else:
                             print('=== Dev Data Evaluation ===')
-                            error_dev_epoch = do_eval_per(
+                            per_dev_epoch = do_eval_per(
                                 session=sess,
                                 decode_op=decode_op_infer,
                                 per_op=ler_op,
                                 network=network,
                                 dataset=dev_data,
-                                param=param,
+                                label_type=param['label_type'],
+                                eos_index=param['eos_index'],
                                 eval_batch_size=1)
-                            print('  PER: %f %%' % (error_dev_epoch * 100))
+                            print('  PER: %f %%' % (per_dev_epoch * 100))
 
-                            if error_dev_epoch < error_best:
-                                error_best = error_dev_epoch
+                            if per_dev_epoch < error_best:
+                                error_best = per_dev_epoch
                                 print('■■■ ↑Best Score (PER)↑ ■■■')
 
                                 print('=== Test Data Evaluation ===')
-                                error_test_epoch = do_eval_per(
+                                per_test = do_eval_per(
                                     session=sess,
                                     decode_op=decode_op_infer,
                                     per_op=ler_op,
                                     network=network,
                                     dataset=test_data,
-                                    param=param,
+                                    label_type=param['label_type'],
+                                    eos_index=param['eos_index'],
                                     eval_batch_size=1)
-                                print('  PER: %f %%' % (error_dev_epoch * 100))
+                                print('  PER: %f %%' %
+                                      (per_test * 100))
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -344,7 +346,7 @@ def main(config_path):
         param['sos_index'] = 0
         param['eos_index'] = 1
     elif param['label_type'] == 'character':
-        param['num_classes'] = 33
+        param['num_classes'] = 35
         param['sos_index'] = 1
         param['eos_index'] = 2
 
@@ -414,7 +416,6 @@ def main(config_path):
     sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
     do_train(network=network, param=param)
-    sys.stdout = sys.__stdout__
 
 
 if __name__ == '__main__':

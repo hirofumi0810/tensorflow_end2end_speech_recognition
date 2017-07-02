@@ -9,7 +9,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+from os.path import basename
 import random
 import numpy as np
 import tensorflow as tf
@@ -49,7 +49,8 @@ class DatasetBase(object):
         self.input_paths = None
         self.label_paths = None
         self.data_num = None
-        self.rest = set([i for i in range(self.data_num)])
+
+        self.rest = set(range(0, self.data_num, 1))
 
     def next_batch(self, batch_size=None, session=None):
         """Make mini-batch.
@@ -64,7 +65,7 @@ class DatasetBase(object):
             input_names: list of file name of input data of size
                 `[batch_size]`
 
-            If num_gpu > 1, each return is divide into list of size `[num_gpu]`.
+            If num_gpu > 1, each return is divide into list of size `[num_gpu]`
         """
         if session is None and self.num_gpu != 1:
             raise ValueError('Set session when using multiple GPUs.')
@@ -75,141 +76,86 @@ class DatasetBase(object):
         next_epoch_flag = False
 
         while True:
-            #########################
             # sorted dataset
-            #########################
             if self.is_sorted:
                 if len(self.rest) > batch_size:
-                    sorted_indices = list(self.rest)[:batch_size]
-                    self.rest -= set(sorted_indices)
+                    data_indices = list(self.rest)[:batch_size]
+                    self.rest -= set(data_indices)
                 else:
-                    sorted_indices = list(self.rest)
-                    self.rest = set(
-                        [i for i in range(self.data_num)])
+                    data_indices = list(self.rest)
+                    self.rest = set(range(0, self.data_num, 1))
                     next_epoch_flag = True
                     if self.data_type == 'train':
                         print('---Next epoch---')
 
                 # Shuffle selected mini-batch
-                random.shuffle(sorted_indices)
+                random.shuffle(data_indices)
 
-                # Load dataset in mini-batch
-                input_list, label_list, input_name_list = [], [], []
-                for i in sorted_indices:
-                    # input_list.append(np.load(self.input_paths[i]))
-                    # label_list.append(np.load(self.label_paths[i]))
-                    # input_name_list.append(os.path.basename(
-                    #     self.input_paths[i]).split('.')[0])
-                    input_list.append(np.load(np.take(self.input_paths, i,
-                                                      axis=0)))
-                    label_list.append(np.load(np.take(self.label_paths, i,
-                                                      axis=0)))
-                    input_name_list.append(
-                        os.path.basename(np.take(self.input_paths, i,
-                                                 axis=0)).split('.')[0])
-                input_list = np.array(input_list)
-                label_list = np.array(label_list)
-                input_name_list = np.array(input_name_list)
-
-                # Compute max frame num in mini-batch
-                max_frame_num = max(map(lambda x: x.shape[0], input_list))
-
-                # Compute max target label length in mini-batch
-                max_seq_len = max(map(len, label_list))
-
-                # Initialization
-                inputs = np.zeros(
-                    (len(sorted_indices), max_frame_num, self.input_size))
-                # Padding with <EOS>
-                labels = np.array([[self.eos_index] * max_seq_len]
-                                  * len(sorted_indices), dtype=int)
-                inputs_seq_len = np.empty(
-                    (len(sorted_indices),), dtype=int)
-                labels_seq_len = np.zeros(
-                    (len(sorted_indices),), dtype=int)
-                input_names = [None] * len(sorted_indices)
-
-                # Set values of each data in mini-batch
-                for i_batch in range(len(sorted_indices)):
-                    data_i = input_list[i_batch]
-                    frame_num = data_i.shape[0]
-                    inputs[i_batch, :frame_num, :] = data_i
-                    labels[i_batch, :len(label_list[i_batch])
-                           ] = label_list[i_batch]
-                    inputs_seq_len[i_batch] = frame_num
-                    labels_seq_len[i_batch] = len(label_list[i_batch])
-                    input_names[i_batch] = input_name_list[i_batch]
-
-            #########################
             # not sorted dataset
-            #########################
             else:
                 if len(self.rest) > batch_size:
                     # Randomly sample mini-batch
-                    random_indices = random.sample(
+                    data_indices = random.sample(
                         list(self.rest), batch_size)
-                    self.rest -= set(random_indices)
+                    self.rest -= set(data_indices)
                 else:
-                    random_indices = list(self.rest)
-                    self.rest = set([i for i in range(self.data_num)])
+                    data_indices = list(self.rest)
+                    self.rest = set(range(0, self.data_num, 1))
                     next_epoch_flag = True
                     if self.data_type == 'train':
                         print('---Next epoch---')
 
                     # Shuffle selected mini-batch
-                    random.shuffle(random_indices)
+                    random.shuffle(data_indices)
 
-                # Load dataset in mini-batch
-                input_list, label_list, input_name_list = [], [], []
-                for i in random_indices:
-                    # input_list.append(np.load(self.input_paths[i]))
-                    # label_list.append(np.load(self.label_paths[i]))
-                    # input_name_list.append(
-                    #     os.path.basename(self.input_paths[i]).split('.')[0])
-                    input_list.append(
-                        np.load(np.take(self.input_paths, i, axis=0)))
-                    label_list.append(
-                        np.load(np.take(self.label_paths, i, axis=0)))
-                    input_name_list.append(
-                        os.path.basename(np.take(self.input_paths, i, axis=0)).split('.')[0])
-                input_list = np.array(input_list)
-                label_list = np.array(label_list)
-                input_name_list = np.array(input_name_list)
+            # Load dataset in mini-batch
+            input_list = np.array(list(
+                map(lambda path: np.load(path),
+                    np.take(self.input_paths, data_indices, axis=0))))
+            label_list = np.array(list(
+                map(lambda path: np.load(path),
+                    np.take(self.label_paths, data_indices, axis=0))))
+            input_names = list(
+                map(lambda path: basename(path).split('.')[0],
+                    np.take(self.input_paths, data_indices, axis=0)))
 
-                # Compute max frame num in mini-batch
-                max_frame_num = max(map(lambda x: x.shape[0], input_list))
+            # Compute max frame num in mini-batch
+            max_frame_num = max(map(lambda x: x.shape[0], input_list))
 
-                # Compute max target label length in mini-batch
-                max_seq_len = max(map(len, label_list))
+            # Compute max target label length in mini-batch
+            max_seq_len = max(map(len, label_list))
 
-                # Initialization
-                inputs = np.zeros(
-                    (len(random_indices), max_frame_num, self.input_size))
-                # Padding with <EOS>
+            # Initialization
+            inputs = np.zeros(
+                (len(data_indices), max_frame_num, self.input_size),
+                dtype=np.float32)
+            # Padding with <EOS>
+            if not self.is_test:
                 labels = np.array([[self.eos_index] * max_seq_len]
-                                  * len(random_indices), dtype=int)
-                inputs_seq_len = np.empty(
-                    (len(random_indices),), dtype=int)
-                labels_seq_len = np.zeros(
-                    (len(random_indices),), dtype=int)
-                input_names = [None] * len(random_indices)
-                if self.is_test:
-                    labels = [None] * len(random_indices)
+                                  * len(data_indices), dtype=np.int32)
+            else:
+                labels = [None] * len(data_indices)
+            inputs_seq_len = np.empty(
+                (len(data_indices),), dtype=np.int32)
+            labels_seq_len = np.zeros(
+                (len(data_indices),), dtype=np.int32)
 
-                # Set values of each data in mini-batch
-                for i_batch in range(len(random_indices)):
-                    data_i = input_list[i_batch]
-                    frame_num = data_i.shape[0]
-                    inputs[i_batch, : frame_num, :] = data_i
-                    if not self.is_test:
-                        labels[i_batch, :len(label_list[i_batch])
-                               ] = label_list[i_batch]
-                    else:
-                        labels[i_batch] = label_list[i_batch]
-                    inputs_seq_len[i_batch] = frame_num
-                    labels_seq_len[i_batch] = len(label_list[i_batch])
-                    input_names[i_batch] = input_name_list[i_batch]
+            # Set values of each data in mini-batch
+            for i_batch in range(len(data_indices)):
+                data_i = input_list[i_batch]
+                frame_num = data_i.shape[0]
+                inputs[i_batch, : frame_num, :] = data_i
+                if not self.is_test:
+                    labels[i_batch, :len(label_list[i_batch])
+                           ] = label_list[i_batch]
+                else:
+                    labels[i_batch] = label_list[i_batch]
+                inputs_seq_len[i_batch] = frame_num
+                labels_seq_len[i_batch] = len(label_list[i_batch])
 
+            ##########
+            # GPU
+            ##########
             if self.num_gpu > 1:
                 divide_num = self.num_gpu
                 if next_epoch_flag:

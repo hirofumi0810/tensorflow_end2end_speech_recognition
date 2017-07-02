@@ -14,9 +14,9 @@ from os.path import join
 import pickle
 import numpy as np
 
-from utils.data.frame_stack import stack_frame
-from utils.progressbar import wrap_iterator
-from utils.data.ctc_all_load import DatasetBase
+from experiments.utils.data.frame_stack import stack_frame
+from experiments.utils.progressbar import wrap_iterator
+from experiments.utils.data.ctc_all_load import DatasetBase
 
 
 class Dataset(DatasetBase):
@@ -90,4 +90,4 @@ class Dataset(DatasetBase):
             self.input_list = np.array(stacked_input_list)
             self.input_size = self.input_size * num_stack
 
-        self.rest = set([i for i in range(self.data_num)])
+        self.rest = set(range(0, self.data_num, 1))
