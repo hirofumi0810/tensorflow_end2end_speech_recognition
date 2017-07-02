@@ -128,7 +128,7 @@ def generate_data(label_type, model, batch_size=1):
             labels = [alpha2num(transcript)] * batch_size
 
             # Convert to SparseTensor
-            labels = list2sparsetensor(labels)
+            labels = list2sparsetensor(labels, padded_value=-1)
             return inputs, labels, inputs_seq_len
 
         elif label_type == 'phone':
@@ -136,7 +136,7 @@ def generate_data(label_type, model, batch_size=1):
             labels = [phone2num(transcript)] * batch_size
 
             # Convert to SparseTensor
-            labels = list2sparsetensor(labels)
+            labels = list2sparsetensor(labels, padded_value=-1)
             return inputs, labels, inputs_seq_len
 
         elif label_type == 'multitask':
@@ -147,8 +147,8 @@ def generate_data(label_type, model, batch_size=1):
             labels_phone = [phone2num(transcript_phone)] * batch_size
 
             # Convert to SparseTensor
-            labels_char = list2sparsetensor(labels_char)
-            labels_phone = list2sparsetensor(labels_phone)
+            labels_char = list2sparsetensor(labels_char, padded_value=-1)
+            labels_phone = list2sparsetensor(labels_phone, padded_value=-1)
             return inputs, labels_char, labels_phone, inputs_seq_len
 
     elif model == 'attention':
@@ -188,7 +188,7 @@ def generate_data(label_type, model, batch_size=1):
             ctc_labels = [alpha2num(ctc_transcript)] * batch_size
 
             # Convert to SparseTensor
-            ctc_labels = list2sparsetensor(ctc_labels)
+            ctc_labels = list2sparsetensor(ctc_labels, padded_value=-1)
             return inputs, att_labels, inputs_seq_len, labels_seq_len, ctc_labels
 
         elif label_type == 'phone':
@@ -199,7 +199,7 @@ def generate_data(label_type, model, batch_size=1):
             ctc_labels = [phone2num(transcript)] * batch_size
 
             # Convert to SparseTensor
-            ctc_labels = list2sparsetensor(ctc_labels)
+            ctc_labels = list2sparsetensor(ctc_labels, padded_value=-1)
 
             return inputs, att_labels, inputs_seq_len, labels_seq_len, ctc_labels
 

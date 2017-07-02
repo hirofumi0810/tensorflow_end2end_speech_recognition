@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from .multitask_blstm_ctc import Multitask_BLSTM_CTC
+from models.ctc.multitask_blstm_ctc import Multitask_BLSTM_CTC
 
 CTC = {
     "multitask_blstm_ctc": Multitask_BLSTM_CTC

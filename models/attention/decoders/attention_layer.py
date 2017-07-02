@@ -15,8 +15,12 @@ class AttentionLayer(object):
         https://arxiv.org/abs/1409.0473.
             Bahdanau, Dzmitry, Kyunghyun Cho, and Yoshua Bengio.
             "Neural machine translation by jointly learning to align and
-            translate."
+                translate."
             arXiv preprint arXiv:1409.0473 (2014).
+        https://arxiv.org/abs/1506.07503.
+            Chorowski, Jan K., et al. "Attention-based models for speech
+                recognition."
+            Advances in Neural Information Processing Systems (2015): 577-585.
     Args:
         num_unit: Number of units used in the attention layer
         attention_smoothing: bool, if True, replace exp to sigmoid function in
@@ -169,13 +173,15 @@ class AttentionLayer(object):
             # location-based attention
             # e_ij = wT * tanh(W * s_{i-1} + U * f_ij + bias)
             ############################################################
-            F = tf.Variable(tf.truncated_normal(
-                shape=[100, 1, 10], stddev=0.1, name='Filter'))
+            with tf.control_dependencies(None):
+                F = tf.Variable(tf.truncated_normal(
+                    shape=[100, 1, 10], stddev=0.1), name='filter')
+
             f = tf.nn.conv1d(tf.expand_dims(attention_weights, axis=2), F,
                              stride=1, padding='SAME',
                              #  use_cudnn_on_gpu=None,
                              #  data_format=None,
-                             name='f')
+                             name='conv_vectors')
 
             # U * f_ij
             Uf = tf.contrib.layers.fully_connected(
@@ -196,13 +202,15 @@ class AttentionLayer(object):
             # hybrid attention (content-based + location-based)
             # e_ij = wT * tanh(W * s_{i-1} + V * h_j + U * f_ij + bias)
             ############################################################
-            F = tf.Variable(tf.truncated_normal(
-                shape=[100, 1, 10], stddev=0.1, name='Filter'))
+            with tf.control_dependencies(None):
+                F = tf.Variable(tf.truncated_normal(
+                    shape=[100, 1, 10], stddev=0.1), name='filter')
+
             f = tf.nn.conv1d(tf.expand_dims(attention_weights, axis=2), F,
                              stride=1, padding='SAME',
                              #  use_cudnn_on_gpu=None,
                              #  data_format=None,
-                             name='f')
+                             name='conv_vectors')
 
             # U * f_ij
             Uf = tf.contrib.layers.fully_connected(

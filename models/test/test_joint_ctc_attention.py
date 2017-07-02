@@ -10,11 +10,10 @@ import time
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
-sys.path.append('../')
 sys.path.append('../../')
-from attention.joint_ctc_attention import JointCTCAttention
-from util import measure_time
-from data import generate_data, num2alpha, num2phone
+from models.attention.joint_ctc_attention import JointCTCAttention
+from models.test.util import measure_time
+from models.test.data import generate_data, num2alpha, num2phone
 from experiments.utils.sparsetensor import list2sparsetensor
 from experiments.utils.parameter import count_total_parameters
 

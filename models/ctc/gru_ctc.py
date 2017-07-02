@@ -4,7 +4,7 @@
 """GRU-CTC model."""
 
 import tensorflow as tf
-from .ctc_base import ctcBase
+from models.ctc.ctc_base import ctcBase
 
 
 class GRU_CTC(ctcBase):

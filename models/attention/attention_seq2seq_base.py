@@ -8,7 +8,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-# from .decoders.beam_search_decoder_from_seq2seq import BeamSearchDecoder
+from models.attention.decoders.beam_search.util import choose_top_k
+from models.attention.decoders.beam_search.namedtuple import BeamSearchConfig
+from models.attention.decoders.beam_search.beam_search_decoder import BeamSearchDecoder
 
 
 OPTIMIZER_CLS_NAMES = {
@@ -55,51 +57,32 @@ class AttentionBase(object):
                     self.parameter_init))
         # TODO: Consider shape of target_embedding
 
-    def choose_top_k(scores_flat, config):
-        """Chooses the top-k beams as successors.
+    def _beam_search_decoder_wrapper(self, decoder, beam_width=None,
+                                     length_penalty_weight=0.0):
+        """Wraps a decoder into a Beam Search decoder.
         Args:
-            scores:
-            config:
+            decoder: An instance of RNNDecoder class
+            beam_width: int, the number of beams to use
+            length_penalty_weight: Weight for the length penalty factor. 0.0
+                disables the penalty.
+            choose_successors_fn: A function used to choose beam successors
+                based on their scores.
+                Maps from (scores, config) => (chosen scores, chosen_ids)
         Returns:
-            next_beam_scores:
-            word_indices:
+            A BeamSearchDecoder with the same interfaces as the decoder.
         """
-        next_beam_scores, word_indices = tf.nn.top_k(
-            scores_flat, k=config.beam_width)
-        return next_beam_scores, word_indices
+        if beam_width is None or beam_width == 1:
+            # Greedy decoding
+            return decoder
 
-    # def _beam_search_decoder_wrapper(self, decoder, beam_width=None,
-    #                                  length_penalty_weight=0.0):
-    #     """Wraps a decoder into a Beam Search decoder.
-    #     Args:
-    #         decoder: The decoder class instance
-    #         beam_width: Number of beams to use, an integer
-    #         length_penalty_weight: Weight for the length penalty factor. 0.0
-    #             disables the penalty.
-    #         choose_successors_fn: A function used to choose beam successors
-    #             based on their scores.
-    #             Maps from (scores, config) => (chosen scores, chosen_ids)
-    #     Returns:
-    #         A BeamSearchDecoder with the same interfaces as the decoder.
-    #     """
-    #     if beam_width is None:
-    #         # Greedy decoding
-    #         return decoder
-    #
-    #     config = BeamSearchConfig(
-    #         beam_width=beam_width,
-    #         vocab_size=self.num_classes,
-    #         eos_token=self.eos_index,
-    #         length_penalty_weight=length_penalty_weight,
-    #         choose_successors_fn=self.choose_top_k)
-    #
-    #     return BeamSearchDecoder(decoder=decoder,
-    #                              config=config)
+        config = BeamSearchConfig(
+            beam_width=beam_width,
+            vocab_size=self.num_classes,
+            eos_token=self.eos_index,
+            length_penalty_weight=length_penalty_weight,
+            choose_successors_fn=choose_top_k)
 
-    @property
-    def decode(self):
-        """Return operation for decoding."""
-        NotImplementedError
+        return BeamSearchDecoder(decoder=decoder, config=config)
 
     def _decode_train(self, decoder, bridge, encoder_outputs, labels,
                       labels_seq_len):

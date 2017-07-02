@@ -9,10 +9,10 @@ import sys
 import unittest
 import tensorflow as tf
 
-sys.path.append('../')
-from attention.encoders.load_encoder import load
-from util import measure_time
-from data import generate_data, num2alpha, num2phone
+sys.path.append('../../')
+from models.attention.encoders.load_encoder import load
+from models.test.util import measure_time
+from models.test.data import generate_data, num2alpha, num2phone
 
 
 class TestAttentionEncoder(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestAttentionEncoder(unittest.TestCase):
     @measure_time
     def test_attention_encoder(self):
         print("Attention Encoder Working check.")
-        self.check_encode(model_type='pblstm_encoder', label_type='character')
+        # self.check_encode(model_type='pblstm_encoder', label_type='character')
         self.check_encode(model_type='blstm_encoder', label_type='character')
         self.check_encode(model_type='lstm_encoder', label_type='character')
         self.check_encode(model_type='bgru_encoder', label_type='character')
@@ -32,9 +32,10 @@ class TestAttentionEncoder(unittest.TestCase):
         with tf.Graph().as_default():
             # Load batch data
             batch_size = 4
-            inputs, _, seq_len, target_len = generate_data(label_type=label_type,
-                                                           model='attention',
-                                                           batch_size=batch_size)
+            inputs, _, inputs_seq_len, target_len = generate_data(
+                label_type=label_type,
+                model='attention',
+                batch_size=batch_size)
 
             # Define model
             frame_num = inputs[0].shape[0]
@@ -52,19 +53,19 @@ class TestAttentionEncoder(unittest.TestCase):
 
             encoder = load(model_type)(num_unit=256,
                                        num_layer=5,
-                                       keep_prob_input=keep_prob_input_pl,
-                                       keep_prob_hidden=keep_prob_hidden_pl,
                                        parameter_init=0.1,
                                        clip_activation=5.0,
                                        num_proj=None)
             encoder_outputs_op = encoder(inputs=inputs_pl,
-                                         inputs_seq_len=inputs_seq_len_pl)
+                                         inputs_seq_len=inputs_seq_len_pl,
+                                         keep_prob_input=keep_prob_input_pl,
+                                         keep_prob_hidden=keep_prob_hidden_pl)
 
             feed_dict = {
-                encoder.inputs: inputs,
-                encoder.inputs_seq_len: seq_len,
-                encoder.keep_prob_input: 1.0,
-                encoder.keep_prob_hidden: 1.0
+                inputs_pl: inputs,
+                inputs_seq_len_pl: inputs_seq_len,
+                keep_prob_input_pl: 1.0,
+                keep_prob_hidden_pl: 1.0
             }
 
             # Add the variable initializer operation

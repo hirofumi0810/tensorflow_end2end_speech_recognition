@@ -10,7 +10,7 @@ from __future__ import print_function
 from collections import namedtuple
 import tensorflow as tf
 from tensorflow.python.util import nest
-from .dynamic_decoder import dynamic_decode
+from models.attention.decoders.dynamic_decoder import dynamic_decode
 
 
 class AttentionDecoderOutput(namedtuple(
@@ -112,10 +112,10 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
     def _build(self, initial_state, helper, mode):
         """
         Args:
-            helper: An instance of `tf.contrib.seq2seq.Helper` to assist
-                decoding
             initial_state: A tensor or tuple of tensors used as the initial
                 cell state. Set to the final state of the encoder by default.
+            helper: An instance of `tf.contrib.seq2seq.Helper` to assist
+                decoding
             mode:
         Returns:
             A tuple of `(outputs, final_state)`
@@ -141,7 +141,8 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         if self.mode == tf.contrib.learn.ModeKeys.INFER:
             maximum_iterations = self.max_decode_length
 
-        # outputs, final_state, final_seq_len = tf.contrib.seq2seq.dynamic_decode(
+        # outputs, final_state, final_seq_len =
+        # tf.contrib.seq2seq.dynamic_decode(
         outputs, final_state = dynamic_decode(
             decoder=self,
             output_time_major=self.time_major,
@@ -149,7 +150,10 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
             maximum_iterations=maximum_iterations,
             scope='dynamic_decoder')
 
+        # tf.contrib.seq2seq.dynamic_decode
         # return self.finalize(outputs, final_state, final_seq_len)
+
+        # ./dynamic_decoder.py
         return self.finalize(outputs, final_state, None)
 
     def finalize(self, outputs, final_state, final_seq_len):

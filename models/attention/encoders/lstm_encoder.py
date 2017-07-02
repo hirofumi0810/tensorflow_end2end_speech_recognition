@@ -8,7 +8,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from .encoder_base import EncoderOutput, EncoderBase
+from models.attention.encoders.encoder_base import EncoderOutput, EncoderBase
 
 
 class LSTMEncoder(EncoderBase):

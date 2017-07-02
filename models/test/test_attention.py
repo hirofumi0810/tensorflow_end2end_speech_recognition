@@ -7,14 +7,14 @@ from __future__ import print_function
 
 import sys
 import time
+import numpy as np
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
-sys.path.append('../')
 sys.path.append('../../')
-from attention.blstm_attention_seq2seq import BLSTMAttetion
-from util import measure_time
-from data import generate_data, num2alpha, num2phone
+from models.attention.blstm_attention_seq2seq import BLSTMAttetion
+from models.test.util import measure_time
+from models.test.data import generate_data, num2alpha, num2phone
 from experiments.utils.sparsetensor import list2sparsetensor
 from experiments.utils.parameter import count_total_parameters
 
@@ -24,17 +24,17 @@ class TestAttention(tf.test.TestCase):
     @measure_time
     def test_attention(self):
         print("Attention Working check.")
-        # self.check_training(attention_type='hybrid', label_type='phone')
-        # self.check_training(attention_type='hybrid', label_type='character')
+        self.check_training(attention_type='hybrid', label_type='phone')
+        self.check_training(attention_type='hybrid', label_type='character')
+
+        self.check_training(attention_type='location', label_type='phone')
+        self.check_training(attention_type='location', label_type='character')
 
         self.check_training(attention_type='content', label_type='phone')
         self.check_training(attention_type='content', label_type='character')
 
         self.check_training(attention_type='layer_dot', label_type='phone')
         self.check_training(attention_type='layer_dot', label_type='character')
-
-        # self.check_training(attention_type='location', label_type='phone')
-        # self.check_training(attention_type='location', label_type='character')
 
     def check_training(self, attention_type, label_type):
 
@@ -44,7 +44,7 @@ class TestAttention(tf.test.TestCase):
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
-            batch_size = 4
+            batch_size = 1
             inputs, labels, inputs_seq_len, labels_seq_len = generate_data(
                 label_type=label_type,
                 model='attention',
@@ -102,9 +102,9 @@ class TestAttention(tf.test.TestCase):
                 sos_index=num_classes - 2,
                 eos_index=num_classes - 1,
                 max_decode_length=50,
-                attention_smoothing=True,
-                attention_weights_tempareture=1,
-                logits_tempareture=1,
+                # attention_smoothing=True,
+                attention_weights_tempareture=0.5,
+                logits_tempareture=1.0,
                 parameter_init=0.1,
                 clip_grad=5.0,
                 clip_activation_encoder=50,
@@ -197,16 +197,19 @@ class TestAttention(tf.test.TestCase):
                             feed_dict=feed_dict)
 
                         # Compute accuracy
-                        print(labels)
-                        feed_dict_ler = {
-                            labels_st_true_pl: list2sparsetensor(
-                                labels,
-                                padded_value=0),
-                            labels_st_pred_pl: list2sparsetensor(
-                                predicted_ids_infer,
-                                padded_value=0)
-                        }
-                        ler_train = sess.run(ler_op, feed_dict=feed_dict_ler)
+                        try:
+                            feed_dict_ler = {
+                                labels_st_true_pl: list2sparsetensor(
+                                    labels,
+                                    padded_value=0),
+                                labels_st_pred_pl: list2sparsetensor(
+                                    predicted_ids_infer,
+                                    padded_value=0)
+                            }
+                            ler_train = sess.run(
+                                ler_op, feed_dict=feed_dict_ler)
+                        except ValueError:
+                            ler_train = 1
 
                         duration_step = time.time() - start_time_step
                         print('Step %d: loss = %.3f / ler = %.4f (%.3f sec)' %

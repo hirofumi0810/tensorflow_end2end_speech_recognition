@@ -7,14 +7,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from .attention_seq2seq_base import AttentionBase
-from .encoders.load_encoder import load as load_encoder
-from .decoders.load_decoder import load as load_decoder
-from .decoders.attention_layer import AttentionLayer
-from .decoders.attention_decoder import AttentionDecoder
-from .decoders.attention_decoder import AttentionDecoderOutput
-from .decoders.dynamic_decoder import _transpose_batch_time as time2batch
-from .bridge import InitialStateBridge
+from models.attention.attention_seq2seq_base import AttentionBase
+from models.attention.encoders.load_encoder import load as load_encoder
+from models.attention.decoders.load_decoder import load as load_decoder
+from models.attention.decoders.attention_layer import AttentionLayer
+from models.attention.decoders.attention_decoder import AttentionDecoder
+from models.attention.decoders.attention_decoder import AttentionDecoderOutput
+from models.attention.decoders.dynamic_decoder import _transpose_batch_time as time2batch
+from models.attention.bridge import InitialStateBridge
 
 
 class BLSTMAttetion(AttentionBase):
@@ -216,6 +216,7 @@ class BLSTMAttetion(AttentionBase):
         #                                                   beam_width=20)
         # decoder_infer = self._beam_search_decoder_wrapper(decoder_infer,
         #                                                   beam_width=20)
+        # TODO: inferenceだけwrapしたい
 
         # Connect between encoder and decoder
         bridge = InitialStateBridge(

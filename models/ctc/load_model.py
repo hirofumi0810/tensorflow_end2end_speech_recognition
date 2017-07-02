@@ -7,11 +7,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from .lstm_ctc import LSTM_CTC
-from .blstm_ctc import BLSTM_CTC
-from .gru_ctc import GRU_CTC
-from .bgru_ctc import BGRU_CTC
-from .cnn_ctc import CNN_CTC
+from models.ctc.lstm_ctc import LSTM_CTC
+from models.ctc.blstm_ctc import BLSTM_CTC
+from models.ctc.gru_ctc import GRU_CTC
+from models.ctc.bgru_ctc import BGRU_CTC
+from models.ctc.cnn_ctc import CNN_CTC
 
 CTC = {
     "lstm_ctc": LSTM_CTC,

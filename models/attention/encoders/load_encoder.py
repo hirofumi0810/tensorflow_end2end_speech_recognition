@@ -7,11 +7,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from .lstm_encoder import LSTMEncoder
-from .blstm_encoder import BLSTMEncoder
-from .gru_encoder import GRUEncoder
-from .bgru_encoder import BGRUEncoder
-from .pyramidal_blstm_encoder import PyramidalBLSTMEncoder
+from models.attention.encoders.lstm_encoder import LSTMEncoder
+from models.attention.encoders.blstm_encoder import BLSTMEncoder
+from models.attention.encoders.gru_encoder import GRUEncoder
+from models.attention.encoders.bgru_encoder import BGRUEncoder
+from models.attention.encoders.pyramidal_blstm_encoder import PyramidalBLSTMEncoder
 
 Encoder = {
     "lstm_encoder": LSTMEncoder,
