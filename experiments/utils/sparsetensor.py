@@ -42,15 +42,20 @@ def sparsetensor2list(labels_st, batch_size):
         labels_st: A SparseTensor of labels
         batch_size: int the size of mini-batch
     Returns:
-        labels: list of labels
+        labels: list of np.ndarray, size of `[batch_size]`. Each element is a
+            sequence of target labels of an input.
     """
     if isinstance(labels_st, tf.SparseTensorValue):
         indices = labels_st.indices
         values = labels_st.values
     else:
-        # expected to list of [indices, values, shape]
+        # labels_st is expected to be a list [indices, values, shape]
         indices = labels_st[0]
         values = labels_st[1]
+        # TODO: Remove later
+
+    if batch_size == 1:
+        return labels_st.values.reshape((1, -1))
 
     labels = []
     batch_boundary = np.where(indices[:, 1] == 0)[0]
@@ -63,7 +68,8 @@ def sparsetensor2list(labels_st, batch_size):
 
     for i in range(batch_size - 1):
         label_each_wav = values[batch_boundary[i]:batch_boundary[i + 1]]
-        labels.append(label_each_wav.tolist())
-    labels.append(values[batch_boundary[-1]:].tolist())
+        labels.append(label_each_wav)
+    # Last one
+    labels.append(values[batch_boundary[-1]:])
 
     return labels

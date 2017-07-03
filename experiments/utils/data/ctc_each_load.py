@@ -62,11 +62,9 @@ class DatasetBase(object):
             session:
         Returns:
             inputs: list of input data, size `[batch_size]`
-            labels: If not test, list of SparseTensor of target labels,
-                else list of target labels.
+            labels: list of target labels
             inputs_seq_len: list of length of inputs of size `[batch_size]`
-            input_names: list of file name of input data of size
-                `[batch_size]`
+            input_names: list of file name of input data of size `[batch_size]`
 
             If num_gpu > 1, each return is divide into list of size `[num_gpu]`
         """
@@ -185,16 +183,7 @@ class DatasetBase(object):
                 # Convert from SparseTensor to numpy.ndarray
                 inputs = list(map(session.run, inputs))
                 labels = list(map(session.run, labels))
-                if self.data_type not in ['eval1', 'eval2', 'eval3']:
-                    labels = list(map(list2sparsetensor,
-                                      labels, [padded_value] * len(labels)))
                 inputs_seq_len = list(map(session.run, inputs_seq_len))
                 input_names = list(map(session.run, input_names))
-                # TODO: Add is_test
-
-            else:
-                if self.data_type not in ['eval1', 'eval2', 'eval3']:
-                    labels = list2sparsetensor(labels,
-                                               padded_value=padded_value)
 
             yield inputs, labels, inputs_seq_len, input_names

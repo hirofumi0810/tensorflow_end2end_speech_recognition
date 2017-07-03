@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate the trained CTC model (CSJ corpus)."""
+"""Decode the trained CTC outputs (CSJ corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -14,12 +14,12 @@ import yaml
 
 sys.path.append('../../../')
 from experiments.csj.data.load_dataset_ctc import Dataset
-from experiments.csj.metrics.ctc import do_eval_per, do_eval_cer
+from experiments.csj.visualization.util_decode_ctc import decode_test
 from models.ctc.load_model import load
 
 
-def do_eval(network, param, epoch=None):
-    """Evaluate the model.
+def do_decode(network, param, epoch=None):
+    """Decode the CTC outputs.
     Args:
         network: model to restore
         param: A dictionary of parameters
@@ -72,7 +72,6 @@ def do_eval(network, param, epoch=None):
                                 network.inputs_seq_len,
                                 decode_type='beam_search',
                                 beam_width=20)
-    per_op = network.compute_ler(decode_op, network.labels)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -92,86 +91,30 @@ def do_eval(network, param, epoch=None):
         else:
             raise ValueError('There are not any checkpoints.')
 
-        if param['label_type'] in ['kana', 'kanji']:
-            print('=== eval1 Evaluation ===')
-            cer_eval1 = do_eval_cer(
-                session=sess,
-                decode_op=decode_op,
-                network=network,
-                dataset=eval1_data,
-                label_type=param['label_type'],
-                is_test=True,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  CER: %f %%' % (cer_eval1 * 100))
-
-            print('=== eval2 Evaluation ===')
-            cer_eval2 = do_eval_cer(
-                session=sess,
-                decode_op=decode_op,
-                network=network,
-                dataset=eval2_data,
-                label_type=param['label_type'],
-                is_test=True,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  CER: %f %%' % (cer_eval2 * 100))
-
-            print('=== eval3 Evaluation ===')
-            cer_eval3 = do_eval_cer(
-                session=sess,
-                decode_op=decode_op,
-                network=network,
-                dataset=eval3_data,
-                label_type=param['label_type'],
-                is_test=True,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  CER: %f %%' % (cer_eval3 * 100))
-
-            print('=== Mean ===')
-            cer_mean = (cer_eval1 + cer_eval2 + cer_eval3) / 3.
-            print('  CER: %f %%' % (cer_mean * 100))
-
-        else:
-            print('=== eval1 Evaluation ===')
-            per_eval1 = do_eval_per(
-                session=sess,
-                per_op=per_op,
-                network=network,
-                dataset=eval1_data,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  PER: %f %%' % (per_eval1 * 100))
-
-            print('=== eval2 Evaluation ===')
-            per_eval2 = do_eval_per(
-                session=sess,
-                per_op=per_op,
-                network=network,
-                dataset=eval2_data,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  PER: %f %%' % (per_eval2 * 100))
-
-            print('=== eval3 Evaluation ===')
-            per_eval3 = do_eval_per(
-                session=sess,
-                per_op=per_op,
-                network=network,
-                dataset=eval3_data,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  PER: %f %%' % (per_eval3 * 100))
-
-            print('=== Mean ===')
-            per_mean = (per_eval1 + per_eval2 + per_eval3) / 3.
-            print('  PER: %f %%' % 1 (per_mean * 100))
+        # Visualize
+        decode_test(session=sess,
+                    decode_op=decode_op,
+                    network=network,
+                    dataset=eval1_data,
+                    label_type=param['label_type'],
+                    save_path=network.model_dir)
+        decode_test(session=sess,
+                    decode_op=decode_op,
+                    network=network,
+                    dataset=eval2_data,
+                    label_type=param['label_type'],
+                    save_path=network.model_dir)
+        decode_test(session=sess,
+                    decode_op=decode_op,
+                    network=network,
+                    dataset=eval3_data,
+                    label_type=param['label_type'],
+                    save_path=network.model_dir)
 
 
 def main(model_path, epoch):
 
-    # Load config file (.yml)
+    # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
         param = config['param']
@@ -184,10 +127,10 @@ def main(model_path, epoch):
     elif param['label_type'] == 'kanji':
         param['num_classes'] = 3386
 
-    # Modle setting
+    # Model setting
     CTCModel = load(model_type=param['model'])
     network = CTCModel(
-        batch_size=param['batch_size'],
+        batch_size=1,
         input_size=param['input_size'] * param['num_stack'],
         num_unit=param['num_unit'],
         num_layer=param['num_layer'],
@@ -203,7 +146,7 @@ def main(model_path, epoch):
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_eval(network=network, param=param, epoch=epoch)
+    do_decode(network=network, param=param, epoch=epoch)
 
 
 if __name__ == '__main__':
@@ -218,5 +161,5 @@ if __name__ == '__main__':
     else:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python eval_ctc.py path_to_saved_model"))
+             "Usase: python decode_ctc.py path_to_saved_model"))
     main(model_path=model_path, epoch=epoch)

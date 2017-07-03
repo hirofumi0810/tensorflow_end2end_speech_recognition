@@ -14,7 +14,6 @@ sys.path.append('../../../')
 from experiments.csj.data.load_dataset_multitask_ctc import Dataset
 from experiments.utils.labels.character import num2char
 from experiments.utils.labels.phone import num2phone
-from experiments.utils.sparsetensor import sparsetensor2list
 from experiments.utils.measure_time_func import measure_time
 
 
@@ -40,29 +39,29 @@ class TestReadDatasetCTC(unittest.TestCase):
                            label_type_sub='phone',
                            num_gpu=1, is_sorted=False)
 
-        # self.check_loading(label_type_main='kanji',
-        #                    label_type_sub='kana',
-        #                    num_gpu=2, is_sorted=True)
-        # self.check_loading(label_type_main='kanji',
-        #                    label_type_sub='phone',
-        #                    num_gpu=2, is_sorted=True)
-        # self.check_loading(label_type_main='kana',
-        #                    label_type_sub='phone',
-        #                    num_gpu=2, is_sorted=True)
-        # self.check_loading(label_type_main='kanji',
-        #                    label_type_sub='kana',
-        #                    num_gpu=2, is_sorted=False)
-        # self.check_loading(label_type_main='kanji',
-        #                    label_type_sub='phone',
-        #                    num_gpu=2, is_sorted=False)
-        # self.check_loading(label_type_main='kana',
-        #                    label_type_sub='phone',
-        #                    num_gpu=2, is_sorted=False)
+        self.check_loading(label_type_main='kanji',
+                           label_type_sub='kana',
+                           num_gpu=2, is_sorted=True)
+        self.check_loading(label_type_main='kanji',
+                           label_type_sub='phone',
+                           num_gpu=2, is_sorted=True)
+        self.check_loading(label_type_main='kana',
+                           label_type_sub='phone',
+                           num_gpu=2, is_sorted=True)
+        self.check_loading(label_type_main='kanji',
+                           label_type_sub='kana',
+                           num_gpu=2, is_sorted=False)
+        self.check_loading(label_type_main='kanji',
+                           label_type_sub='phone',
+                           num_gpu=2, is_sorted=False)
+        self.check_loading(label_type_main='kana',
+                           label_type_sub='phone',
+                           num_gpu=2, is_sorted=False)
 
         # For many GPUs
-        # self.check_loading(label_type_main='kanji',
-        #                    label_type_sub='kana',
-        #                    num_gpu=7, is_sorted=True)
+        self.check_loading(label_type_main='kanji',
+                           label_type_sub='kana',
+                           num_gpu=7, is_sorted=True)
 
     @measure_time
     def check_loading(self, label_type_main, label_type_sub, num_gpu,
@@ -71,8 +70,8 @@ class TestReadDatasetCTC(unittest.TestCase):
         print('----- num_gpu: ' + str(num_gpu) +
               ', is_sorted: ' + str(is_sorted) + ' -----')
 
-        batch_size = 64
-        dataset = Dataset(data_type='dev', train_data_size='default',
+        batch_size = 32
+        dataset = Dataset(data_type='train', train_data_size='default',
                           label_type_main=label_type_main,
                           label_type_sub=label_type_sub,
                           batch_size=batch_size,
@@ -102,18 +101,13 @@ class TestReadDatasetCTC(unittest.TestCase):
             iter_per_epoch = int(dataset.data_num /
                                  (batch_size * num_gpu)) + 1
             for i in range(iter_per_epoch + 1):
-                inputs, labels_main_st, labels_sub_st, inputs_seq_len, input_names = mini_batch.__next__()
+                inputs, labels_main, labels_sub, inputs_seq_len, input_names = mini_batch.__next__()
 
                 if num_gpu > 1:
                     for inputs_gpu in inputs:
                         print(inputs_gpu.shape)
-                    labels_main_st = labels_main_st[0]
-                    labels_sub_st = labels_sub_st[0]
-
-                labels_main = sparsetensor2list(
-                    labels_main_st, batch_size=len(inputs))
-                labels_sub = sparsetensor2list(
-                    labels_sub_st, batch_size=len(inputs))
+                    labels_main = labels_main[0]
+                    labels_sub = labels_sub[0]
 
                 if num_gpu < 1:
                     for inputs_i, labels_i in zip(inputs, labels_main):
@@ -129,11 +123,10 @@ class TestReadDatasetCTC(unittest.TestCase):
 
                 str_true_main = map_fn_main(labels_main[0], map_file_path_main)
                 str_true_main = re.sub(r'_', ' ', str_true_main)
-                str_true_sub = map_fn_sub(
-                    labels_sub[0], map_file_path_sub)
-                # print(str_true_main)
-                # print(str_true_sub)
-                # print('-----')
+                str_true_sub = map_fn_sub(labels_sub[0], map_file_path_sub)
+                print(str_true_main)
+                print(str_true_sub)
+                print('-----')
 
 
 if __name__ == '__main__':

@@ -5,6 +5,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+
 
 def char2num(str_char, map_file_path):
     """Convert from character to number.
@@ -30,11 +32,13 @@ def char2num(str_char, map_file_path):
     return char_list
 
 
-def num2char(num_list, map_file_path):
+def num2char(num_list, map_file_path, padded_value=-1):
     """Convert from number to character.
     Args:
-        num_list: list of character indices
+        num_list: np.ndarray, list of character indices. batch_size == 1 is
+            expected.
         map_file_path: path to the mapping file
+        padded_value: int, the value used for padding
     Returns:
         str_char: string of characters
     """
@@ -45,10 +49,13 @@ def num2char(num_list, map_file_path):
             line = line.strip().split()
             map_dict[int(line[1])] = line[0]
 
+    # Remove padded values
+    assert type(num_list) == np.ndarray, 'num_list should be np.ndarray.'
+    num_list = np.delete(num_list, np.where(num_list == -1), axis=0)
+
     # Convert from indices to the corresponding characters
-    char_list = []
-    for i in range(len(num_list)):
-        char_list.append(map_dict[num_list[i]])
+    char_list = list(map(lambda x: map_dict[x], num_list))
 
     str_char = ''.join(char_list)
     return str_char
+    # TODO: change to batch version

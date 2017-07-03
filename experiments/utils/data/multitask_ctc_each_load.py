@@ -68,10 +68,8 @@ class DatasetBase(object):
             session:
         Returns:
             inputs: list of input data, size `[batch_size]`
-            labels_main_st: list of SparseTensor of target labels in the main
-                task
-            labels_sub_st: list of SparseTensor of target labels in the
-                sub task
+            labels_main: list of target labels in the main task
+            labels_sub: list of target labels in the sub task
             inputs_seq_len: list of length of inputs of size `[batch_size]`
             input_names: list of file name of input data of size `[batch_size]`
 
@@ -207,19 +205,8 @@ class DatasetBase(object):
                 inputs = list(map(session.run, inputs))
                 labels_main = list(map(session.run, labels_main))
                 labels_sub = list(map(session.run, labels_sub))
-                labels_main_st = list(
-                    map(list2sparsetensor,
-                        labels_main, [padded_value] * len(labels_main)))
-                labels_sub_st = list(
-                    map(list2sparsetensor,
-                        labels_sub, [padded_value] * len(labels_sub)))
                 inputs_seq_len = list(map(session.run, inputs_seq_len))
                 input_names = list(map(session.run, input_names))
-            else:
-                labels_main_st = list2sparsetensor(labels_main,
-                                                   padded_value=padded_value)
-                labels_sub_st = list2sparsetensor(labels_sub,
-                                                  padded_value=padded_value)
 
-            yield (inputs, labels_main_st, labels_sub_st, inputs_seq_len,
+            yield (inputs, labels_main, labels_sub, inputs_seq_len,
                    input_names)

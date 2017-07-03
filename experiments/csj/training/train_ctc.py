@@ -15,14 +15,14 @@ from setproctitle import setproctitle
 import yaml
 import shutil
 
-sys.path.append('../../')
 sys.path.append('../../../')
-from csj.data.load_dataset_ctc import Dataset
-from csj.metrics.ctc import do_eval_per, do_eval_cer
+from experiments.csj.data.load_dataset_ctc import Dataset
+from experiments.csj.metrics.ctc import do_eval_per, do_eval_cer
+from experiments.utils.directory import mkdir, mkdir_join
+from experiments.utils.parameter import count_total_parameters
+from experiments.utils.csv import save_loss, save_ler
+from experiments.utils.sparsetensor import list2sparsetensor
 from models.ctc.load_model import load
-from utils.directory import mkdir, mkdir_join
-from utils.parameter import count_total_parameters
-from utils.csv import save_loss, save_ler
 
 
 def do_train(network, param):
@@ -32,18 +32,27 @@ def do_train(network, param):
         param: A dictionary of parameters
     """
     # Load dataset
-    train_data = Dataset(data_type='train', label_type=param['label_type'],
+    train_data = Dataset(data_type='train',
+                         label_type=param['label_type'],
                          train_data_size=param['train_data_size'],
                          batch_size=param['batch_size'],
                          num_stack=param['num_stack'],
                          num_skip=param['num_skip'],
                          is_sorted=True)
-    dev_data = Dataset(data_type='dev', label_type=param['label_type'],
-                       train_data_size=param['train_data_size'],
-                       batch_size=param['batch_size'],
-                       num_stack=param['num_stack'],
-                       num_skip=param['num_skip'],
-                       is_sorted=False)
+    dev_data_step = Dataset(data_type='dev',
+                            label_type=param['label_type'],
+                            train_data_size=param['train_data_size'],
+                            batch_size=param['batch_size'],
+                            num_stack=param['num_stack'],
+                            num_skip=param['num_skip'],
+                            is_sorted=False)
+    dev_data_epoch = Dataset(data_type='dev',
+                             label_type=param['label_type'],
+                             train_data_size=param['train_data_size'],
+                             batch_size=param['batch_size'],
+                             num_stack=param['num_stack'],
+                             num_skip=param['num_skip'],
+                             is_sorted=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -116,7 +125,7 @@ def do_train(network, param):
 
             # Make mini-batch generator
             mini_batch_train = train_data.next_batch()
-            mini_batch_dev = dev_data.next_batch()
+            mini_batch_dev = dev_data_step.next_batch()
 
             # Train model
             iter_per_epoch = int(train_data.data_num / param['batch_size'])
@@ -131,30 +140,33 @@ def do_train(network, param):
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_st, inputs_seq_len, _ = mini_batch_train.__next__()
+                with tf.device('/cpu:0'):
+                    inputs, labels, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
-                    network.labels: labels_st,
+                    network.labels: list2sparsetensor(labels, padded_value=-1),
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
                     network.lr: float(param['learning_rate'])
                 }
 
-                # Create feed dictionary for next mini batch (dev)
-                inputs, labels_st, inputs_seq_len, _ = mini_batch_dev.__next__()
-                feed_dict_dev = {
-                    network.inputs: inputs,
-                    network.labels: labels_st,
-                    network.inputs_seq_len: inputs_seq_len,
-                    network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden
-                }
-
                 # Update parameters
                 sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % 200 == 0:
+
+                    # Create feed dictionary for next mini batch (dev)
+                    with tf.device('/cpu:0'):
+                        inputs, labels, inputs_seq_len, _ = mini_batch_dev.__next__()
+                    feed_dict_dev = {
+                        network.inputs: inputs,
+                        network.labels: list2sparsetensor(labels,
+                                                          padded_value=-1),
+                        network.inputs_seq_len: inputs_seq_len,
+                        network.keep_prob_input: network.dropout_ratio_input,
+                        network.keep_prob_hidden: network.dropout_ratio_hidden
+                    }
 
                     # Compute loss_
                     loss_train = sess.run(loss_op, feed_dict=feed_dict_train)
@@ -208,7 +220,7 @@ def do_train(network, param):
                                 session=sess,
                                 decode_op=decode_op,
                                 network=network,
-                                dataset=dev_data,
+                                dataset=dev_data_epoch,
                                 label_type=param['label_type'],
                                 eval_batch_size=param['batch_size'])
                             print('  CER: %f %%' % (cer_dev_epoch * 100))
@@ -223,7 +235,7 @@ def do_train(network, param):
                                 session=sess,
                                 per_op=ler_op,
                                 network=network,
-                                dataset=dev_data,
+                                dataset=dev_data_epoch,
                                 eval_batch_size=param['batch_size'])
                             print('  PER: %f %%' % (per_dev_epoch * 100))
 
@@ -260,15 +272,15 @@ def main(config_path):
         param = config['param']
 
     # Except for a blank label
-    if param['label_type'] == 'phone':
-        param['num_classes'] = 38
+    if param['label_type'] == 'kanji':
+        param['num_classes'] = 3386
     elif param['label_type'] == 'kana':
         param['num_classes'] = 147
-    elif param['label_type'] == 'kanji':
-        param['num_classes'] = 3386
+    elif param['label_type'] == 'phone':
+        param['num_classes'] = 38
 
     # Model setting
-    CTCModel = load(model_type=config['model_name'])
+    CTCModel = load(model_type=param['model'])
     network = CTCModel(batch_size=param['batch_size'],
                        input_size=param['input_size'] * param['num_stack'],
                        num_unit=param['num_unit'],
