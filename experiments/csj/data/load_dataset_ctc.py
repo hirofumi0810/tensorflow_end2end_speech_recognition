@@ -21,19 +21,20 @@ from experiments.utils.data.ctc_each_load import DatasetBase
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, train_data_size, label_type, batch_size,
-                 num_stack=None, num_skip=None,
-                 is_sorted=True, is_progressbar=False, num_gpu=1):
+                 num_stack=None, num_skip=None, is_sorted=True,
+                 is_progressbar=False, num_gpu=1, is_gpu=True):
         """A class for loading dataset.
         Args:
             data_type: string, train, dev, eval1, eval2, eval3
             train_data_size: string, default or large
-            label_type: string, phone or character or kanji
+            label_type: string, kanji or kana or phone
             batch_size: int, the size of mini-batch
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip
             is_sorted: if True, sort dataset by frame num
             is_progressbar: if True, visualize progressbar
             num_gpu: int, if more than 1, divide batch_size by num_gpu
+            is_gpu, bool
         """
         if data_type not in ['train', 'dev', 'eval1', 'eval2', 'eval3']:
             raise ValueError(
@@ -48,12 +49,20 @@ class Dataset(DatasetBase):
         self.is_sorted = is_sorted
         self.is_progressbar = is_progressbar
         self.num_gpu = num_gpu
-
         self.input_size = 123
-        input_path = join('/data/inaguma/csj/inputs',
-                          train_data_size, data_type)
-        label_path = join('/data/inaguma/csj/labels/ctc/',
-                          train_data_size, label_type, data_type)
+
+        if is_gpu:
+            # GPU
+            input_path = join('/data/inaguma/csj/inputs',
+                              train_data_size, data_type)
+            label_path = join('/data/inaguma/csj/labels/ctc/',
+                              train_data_size, label_type, data_type)
+        else:
+            # CPU
+            input_path = join('/n/sd8/inaguma/corpus/csj/dataset/inputs',
+                              train_data_size, data_type)
+            label_path = join('/n/sd8/inaguma/corpus/csj/dataset/labels/ctc/',
+                              train_data_size, label_type, data_type)
 
         # Load the frame number dictionary
         with open(join(input_path, 'frame_num.pickle'), 'rb') as f:

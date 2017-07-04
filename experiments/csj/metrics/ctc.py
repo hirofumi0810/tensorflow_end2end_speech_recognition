@@ -17,59 +17,6 @@ from experiments.utils.progressbar import wrap_iterator
 
 
 @exception
-def do_eval_per(session, per_op, network, dataset, eval_batch_size=None,
-                is_progressbar=False, is_multitask=False):
-    """Evaluate trained model by Phone Error Rate.
-    Args:
-        session: session of training model
-        per_op: operation for computing phone error rate
-        network: network to evaluate
-        dataset: An instance of a `Dataset' class
-        eval_batch_size: int, the batch size when evaluating the model
-        is_progressbar: if True, visualize progressbar
-        is_multitask: if True, evaluate the multitask model
-    Returns:
-        per_global: An average of PER
-    """
-    if eval_batch_size is None:
-        batch_size = dataset.batch_size
-    else:
-        batch_size = eval_batch_size
-
-    num_examples = dataset.data_num
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
-    per_global = 0
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=batch_size)
-
-    for step in wrap_iterator(range(iteration), is_progressbar):
-        # Create feed dictionary for next mini batch
-        if not is_multitask:
-            inputs, labels_true, inputs_seq_len, _ = mini_batch.__next__()
-        else:
-            inputs, _, labels_true,  inputs_seq_len, _ = mini_batch.__next__()
-
-        feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
-        }
-
-        batch_size_each = len(inputs_seq_len)
-
-        per_local = session.run(per_op, feed_dict=feed_dict)
-        per_global += per_local * batch_size_each
-
-    per_global /= dataset.data_num
-
-    return per_global
-
-
-@exception
 def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
                 eval_batch_size=None, is_progressbar=False,
                 is_multitask=False, is_main=False):
@@ -79,7 +26,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of `Dataset` class
-        label_type: string, kana or kanji
+        label_type: string, kanji or kana or phone
         is_test: bool, set to True when evaluating by the test set
         eval_batch_size: int, the batch size when evaluating the model
         is_progressbar: if True, visualize progressbar
@@ -106,6 +53,9 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         map_file_path = '../metrics/mapping_files/ctc/kanji2num.txt'
     elif label_type == 'kana':
         map_file_path = '../metrics/mapping_files/ctc/kana2num.txt'
+    elif label_type == 'phone':
+        map_file_path == '../metrics/mapping_files/ctc/phone2num.txt'
+
     for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini batch
         if not is_multitask:
@@ -130,7 +80,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
 
         for i_batch in range(batch_size_each):
             # Convert from list to string
-            if is_test:
+            if label_type != 'phone' and is_test:
                 str_true = ''.join(labels_true[i_batch])
                 # NOTE: 漢字とかなの場合はテストデータのラベルはそのまま保存してある
             else:

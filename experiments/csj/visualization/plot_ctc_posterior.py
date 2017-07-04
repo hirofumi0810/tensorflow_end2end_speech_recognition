@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Decode the trained CTC outputs (CSJ corpus)."""
+"""Plot the trained CTC posteriors (CSJ corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -14,16 +14,16 @@ import yaml
 
 sys.path.append('../../../')
 from experiments.csj.data.load_dataset_ctc import Dataset
-from experiments.csj.visualization.util_decode_ctc import decode_test
+from experiments.csj.visualization.util_plot_ctc import posterior_test
 from models.ctc.load_model import load
 
 
-def do_decode(network, param, epoch=None):
-    """Decode the CTC outputs.
+def do_plot(network, param, epoch=None):
+    """Plot the CTC posteriors.
     Args:
         network: model to restore
         param: A dictionary of parameters
-        epoch: int, the epoch to restore
+        epoch: epoch to restore
     """
     # Load dataset
     eval1_data = Dataset(data_type='eval1', label_type=param['label_type'],
@@ -68,10 +68,7 @@ def do_decode(network, param, epoch=None):
                                      network.inputs_seq_len,
                                      network.keep_prob_input,
                                      network.keep_prob_hidden)
-    decode_op = network.decoder(logits,
-                                network.inputs_seq_len,
-                                decode_type='beam_search',
-                                beam_width=20)
+    posteriors_op = network.posteriors(logits)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -91,25 +88,30 @@ def do_decode(network, param, epoch=None):
         else:
             raise ValueError('There are not any checkpoints.')
 
-        # Visualize
-        decode_test(session=sess,
-                    decode_op=decode_op,
-                    network=network,
-                    dataset=eval1_data,
-                    label_type=param['label_type'],
-                    save_path=network.model_dir)
-        decode_test(session=sess,
-                    decode_op=decode_op,
-                    network=network,
-                    dataset=eval2_data,
-                    label_type=param['label_type'],
-                    save_path=network.model_dir)
-        decode_test(session=sess,
-                    decode_op=decode_op,
-                    network=network,
-                    dataset=eval3_data,
-                    label_type=param['label_type'],
-                    save_path=network.model_dir)
+        posterior_test(session=sess,
+                       posteriors_op=posteriors_op,
+                       network=network,
+                       dataset=eval1_data,
+                       label_type=param['label_type'],
+                       # save_path=network.model_dir,
+                       save_path=None,
+                       show=True)
+        posterior_test(session=sess,
+                       posteriors_op=posteriors_op,
+                       network=network,
+                       dataset=eval2_data,
+                       label_type=param['label_type'],
+                       # save_path=network.model_dir,
+                       save_path=None,
+                       show=True)
+        posterior_test(session=sess,
+                       posteriors_op=posteriors_op,
+                       network=network,
+                       dataset=eval3_data,
+                       label_type=param['label_type'],
+                       # save_path=network.model_dir,
+                       save_path=None,
+                       show=True)
 
 
 def main(model_path, epoch):
@@ -146,7 +148,7 @@ def main(model_path, epoch):
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_decode(network=network, param=param, epoch=epoch)
+    do_plot(network=network, param=param, epoch=epoch)
 
 
 if __name__ == '__main__':
@@ -161,5 +163,5 @@ if __name__ == '__main__':
     else:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python decode_ctc.py path_to_saved_model"))
+             "Usase: python plot_ctc_posterior.py path_to_saved_model"))
     main(model_path=model_path, epoch=epoch)

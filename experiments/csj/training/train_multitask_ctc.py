@@ -17,7 +17,7 @@ import shutil
 
 sys.path.append('../../../')
 from experiments.csj.data.load_dataset_multitask_ctc import Dataset
-from experiments.csj.metrics.ctc import do_eval_per, do_eval_cer
+from experiments.csj.metrics.ctc import do_eval_cer
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.csv import save_loss, save_ler
@@ -252,32 +252,21 @@ def do_train(network, param):
                         print('  CER (main): %f %%' %
                               (ler_main_dev_epoch * 100))
 
-                        if param['label_type_sub'] == 'kana':
-                            ler_sub_dev_epoch = do_eval_cer(
-                                session=sess,
-                                decode_op=decode_op_sub,
-                                network=network,
-                                dataset=dev_data_epoch,
-                                label_type=param['label_type_sub'],
-                                eval_batch_size=param['batch_size'],
-                                is_multitask=True,
-                                is_main=False)
-                            print('  CER (sub): %f %%' %
-                                  (ler_sub_dev_epoch * 100))
-                        elif param['label_type_sub'] == 'phone':
-                            ler_sub_dev_epoch = do_eval_per(
-                                session=sess,
-                                per_op=ler_op_sub,
-                                network=network,
-                                dataset=dev_data_epoch,
-                                eval_batch_size=param['batch_size'],
-                                is_multitask=True)
-                            print('  PER (sub): %f %%' %
-                                  (ler_sub_dev_epoch * 100))
+                        ler_sub_dev_epoch = do_eval_cer(
+                            session=sess,
+                            decode_op=decode_op_sub,
+                            network=network,
+                            dataset=dev_data_epoch,
+                            label_type=param['label_type_sub'],
+                            eval_batch_size=param['batch_size'],
+                            is_multitask=True,
+                            is_main=False)
+                        print('  CER (sub): %f %%' %
+                              (ler_sub_dev_epoch * 100))
 
                         if ler_main_dev_epoch < ler_main_dev_best:
                             ler_main_dev_best = ler_main_dev_epoch
-                            print('■■■ ↑Best Score (CER)↑ ■■■')
+                            print('■■■ ↑Best Score (CER main)↑ ■■■')
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -307,25 +296,23 @@ def main(config_path):
     # Read a config file (.yml)
     with open(config_path, "r") as f:
         config = yaml.load(f)
-        corpus = config['corpus']
-        feature = config['feature']
         param = config['param']
 
     # Except for a blank label
-    if corpus['label_type_main'] == 'kanji':
+    if param['label_type_main'] == 'kanji':
         param['num_classes_main'] = 3386
-    elif corpus['label_type_main'] == 'kana':
+    elif param['label_type_main'] == 'kana':
         param['num_classes_main'] = 147
 
-    if corpus['label_type_sub'] == 'kana':
+    if param['label_type_sub'] == 'kana':
         param['num_classes_sub'] = 147
-    elif corpus['label_type_sub'] == 'phone':
+    elif param['label_type_sub'] == 'phone':
         param['num_classes_sub'] = 38
 
     # Model setting
     CTCModel = load(model_type=param['model'])
     network = CTCModel(batch_size=param['batch_size'],
-                       input_size=feature['input_size'] * feature['num_stack'],
+                       input_size=param['input_size'] * param['num_stack'],
                        num_unit=param['num_unit'],
                        num_layer_main=param['num_layer_main'],
                        num_layer_sub=param['num_layer_sub'],
@@ -351,12 +338,12 @@ def main(config_path):
         network.model_name += '_bottoleneck' + str(param['bottleneck_dim'])
     if param['num_proj'] != 0:
         network.model_name += '_proj' + str(param['num_proj'])
-    if feature['num_stack'] != 1:
-        network.model_name += '_stack' + str(feature['num_stack'])
+    if param['num_stack'] != 1:
+        network.model_name += '_stack' + str(param['num_stack'])
     if param['weight_decay'] != 0:
         network.model_name += '_weightdecay' + str(param['weight_decay'])
     network.model_name += '_taskweight' + str(param['main_task_weight'])
-    if corpus['train_data_size'] == 'large':
+    if param['train_data_size'] == 'large':
         network.model_name += '_large'
 
     # Set save path
@@ -364,7 +351,7 @@ def main(config_path):
     network.model_dir = mkdir_join(network.model_dir, 'ctc')
     network.model_dir = mkdir_join(
         network.model_dir,
-        corpus['label_type_main'] + '_' + corpus['label_type_sub'])
+        param['label_type_main'] + '_' + param['label_type_sub'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
@@ -375,8 +362,8 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('multictc_csj_' + corpus['label_type_main'] + '_' +
-                 corpus['label_type_sub'] + '_' + corpus['train_data_size'])
+    setproctitle('csj_multictc_' + param['label_type_main'] + '_' +
+                 param['label_type_sub'] + '_' + param['train_data_size'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
@@ -391,5 +378,5 @@ if __name__ == '__main__':
 
     args = sys.argv
     if len(args) != 2:
-        sys.exit(0)
+        raise ValueError
     main(config_path=args[1])

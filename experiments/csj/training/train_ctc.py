@@ -17,7 +17,7 @@ import shutil
 
 sys.path.append('../../../')
 from experiments.csj.data.load_dataset_ctc import Dataset
-from experiments.csj.metrics.ctc import do_eval_per, do_eval_cer
+from experiments.csj.metrics.ctc import do_eval_cer
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.csv import save_loss, save_ler
@@ -214,34 +214,22 @@ def do_train(network, param):
 
                     if epoch >= 5:
                         start_time_eval = time.time()
+                        print('=== Dev Evaluation ===')
+                        cer_dev_epoch = do_eval_cer(
+                            session=sess,
+                            decode_op=decode_op,
+                            network=network,
+                            dataset=dev_data_epoch,
+                            label_type=param['label_type'],
+                            eval_batch_size=param['batch_size'])
                         if param['label_type'] in ['kana', 'kanji']:
-                            print('=== Dev Evaluation ===')
-                            cer_dev_epoch = do_eval_cer(
-                                session=sess,
-                                decode_op=decode_op,
-                                network=network,
-                                dataset=dev_data_epoch,
-                                label_type=param['label_type'],
-                                eval_batch_size=param['batch_size'])
                             print('  CER: %f %%' % (cer_dev_epoch * 100))
+                        else:
+                            print('  PER: %f %%' % (cer_dev_epoch * 100))
 
                             if cer_dev_epoch < error_best:
                                 error_best = cer_dev_epoch
-                                print('■■■ ↑Best Score (CER)↑ ■■■')
-
-                        else:
-                            print('=== Dev Evaluation ===')
-                            per_dev_epoch = do_eval_per(
-                                session=sess,
-                                per_op=ler_op,
-                                network=network,
-                                dataset=dev_data_epoch,
-                                eval_batch_size=param['batch_size'])
-                            print('  PER: %f %%' % (per_dev_epoch * 100))
-
-                            if per_dev_epoch < error_best:
-                                error_best = per_dev_epoch
-                                print('■■■ ↑Best Score (PER)↑ ■■■')
+                                print('■■■ ↑Best Score↑ ■■■')
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
