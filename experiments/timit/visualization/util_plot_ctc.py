@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""""Utilities for plotting of the CTC model."""
+""""Utilities for plotting of the CTC model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -138,7 +138,7 @@ def plot_probs_ctc_phone(probs, wav_index, label_type, save_path, show):
     """Plot posteriors of phones.
     Args:
         probs:
-        wav_index: int,
+        wav_index: string,
         label_type: string, phone39 or phone48 or phone61
         save_path: path to save ctc outpus
         show: if True, show each figure
@@ -183,7 +183,7 @@ def plot_probs_ctc_char(probs, wav_index, save_path, show):
     """Plot posteriors of characters.
     Args:
         probs:
-        wav_index: int,
+        wav_index: string,
         save_path: path to save ctc outpus
         show: if True, show each figure
     """

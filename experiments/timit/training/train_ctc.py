@@ -21,8 +21,8 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.csv import save_loss, save_ler
+from experiments.utils.sparsetensor import list2sparsetensor
 from models.ctc.load_model import load
-
 
 
 def do_train(network, param):
@@ -86,7 +86,8 @@ def do_train(network, param):
             loss_op,
             optimizer=param['optimizer'],
             learning_rate_init=float(param['learning_rate']),
-            is_scheduled=False)
+            decay_steps=param['decay_steps'],
+            decay_rate=param['decay_rate'])
         decode_op = network.decoder(logits,
                                     network.inputs_seq_len,
                                     decode_type='beam_search',
@@ -142,21 +143,11 @@ def do_train(network, param):
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_st, inputs_seq_len, _ = mini_batch_train.__next__()
+                with tf.device('/cpu:0'):
+                    inputs, labels, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
-                    network.labels: labels_st,
-                    network.inputs_seq_len: inputs_seq_len,
-                    network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.lr: float(param['learning_rate'])
-                }
-
-                # Create feed dictionary for next mini batch (dev)
-                inputs, labels_st, inputs_seq_len, _ = mini_batch_dev.__next__()
-                feed_dict_dev = {
-                    network.inputs: inputs,
-                    network.labels: labels_st,
+                    network.labels: list2sparsetensor(labels, padded_value=-1),
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden
@@ -166,6 +157,18 @@ def do_train(network, param):
                 sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % 10 == 0:
+
+                    # Create feed dictionary for next mini batch (dev)
+                    with tf.device('/cpu:0'):
+                        inputs, labels, inputs_seq_len, _ = mini_batch_dev.__next__()
+                    feed_dict_dev = {
+                        network.inputs: inputs,
+                        network.labels: list2sparsetensor(labels,
+                                                          padded_value=-1),
+                        network.inputs_seq_len: inputs_seq_len,
+                        network.keep_prob_input: network.dropout_ratio_input,
+                        network.keep_prob_hidden: network.dropout_ratio_hidden
+                    }
 
                     # Compute loss
                     loss_train = sess.run(loss_op, feed_dict=feed_dict_train)
@@ -213,56 +216,56 @@ def do_train(network, param):
 
                     if epoch >= 10:
                         start_time_eval = time.time()
-
-                        if param['label_type'] == 'character':
-                            print('=== Dev Data Evaluation ===')
-                            cer_dev_epoch = do_eval_cer(
-                                session=sess,
-                                decode_op=decode_op,
-                                network=network,
-                                dataset=dev_data,
-                                eval_batch_size=1)
-                            print('  CER: %f %%' % (cer_dev_epoch * 100))
-
-                            if cer_dev_epoch < error_best:
-                                error_best = cer_dev_epoch
-                                print('■■■ ↑Best Score (CER)↑ ■■■')
-
-                                print('=== Test Data Evaluation ===')
-                                cer_test = do_eval_cer(
+                        with tf.device('/cpu:0'):
+                            if param['label_type'] == 'character':
+                                print('=== Dev Data Evaluation ===')
+                                cer_dev_epoch = do_eval_cer(
                                     session=sess,
                                     decode_op=decode_op,
                                     network=network,
-                                    dataset=test_data,
+                                    dataset=dev_data,
                                     eval_batch_size=1)
-                                print('  CER: %f %%' % (cer_test * 100))
+                                print('  CER: %f %%' % (cer_dev_epoch * 100))
 
-                        else:
-                            print('=== Dev Data Evaluation ===')
-                            per_dev_epoch = do_eval_per(
-                                session=sess,
-                                decode_op=decode_op,
-                                per_op=ler_op,
-                                network=network,
-                                dataset=dev_data,
-                                label_type=param['label_type'],
-                                eval_batch_size=1)
-                            print('  PER: %f %%' % (per_dev_epoch * 100))
+                                if cer_dev_epoch < error_best:
+                                    error_best = cer_dev_epoch
+                                    print('■■■ ↑Best Score (CER)↑ ■■■')
 
-                            if per_dev_epoch < error_best:
-                                error_best = per_dev_epoch
-                                print('■■■ ↑Best Score (PER)↑ ■■■')
+                                    print('=== Test Data Evaluation ===')
+                                    cer_test = do_eval_cer(
+                                        session=sess,
+                                        decode_op=decode_op,
+                                        network=network,
+                                        dataset=test_data,
+                                        eval_batch_size=1)
+                                    print('  CER: %f %%' % (cer_test * 100))
 
-                                print('=== Test Data Evaluation ===')
-                                per_test = do_eval_per(
+                            else:
+                                print('=== Dev Data Evaluation ===')
+                                per_dev_epoch = do_eval_per(
                                     session=sess,
                                     decode_op=decode_op,
                                     per_op=ler_op,
                                     network=network,
-                                    dataset=test_data,
+                                    dataset=dev_data,
                                     label_type=param['label_type'],
                                     eval_batch_size=1)
-                                print('  PER: %f %%' % (per_test * 100))
+                                print('  PER: %f %%' % (per_dev_epoch * 100))
+
+                                if per_dev_epoch < error_best:
+                                    error_best = per_dev_epoch
+                                    print('■■■ ↑Best Score (PER)↑ ■■■')
+
+                                    print('=== Test Data Evaluation ===')
+                                    per_test = do_eval_per(
+                                        session=sess,
+                                        decode_op=decode_op,
+                                        per_op=ler_op,
+                                        network=network,
+                                        dataset=test_data,
+                                        label_type=param['label_type'],
+                                        eval_batch_size=1)
+                                    print('  PER: %f %%' % (per_test * 100))
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -324,10 +327,17 @@ def main(config_path):
     network.model_name += '_lr' + str(param['learning_rate'])
     if param['num_proj'] != 0:
         network.model_name += '_proj' + str(param['num_proj'])
+    if param['dropout_input'] != 1:
+        network.model_name += '_dropi' + str(param['dropout_input'])
+    if param['dropout_hidden'] != 1:
+        network.model_name += '_droph' + str(param['dropout_hidden'])
     if param['num_stack'] != 1:
         network.model_name += '_stack' + str(param['num_stack'])
     if param['weight_decay'] != 0:
         network.model_name += '_weightdecay' + str(param['weight_decay'])
+    if param['decay_rate'] != 1:
+        network.model_name += '_lrdecay' + \
+            str(param['decay_steps'] + param['decay_rate'])
 
     # Set save path
     network.model_dir = mkdir('/n/sd8/inaguma/result/timit/')

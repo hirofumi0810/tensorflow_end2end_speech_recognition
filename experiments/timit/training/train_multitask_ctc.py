@@ -21,6 +21,7 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.csv import save_loss, save_ler
+from experiments.utils.sparsetensor import list2sparsetensor
 from models.ctc.load_model_multitask import load
 
 
@@ -48,7 +49,7 @@ def do_train(network, param):
                        num_skip=param['num_skip'],
                        is_sorted=False)
     test_data = Dataset(data_type='test',
-                        labels_type_main='character',
+                        label_type_main='character',
                         label_type_sub='phone39',
                         batch_size=1,
                         num_stack=param['num_stack'],
@@ -93,7 +94,8 @@ def do_train(network, param):
             loss_op,
             optimizer=param['optimizer'],
             learning_rate_init=float(param['learning_rate']),
-            is_scheduled=False)
+            decay_steps=param['decay_steps'],
+            decay_rate=param['decay_rate'])
         decode_op_main, decode_op_sub = network.decoder(
             logits_main,
             logits_sub,
@@ -154,24 +156,14 @@ def do_train(network, param):
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_char_st, labels_phone_st, inputs_seq_len, input_names = mini_batch_train.__next__()
+                with tf.device('/cpu:0'):
+                    inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
-                    network.labels: labels_char_st,
-                    network.labels_sub: labels_phone_st,
-                    network.inputs_seq_len: inputs_seq_len,
-                    network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.lr: float(param['learning_rate'])
-                }
-                print(inputs_seq_len)
-
-                # Create feed dictionary for next mini batch (dev)
-                inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_dev.__next__()
-                feed_dict_dev = {
-                    network.inputs: inputs,
-                    network.labels: labels_char_st,
-                    network.labels_sub: labels_phone_st,
+                    network.labels: list2sparsetensor(labels_char,
+                                                      padded_value=-1),
+                    network.labels_sub: list2sparsetensor(labels_phone,
+                                                          padded_value=-1),
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden
@@ -181,6 +173,21 @@ def do_train(network, param):
                 sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % 10 == 0:
+
+                    # Create feed dictionary for next mini batch (dev)
+                    with tf.device('/cpu:0'):
+                        inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_dev.__next__()
+                    feed_dict_dev = {
+                        network.inputs: inputs,
+                        network.labels:  list2sparsetensor(labels_char,
+                                                           padded_value=-1),
+                        network.labels_sub: list2sparsetensor(labels_phone,
+                                                              padded_value=-1),
+                        network.inputs_seq_len: inputs_seq_len,
+                        network.keep_prob_input: network.dropout_ratio_input,
+                        network.keep_prob_hidden: network.dropout_ratio_hidden
+                    }
+
                     # Compute loss
                     loss_train = sess.run(loss_op, feed_dict=feed_dict_train)
                     loss_dev = sess.run(loss_op, feed_dict=feed_dict_dev)
@@ -319,7 +326,6 @@ def main(config_path):
                        num_unit=param['num_unit'],
                        num_layer_main=param['num_layer_main'],
                        num_layer_sub=param['num_layer_sub'],
-                       #    bottleneck_dim=param['bottleneck_dim'],
                        num_classes_main=33,
                        num_classes_sub=param['num_classes_sub'],
                        main_task_weight=param['main_task_weight'],
@@ -339,11 +345,18 @@ def main(config_path):
     network.model_name += '_lr' + str(param['learning_rate'])
     if param['num_proj'] != 0:
         network.model_name += '_proj' + str(param['num_proj'])
+    if param['dropout_input'] != 1:
+        network.model_name += '_dropi' + str(param['dropout_input'])
+    if param['dropout_hidden'] != 1:
+        network.model_name += '_droph' + str(param['dropout_hidden'])
     if param['num_stack'] != 1:
         network.model_name += '_stack' + str(param['num_stack'])
     if param['weight_decay'] != 0:
         network.model_name += '_weightdecay' + str(param['weight_decay'])
     network.model_name += '_taskweight' + str(param['main_task_weight'])
+    if param['decay_rate'] != 1:
+        network.model_name += '_lrdecay' + \
+            str(param['decay_steps'] + param['decay_rate'])
 
     # Set save path
     network.model_dir = mkdir('/n/sd8/inaguma/result/timit/')

@@ -13,17 +13,8 @@ read_dataset_ctc_cluster.py
 read_dataset_multitask_ctc_cluster.py
 
 # csj
-train_ctc_dialog.py
-train_attention_dialog.py
-eval_ctc_dialog.py
-read_dataset_ctc_dialog.py
-test_read_dataset_ctc_dialog.py
-char2num_insert.txt
-char2num_insert2.txt
-char2num_insert3.txt
-phone2num_insert.txt
-phone2num_insert2.txt
-phone2num_insert3.txt
-run_ctc_dialog.sh
-dialog
+*_ss
+*_ss.sh
+*_ss.py
+*_ss.txt
 csj/fine_tuning

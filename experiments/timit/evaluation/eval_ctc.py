@@ -26,18 +26,11 @@ def do_eval(network, param, epoch=None):
         epoch: int, the epoch to restore
     """
     # Load dataset
-    if param['label_type'] == 'character':
-        test_data = Dataset(data_type='test', label_type='character',
-                            batch_size=1,
-                            num_stack=param['num_stack'],
-                            num_skip=param['num_skip'],
-                            is_sorted=False, is_progressbar=True)
-    else:
-        test_data = Dataset(data_type='test', label_type='phone39',
-                            batch_size=1,
-                            num_stack=param['num_stack'],
-                            num_skip=param['num_skip'],
-                            is_sorted=False, is_progressbar=True)
+    test_data = Dataset(data_type='test', label_type='phone39',
+                        batch_size=1,
+                        num_stack=param['num_stack'],
+                        num_skip=param['num_skip'],
+                        is_sorted=False, is_progressbar=True)
 
     # Define placeholders
     network.inputs = tf.placeholder(

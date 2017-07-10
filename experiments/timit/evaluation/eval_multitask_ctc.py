@@ -18,13 +18,11 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from models.ctc.load_model_multitask import load
 
 
-def do_eval(network, label_type_sub, num_stack, num_skip, epoch=None):
+def do_eval(network, param, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
-        label_type_sub: string, phone39 or phone48 or phone61
-        num_stack: int, the number of frames to stack
-        num_skip: int, the number of frames to skip
+        param: A dictionary of parameters
         epoch: int, the epoch to restore
     """
     # Load dataset
@@ -32,7 +30,8 @@ def do_eval(network, label_type_sub, num_stack, num_skip, epoch=None):
                         label_type_main='character',
                         label_type_sub='phone39',
                         batch_size=1,
-                        num_stack=num_stack, num_skip=num_skip,
+                        num_stack=param['num_stack'],
+                        num_skip=param['num_skip'],
                         is_sorted=False, is_progressbar=True)
 
     # Define placeholders
@@ -104,41 +103,37 @@ def do_eval(network, label_type_sub, num_stack, num_skip, epoch=None):
             per_op=per_op_sub,
             network=network,
             dataset=test_data,
-            train_label_type=label_type_sub,
+            train_label_type=param['label_type_sub'],
             is_progressbar=True,
             is_multitask=True)
         print('  PER: %f %%' % (per_test * 100))
 
 
-def main(model_path):
-
-    epoch = None  # if None, restore the final epoch
+def main(model_path, epoch):
 
     # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
-        corpus = config['corpus']
-        feature = config['feature']
         param = config['param']
 
     # Except for a blank label
-    if corpus['label_type_sub'] == 'phone61':
-        num_classes_sub = 61
-    elif corpus['label_type_sub'] == 'phone48':
-        num_classes_sub = 48
-    elif corpus['label_type_sub'] == 'phone39':
-        num_classes_sub = 39
+    if param['label_type_sub'] == 'phone61':
+        param['num_classes_sub'] = 61
+    elif param['label_type_sub'] == 'phone48':
+        param['num_classes_sub'] = 48
+    elif param['label_type_sub'] == 'phone39':
+        param['num_classes_sub'] = 39
 
     # Model setting
-    CTCModel = load(model_type=config['model_name'])
+    CTCModel = load(model_type=param['model'])
     network = CTCModel(
         batch_size=1,
-        input_size=feature['input_size'] * feature['num_stack'],
+        input_size=param['input_size'] * param['num_stack'],
         num_unit=param['num_unit'],
         num_layer_main=param['num_layer_main'],
         num_layer_sub=param['num_layer_sub'],
-        num_classes_main=30,
-        num_classes_sub=num_classes_sub,
+        num_classes_main=33,
+        num_classes_sub=param['num_classes_sub'],
         main_task_weight=param['main_task_weight'],
         parameter_init=param['weight_init'],
         clip_grad=param['clip_grad'],
@@ -150,11 +145,7 @@ def main(model_path):
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_eval(network=network,
-            label_type_sub=corpus['label_type_sub'],
-            num_stack=feature['num_stack'],
-            num_skip=feature['num_skip'],
-            epoch=epoch)
+    do_eval(network=network, param=param, epoch=epoch)
 
 
 if __name__ == '__main__':

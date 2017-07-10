@@ -24,11 +24,11 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
         self.check_loading(num_gpu=1, is_sorted=True)
         self.check_loading(num_gpu=1, is_sorted=False)
 
-        # self.check_loading(num_gpu=2, is_sorted=True)
-        # self.check_loading(num_gpu=2, is_sorted=False)
+        self.check_loading(num_gpu=2, is_sorted=True)
+        self.check_loading(num_gpu=2, is_sorted=False)
 
         # For many GPUs
-        # self.check_loading(num_gpu=7, is_sorted=True)
+        self.check_loading(num_gpu=7, is_sorted=True)
 
     @measure_time
     def check_loading(self, num_gpu, is_sorted):

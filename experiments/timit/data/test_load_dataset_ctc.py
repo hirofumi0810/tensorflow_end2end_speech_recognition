@@ -26,13 +26,13 @@ class TestLoadDatasetCTC(unittest.TestCase):
         self.check_loading(label_type='phone61', num_gpu=1, is_sorted=True)
         self.check_loading(label_type='phone61', num_gpu=1, is_sorted=False)
 
-        # self.check_loading(label_type='character', num_gpu=2, is_sorted=True)
-        # self.check_loading(label_type='character', num_gpu=2, is_sorted=False)
-        # self.check_loading(label_type='phone61', num_gpu=2, is_sorted=True)
-        # self.check_loading(label_type='phone61', num_gpu=2, is_sorted=False)
+        self.check_loading(label_type='character', num_gpu=2, is_sorted=True)
+        self.check_loading(label_type='character', num_gpu=2, is_sorted=False)
+        self.check_loading(label_type='phone61', num_gpu=2, is_sorted=True)
+        self.check_loading(label_type='phone61', num_gpu=2, is_sorted=False)
 
         # For many GPUs
-        # self.check_loading(label_type='character', num_gpu=7, is_sorted=True)
+        self.check_loading(label_type='character', num_gpu=7, is_sorted=True)
 
     @measure_time
     def check_loading(self, label_type, num_gpu, is_sorted):
