@@ -9,6 +9,7 @@ from __future__ import print_function
 
 import re
 import Levenshtein
+import numpy as np
 
 from experiments.timit.metrics.mapping import map_to_39phone
 from experiments.timit.metrics.edit_distance import compute_edit_distance
@@ -36,7 +37,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         is_progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
     Returns:
-        per_global: An average of PER
+        per_mean: An average of PER
     """
     if eval_batch_size is not None:
         batch_size = eval_batch_size
@@ -44,20 +45,22 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         batch_size = dataset.batch_size
 
     train_label_type = label_type
-    data_label_type = dataset.label_type
+    eval_label_type = dataset.label_type
 
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
     if (num_examples / batch_size) != int(num_examples / batch_size):
         iteration += 1
-    per_global = 0
+    per_mean = 0
 
     # Make data generator
     mini_batch = dataset.next_batch(batch_size=batch_size)
 
-    phone2num_map_file_path = '../metrics/mapping_files/attention/phone2num_' + \
-        train_label_type[5:7] + '.txt'
-    phone2num_39_map_file_path = '../metrics/mapping_files/attention/phone2num_39.txt'
+    train_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + \
+        train_label_type + '_to_num.txt'
+    eval_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + \
+        train_label_type + '_to_num.txt'
+    phone2num_39_map_file_path = '../metrics/mapping_files/ctc/phone39_to_num.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini-batch
@@ -75,62 +78,60 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
         batch_size_each = len(inputs_seq_len)
 
-        if False:
-            # Evaluate by 61 phones
-            per_local = session.run(per_op, feed_dict=feed_dict)
-            per_global += per_local * batch_size_each
+        # Evaluate by 39 phones
+        predicted_ids = session.run(decode_op, feed_dict=feed_dict)
 
-        else:
-            # Evaluate by 39 phones
-            predicted_ids = session.run(decode_op, feed_dict=feed_dict)
-            predicted_ids_phone39 = []
-            labels_true_phone39 = []
-            for i_batch in range(batch_size_each):
-                # Convert from num to phone (-> list of phone strings)
-                phone_pred_seq = num2phone(
-                    predicted_ids[i_batch], phone2num_map_file_path)
-                phone_pred_list = phone_pred_seq.split(' ')
+        labels_pred_mapped, labels_true_mapped = [], []
+        for i_batch in range(batch_size_each):
+            ###############
+            # Hypothesis
+            ###############
+            # Convert from num to phone (-> list of phone strings)
+            phone_pred_list = num2phone(
+                predicted_ids[i_batch],
+                train_phone2num_map_file_path).split(' ')
 
-                # Mapping to 39 phones (-> list of phone strings)
-                phone_pred_list = map_to_39phone(
-                    phone_pred_list, train_label_type,
-                    phone2phone_map_file_path)
+            # Mapping to 39 phones (-> list of phone strings)
+            phone_pred_list = map_to_39phone(phone_pred_list,
+                                             train_label_type,
+                                             phone2phone_map_file_path)
 
-                # Convert from phone to num (-> list of phone indices)
-                phone_pred_list = phone2num(
-                    phone_pred_list, phone2num_39_map_file_path)
-                predicted_ids_phone39.append(phone_pred_list)
+            # Convert from phone to num (-> list of phone indices)
+            phone_pred_list = phone2num(phone_pred_list,
+                                        phone2num_39_map_file_path)
+            labels_pred_mapped.append(phone_pred_list)
 
-                if data_label_type != 'phone39':
-                    # Convert from num to phone (-> list of phone strings)
-                    phone_true_seq = num2phone(
-                        labels_true[i_batch], phone2num_map_file_path)
-                    phone_true_list = phone_true_seq.split(' ')
+            ###############
+            # Reference
+            ###############
+            # Convert from num to phone (-> list of phone strings)
+            phone_true_list = num2phone(
+                labels_true[i_batch],
+                eval_phone2num_map_file_path).split(' ')
 
-                    # Mapping to 39 phones (-> list of phone strings)
-                    phone_true_list = map_to_39phone(
-                        phone_true_list, train_label_type,
-                        phone2phone_map_file_path)
+            # Mapping to 39 phones (-> list of phone strings)
+            phone_true_list = map_to_39phone(phone_true_list,
+                                             eval_label_type,
+                                             phone2phone_map_file_path)
 
-                    # Convert from phone to num (-> list of phone indices)
-                    phone_true_list = phone2num(
-                        phone_true_list, phone2num_39_map_file_path)
-                    labels_true_phone39.append(phone_true_list)
-                else:
-                    labels_true_phone39 = labels_true
+            # Convert from phone to num (-> list of phone indices)
+            phone_true_list = phone2num(phone_true_list,
+                                        phone2num_39_map_file_path)
+            labels_true_mapped.append(phone_true_list)
 
-            # Compute edit distance
-            labels_true_st = list2sparsetensor(
-                labels_true_phone39, padded_value=eos_index)
-            labels_pred_st = list2sparsetensor(
-                predicted_ids_phone39, padded_value=eos_index)
-            per_local = compute_edit_distance(
-                session, labels_true_st, labels_pred_st)
-            per_global += per_local * batch_size_each
+        # Compute edit distance
+        labels_true_st = list2sparsetensor(labels_true_mapped,
+                                           padded_value=eos_index)
+        labels_pred_st = list2sparsetensor(labels_pred_mapped,
+                                           padded_value=eos_index)
+        per_each = compute_edit_distance(session,
+                                         labels_true_st,
+                                         labels_pred_st)
+        per_mean += per_each * batch_size_each
 
-    per_global /= dataset.data_num
+    per_mean /= dataset.data_num
 
-    return per_global
+    return per_mean
 
 
 @exception
@@ -162,7 +163,7 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
         iteration += 1
     cer_sum = 0
 
-    map_file_path = '../metrics/mapping_files/attention/char2num.txt'
+    map_file_path = '../metrics/mapping_files/ctc/character_to_num.txt'
     for step in wrap_iterator(range(iteration), is_progressbar):
         # Create feed dictionary for next mini-batch
         if not is_multitask:

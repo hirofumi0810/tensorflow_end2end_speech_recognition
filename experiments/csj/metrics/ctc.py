@@ -87,9 +87,9 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
                 str_true = num2char(labels_true[i_batch], map_file_path)
             str_pred = num2char(labels_pred[i_batch], map_file_path)
 
-            # Remove silence(_) labels
-            str_true = re.sub(r'[_NZ]+', "", str_true)
-            str_pred = re.sub(r'[_NZ]+', "", str_pred)
+            # Remove silence(_) & noise(NZ) labels
+            str_true = re.sub(r'[_NZー]+', "", str_true)
+            str_pred = re.sub(r'[_NZー]+', "", str_pred)
 
             # Compute edit distance
             cer_each = Levenshtein.distance(
