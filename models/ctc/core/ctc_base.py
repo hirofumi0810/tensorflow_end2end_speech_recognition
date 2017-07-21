@@ -93,7 +93,13 @@ class ctcBase(object):
 
     def _add_noise_to_gradients(grads_and_vars, gradient_noise_scale,
                                 stddev=0.075):
-        """Adds scaled noise from a 0-mean normal distribution to gradients."""
+        """Adds scaled noise from a 0-mean normal distribution to gradients.
+        Args:
+            grads_and_vars:
+            gradient_noise_scale:
+            stddev:
+        Returns:
+        """
         raise NotImplementedError
 
     def compute_loss(self, inputs, labels, inputs_seq_len, keep_prob_input,
@@ -150,7 +156,7 @@ class ctcBase(object):
         return loss, logits
 
     def train(self, loss, optimizer, learning_rate_init=None,
-              clip_grad_by_norm=None, is_scheduled=False):
+              clip_grad_by_norm=None, decay_steps=None, decay_rate=None):
         """Operation for training.
         Args:
             loss: An operation for computing loss
@@ -158,7 +164,9 @@ class ctcBase(object):
             learning_rate_init: initial learning rate
             clip_grad_by_norm: if True, clip gradients by norm of the
                 value of self.clip_grad
-            is_scheduled: if True, schedule learning rate at each epoch
+            decay_steps: int, the step to decay the current learning rate
+            decay_rate: A float value, the rate to decay the current learning
+                rate
         Returns:
             train_op: operation for training
         """
@@ -170,22 +178,27 @@ class ctcBase(object):
         if learning_rate_init < 0.0:
             raise ValueError("Invalid learning_rate %s.", learning_rate_init)
 
-        self.lr = tf.placeholder(tf.float32, name='learning_rate')
+        # Create a variable to track the global step
+        global_step = tf.Variable(0, name='global_step', trainable=False)
+
+        if decay_steps is None:
+            # Not schedule
+            learning_rate = learning_rate_init
+        else:
+            learning_rate = tf.train.exponential_decay(learning_rate_init,
+                                                       global_step,
+                                                       decay_steps=decay_steps,
+                                                       decay_rate=decay_rate,
+                                                       staircase=True)
 
         # Select optimizer
-        if is_scheduled:
-            learning_rate_init = self.lr
-
         if optimizer == 'momentum':
             optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate_init,
+                learning_rate=learning_rate,
                 momentum=0.9)
         else:
             optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate_init)
-
-        # Create a variable to track the global step
-        global_step = tf.Variable(0, name='global_step', trainable=False)
+                learning_rate=learning_rate)
 
         if self.clip_grad is not None:
             # Gradient clipping

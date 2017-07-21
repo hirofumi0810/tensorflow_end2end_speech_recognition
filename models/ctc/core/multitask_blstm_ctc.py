@@ -8,7 +8,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models.ctc.ctc_base import ctcBase
+from models.ctc.core.ctc_base import ctcBase
 
 
 class Multitask_BLSTM_CTC(ctcBase):
@@ -94,7 +94,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                                 keep_prob_input,
                                 name='dropout_input')
 
-        # inputs: `[batch_size, max_time, input_size_splice]`
+        # inputs: `[batch_size, max_time, input_size]`
         batch_size = tf.shape(inputs)[0]
 
         # Hidden layers
@@ -375,7 +375,6 @@ class Multitask_BLSTM_CTC(ctcBase):
             decode_op_main, labels_main, normalize=True))
         ler_op_sub = tf.reduce_mean(tf.edit_distance(
             decode_op_sub, labels_sub, normalize=True))
-        # NOTE: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
 
         # Add a scalar summary for the snapshot of LER
         with tf.name_scope("ler"):

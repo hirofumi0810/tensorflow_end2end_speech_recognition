@@ -4,7 +4,7 @@
 """GRU-CTC model."""
 
 import tensorflow as tf
-from models.ctc.ctc_base import ctcBase
+from models.ctc.core.ctc_base import ctcBase
 
 
 class GRU_CTC(ctcBase):
@@ -97,7 +97,7 @@ class GRU_CTC(ctcBase):
                                                  sequence_length=inputs_seq_len,
                                                  dtype=tf.float32)
 
-        # inputs: `[batch_size, max_time, input_size_splice]`
+        # inputs: `[batch_size, max_time, input_size]`
         batch_size = tf.shape(inputs)[0]
 
         # Reshape to apply the same weights over the timesteps

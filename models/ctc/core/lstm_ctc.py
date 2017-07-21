@@ -8,7 +8,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models.ctc.ctc_base import ctcBase
+from models.ctc.core.ctc_base import ctcBase
 
 
 class LSTM_CTC(ctcBase):
@@ -114,7 +114,7 @@ class LSTM_CTC(ctcBase):
             output_node = self.num_proj
         outputs = tf.reshape(outputs, shape=[-1, output_node])
 
-        # inputs: `[batch_size, max_time, input_size_splice]`
+        # inputs: `[batch_size, max_time, input_size]`
         batch_size = tf.shape(inputs)[0]
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
