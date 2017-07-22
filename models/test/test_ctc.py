@@ -16,6 +16,7 @@ from models.test.util import measure_time
 from models.test.data import generate_data, num2alpha, num2phone
 from experiments.utils.sparsetensor import sparsetensor2list
 from experiments.utils.parameter import count_total_parameters
+from experiments.utils.training.learning_rate_controller.step import Controller
 
 
 class TestCTC(tf.test.TestCase):
@@ -23,16 +24,20 @@ class TestCTC(tf.test.TestCase):
     @measure_time
     def test_ctc(self):
         print("CTC Working check.")
-        self.check_training(model_type='blstm_ctc', label_type='character')
         self.check_training(model_type='blstm_ctc', label_type='phone')
-        self.check_training(model_type='lstm_ctc', label_type='character')
+        self.check_training(model_type='blstm_ctc', label_type='character')
+
         self.check_training(model_type='lstm_ctc', label_type='phone')
-        self.check_training(model_type='bgru_ctc', label_type='character')
+        self.check_training(model_type='lstm_ctc', label_type='character')
+
         self.check_training(model_type='bgru_ctc', label_type='phone')
-        self.check_training(model_type='gru_ctc', label_type='character')
+        self.check_training(model_type='bgru_ctc', label_type='character')
+
         self.check_training(model_type='gru_ctc', label_type='phone')
+        self.check_training(model_type='gru_ctc', label_type='character')
+
         # self.check_training(model_type='cnn_ctc', label_type='phone')
-        # self.check_training(model_type='cnn_ctc', label_type='phone')
+        # self.check_training(model_type='cnn_ctc', label_type='character')
 
     def check_training(self, model_type, label_type):
         print('----- ' + model_type + ', ' + label_type + ' -----')
@@ -47,7 +52,7 @@ class TestCTC(tf.test.TestCase):
 
             # Define placeholders
             inputs_pl = tf.placeholder(tf.float32,
-                                       shape=[None, None, inputs.shape[-1]],
+                                       shape=[None, None, inputs[0].shape[-1]],
                                        name='inputs')
             indices_pl = tf.placeholder(tf.int64, name='indices')
             values_pl = tf.placeholder(tf.int32, name='values')
@@ -60,12 +65,14 @@ class TestCTC(tf.test.TestCase):
                                                 name='keep_prob_input')
             keep_prob_hidden_pl = tf.placeholder(tf.float32,
                                                  name='keep_prob_hidden')
+            learning_rate_pl = tf.placeholder(tf.float32,
+                                              name='learning_rate')
 
             # Define model graph
             num_classes = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
             network = model(batch_size=batch_size,
-                            input_size=inputs[0].shape[1],
+                            input_size=inputs[0].shape[-1],
                             num_unit=256,
                             num_layer=2,
                             bottleneck_dim=0,
@@ -84,16 +91,22 @@ class TestCTC(tf.test.TestCase):
                                                    inputs_seq_len_pl,
                                                    keep_prob_input_pl,
                                                    keep_prob_hidden_pl)
-            learning_rate = 1e-3
             train_op = network.train(loss_op,
                                      optimizer='rmsprop',
-                                     learning_rate_init=learning_rate,
-                                     is_scheduled=False)
+                                     learning_rate=learning_rate_pl)
             decode_op = network.decoder(logits,
                                         inputs_seq_len_pl,
                                         decode_type='beam_search',
                                         beam_width=20)
             ler_op = network.compute_ler(decode_op, labels_pl)
+
+            # Define learning rate controller
+            learning_rate = 1e-3
+            lr_controller = Controller(learning_rate_init=learning_rate,
+                                       decay_start_step=10,
+                                       decay_steps=20,
+                                       decay_rate=0.99,
+                                       lower_better=True)
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
@@ -114,9 +127,10 @@ class TestCTC(tf.test.TestCase):
                 labels_pl: labels_true_st,
                 inputs_seq_len_pl: inputs_seq_len,
                 keep_prob_input_pl: network.dropout_ratio_input,
-                keep_prob_hidden_pl: network.dropout_ratio_hidden,
-                network.lr: learning_rate
+                keep_prob_hidden_pl: network.dropout_ratio_hidden
             }
+
+            map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
 
             with tf.Session() as sess:
                 # Initialize parameters
@@ -132,6 +146,12 @@ class TestCTC(tf.test.TestCase):
                 ler_train_pre = 1
                 not_improved_count = 0
                 for step in range(max_steps):
+
+                    learning_rate = lr_controller.decay_lr(
+                        learning_rate=learning_rate,
+                        step=step,
+                        value=ler_train_pre)
+                    feed_dict[learning_rate_pl] = learning_rate
 
                     # Compute loss
                     _, loss_train = sess.run(
@@ -152,8 +172,8 @@ class TestCTC(tf.test.TestCase):
                         ler_train = sess.run(ler_op, feed_dict=feed_dict)
 
                         duration_step = time.time() - start_time_step
-                        print('Step %d: loss = %.3f / ler = %.4f (%.3f sec)' %
-                              (step + 1, loss_train, ler_train, duration_step))
+                        print('Step %d: loss = %.3f / ler = %.4f (%.3f sec) / lr = %.5f' %
+                              (step + 1, loss_train, ler_train, duration_step, learning_rate))
                         start_time_step = time.time()
 
                         # Visualize
@@ -167,8 +187,10 @@ class TestCTC(tf.test.TestCase):
                             print('True: %s' % num2alpha(labels_true[0]))
                             print('Pred: %s' % num2alpha(labels_pred[0]))
                         else:
-                            print('True: %s' % num2phone(labels_true[0]))
-                            print('Pred: %s' % num2phone(labels_pred[0]))
+                            print('True: %s' % num2phone(
+                                labels_true[0], map_file_path))
+                            print('Pred: %s' % num2phone(
+                                labels_pred[0], map_file_path))
 
                         if ler_train >= ler_train_pre:
                             not_improved_count += 1
