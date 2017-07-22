@@ -14,25 +14,25 @@ import yaml
 
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
-from experiments.timit.visualization.util_plot_ctc import posterior_test_multitask
+from experiments.timit.visualization.core.plot.ctc import posterior_test_multitask
 from models.ctc.load_model_multitask import load
 
 
-def do_plot(network, param, epoch=None):
+def do_plot(network, params, epoch=None):
     """Plot the multi-task CTC posteriors.
     Args:
         network: model to restore
-        param: A dictionary of parameters
+        params: A dictionary of parameters
         epoch: int, the epoch to restore
     """
     # Load dataset
     test_data = Dataset(data_type='test',
                         label_type_main='character',
-                        label_type_sub=param['label_type_sub'],
+                        label_type_sub=params['label_type_sub'],
                         batch_size=1,
-                        num_stack=param['num_stack'],
-                        num_skip=param['num_skip'],
-                        is_sorted=False, is_progressbar=True)
+                        num_stack=params['num_stack'],
+                        num_skip=params['num_skip'],
+                        sort_utt=False, progressbar=True)
 
     # Define placeholders
     network.inputs = tf.placeholder(
@@ -92,7 +92,7 @@ def do_plot(network, param, epoch=None):
                                  posteriors_op_sub=posteriors_op_sub,
                                  network=network,
                                  dataset=test_data,
-                                 label_type_sub=param['label_type_sub'],
+                                 label_type_sub=params['label_type_sub'],
                                  save_path=network.model_dir,
                                  show=False)
 
@@ -102,37 +102,37 @@ def main(model_path, epoch):
     # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
-        param = config['param']
+        params = config['param']
 
     # Except for a blank label
-    if param['label_type_sub'] == 'phone61':
-        param['num_classes_sub'] = 61
-    elif param['label_type_sub'] == 'phone48':
-        param['num_classes_sub'] = 48
-    elif param['label_type_sub'] == 'phone39':
-        param['num_classes_sub'] = 39
+    if params['label_type_sub'] == 'phone61':
+        params['num_classes_sub'] = 61
+    elif params['label_type_sub'] == 'phone48':
+        params['num_classes_sub'] = 48
+    elif params['label_type_sub'] == 'phone39':
+        params['num_classes_sub'] = 39
 
     # Model setting
     CTCModel = load(model_type=config['model_name'])
     network = CTCModel(
         batch_size=1,
-        input_size=param['input_size'] * param['num_stack'],
-        num_unit=param['num_unit'],
-        num_layer_main=param['num_layer_main'],
-        num_layer_sub=param['num_layer_sub'],
+        input_size=params['input_size'] * params['num_stack'],
+        num_unit=params['num_unit'],
+        num_layer_main=params['num_layer_main'],
+        num_layer_sub=params['num_layer_sub'],
         num_classes_main=30,
-        num_classes_sub=param['num_classes_sub'],
-        main_task_weight=param['main_task_weight'],
-        clip_grad=param['clip_grad'],
-        clip_activation=param['clip_activation'],
-        dropout_ratio_input=param['dropout_input'],
-        dropout_ratio_hidden=param['dropout_hidden'],
-        num_proj=param['num_proj'],
-        weight_decay=param['weight_decay'])
+        num_classes_sub=params['num_classes_sub'],
+        main_task_weight=params['main_task_weight'],
+        clip_grad=params['clip_grad'],
+        clip_activation=params['clip_activation'],
+        dropout_ratio_input=params['dropout_input'],
+        dropout_ratio_hidden=params['dropout_hidden'],
+        num_proj=params['num_proj'],
+        weight_decay=params['weight_decay'])
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_plot(network=network, param=param, epoch=epoch)
+    do_plot(network=network, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

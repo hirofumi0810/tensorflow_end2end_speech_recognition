@@ -14,22 +14,22 @@ import yaml
 
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_attention import Dataset
-from experiments.timit.visualization.util_plot_attention import attention_test
+from experiments.timit.visualization.core.plot.attention import attention_test
 from models.attention import blstm_attention_seq2seq
 
 
-def do_plot(network, param, epoch=None):
+def do_plot(network, param, s epoch=None):
     """Plot attention weights.
     Args:
         network: model to restore
-        param: A dictionary of parameters
+        params: A dictionary of parameters
         epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test', label_type=param['label_type'],
+    test_data = Dataset(data_type='test', label_type=params['label_type'],
                         batch_size=1,
-                        eos_index=param['eos_index'],
-                        is_sorted=False, is_progressbar=True)
+                        eos_index=params['eos_index'],
+                        sort_utt=False, progressbar=True)
 
     # Define placeholders
     network.inputs = tf.placeholder(tf.float32,
@@ -88,7 +88,7 @@ def do_plot(network, param, epoch=None):
                        attention_weights_op=attention_weights_op,
                        network=network,
                        dataset=test_data,
-                       label_type=param['label_type'],
+                       label_type=params['label_type'],
                        save_path=None,
                        show=True)
 
@@ -98,55 +98,55 @@ def main(model_path, epoch):
     # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
-        param = config['param']
+        params = config['param']
 
-    if param['label_type'] == 'phone61':
-        param['num_classes'] = 63
-        param['sos_index'] = 0
-        param['eos_index'] = 1
-    elif param['label_type'] == 'phone48':
-        param['num_classes'] = 50
-        param['sos_index'] = 0
-        param['eos_index'] = 1
-    elif param['label_type'] == 'phone39':
-        param['num_classes'] = 41
-        param['sos_index'] = 0
-        param['eos_index'] = 1
-    elif param['label_type'] == 'character':
-        param['num_classes'] = 33
-        param['sos_index'] = 1
-        param['eos_index'] = 2
+    if params['label_type'] == 'phone61':
+        params['num_classes'] = 63
+        params['sos_index'] = 0
+        params['eos_index'] = 1
+    elif params['label_type'] == 'phone48':
+        params['num_classes'] = 50
+        params['sos_index'] = 0
+        params['eos_index'] = 1
+    elif params['label_type'] == 'phone39':
+        params['num_classes'] = 41
+        params['sos_index'] = 0
+        params['eos_index'] = 1
+    elif params['label_type'] == 'character':
+        params['num_classes'] = 33
+        params['sos_index'] = 1
+        params['eos_index'] = 2
 
     # Model setting
-    # AttentionModel = load(model_type=param['model'])
+    # AttentionModel = load(model_type=params['model'])
     network = blstm_attention_seq2seq.BLSTMAttetion(
         batch_size=1,
-        input_size=param['input_size'],
-        encoder_num_unit=param['encoder_num_unit'],
-        encoder_num_layer=param['encoder_num_layer'],
-        attention_dim=param['attention_dim'],
-        attention_type=param['attention_type'],
-        decoder_num_unit=param['decoder_num_unit'],
-        decoder_num_layer=param['decoder_num_layer'],
-        embedding_dim=param['embedding_dim'],
-        num_classes=param['num_classes'],
-        sos_index=param['sos_index'],
-        eos_index=param['eos_index'],
-        max_decode_length=param['max_decode_length'],
-        attention_smoothing=param['attention_smoothing'],
-        attention_weights_tempareture=param['attention_weights_tempareture'],
-        logits_tempareture=param['logits_tempareture'],
-        parameter_init=param['weight_init'],
-        clip_grad=param['clip_grad'],
-        clip_activation_encoder=param['clip_activation_encoder'],
-        clip_activation_decoder=param['clip_activation_decoder'],
-        dropout_ratio_input=param['dropout_input'],
-        dropout_ratio_hidden=param['dropout_hidden'],
-        weight_decay=param['weight_decay'])
+        input_size=params['input_size'],
+        encoder_num_unit=params['encoder_num_unit'],
+        encoder_num_layer=params['encoder_num_layer'],
+        attention_dim=params['attention_dim'],
+        attention_type=params['attention_type'],
+        decoder_num_unit=params['decoder_num_unit'],
+        decoder_num_layer=params['decoder_num_layer'],
+        embedding_dim=params['embedding_dim'],
+        num_classes=params['num_classes'],
+        sos_index=params['sos_index'],
+        eos_index=params['eos_index'],
+        max_decode_length=params['max_decode_length'],
+        attention_smoothing=params['attention_smoothing'],
+        attention_weights_tempareture=params['attention_weights_tempareture'],
+        logits_tempareture=params['logits_tempareture'],
+        parameter_init=params['weight_init'],
+        clip_grad=params['clip_grad'],
+        clip_activation_encoder=params['clip_activation_encoder'],
+        clip_activation_decoder=params['clip_activation_decoder'],
+        dropout_ratio_input=params['dropout_input'],
+        dropout_ratio_hidden=params['dropout_hidden'],
+        weight_decay=params['weight_decay'])
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_plot(network=network, param=param, epoch=epoch)
+    do_plot(network=network, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

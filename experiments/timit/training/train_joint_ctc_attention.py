@@ -25,28 +25,28 @@ from experiments.utils.csv import save_loss, save_ler
 from models.attention.joint_ctc_attention import JointCTCAttention
 
 
-def do_train(network, param):
+def do_train(network, params):
     """Run training. If target labels are phone, the model is evaluated by PER
     with 39 phones.
     Args:
         network: network to train
-        param: A dictionary of parameters
+        params: A dictionary of parameters
     """
     # Load dataset
-    train_data = Dataset(data_type='train', label_type=param['label_type'],
-                         batch_size=param['batch_size'],
-                         eos_index=param['eos_index'], is_sorted=True)
-    dev_data = Dataset(data_type='dev', label_type=param['label_type'],
-                       batch_size=param['batch_size'],
-                       eos_index=param['eos_index'], is_sorted=False)
-    if param['label_type'] == 'character':
+    train_data = Dataset(data_type='train', label_type=params['label_type'],
+                         batch_size=params['batch_size'],
+                         eos_index=params['eos_index'], sort_utt=True)
+    dev_data = Dataset(data_type='dev', label_type=params['label_type'],
+                       batch_size=params['batch_size'],
+                       eos_index=params['eos_index'], sort_utt=False)
+    if params['label_type'] == 'character':
         test_data = Dataset(data_type='test', label_type='character',
                             batch_size=1,
-                            eos_index=param['eos_index'], is_sorted=False)
+                            eos_index=params['eos_index'], sort_utt=False)
     else:
         test_data = Dataset(data_type='test', label_type='phone39',
                             batch_size=1,
-                            eos_index=param['eos_index'], is_sorted=False)
+                            eos_index=params['eos_index'], sort_utt=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -100,8 +100,8 @@ def do_train(network, param):
             network.keep_prob_hidden)
         train_op = network.train(
             loss_op,
-            optimizer=param['optimizer'],
-            learning_rate_init=float(param['learning_rate']),
+            optimizer=params['optimizer'],
+            learning_rate_init=float(params['learning_rate']),
             is_scheduled=False)
         _, decode_op_infer = network.decoder(
             decoder_outputs_train,
@@ -148,11 +148,11 @@ def do_train(network, param):
             sess.run(init_op)
 
             # Train model
-            iter_per_epoch = int(train_data.data_num / param['batch_size'])
-            train_step = train_data.data_num / param['batch_size']
+            iter_per_epoch = int(train_data.data_num / params['batch_size'])
+            train_step = train_data.data_num / params['batch_size']
             if train_step != int(train_step):
                 iter_per_epoch += 1
-            max_steps = iter_per_epoch * param['num_epoch']
+            max_steps = iter_per_epoch * params['num_epoch']
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
@@ -160,34 +160,38 @@ def do_train(network, param):
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, att_labels_train, ctc_labels_st, inputs_seq_len, att_labels_seq_len, _ = mini_batch_train.__next__()
+                with tf.device('/cpu:0'):
+                    inputs, att_labels_train, ctc_labels, inputs_seq_len, att_labels_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
                     network.att_labels: att_labels_train,
                     network.inputs_seq_len: inputs_seq_len,
                     network.att_labels_seq_len: att_labels_seq_len,
-                    network.ctc_labels: ctc_labels_st,
+                    network.ctc_labels: list2sparsetensor(ctc_labels,
+                                                          padded_value=-1),
                     network.keep_prob_input: network.dropout_ratio_input,
                     network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.lr: float(param['learning_rate'])
-                }
-
-                # Create feed dictionary for next mini batch (dev)
-                inputs, att_labels_dev, ctc_labels_st, inputs_seq_len, att_labels_seq_len, _ = mini_batch_dev.__next__()
-                feed_dict_dev = {
-                    network.inputs: inputs,
-                    network.att_labels: att_labels_dev,
-                    network.inputs_seq_len: inputs_seq_len,
-                    network.att_labels_seq_len: att_labels_seq_len,
-                    network.ctc_labels: ctc_labels_st,
-                    network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden
+                    network.lr: float(params['learning_rate'])
                 }
 
                 # Update param
                 sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % 10 == 0:
+
+                    # Create feed dictionary for next mini batch (dev)
+                    with tf.device('/cpu:0'):
+                        inputs, att_labels_dev, ctc_labels, inputs_seq_len, att_labels_seq_len, _ = mini_batch_dev.__next__()
+                    feed_dict_dev = {
+                        network.inputs: inputs,
+                        network.att_labels: att_labels_dev,
+                        network.inputs_seq_len: inputs_seq_len,
+                        network.att_labels_seq_len: att_labels_seq_len,
+                        network.ctc_labels: list2sparsetensor(ctc_labels,
+                                                              padded_value=-1),
+                        network.keep_prob_input: network.dropout_ratio_input,
+                        network.keep_prob_hidden: network.dropout_ratio_hidden
+                    }
 
                     # Compute loss
                     loss_train = sess.run(loss_op, feed_dict=feed_dict_train)
@@ -217,18 +221,18 @@ def do_train(network, param):
                     feed_dict_ler_train = {
                         network.att_labels_true_st: list2sparsetensor(
                             att_labels_train,
-                            padded_value=param['eos_index']),
+                            padded_value=params['eos_index']),
                         network.att_labels_pred_st: list2sparsetensor(
                             predicted_ids_train,
-                            padded_value=param['eos_index'])
+                            padded_value=params['eos_index'])
                     }
                     feed_dict_ler_dev = {
                         network.att_labels_true_st: list2sparsetensor(
                             att_labels_dev,
-                            padded_value=param['eos_index']),
+                            padded_value=params['eos_index']),
                         network.att_labels_pred_st: list2sparsetensor(
                             predicted_ids_dev,
-                            padded_value=param['eos_index'])
+                            padded_value=params['eos_index'])
                     }
 
                     # Compute accuracy
@@ -261,7 +265,7 @@ def do_train(network, param):
 
                     if epoch >= 20:
                         start_time_eval = time.time()
-                        if param['label_type'] == 'character':
+                        if params['label_type'] == 'character':
                             print('=== Dev Data Evaluation ===')
                             cer_dev_epoch = do_eval_cer(
                                 session=sess,
@@ -293,8 +297,8 @@ def do_train(network, param):
                                 per_op=ler_op,
                                 network=network,
                                 dataset=dev_data,
-                                label_type=param['label_type'],
-                                eos_index=param['eos_index'],
+                                label_type=params['label_type'],
+                                eos_index=params['eos_index'],
                                 eval_batch_size=1)
                             print('  PER: %f %%' % (per_dev_epoch * 100))
 
@@ -309,8 +313,8 @@ def do_train(network, param):
                                     per_op=ler_op,
                                     network=network,
                                     dataset=test_data,
-                                    label_type=param['label_type'],
-                                    eos_index=param['eos_index'],
+                                    label_type=params['label_type'],
+                                    eos_index=params['eos_index'],
                                     eval_batch_size=1)
                                 print('  PER: %f %%' %
                                       (per_test * 100))
@@ -336,84 +340,84 @@ def do_train(network, param):
                 f.write('')
 
 
-def main(config_path):
+def main(config_path, model_save_path):
 
     # Load a config file (.yml)
     with open(config_path, "r") as f:
         config = yaml.load(f)
-        param = config['param']
+        params = config['param']
 
-    if param['label_type'] == 'phone61':
-        param['att_num_classes'] = 63
-        param['ctc_num_classes'] = 61
-        param['sos_index'] = 0
-        param['eos_index'] = 1
-    elif param['label_type'] == 'phone48':
-        param['att_num_classes'] = 50
-        param['ctc_num_classes'] = 48
-        param['sos_index'] = 0
-        param['eos_index'] = 1
-    elif param['label_type'] == 'phone39':
-        param['att_num_classes'] = 41
-        param['ctc_num_classes'] = 39
-        param['sos_index'] = 0
-        param['eos_index'] = 1
-    elif param['label_type'] == 'character':
-        param['att_num_classes'] = 35
-        param['ctc_num_classes'] = 33
-        param['sos_index'] = 1
-        param['eos_index'] = 2
+    if params['label_type'] == 'phone61':
+        params['att_num_classes'] = 63
+        params['ctc_num_classes'] = 61
+        params['sos_index'] = 0
+        params['eos_index'] = 1
+    elif params['label_type'] == 'phone48':
+        params['att_num_classes'] = 50
+        params['ctc_num_classes'] = 48
+        params['sos_index'] = 0
+        params['eos_index'] = 1
+    elif params['label_type'] == 'phone39':
+        params['att_num_classes'] = 41
+        params['ctc_num_classes'] = 39
+        params['sos_index'] = 0
+        params['eos_index'] = 1
+    elif params['label_type'] == 'character':
+        params['att_num_classes'] = 35
+        params['ctc_num_classes'] = 33
+        params['sos_index'] = 1
+        params['eos_index'] = 2
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
     network = JointCTCAttention(
-        batch_size=param['batch_size'],
-        input_size=param['input_size'],
-        encoder_num_unit=param['encoder_num_unit'],
-        encoder_num_layer=param['encoder_num_layer'],
-        attention_dim=param['attention_dim'],
-        attention_type=param['attention_type'],
-        decoder_num_unit=param['decoder_num_unit'],
-        decoder_num_layer=param['decoder_num_layer'],
-        embedding_dim=param['embedding_dim'],
-        att_num_classes=param['att_num_classes'],
-        ctc_num_classes=param['ctc_num_classes'],
-        att_task_weight=param['att_task_weight'],
-        sos_index=param['sos_index'],
-        eos_index=param['eos_index'],
-        max_decode_length=param['max_decode_length'],
-        # attention_smoothing=param['attention_smoothing'],
-        attention_weights_tempareture=param['attention_weights_tempareture'],
-        logits_tempareture=param['logits_tempareture'],
-        parameter_init=param['weight_init'],
-        clip_grad=param['clip_grad'],
-        clip_activation_encoder=param['clip_activation_encoder'],
-        clip_activation_decoder=param['clip_activation_decoder'],
-        dropout_ratio_input=param['dropout_input'],
-        dropout_ratio_hidden=param['dropout_hidden'],
-        weight_decay=param['weight_decay'])
+        batch_size=params['batch_size'],
+        input_size=params['input_size'],
+        encoder_num_unit=params['encoder_num_unit'],
+        encoder_num_layer=params['encoder_num_layer'],
+        attention_dim=params['attention_dim'],
+        attention_type=params['attention_type'],
+        decoder_num_unit=params['decoder_num_unit'],
+        decoder_num_layer=params['decoder_num_layer'],
+        embedding_dim=params['embedding_dim'],
+        att_num_classes=params['att_num_classes'],
+        ctc_num_classes=params['ctc_num_classes'],
+        att_task_weight=params['att_task_weight'],
+        sos_index=params['sos_index'],
+        eos_index=params['eos_index'],
+        max_decode_length=params['max_decode_length'],
+        # attention_smoothing=params['attention_smoothing'],
+        attention_weights_tempareture=params['attention_weights_tempareture'],
+        logits_tempareture=params['logits_tempareture'],
+        parameter_init=params['weight_init'],
+        clip_grad=params['clip_grad'],
+        clip_activation_encoder=params['clip_activation_encoder'],
+        clip_activation_decoder=params['clip_activation_decoder'],
+        dropout_ratio_input=params['dropout_input'],
+        dropout_ratio_hidden=params['dropout_hidden'],
+        weight_decay=params['weight_decay'])
 
-    network.model_name = param['model']
-    network.model_name += '_encoder' + str(param['encoder_num_unit'])
-    network.model_name += '_' + str(param['encoder_num_layer'])
-    network.model_name += '_attdim' + str(param['attention_dim'])
-    network.model_name += '_decoder' + str(param['decoder_num_unit'])
-    network.model_name += '_' + str(param['decoder_num_layer'])
-    network.model_name += '_' + param['optimizer']
-    network.model_name += '_lr' + str(param['learning_rate'])
-    network.model_name += '_' + param['attention_type']
-    # if bool(param['attention_smoothing']):
+    network.model_name = params['model']
+    network.model_name += '_encoder' + str(params['encoder_num_unit'])
+    network.model_name += '_' + str(params['encoder_num_layer'])
+    network.model_name += '_attdim' + str(params['attention_dim'])
+    network.model_name += '_decoder' + str(params['decoder_num_unit'])
+    network.model_name += '_' + str(params['decoder_num_layer'])
+    network.model_name += '_' + params['optimizer']
+    network.model_name += '_lr' + str(params['learning_rate'])
+    network.model_name += '_' + params['attention_type']
+    # if bool(params['attention_smoothing']):
     #     network.model_name += '_smoothing'
-    if param['attention_weights_tempareture'] != 1:
+    if params['attention_weights_tempareture'] != 1:
         network.model_name += '_sharpening' + \
-            str(param['attention_weights_tempareture'])
-    if param['weight_decay'] != 0:
-        network.model_name += '_weightdecay' + str(param['weight_decay'])
+            str(params['attention_weights_tempareture'])
+    if params['weight_decay'] != 0:
+        network.model_name += '_weightdecay' + str(params['weight_decay'])
 
     # Set save path
-    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/')
+    network.model_dir = mkdir(model_save_path)
     network.model_dir = mkdir_join(network.model_dir, 'attention')
-    network.model_dir = mkdir_join(network.model_dir, param['label_type'])
+    network.model_dir = mkdir_join(network.model_dir, params['label_type'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
@@ -424,19 +428,19 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('timit_jointctcatt_' + param['label_type'])
+    setproctitle('timit_jointctcatt_' + params['label_type'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
     sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
-    do_train(network=network, param=param)
+    do_train(network=network, params=params)
 
 
 if __name__ == '__main__':
 
     args = sys.argv
-    if len(args) != 2:
+    if len(args) != 3:
         raise ValueError
-    main(config_path=args[1])
+    main(config_path=args[1], model_save_path=args[2])

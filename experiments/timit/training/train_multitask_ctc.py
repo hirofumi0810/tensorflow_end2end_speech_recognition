@@ -25,36 +25,36 @@ from experiments.utils.sparsetensor import list2sparsetensor
 from models.ctc.load_model_multitask import load
 
 
-def do_train(network, param):
+def do_train(network, params):
     """Run multi-task training. The target labels in the main task is
     characters and those in the sub task is 61 phones. The model is
     evaluated by CER and PER with 39 phones.
     Args:
         network: network to train
-        param: A dictionary of parameters
+        params: A dictionary of parameters
     """
     # Load dataset
     train_data = Dataset(data_type='train',
                          label_type_main='character',
-                         label_type_sub=param['label_type_sub'],
-                         batch_size=param['batch_size'],
-                         num_stack=param['num_stack'],
-                         num_skip=param['num_skip'],
-                         is_sorted=True)
+                         label_type_sub=params['label_type_sub'],
+                         batch_size=params['batch_size'],
+                         num_stack=params['num_stack'],
+                         num_skip=params['num_skip'],
+                         sort_utt=True)
     dev_data = Dataset(data_type='dev',
                        label_type_main='character',
-                       label_type_sub=param['label_type_sub'],
-                       batch_size=param['batch_size'],
-                       num_stack=param['num_stack'],
-                       num_skip=param['num_skip'],
-                       is_sorted=False)
+                       label_type_sub=params['label_type_sub'],
+                       batch_size=params['batch_size'],
+                       num_stack=params['num_stack'],
+                       num_skip=params['num_skip'],
+                       sort_utt=False)
     test_data = Dataset(data_type='test',
                         label_type_main='character',
                         label_type_sub='phone39',
                         batch_size=1,
-                        num_stack=param['num_stack'],
-                        num_skip=param['num_skip'],
-                        is_sorted=False)
+                        num_stack=params['num_stack'],
+                        num_skip=params['num_skip'],
+                        sort_utt=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -92,10 +92,10 @@ def do_train(network, param):
             network.keep_prob_hidden)
         train_op = network.train(
             loss_op,
-            optimizer=param['optimizer'],
-            learning_rate_init=float(param['learning_rate']),
-            decay_steps=param['decay_steps'],
-            decay_rate=param['decay_rate'])
+            optimizer=params['optimizer'],
+            learning_rate_init=float(params['learning_rate']),
+            decay_steps=params['decay_steps'],
+            decay_rate=params['decay_rate'])
         decode_op_main, decode_op_sub = network.decoder(
             logits_main,
             logits_sub,
@@ -144,11 +144,11 @@ def do_train(network, param):
             mini_batch_dev = dev_data.next_batch()
 
             # Train model
-            iter_per_epoch = int(train_data.data_num / param['batch_size'])
-            train_step = train_data.data_num / param['batch_size']
+            iter_per_epoch = int(train_data.data_num / params['batch_size'])
+            train_step = train_data.data_num / params['batch_size']
             if train_step != int(train_step):
                 iter_per_epoch += 1
-            max_steps = iter_per_epoch * param['num_epoch']
+            max_steps = iter_per_epoch * params['num_epoch']
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
@@ -253,7 +253,7 @@ def do_train(network, param):
                             per_op=ler_op_sub,
                             network=network,
                             dataset=dev_data,
-                            label_type=param['label_type_sub'],
+                            label_type=params['label_type_sub'],
                             eval_batch_size=1,
                             is_multitask=True)
                         print('  PER: %f %%' % (per_dev_epoch * 100))
@@ -277,7 +277,7 @@ def do_train(network, param):
                                 per_op=ler_op_sub,
                                 network=network,
                                 dataset=test_data,
-                                label_type=param['label_type_sub'],
+                                label_type=params['label_type_sub'],
                                 eval_batch_size=1,
                                 is_multitask=True)
                             print('  PER: %f %%' % (per_test * 100))
@@ -305,64 +305,64 @@ def do_train(network, param):
                 f.write('')
 
 
-def main(config_path):
+def main(config_path, model_save_path):
 
     # Load a config file (.yml)
     with open(config_path, "r") as f:
         config = yaml.load(f)
-        param = config['param']
+        params = config['param']
 
-    if param['label_type_sub'] == 'phone61':
-        param['num_classes_sub'] = 61
-    elif param['label_type_sub'] == 'phone48':
-        param['num_classes_sub'] = 48
-    elif param['label_type_sub'] == 'phone39':
-        param['num_classes_sub'] = 39
+    if params['label_type_sub'] == 'phone61':
+        params['num_classes_sub'] = 61
+    elif params['label_type_sub'] == 'phone48':
+        params['num_classes_sub'] = 48
+    elif params['label_type_sub'] == 'phone39':
+        params['num_classes_sub'] = 39
 
     # Model setting
-    CTCModel = load(model_type=param['model'])
-    network = CTCModel(batch_size=param['batch_size'],
-                       input_size=param['input_size'] * param['num_stack'],
-                       num_unit=param['num_unit'],
-                       num_layer_main=param['num_layer_main'],
-                       num_layer_sub=param['num_layer_sub'],
+    CTCModel = load(model_type=params['model'])
+    network = CTCModel(batch_size=params['batch_size'],
+                       input_size=params['input_size'] * params['num_stack'],
+                       num_unit=params['num_unit'],
+                       num_layer_main=params['num_layer_main'],
+                       num_layer_sub=params['num_layer_sub'],
                        num_classes_main=33,
-                       num_classes_sub=param['num_classes_sub'],
-                       main_task_weight=param['main_task_weight'],
-                       parameter_init=param['weight_init'],
-                       clip_grad=param['clip_grad'],
-                       clip_activation=param['clip_activation'],
-                       dropout_ratio_input=param['dropout_input'],
-                       dropout_ratio_hidden=param['dropout_hidden'],
-                       num_proj=param['num_proj'],
-                       weight_decay=param['weight_decay'])
+                       num_classes_sub=params['num_classes_sub'],
+                       main_task_weight=params['main_task_weight'],
+                       parameter_init=params['weight_init'],
+                       clip_grad=params['clip_grad'],
+                       clip_activation=params['clip_activation'],
+                       dropout_ratio_input=params['dropout_input'],
+                       dropout_ratio_hidden=params['dropout_hidden'],
+                       num_proj=params['num_proj'],
+                       weight_decay=params['weight_decay'])
 
-    network.model_name = param['model']
-    network.model_name += '_' + str(param['num_unit'])
-    network.model_name += '_main' + str(param['num_layer_main'])
-    network.model_name += '_sub' + str(param['num_layer_sub'])
-    network.model_name += '_' + param['optimizer']
-    network.model_name += '_lr' + str(param['learning_rate'])
-    if param['num_proj'] != 0:
-        network.model_name += '_proj' + str(param['num_proj'])
-    if param['dropout_input'] != 1:
-        network.model_name += '_dropi' + str(param['dropout_input'])
-    if param['dropout_hidden'] != 1:
-        network.model_name += '_droph' + str(param['dropout_hidden'])
-    if param['num_stack'] != 1:
-        network.model_name += '_stack' + str(param['num_stack'])
-    if param['weight_decay'] != 0:
-        network.model_name += '_weightdecay' + str(param['weight_decay'])
-    network.model_name += '_taskweight' + str(param['main_task_weight'])
-    if param['decay_rate'] != 1:
+    network.model_name = params['model']
+    network.model_name += '_' + str(params['num_unit'])
+    network.model_name += '_main' + str(params['num_layer_main'])
+    network.model_name += '_sub' + str(params['num_layer_sub'])
+    network.model_name += '_' + params['optimizer']
+    network.model_name += '_lr' + str(params['learning_rate'])
+    if params['num_proj'] != 0:
+        network.model_name += '_proj' + str(params['num_proj'])
+    if params['dropout_input'] != 1:
+        network.model_name += '_dropi' + str(params['dropout_input'])
+    if params['dropout_hidden'] != 1:
+        network.model_name += '_droph' + str(params['dropout_hidden'])
+    if params['num_stack'] != 1:
+        network.model_name += '_stack' + str(params['num_stack'])
+    if params['weight_decay'] != 0:
+        network.model_name += '_weightdecay' + str(params['weight_decay'])
+    network.model_name += '_taskweight' + str(params['main_task_weight'])
+    if params['decay_rate'] != 1:
         network.model_name += '_lrdecay' + \
-            str(param['decay_steps'] + param['decay_rate'])
+            str(params['decay_steps'] + params['decay_rate'])
 
     # Set save path
-    network.model_dir = mkdir('/n/sd8/inaguma/result/timit/')
+    network.model_dir = mkdir(model_save_path)
     network.model_dir = mkdir_join(network.model_dir, 'ctc')
     network.model_dir = mkdir_join(
-        network.model_dir, 'char_' + param['label_type_sub'])
+        network.model_dir, 'char_' + params['label_type_sub'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
@@ -380,12 +380,12 @@ def main(config_path):
 
     sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
-    do_train(network=network, param=param)
+    do_train(network=network, params=params)
 
 
 if __name__ == '__main__':
 
     args = sys.argv
-    if len(args) != 2:
+    if len(args) != 3:
         raise ValueError
-    main(config_path=args[1])
+    main(config_path=args[1], model_save_path=args[2])

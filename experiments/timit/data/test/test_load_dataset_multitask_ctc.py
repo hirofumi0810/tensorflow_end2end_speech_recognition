@@ -10,7 +10,7 @@ import sys
 import unittest
 import tensorflow as tf
 
-sys.path.append('../../../')
+sys.path.append('../../../../')
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
 from experiments.utils.labels.character import num2char
 from experiments.utils.labels.phone import num2phone
@@ -21,19 +21,19 @@ from experiments.utils.measure_time_func import measure_time
 class TestLoadDatasetMultitaskCTC(unittest.TestCase):
 
     def test(self):
-        self.check_loading(num_gpu=1, is_sorted=True)
-        self.check_loading(num_gpu=1, is_sorted=False)
+        self.check_loading(num_gpu=1, sort_utt=True)
+        self.check_loading(num_gpu=1, sort_utt=False)
 
-        self.check_loading(num_gpu=2, is_sorted=True)
-        self.check_loading(num_gpu=2, is_sorted=False)
+        self.check_loading(num_gpu=2, sort_utt=True)
+        self.check_loading(num_gpu=2, sort_utt=False)
 
         # For many GPUs
-        self.check_loading(num_gpu=7, is_sorted=True)
+        self.check_loading(num_gpu=7, sort_utt=True)
 
     @measure_time
-    def check_loading(self, num_gpu, is_sorted):
+    def check_loading(self, num_gpu, sort_utt):
         print('----- num_gpu: ' + str(num_gpu) +
-              ', is_sorted: ' + str(is_sorted) + ' -----')
+              ', sort_utt: ' + str(sort_utt) + ' -----')
 
         batch_size = 64
         dataset = Dataset(data_type='train',
@@ -41,14 +41,14 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
                           label_type_sub='phone61',
                           batch_size=batch_size,
                           num_stack=3, num_skip=3,
-                          is_sorted=is_sorted, is_progressbar=True,
+                          sort_utt=sort_utt, progressbar=True,
                           num_gpu=num_gpu)
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
             print('=> Loading mini-batch...')
-            map_file_path_char = '../metrics/mapping_files/ctc/char2num.txt'
-            map_file_path_phone = '../metrics/mapping_files/ctc/phone2num_61.txt'
+            map_file_path_char = '../../metrics/mapping_files/ctc/character_to_num.txt'
+            map_file_path_phone = '../../metrics/mapping_files/ctc/phone61_to_num.txt'
 
             mini_batch = dataset.next_batch(session=sess)
 
@@ -87,9 +87,9 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
                 str_true_char = re.sub(r'_', ' ', str_true_char)
                 str_true_phone = num2phone(
                     labels_phone[0], map_file_path_phone)
-                # print(str_true_char)
-                # print(str_true_phone)
-                # print('-----')
+                print(str_true_char)
+                print(str_true_phone)
+                print('-----')
 
 
 if __name__ == '__main__':

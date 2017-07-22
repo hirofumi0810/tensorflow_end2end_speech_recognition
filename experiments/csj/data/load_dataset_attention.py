@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 """Load dataset for the Attention model (CSJ corpus).
-   In addition, frame stacking and skipping are used.
    You can use the multi-GPU version.
 """
 
@@ -15,23 +14,26 @@ import pickle
 import numpy as np
 
 from experiments.utils.progressbar import wrap_iterator
-from experiments.utils.data.attention_each_load import DatasetBase
+from experiments.utils.data.each_load.attention_each_load import DatasetBase
 
 
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, train_data_size, label_type, batch_size,
-                 eos_index, is_sorted=True, is_progressbar=False, num_gpu=1):
+                 eos_index, sort_utt=True, progressbar=False, num_gpu=1,
+                 is_gpu=True, divide_by_space=True):
         """A class for loading dataset.
         Args:
             data_type: string, train, dev, eval1, eval2, eval3
             train_data_size: string, default or large
-            label_type: string, phone or character or kanji
+            label_type: string, kanji or kana or phone
             batch_size: int, the size of mini-batch
             eos_index: int , the index of <EOS> class
-            is_sorted: if True, sort dataset by frame num
-            is_progressbar: if True, visualize progressbar
+            sort_utt: if True, sort all utterances by the number of frames
+            progressbar: if True, visualize progressbar
             num_gpu: int, if more than 1, divide batch_size by num_gpu
+            is_gpu: bool,
+            divide_by_space: if True, each subword will be diveded by space
         """
         if data_type not in ['train', 'dev', 'eval1', 'eval2', 'eval3']:
             raise ValueError(
@@ -42,15 +44,33 @@ class Dataset(DatasetBase):
         self.label_type = label_type
         self.batch_size = batch_size * num_gpu
         self.eos_index = eos_index
-        self.is_sorted = is_sorted
-        self.is_progressbar = is_progressbar
+        self.sort_utt = sort_utt
+        self.progressbar = progressbar
         self.num_gpu = num_gpu
-
         self.input_size = 123
-        input_path = join('/data/inaguma/csj/inputs',
-                          train_data_size, data_type)
-        label_path = join('/data/inaguma/csj/labels/attention/',
-                          train_data_size, label_type, data_type)
+
+        if is_gpu:
+            # GPU server
+            input_path = join('/data/inaguma/csj/inputs',
+                              train_data_size, data_type)
+            if divide_by_space:
+                label_path = join('/data/inaguma/csj/labels/attention_divide/',
+                                  train_data_size, label_type, data_type)
+            else:
+                label_path = join('/data/inaguma/csj/labels/attention/',
+                                  train_data_size, label_type, data_type)
+        else:
+            # CPU
+            input_path = join('/n/sd8/inaguma/corpus/csj/dataset/inputs',
+                              train_data_size, data_type)
+            if divide_by_space:
+                label_path = join(
+                    '/n/sd8/inaguma/corpus/csj/dataset/labels/attention_divide/',
+                    train_data_size, label_type, data_type)
+            else:
+                label_path = join(
+                    '/n/sd8/inaguma/corpus/csj/dataset/labels/attention/',
+                    train_data_size, label_type, data_type)
 
         # Load the frame number dictionary
         with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
@@ -62,7 +82,7 @@ class Dataset(DatasetBase):
                                         key=lambda x: x[1])
         input_paths, label_paths = [], []
         for input_name, frame_num in wrap_iterator(frame_num_tuple_sorted,
-                                                   self.is_progressbar):
+                                                   self.progressbar):
             speaker_name = input_name.split('_')[0]
             input_paths.append(
                 join(input_path, speaker_name, input_name + '.npy'))

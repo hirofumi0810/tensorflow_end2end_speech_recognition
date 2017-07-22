@@ -14,52 +14,10 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from experiments.utils.data.frame_stack import stack_frame
-from experiments.utils.sparsetensor import list2sparsetensor
+from experiments.utils.data.frame_stacking import stack_frame
 
 
 class DatasetBase(object):
-
-    def __init__(self, data_type, label_type_main, label_type_sub,
-                 batch_size, num_stack=None, num_skip=None,
-                 is_sorted=True, is_progressbar=False, num_gpu=1):
-        """Load mini-batch in each step.
-        Args:
-            data_type: string
-            label_type_main: string
-            label_type_sub: string
-            batch_size: int, the size of mini-batch
-            num_stack: int, the number of frames to stack
-            num_skip: int, the number of frames to skip
-            is_sorted: if True, sort dataset by frame num
-            is_progressbar: if True, visualize progressbar
-            num_gpu: int, if more than 1, divide batch_size by num_gpu
-        """
-        self.data_type = data_type
-        self.label_type_main = label_type_main
-        self.label_type_sub = label_type_sub
-        self.batch_size = batch_size * num_gpu
-        self.is_sorted = is_sorted
-        self.is_progressbar = is_progressbar
-        self.num_gpu = num_gpu
-
-        self.input_size = None
-
-        # Step
-        # 1. Load the frame number dictionary
-        self.frame_num_dict = None
-
-        # 2. Load all paths to input & label
-        self.input_paths = None
-        self.label_main_paths = None
-        self.label_sub_paths = None
-        self.data_num = None
-
-        # 3. Load all dataset in advance
-        self.input_list = None
-        self.label_main_list = None
-        self.label_sub_list = None
-        self.rest = set(range(0, self.data_num, 1))
 
     def next_batch(self, batch_size=None, session=None):
         """Make mini-batch.
@@ -86,7 +44,7 @@ class DatasetBase(object):
 
         while True:
             # sorted dataset
-            if self.is_sorted:
+            if self.sort_utt:
                 if len(self.rest) > batch_size:
                     data_indices = list(self.rest)[:batch_size]
                     self.rest -= set(data_indices)
@@ -141,7 +99,7 @@ class DatasetBase(object):
                     self.frame_num_dict,
                     self.num_stack,
                     self.num_skip,
-                    is_progressbar=False)
+                    progressbar=False)
 
             # Compute max frame num in mini-batch
             max_frame_num = max(map(lambda x: x.shape[0], input_list))

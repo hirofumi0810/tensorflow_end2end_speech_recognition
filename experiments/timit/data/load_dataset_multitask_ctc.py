@@ -16,14 +16,14 @@ import numpy as np
 
 from experiments.utils.data.frame_stack import stack_frame
 from experiments.utils.progressbar import wrap_iterator
-from experiments.utils.data.multitask_ctc_all_load import DatasetBase
+from experiments.utils.data.all_load.multitask_ctc_all_load import DatasetBase
 
 
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, label_type_main, label_type_sub, batch_size,
                  num_stack=None, num_skip=None,
-                 is_sorted=True, is_progressbar=False, num_gpu=1):
+                 sort_utt=True, progressbar=False, num_gpu=1):
         """A class for loading dataset.
         Args:
             data_type: string, train or dev or test
@@ -31,8 +31,8 @@ class Dataset(DatasetBase):
             batch_size: int, the size of mini-batch
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip
-            is_sorted: if True, sort dataset by frame num
-            is_progressbar: if True, visualize progressbar
+            sort_utt: if True, sort all utterances by the number of frames
+            progressbar: if True, visualize progressbar
             num_gpu: int, if more than 1, divide batch_size by num_gpu
         """
         if data_type not in ['train', 'dev', 'test']:
@@ -44,8 +44,8 @@ class Dataset(DatasetBase):
         self.batch_size = batch_size * num_gpu
         self.num_stack = num_stack
         self.num_skip = num_skip
-        self.is_sorted = is_sorted
-        self.is_progressbar = is_progressbar
+        self.sort_utt = sort_utt
+        self.progressbar = progressbar
         self.num_gpu = num_gpu
 
         self.input_size = 123
@@ -84,7 +84,7 @@ class Dataset(DatasetBase):
         print('=> Loading ' + data_type +
               ' dataset (' + label_type_sub + ')...')
         input_list, label_main_list, label_sub_list = [], [], []
-        for i in wrap_iterator(range(self.data_num), self.is_progressbar):
+        for i in wrap_iterator(range(self.data_num), self.progressbar):
             input_list.append(np.load(self.input_paths[i]))
             label_main_list.append(np.load(self.label_main_paths[i]))
             label_sub_list.append(np.load(self.label_sub_paths[i]))
@@ -100,7 +100,7 @@ class Dataset(DatasetBase):
                                           self.frame_num_dict,
                                           num_stack,
                                           num_skip,
-                                          is_progressbar)
+                                          progressbar)
             self.input_size = self.input_size * num_stack
 
         self.rest = set(range(0, self.data_num, 1))

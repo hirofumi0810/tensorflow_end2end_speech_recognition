@@ -39,14 +39,17 @@ def decode_test(session, decode_op, network, dataset, label_type,
     elif label_type == 'phone':
         map_file_path = '../metrics/mapping_files/ctc/phone2num.txt'
 
-    if save_path is not None:
-        sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
+    # if save_path is not None:
+    #     sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
 
     for step in range(iteration):
         # Create feed dictionary for next mini batch
         inputs, labels_true, inputs_seq_len, input_names = mini_batch.__next__()
         # NOTE: labels_true is expected to be a list of string when evaluation
         # using dataset where label_type is kanji or kana
+
+        if input_names[0] not in ['A03M0106_0057', 'A03M0016_0014']:
+            continue
 
         feed_dict = {
             network.inputs: inputs,

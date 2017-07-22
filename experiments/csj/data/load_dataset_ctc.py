@@ -11,18 +11,23 @@ from __future__ import division
 from __future__ import print_function
 
 from os.path import join
+import sys
 import pickle
 import numpy as np
 
+sys.path.append('../../../')
 from experiments.utils.progressbar import wrap_iterator
-from experiments.utils.data.ctc_each_load import DatasetBase
+from experiments.utils.data.each_load.ctc_each_load import DatasetBase
+
+import tensorflow as tf
 
 
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, train_data_size, label_type, batch_size,
-                 num_stack=None, num_skip=None, is_sorted=True,
-                 is_progressbar=False, num_gpu=1, is_gpu=True):
+                 num_stack=None, num_skip=None, sort_utt=True,
+                 progressbar=False, num_gpu=1, is_gpu=True,
+                 divide_by_space=False):
         """A class for loading dataset.
         Args:
             data_type: string, train, dev, eval1, eval2, eval3
@@ -31,10 +36,11 @@ class Dataset(DatasetBase):
             batch_size: int, the size of mini-batch
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip
-            is_sorted: if True, sort dataset by frame num
-            is_progressbar: if True, visualize progressbar
+            sort_utt: if True, sort all utterances by the number of frames
+            progressbar: if True, visualize progressbar
             num_gpu: int, if more than 1, divide batch_size by num_gpu
-            is_gpu, bool
+            is_gpu: bool,
+            divide_by_space: if True, each subword will be diveded by space
         """
         if data_type not in ['train', 'dev', 'eval1', 'eval2', 'eval3']:
             raise ValueError(
@@ -46,23 +52,33 @@ class Dataset(DatasetBase):
         self.batch_size = batch_size * num_gpu
         self.num_stack = num_stack
         self.num_skip = num_skip
-        self.is_sorted = is_sorted
-        self.is_progressbar = is_progressbar
+        self.sort_utt = sort_utt
+        self.progressbar = progressbar
         self.num_gpu = num_gpu
         self.input_size = 123
 
         if is_gpu:
-            # GPU
-            input_path = join('/data/inaguma/csj/inputs',
+            # GPU server
+            input_path = join('/data/inaguma/csj/new/inputs',
                               train_data_size, data_type)
-            label_path = join('/data/inaguma/csj/labels/ctc/',
-                              train_data_size, label_type, data_type)
+            if divide_by_space:
+                label_path = join('/data/inaguma/csj/labels/ctc_divide/',
+                                  train_data_size, label_type, data_type)
+            else:
+                label_path = join('/data/inaguma/csj/new/labels/ctc/',
+                                  train_data_size, label_type, data_type)
         else:
             # CPU
             input_path = join('/n/sd8/inaguma/corpus/csj/dataset/inputs',
                               train_data_size, data_type)
-            label_path = join('/n/sd8/inaguma/corpus/csj/dataset/labels/ctc/',
-                              train_data_size, label_type, data_type)
+            if divide_by_space:
+                label_path = join(
+                    '/n/sd8/inaguma/corpus/csj/dataset/labels/ctc_divide/',
+                    train_data_size, label_type, data_type)
+            else:
+                label_path = join(
+                    '/n/sd8/inaguma/corpus/csj/dataset/labels/ctc/',
+                    train_data_size, label_type, data_type)
 
         # Load the frame number dictionary
         with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
@@ -74,7 +90,7 @@ class Dataset(DatasetBase):
                                         key=lambda x: x[1])
         input_paths, label_paths = [], []
         for input_name, frame_num in wrap_iterator(frame_num_tuple_sorted,
-                                                   self.is_progressbar):
+                                                   self.progressbar):
             speaker_name = input_name.split('_')[0]
             input_paths.append(
                 join(input_path, speaker_name, input_name + '.npy'))
@@ -94,3 +110,22 @@ class Dataset(DatasetBase):
             self.is_test = True
         else:
             self.is_test = False
+
+
+if __name__ == '__main__':
+    batch_size = 64
+    dataset = Dataset(data_type='eval1', train_data_size='default',
+                      label_type='kana', batch_size=64,
+                      num_stack=3, num_skip=3,
+                      sort_utt=True, progressbar=True,
+                      num_gpu=1)
+
+    tf.reset_default_graph()
+    with tf.Session().as_default() as sess:
+
+        mini_batch = dataset.next_batch(session=sess)
+
+        iter_per_epoch = int(dataset.data_num /
+                             (batch_size * 1)) + 1
+        for i in range(iter_per_epoch + 1):
+            inputs, labels, inputs_seq_len, input_names = mini_batch.__next__()

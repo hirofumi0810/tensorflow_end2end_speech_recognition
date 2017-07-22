@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Base class for laoding dataset for the Attention model.
+"""Base class for loading dataset for the Attention model.
    You can use the multi-GPU version.
 """
 
@@ -17,41 +17,6 @@ import tensorflow as tf
 
 class DatasetBase(object):
 
-    def __init__(self, data_type, label_type, batch_size, eos_index,
-                 is_sorted=True, is_progressbar=False, num_gpu=1):
-        """Load all dataset in advance.
-        Args:
-            data_type: string
-            label_type: string
-            eos_index: int , the index of <EOS> class
-            is_sorted: if True, sort dataset by frame num
-            is_progressbar: if True, visualize progressbar
-            num_gpu: int, if more than 1, divide batch_size by num_gpu
-        """
-        self.data_type = data_type
-        self.label_type = label_type
-        self.batch_size = batch_size * num_gpu
-        self.eos_index = eos_index
-        self.is_sorted = is_sorted
-        self.is_progressbar = is_progressbar
-        self.num_gpu = num_gpu
-
-        self.input_size = None
-
-        # Step
-        # 1. Load the frame number dictionary
-        self.frame_num_dict = None
-
-        # 2. Load all paths to input & label
-        self.input_paths = None
-        self.label_paths = None
-        self.data_num = None
-
-        # 3. Load all dataset in advance
-        self.input_list = None
-        self.label_list = None
-        self.rest = set(range(0, self.data_num, 1))
-
     def next_batch(self, batch_size=None, session=None):
         """Make mini-batch.
         Args:
@@ -60,10 +25,10 @@ class DatasetBase(object):
         Returns:
             inputs: list of input data, size `[batch_size]`
             labels: list of target labels, size `[batch_size]`
+                size `[batch_size]`, else list of target labels sequence.
             inputs_seq_len: list of length of inputs of size `[batch_size]`
-            labels_seq_len: list of length of target labels of size
+            input_names: list of file name of input data of size
                 `[batch_size]`
-            input_names: list of file name of input data of size `[batch_size]`
 
             If num_gpu > 1, each return is divide into list of size `[num_gpu]`
         """
@@ -77,7 +42,7 @@ class DatasetBase(object):
 
         while True:
             # sorted dataset
-            if self.is_sorted:
+            if self.sort_utt:
                 if len(self.rest) > batch_size:
                     data_indices = list(self.rest)[:batch_size]
                     self.rest -= set(data_indices)
@@ -88,11 +53,15 @@ class DatasetBase(object):
                     if self.data_type == 'train':
                         print('---Next epoch---')
 
+                # Shuffle selected mini-batch
+                random.shuffle(data_indices)
+
             # not sorted dataset
             else:
                 if len(self.rest) > batch_size:
                     # Randomly sample mini-batch
-                    data_indices = random.sample(list(self.rest), batch_size)
+                    data_indices = random.sample(
+                        list(self.rest), batch_size)
                     self.rest -= set(data_indices)
                 else:
                     data_indices = list(self.rest)
@@ -104,35 +73,50 @@ class DatasetBase(object):
                     # Shuffle selected mini-batch
                     random.shuffle(data_indices)
 
+            # Load dataset in mini-batch
+            input_list = np.array(list(
+                map(lambda path: np.load(path),
+                    np.take(self.input_paths, data_indices, axis=0))))
+            label_list = np.array(list(
+                map(lambda path: np.load(path),
+                    np.take(self.label_paths, data_indices, axis=0))))
+            input_names = list(
+                map(lambda path: basename(path).split('.')[0],
+                    np.take(self.input_paths, data_indices, axis=0)))
+
             # Compute max frame num in mini-batch
-            max_frame_num = max(map(lambda x: x.shape[0],
-                                    self.input_list[data_indices]))
+            max_frame_num = max(map(lambda x: x.shape[0], input_list))
 
             # Compute max target label length in mini-batch
-            max_seq_len = max(map(len, self.label_list[data_indices]))
+            max_seq_len = max(map(len, label_list))
 
             # Initialization
             inputs = np.zeros(
                 (len(data_indices), max_frame_num, self.input_size),
                 dtype=np.float32)
             # Padding with <EOS>
-            labels = np.array([[self.eos_index] * max_seq_len]
-                              * len(data_indices), dtype=np.int32)
-            inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
-            labels_seq_len = np.zeros((len(data_indices),), dtype=int)
-            input_names = list(
-                map(lambda path: basename(path).split('.')[0],
-                    np.take(self.input_paths, data_indices, axis=0)))
+            if not self.is_test:
+                labels = np.array([[self.eos_index] * max_seq_len]
+                                  * len(data_indices), dtype=np.int32)
+            else:
+                labels = [None] * len(data_indices)
+            inputs_seq_len = np.empty(
+                (len(data_indices),), dtype=np.int32)
+            labels_seq_len = np.zeros(
+                (len(data_indices),), dtype=np.int32)
 
             # Set values of each data in mini-batch
-            for i_batch, x in enumerate(data_indices):
-                data_i = self.input_list[x]
+            for i_batch in range(len(data_indices)):
+                data_i = input_list[i_batch]
                 frame_num = data_i.shape[0]
-                inputs[i_batch, :frame_num, :] = data_i
-                labels[i_batch, :len(self.label_list[x])
-                       ] = self.label_list[x]
+                inputs[i_batch, : frame_num, :] = data_i
+                if not self.is_test:
+                    labels[i_batch, :len(label_list[i_batch])
+                           ] = label_list[i_batch]
+                else:
+                    labels[i_batch] = label_list[i_batch]
                 inputs_seq_len[i_batch] = frame_num
-                labels_seq_len[i_batch] = len(self.label_list[x])
+                labels_seq_len[i_batch] = len(label_list[i_batch])
 
             ##########
             # GPU
@@ -149,8 +133,10 @@ class DatasetBase(object):
                 # Now we split the mini-batch data by num_gpu
                 inputs = tf.split(inputs, divide_num, axis=0)
                 labels = tf.split(labels, divide_num, axis=0)
-                inputs_seq_len = tf.split(inputs_seq_len, divide_num, axis=0)
-                labels_seq_len = tf.split(labels_seq_len, divide_num, axis=0)
+                inputs_seq_len = tf.split(
+                    inputs_seq_len, divide_num, axis=0)
+                labels_seq_len = tf.split(
+                    labels_seq_len, divide_num, axis=0)
                 input_names = tf.split(input_names, divide_num, axis=0)
 
                 # Convert from SparseTensor to numpy.ndarray
@@ -159,5 +145,7 @@ class DatasetBase(object):
                 inputs_seq_len = list(map(session.run, inputs_seq_len))
                 labels_seq_len = list(map(session.run, labels_seq_len))
                 input_names = list(map(session.run, input_names))
+                # TODO: Add is_test
 
-            yield inputs, labels, inputs_seq_len, labels_seq_len, input_names
+            yield (inputs, labels, inputs_seq_len, labels_seq_len,
+                   input_names)

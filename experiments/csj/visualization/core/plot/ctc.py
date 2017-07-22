@@ -109,6 +109,7 @@ def plot_probs_ctc(probs, wav_index, label_type, save_path, show):
     plt.xticks(list(range(0, int(len(probs) / 100) + 1, 1)))
     plt.yticks(list(range(0, 2, 1)))
     plt.legend(loc="upper right", fontsize=12)
+
     if show:
         plt.show()
 

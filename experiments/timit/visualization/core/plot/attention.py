@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Utilities for plotting of Attetnion-based model."""
+"""Utilities for plotting of Attetnion-based model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division

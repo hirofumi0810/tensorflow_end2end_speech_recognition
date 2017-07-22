@@ -25,34 +25,34 @@ from experiments.utils.sparsetensor import list2sparsetensor
 from models.ctc.load_model import load
 
 
-def do_train(network, param):
+def do_train(network, params):
     """Run training.
     Args:
         network: network to train
-        param: A dictionary of parameters
+        params: A dictionary of parameters
     """
     # Load dataset
     train_data = Dataset(data_type='train',
-                         label_type=param['label_type'],
-                         train_data_size=param['train_data_size'],
-                         batch_size=param['batch_size'],
-                         num_stack=param['num_stack'],
-                         num_skip=param['num_skip'],
-                         is_sorted=True)
+                         label_type=params['label_type'],
+                         train_data_size=params['train_data_size'],
+                         batch_size=params['batch_size'],
+                         num_stack=params['num_stack'],
+                         num_skip=params['num_skip'],
+                         sort_utt=True)
     dev_data_step = Dataset(data_type='dev',
-                            label_type=param['label_type'],
-                            train_data_size=param['train_data_size'],
-                            batch_size=param['batch_size'],
-                            num_stack=param['num_stack'],
-                            num_skip=param['num_skip'],
-                            is_sorted=False)
+                            label_type=params['label_type'],
+                            train_data_size=params['train_data_size'],
+                            batch_size=params['batch_size'],
+                            num_stack=params['num_stack'],
+                            num_skip=params['num_skip'],
+                            sort_utt=False)
     dev_data_epoch = Dataset(data_type='dev',
-                             label_type=param['label_type'],
-                             train_data_size=param['train_data_size'],
-                             batch_size=param['batch_size'],
-                             num_stack=param['num_stack'],
-                             num_skip=param['num_skip'],
-                             is_sorted=False)
+                             label_type=params['label_type'],
+                             train_data_size=params['train_data_size'],
+                             batch_size=params['batch_size'],
+                             num_stack=params['num_stack'],
+                             num_skip=params['num_skip'],
+                             sort_utt=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -82,9 +82,10 @@ def do_train(network, param):
                                                network.keep_prob_hidden)
         train_op = network.train(
             loss_op,
-            optimizer=param['optimizer'],
-            learning_rate_init=float(param['learning_rate']),
-            is_scheduled=False)
+            optimizer=params['optimizer'],
+            learning_rate_init=float(params['learning_rate']),
+            decay_steps=params['decay_steps'],
+            decay_rate=params['decay_rate'])
         decode_op = network.decoder(logits,
                                     network.inputs_seq_len,
                                     decode_type='beam_search',
@@ -128,11 +129,11 @@ def do_train(network, param):
             mini_batch_dev = dev_data_step.next_batch()
 
             # Train model
-            iter_per_epoch = int(train_data.data_num / param['batch_size'])
-            train_step = train_data.data_num / param['batch_size']
+            iter_per_epoch = int(train_data.data_num / params['batch_size'])
+            train_step = train_data.data_num / params['batch_size']
             if (train_step) != int(train_step):
                 iter_per_epoch += 1
-            max_steps = iter_per_epoch * param['num_epoch']
+            max_steps = iter_per_epoch * params['num_epoch']
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
@@ -140,15 +141,14 @@ def do_train(network, param):
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                with tf.device('/cpu:0'):
-                    inputs, labels, inputs_seq_len, _ = mini_batch_train.__next__()
+                # with tf.device('/cpu:0'):
+                inputs, labels, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
                     network.labels: list2sparsetensor(labels, padded_value=-1),
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.lr: float(param['learning_rate'])
+                    network.keep_prob_hidden: network.dropout_ratio_hidden
                 }
 
                 # Update parameters
@@ -157,8 +157,8 @@ def do_train(network, param):
                 if (step + 1) % 200 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    with tf.device('/cpu:0'):
-                        inputs, labels, inputs_seq_len, _ = mini_batch_dev.__next__()
+                    # with tf.device('/cpu:0'):
+                    inputs, labels, inputs_seq_len, _ = mini_batch_dev.__next__()
                     feed_dict_dev = {
                         network.inputs: inputs,
                         network.labels: list2sparsetensor(labels,
@@ -214,29 +214,27 @@ def do_train(network, param):
 
                     if epoch >= 5:
                         start_time_eval = time.time()
+
                         print('=== Dev Evaluation ===')
                         cer_dev_epoch = do_eval_cer(
                             session=sess,
                             decode_op=decode_op,
                             network=network,
                             dataset=dev_data_epoch,
-                            label_type=param['label_type'],
-                            eval_batch_size=param['batch_size'])
-                        if param['label_type'] in ['kana', 'kanji']:
-                            print('  CER: %f %%' % (cer_dev_epoch * 100))
-                        else:
-                            print('  PER: %f %%' % (cer_dev_epoch * 100))
+                            label_type=params['label_type'],
+                            eval_batch_size=params['batch_size'])
+                        print('  CER: %f %%' % (cer_dev_epoch * 100))
 
-                            if cer_dev_epoch < error_best:
-                                error_best = cer_dev_epoch
-                                print('■■■ ↑Best Score↑ ■■■')
+                        if cer_dev_epoch < error_best:
+                            error_best = cer_dev_epoch
+                            print('■■■ ↑Best Score↑ ■■■')
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
                               (duration_eval / 60))
 
-                        start_time_epoch = time.time()
-                        start_time_step = time.time()
+                    start_time_epoch = time.time()
+                    start_time_step = time.time()
 
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
@@ -252,57 +250,58 @@ def do_train(network, param):
                 f.write('')
 
 
-def main(config_path):
+def main(config_path, model_save_path):
 
     # Load a config file (.yml)
     with open(config_path, "r") as f:
         config = yaml.load(f)
-        param = config['param']
+        params = config['param']
 
     # Except for a blank label
-    if param['label_type'] == 'kanji':
-        param['num_classes'] = 3386
-    elif param['label_type'] == 'kana':
-        param['num_classes'] = 147
-    elif param['label_type'] == 'phone':
-        param['num_classes'] = 38
+    if params['label_type'] == 'kanji':
+        params['num_classes'] = 3386
+    elif params['label_type'] == 'kana':
+        params['num_classes'] = 147
+    elif params['label_type'] == 'phone':
+        params['num_classes'] = 38
 
     # Model setting
-    CTCModel = load(model_type=param['model'])
-    network = CTCModel(batch_size=param['batch_size'],
-                       input_size=param['input_size'] * param['num_stack'],
-                       num_unit=param['num_unit'],
-                       num_layer=param['num_layer'],
-                       bottleneck_dim=param['bottleneck_dim'],
-                       num_classes=param['num_classes'],
-                       parameter_init=param['weight_init'],
-                       clip_grad=param['clip_grad'],
-                       clip_activation=param['clip_activation'],
-                       dropout_ratio_input=param['dropout_input'],
-                       dropout_ratio_hidden=param['dropout_hidden'],
-                       num_proj=param['num_proj'],
-                       weight_decay=param['weight_decay'])
+    CTCModel = load(model_type=params['model'])
+    network = CTCModel(batch_size=params['batch_size'],
+                       input_size=params['input_size'] * params['num_stack'],
+                       num_unit=params['num_unit'],
+                       num_layer=params['num_layer'],
+                       bottleneck_dim=params['bottleneck_dim'],
+                       num_classes=params['num_classes'],
+                       parameter_init=params['weight_init'],
+                       clip_grad=params['clip_grad'],
+                       clip_activation=params['clip_activation'],
+                       dropout_ratio_input=params['dropout_input'],
+                       dropout_ratio_hidden=params['dropout_hidden'],
+                       num_proj=params['num_proj'],
+                       weight_decay=params['weight_decay'])
 
-    network.model_name = param['model']
-    network.model_name += '_' + str(param['num_unit'])
-    network.model_name += '_' + str(param['num_layer'])
-    network.model_name += '_' + param['optimizer']
-    network.model_name += '_lr' + str(param['learning_rate'])
-    if param['bottleneck_dim'] != 0:
-        network.model_name += '_bottoleneck' + str(param['bottleneck_dim'])
-    if param['num_proj'] != 0:
-        network.model_name += '_proj' + str(param['num_proj'])
-    if param['num_stack'] != 1:
-        network.model_name += '_stack' + str(param['num_stack'])
-    if param['weight_decay'] != 0:
-        network.model_name += '_weightdecay' + str(param['weight_decay'])
-    if param['train_data_size'] == 'large':
+    network.model_name = params['model']
+    network.model_name += '_' + str(params['num_unit'])
+    network.model_name += '_' + str(params['num_layer'])
+    network.model_name += '_' + params['optimizer']
+    network.model_name += '_lr' + str(params['learning_rate'])
+    if params['bottleneck_dim'] != 0:
+        network.model_name += '_bottoleneck' + str(params['bottleneck_dim'])
+    if params['num_proj'] != 0:
+        network.model_name += '_proj' + str(params['num_proj'])
+    if params['num_stack'] != 1:
+        network.model_name += '_stack' + str(params['num_stack'])
+    if params['train_data_size'] == 'large':
         network.model_name += '_large'
+    if params['decay_rate'] != 1:
+        network.model_name += '_lrdecay' + \
+            str(params['decay_steps'] + params['decay_rate'])
 
     # Set save path
-    network.model_dir = mkdir('/n/sd8/inaguma/result/csj/')
+    network.model_dir = mkdir(model_save_path)
     network.model_dir = mkdir_join(network.model_dir, 'ctc')
-    network.model_dir = mkdir_join(network.model_dir, param['label_type'])
+    network.model_dir = mkdir_join(network.model_dir, params['label_type'])
     network.model_dir = mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
@@ -313,21 +312,20 @@ def main(config_path):
         raise ValueError('File exists.')
 
     # Set process name
-    setproctitle('csj_ctc_' + param['label_type'] +
-                 '_' + param['train_data_size'])
+    setproctitle('csj_ctc_' + params['label_type'] +
+                 '_' + params['train_data_size'])
 
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
     sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     print(network.model_name)
-    do_train(network=network, param=param)
-    sys.stdout = sys.__stdout__
+    do_train(network=network, params=params)
 
 
 if __name__ == '__main__':
 
     args = sys.argv
-    if len(args) != 2:
+    if len(args) != 3:
         raise ValueError
-    main(config_path=args[1])
+    main(config_path=args[1], model_save_path=args[2])

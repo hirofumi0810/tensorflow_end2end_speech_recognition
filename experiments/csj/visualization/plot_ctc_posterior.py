@@ -14,7 +14,7 @@ import yaml
 
 sys.path.append('../../../')
 from experiments.csj.data.load_dataset_ctc import Dataset
-from experiments.csj.visualization.util_plot_ctc import posterior_test
+from experiments.csj.visualization.core.plot.ctc import posterior_test
 from models.ctc.load_model import load
 
 
@@ -31,19 +31,19 @@ def do_plot(network, param, epoch=None):
                          train_data_size=param['train_data_size'],
                          num_stack=param['num_stack'],
                          num_skip=param['num_skip'],
-                         is_sorted=False, is_progressbar=True)
+                         is_sorted=False, is_progressbar=True, is_gpu=False)
     eval2_data = Dataset(data_type='eval2', label_type=param['label_type'],
                          batch_size=1,
                          train_data_size=param['train_data_size'],
                          num_stack=param['num_stack'],
                          num_skip=param['num_skip'],
-                         is_sorted=False, is_progressbar=True)
+                         is_sorted=False, is_progressbar=True, is_gpu=False)
     eval3_data = Dataset(data_type='eval3', label_type=param['label_type'],
                          batch_size=1,
                          train_data_size=param['train_data_size'],
                          num_stack=param['num_stack'],
                          num_skip=param['num_skip'],
-                         is_sorted=False, is_progressbar=True)
+                         is_sorted=False, is_progressbar=True, is_gpu=False)
 
     # Define placeholders
     network.inputs = tf.placeholder(

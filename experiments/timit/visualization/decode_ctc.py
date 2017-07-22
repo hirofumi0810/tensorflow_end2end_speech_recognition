@@ -14,23 +14,23 @@ import yaml
 
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_ctc import Dataset
-from experiments.timit.visualization.util_decode_ctc import decode_test
+from experiments.timit.visualization.core.decode.ctc import decode_test
 from models.ctc.load_model import load
 
 
-def do_decode(network, param, epoch=None):
+def do_decode(network, params, epoch=None):
     """Decode the CTC outputs.
     Args:
         network: model to restore
-        param: A dictionary of parameters
+        params: A dictionary of parameters
         epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test', label_type=param['label_type'],
+    test_data = Dataset(data_type='test', label_type=params['label_type'],
                         batch_size=1,
-                        num_stack=param['num_stack'],
-                        num_skip=param['num_skip'],
-                        is_sorted=False, is_progressbar=True)
+                        num_stack=params['num_stack'],
+                        num_skip=params['num_skip'],
+                        sort_utt=False, progressbar=True)
 
     # Define placeholders
     network.inputs = tf.placeholder(
@@ -83,7 +83,7 @@ def do_decode(network, param, epoch=None):
                     decode_op=decode_op,
                     network=network,
                     dataset=test_data,
-                    label_type=param['label_type'],
+                    label_type=params['label_type'],
                     save_path=network.model_dir)
 
 
@@ -92,37 +92,37 @@ def main(model_path, epoch):
     # Load config file
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
-        param = config['param']
+        params = config['param']
 
     # Except for a blank label
-    if param['label_type'] == 'phone61':
-        param['num_classes'] = 61
-    elif param['label_type'] == 'phone48':
-        param['num_classes'] = 48
-    elif param['label_type'] == 'phone39':
-        param['num_classes'] = 39
-    elif param['label_type'] == 'character':
-        param['num_classes'] = 33
+    if params['label_type'] == 'phone61':
+        params['num_classes'] = 61
+    elif params['label_type'] == 'phone48':
+        params['num_classes'] = 48
+    elif params['label_type'] == 'phone39':
+        params['num_classes'] = 39
+    elif params['label_type'] == 'character':
+        params['num_classes'] = 33
 
     # Model setting
-    CTCModel = load(model_type=param['model'])
+    CTCModel = load(model_type=params['model'])
     network = CTCModel(
         batch_size=1,
-        input_size=param['input_size'] * param['num_stack'],
-        num_unit=param['num_unit'],
-        num_layer=param['num_layer'],
-        num_classes=param['num_classes'],
-        parameter_init=param['weight_init'],
-        clip_grad=param['clip_grad'],
-        clip_activation=param['clip_activation'],
-        dropout_ratio_input=param['dropout_input'],
-        dropout_ratio_hidden=param['dropout_hidden'],
-        num_proj=param['num_proj'],
-        weight_decay=param['weight_decay'])
+        input_size=params['input_size'] * params['num_stack'],
+        num_unit=params['num_unit'],
+        num_layer=params['num_layer'],
+        num_classes=params['num_classes'],
+        parameter_init=params['weight_init'],
+        clip_grad=params['clip_grad'],
+        clip_activation=params['clip_activation'],
+        dropout_ratio_input=params['dropout_input'],
+        dropout_ratio_hidden=params['dropout_hidden'],
+        num_proj=params['num_proj'],
+        weight_decay=params['weight_decay'])
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_decode(network=network, param=param, epoch=epoch)
+    do_decode(network=network, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

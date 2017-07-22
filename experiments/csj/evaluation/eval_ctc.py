@@ -14,36 +14,36 @@ import yaml
 
 sys.path.append('../../../')
 from experiments.csj.data.load_dataset_ctc import Dataset
-from experiments.csj.metrics.ctc import do_eval_per, do_eval_cer
+from experiments.csj.metrics.ctc import do_eval_cer
 from models.ctc.load_model import load
 
 
-def do_eval(network, param, epoch=None):
+def do_eval(network, params, epoch=None):
     """Evaluate the model.
     Args:
         network: model to restore
-        param: A dictionary of parameters
+        params: A dictionary of parameters
         epoch: int, the epoch to restore
     """
     # Load dataset
-    eval1_data = Dataset(data_type='eval1', label_type=param['label_type'],
+    eval1_data = Dataset(data_type='eval1', label_type=params['label_type'],
                          batch_size=1,
-                         train_data_size=param['train_data_size'],
-                         num_stack=param['num_stack'],
-                         num_skip=param['num_skip'],
-                         is_sorted=False, is_progressbar=True)
-    eval2_data = Dataset(data_type='eval2', label_type=param['label_type'],
+                         train_data_size=params['train_data_size'],
+                         num_stack=params['num_stack'],
+                         num_skip=params['num_skip'],
+                         sort_utt=False, progressbar=True, is_gpu=False)
+    eval2_data = Dataset(data_type='eval2', label_type=params['label_type'],
                          batch_size=1,
-                         train_data_size=param['train_data_size'],
-                         num_stack=param['num_stack'],
-                         num_skip=param['num_skip'],
-                         is_sorted=False, is_progressbar=True)
-    eval3_data = Dataset(data_type='eval3', label_type=param['label_type'],
+                         train_data_size=params['train_data_size'],
+                         num_stack=params['num_stack'],
+                         num_skip=params['num_skip'],
+                         sort_utt=False, progressbar=True, is_gpu=False)
+    eval3_data = Dataset(data_type='eval3', label_type=params['label_type'],
                          batch_size=1,
-                         train_data_size=param['train_data_size'],
-                         num_stack=param['num_stack'],
-                         num_skip=param['num_skip'],
-                         is_sorted=False, is_progressbar=True)
+                         train_data_size=params['train_data_size'],
+                         num_stack=params['num_stack'],
+                         num_skip=params['num_skip'],
+                         sort_utt=False, progressbar=True, is_gpu=False)
 
     # Define placeholders
     network.inputs = tf.placeholder(
@@ -72,7 +72,6 @@ def do_eval(network, param, epoch=None):
                                 network.inputs_seq_len,
                                 decode_type='beam_search',
                                 beam_width=20)
-    per_op = network.compute_ler(decode_op, network.labels)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -92,81 +91,57 @@ def do_eval(network, param, epoch=None):
         else:
             raise ValueError('There are not any checkpoints.')
 
-        if param['label_type'] in ['kana', 'kanji']:
-            print('=== eval1 Evaluation ===')
-            cer_eval1 = do_eval_cer(
-                session=sess,
-                decode_op=decode_op,
-                network=network,
-                dataset=eval1_data,
-                label_type=param['label_type'],
-                is_test=True,
-                eval_batch_size=1,
-                is_progressbar=True)
+        print('=== eval1 Evaluation ===')
+        cer_eval1 = do_eval_cer(session=sess,
+                                decode_op=decode_op,
+                                network=network,
+                                dataset=eval1_data,
+                                label_type=params['label_type'],
+                                is_test=True,
+                                eval_batch_size=1,
+                                is_progressbar=True)
+        if params['label_type'] in ['kana', 'kanji']:
             print('  CER: %f %%' % (cer_eval1 * 100))
-
-            print('=== eval2 Evaluation ===')
-            cer_eval2 = do_eval_cer(
-                session=sess,
-                decode_op=decode_op,
-                network=network,
-                dataset=eval2_data,
-                label_type=param['label_type'],
-                is_test=True,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  CER: %f %%' % (cer_eval2 * 100))
-
-            print('=== eval3 Evaluation ===')
-            cer_eval3 = do_eval_cer(
-                session=sess,
-                decode_op=decode_op,
-                network=network,
-                dataset=eval3_data,
-                label_type=param['label_type'],
-                is_test=True,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  CER: %f %%' % (cer_eval3 * 100))
-
-            print('=== Mean ===')
-            cer_mean = (cer_eval1 + cer_eval2 + cer_eval3) / 3.
-            print('  CER: %f %%' % (cer_mean * 100))
-
         else:
-            print('=== eval1 Evaluation ===')
-            per_eval1 = do_eval_per(
-                session=sess,
-                per_op=per_op,
-                network=network,
-                dataset=eval1_data,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  PER: %f %%' % (per_eval1 * 100))
+            print('  PER: %f %%' % (cer_eval1 * 100))
 
-            print('=== eval2 Evaluation ===')
-            per_eval2 = do_eval_per(
-                session=sess,
-                per_op=per_op,
-                network=network,
-                dataset=eval2_data,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  PER: %f %%' % (per_eval2 * 100))
+        print('=== eval2 Evaluation ===')
+        cer_eval2 = do_eval_cer(session=sess,
+                                decode_op=decode_op,
+                                network=network,
+                                dataset=eval2_data,
+                                label_type=params['label_type'],
+                                is_test=True,
+                                eval_batch_size=1,
+                                is_progressbar=True)
+        if params['label_type'] in ['kana', 'kanji']:
+            print('  CER: %f %%' % (cer_eval2 * 100))
+        else:
+            print('  PER: %f %%' % (cer_eval2 * 100))
 
-            print('=== eval3 Evaluation ===')
-            per_eval3 = do_eval_per(
-                session=sess,
-                per_op=per_op,
-                network=network,
-                dataset=eval3_data,
-                eval_batch_size=1,
-                is_progressbar=True)
-            print('  PER: %f %%' % (per_eval3 * 100))
+        print('=== eval3 Evaluation ===')
+        cer_eval3 = do_eval_cer(session=sess,
+                                decode_op=decode_op,
+                                network=network,
+                                dataset=eval3_data,
+                                label_type=params['label_type'],
+                                is_test=True,
+                                eval_batch_size=1,
+                                is_progressbar=True)
+        if params['label_type'] in ['kana', 'kanji']:
+            print('  CER: %f %%' % (cer_eval3 * 100))
+        else:
+            print('  PER: %f %%' % (cer_eval3 * 100))
 
-            print('=== Mean ===')
-            per_mean = (per_eval1 + per_eval2 + per_eval3) / 3.
-            print('  PER: %f %%' % 1 (per_mean * 100))
+        print('=== Mean ===')
+        if params['train_data_size'] == 'default':
+            cer_mean = (cer_eval1 + cer_eval2) / 2.
+        else:
+            cer_mean = (cer_eval1 + cer_eval2 + cer_eval3) / 3.
+        if params['label_type'] in ['kana', 'kanji']:
+            print('  CER: %f %%' % (cer_mean * 100))
+        else:
+            print('  PER: %f %%' % (cer_mean * 100))
 
 
 def main(model_path, epoch):
@@ -174,36 +149,36 @@ def main(model_path, epoch):
     # Load config file (.yml)
     with open(os.path.join(model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
-        param = config['param']
+        params = config['param']
 
     # Except for a blank label
-    if param['label_type'] == 'phone':
-        param['num_classes'] = 38
-    elif param['label_type'] == 'kana':
-        param['num_classes'] = 147
-    elif param['label_type'] == 'kanji':
-        param['num_classes'] = 3386
+    if params['label_type'] == 'kanji':
+        params['num_classes'] = 3386
+    elif params['label_type'] == 'kana':
+        params['num_classes'] = 147
+    elif params['label_type'] == 'phone':
+        params['num_classes'] = 38
 
     # Modle setting
-    CTCModel = load(model_type=param['model'])
+    CTCModel = load(model_type=params['model'])
     network = CTCModel(
-        batch_size=param['batch_size'],
-        input_size=param['input_size'] * param['num_stack'],
-        num_unit=param['num_unit'],
-        num_layer=param['num_layer'],
-        bottleneck_dim=param['bottleneck_dim'],
-        num_classes=param['num_classes'],
-        parameter_init=param['weight_init'],
-        clip_grad=param['clip_grad'],
-        clip_activation=param['clip_activation'],
-        dropout_ratio_input=param['dropout_input'],
-        dropout_ratio_hidden=param['dropout_hidden'],
-        num_proj=param['num_proj'],
-        weight_decay=param['weight_decay'])
+        batch_size=params['batch_size'],
+        input_size=params['input_size'] * params['num_stack'],
+        num_unit=params['num_unit'],
+        num_layer=params['num_layer'],
+        bottleneck_dim=params['bottleneck_dim'],
+        num_classes=params['num_classes'],
+        parameter_init=params['weight_init'],
+        clip_grad=params['clip_grad'],
+        clip_activation=params['clip_activation'],
+        dropout_ratio_input=params['dropout_input'],
+        dropout_ratio_hidden=params['dropout_hidden'],
+        num_proj=params['num_proj'],
+        weight_decay=params['weight_decay'])
 
     network.model_dir = model_path
     print(network.model_dir)
-    do_eval(network=network, param=param, epoch=epoch)
+    do_eval(network=network, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

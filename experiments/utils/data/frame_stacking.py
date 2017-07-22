@@ -10,7 +10,8 @@ import numpy as np
 from experiments.utils.progressbar import wrap_iterator
 
 
-def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is_progressbar=False):
+def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
+                progressbar=False):
     """Stack & skip some frames. This implementation is based on
        https://arxiv.org/abs/1507.06947.
            Sak, Haşim, et al.
@@ -24,7 +25,7 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
             value => the number of frames
         num_stack: int, the number of frames to stack
         num_skip: int, the number of frames to skip
-        is_progressbar: if True, visualize progressbar
+        progressbar: if True, visualize progressbar
     Returns:
         stacked_input_list: list of frame-stacked inputs
     """
@@ -35,7 +36,7 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip, is
     utt_num = len(input_paths)
 
     stacked_input_list = []
-    for i_utt in wrap_iterator(range(utt_num), is_progressbar):
+    for i_utt in wrap_iterator(range(utt_num), progressbar):
         # Per utterance
         input_name = basename(input_paths[i_utt]).split('.')[0]
         frame_num = frame_num_dict[input_name]

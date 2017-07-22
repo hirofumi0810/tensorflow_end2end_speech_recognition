@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""""Utilities for decoding of the Attention model."""
+""""Utilities for decoding of the Attention model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -63,6 +63,5 @@ def decode_test(session, decode_op, network, dataset, label_type,
             print('----- wav: %s -----' % input_names[0])
             print('True: %s' % num2phone(
                 labels_true[0][1:-1], map_file_path))
-
             print('Pred: %s' % num2phone(
                 labels_pred[0], map_file_path).replace('>', ''))
