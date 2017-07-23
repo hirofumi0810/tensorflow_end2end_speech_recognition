@@ -25,4 +25,5 @@ param:
   clip_activation_decoder: 50
   dropout_input: 1.0
   dropout_hidden: 0.8
+  dropout_output: 1.0
   weight_decay: 1e-6

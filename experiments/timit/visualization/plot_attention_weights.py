@@ -48,6 +48,8 @@ def do_plot(network, param, s epoch=None):
                                              name='keep_prob_input')
     network.keep_prob_hidden = tf.placeholder(tf.float32,
                                               name='keep_prob_hidden')
+    network.keep_prob_output = tf.placeholder(tf.float32,
+                                              name='keep_prob_output')
 
     # Add to the graph each operation (including model definition)
     _, _, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
@@ -56,7 +58,8 @@ def do_plot(network, param, s epoch=None):
         network.inputs_seq_len,
         network.labels_seq_len,
         network.keep_prob_input,
-        network.keep_prob_hidden)
+        network.keep_prob_hidden,
+        network.keep_prob_output)
     _, decode_op_infer = network.decoder(
         decoder_outputs_train,
         decoder_outputs_infer,
@@ -142,6 +145,7 @@ def main(model_path, epoch):
         clip_activation_decoder=params['clip_activation_decoder'],
         dropout_ratio_input=params['dropout_input'],
         dropout_ratio_hidden=params['dropout_hidden'],
+        dropout_ratio_output=params['dropout_output'],
         weight_decay=params['weight_decay'])
 
     network.model_dir = model_path

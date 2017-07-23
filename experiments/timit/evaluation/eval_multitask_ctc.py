@@ -39,26 +39,33 @@ def do_eval(network, params, epoch=None):
         tf.float32,
         shape=[None, None, network.input_size],
         name='input')
-    indices_pl = tf.placeholder(tf.int64, name='indices')
-    values_pl = tf.placeholder(tf.int32, name='values')
-    shape_pl = tf.placeholder(tf.int64, name='shape')
-    network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
-    indices_sub_pl = tf.placeholder(tf.int64, name='indices_sub')
-    values_sub_pl = tf.placeholder(tf.int32, name='values_sub')
-    shape_sub_pl = tf.placeholder(tf.int64, name='shape_sub')
-    network.labels_sub = tf.SparseTensor(indices_sub_pl,
-                                         values_sub_pl,
-                                         shape_sub_pl)
+    network.labels = tf.SparseTensor(
+        tf.placeholder(tf.int64, name='indices'),
+        tf.placeholder(tf.int32, name='values'),
+        tf.placeholder(tf.int64, name='shape'))
+    network.labels_sub = tf.SparseTensor(
+        tf.placeholder(tf.int64, name='indices_sub'),
+        tf.placeholder(tf.int32, name='values_sub'),
+        tf.placeholder(tf.int64, name='shape_sub'))
     network.inputs_seq_len = tf.placeholder(tf.int64,
                                             shape=[None],
                                             name='inputs_seq_len')
+    network.keep_prob_input = tf.placeholder(tf.float32,
+                                             name='keep_prob_input')
+    network.keep_prob_hidden = tf.placeholder(tf.float32,
+                                              name='keep_prob_hidden')
+    network.keep_prob_output = tf.placeholder(tf.float32,
+                                              name='keep_prob_output')
 
     # Add to the graph each operation
     _, logits_main, logits_sub = network.compute_loss(
         network.inputs,
         network.labels,
         network.labels_sub,
-        network.inputs_seq_len)
+        network.inputs_seq_len,
+        network.keep_prob_input,
+        network.keep_prob_hidden,
+        network.keep_prob_output)
     decode_op_main, decode_op_sub = network.decoder(
         logits_main,
         logits_sub,
@@ -93,7 +100,7 @@ def do_eval(network, params, epoch=None):
             decode_op=decode_op_main,
             network=network,
             dataset=test_data,
-            is_progressbar=True,
+            progressbar=True,
             is_multitask=True)
         print('  CER: %f %%' % (cer_test * 100))
 
@@ -104,7 +111,7 @@ def do_eval(network, params, epoch=None):
             network=network,
             dataset=test_data,
             train_label_type=params['label_type_sub'],
-            is_progressbar=True,
+            progressbar=True,
             is_multitask=True)
         print('  PER: %f %%' % (per_test * 100))
 
@@ -140,6 +147,7 @@ def main(model_path, epoch):
         clip_activation=params['clip_activation'],
         dropout_ratio_input=params['dropout_input'],
         dropout_ratio_hidden=params['dropout_hidden'],
+        dropout_ratio_output=params['dropout_output'],
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 

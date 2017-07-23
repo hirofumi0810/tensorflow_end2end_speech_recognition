@@ -14,7 +14,7 @@ import pickle
 import numpy as np
 
 from experiments.utils.progressbar import wrap_iterator
-from experiments.utils.data.all_load.joint_ctc_attention_all_load import DatasetBase
+from experiments.utils.data.dataset_loader.all_load.joint_ctc_attention_all_load import DatasetBase
 
 
 class Dataset(DatasetBase):

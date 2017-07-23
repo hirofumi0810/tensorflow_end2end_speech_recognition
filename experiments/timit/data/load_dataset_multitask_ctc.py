@@ -14,9 +14,9 @@ from os.path import join
 import pickle
 import numpy as np
 
-from experiments.utils.data.frame_stack import stack_frame
 from experiments.utils.progressbar import wrap_iterator
-from experiments.utils.data.all_load.multitask_ctc_all_load import DatasetBase
+from experiments.utils.data.dataset_loader.all_load.multitask_ctc_all_load import DatasetBase
+from experiments.utils.data.frame_stack import stack_frame
 
 
 class Dataset(DatasetBase):

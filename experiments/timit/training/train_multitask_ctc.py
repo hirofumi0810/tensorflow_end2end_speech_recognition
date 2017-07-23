@@ -18,10 +18,12 @@ import shutil
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
 from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
+from experiments.utils.data.sparsetensor import list2sparsetensor
+from experiments.utils.training.learning_rate_controller.epoch import Controller
+
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.csv import save_loss, save_ler
-from experiments.utils.sparsetensor import list2sparsetensor
 from models.ctc.load_model_multitask import load
 
 
@@ -64,16 +66,14 @@ def do_train(network, params):
             tf.float32,
             shape=[None, None, network.input_size],
             name='input')
-        indices_pl = tf.placeholder(tf.int64, name='indices')
-        values_pl = tf.placeholder(tf.int32, name='values')
-        shape_pl = tf.placeholder(tf.int64, name='shape')
-        network.labels = tf.SparseTensor(indices_pl, values_pl, shape_pl)
-        indices_sub_pl = tf.placeholder(tf.int64, name='indices_sub')
-        values_sub_pl = tf.placeholder(tf.int32, name='values_sub')
-        shape_sub_pl = tf.placeholder(tf.int64, name='shape_sub')
-        network.labels_sub = tf.SparseTensor(indices_sub_pl,
-                                             values_sub_pl,
-                                             shape_sub_pl)
+        network.labels = tf.SparseTensor(
+            tf.placeholder(tf.int64, name='indices'),
+            tf.placeholder(tf.int32, name='values'),
+            tf.placeholder(tf.int64, name='shape'))
+        network.labels_sub = tf.SparseTensor(
+            tf.placeholder(tf.int64, name='indices_sub'),
+            tf.placeholder(tf.int32, name='values_sub'),
+            tf.placeholder(tf.int64, name='shape_sub'))
         network.inputs_seq_len = tf.placeholder(tf.int64,
                                                 shape=[None],
                                                 name='inputs_seq_len')
@@ -81,6 +81,10 @@ def do_train(network, params):
                                                  name='keep_prob_input')
         network.keep_prob_hidden = tf.placeholder(tf.float32,
                                                   name='keep_prob_hidden')
+        network.keep_prob_output = tf.placeholder(tf.float32,
+                                                  name='keep_prob_output')
+        learning_rate_pl = tf.placeholder(tf.float32,
+                                          name='learning_rate')
 
         # Add to the graph each operation
         loss_op, logits_main, logits_sub = network.compute_loss(
@@ -89,13 +93,11 @@ def do_train(network, params):
             network.labels_sub,
             network.inputs_seq_len,
             network.keep_prob_input,
-            network.keep_prob_hidden)
-        train_op = network.train(
-            loss_op,
-            optimizer=params['optimizer'],
-            learning_rate_init=float(params['learning_rate']),
-            decay_steps=params['decay_steps'],
-            decay_rate=params['decay_rate'])
+            network.keep_prob_hidden,
+            network.keep_prob_output)
+        train_op = network.train(loss_op,
+                                 optimizer=params['optimizer'],
+                                 learning_rate=learning_rate_pl)
         decode_op_main, decode_op_sub = network.decoder(
             logits_main,
             logits_sub,
@@ -105,6 +107,12 @@ def do_train(network, params):
         ler_op_main, ler_op_sub = network.compute_ler(
             decode_op_main, decode_op_sub,
             network.labels, network.labels_sub)
+
+        # Define learning rate controller
+        lr_controller = Controller(learning_rate_init=params['learning_rate'],
+                                   decay_start_epoch=20,
+                                   decay_rate=0.98,
+                                   lower_better=True)
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -153,11 +161,11 @@ def do_train(network, params):
             start_time_epoch = time.time()
             start_time_step = time.time()
             cer_dev_best = 1
+            learning_rate = float(params['learning_rate'])
             for step in range(max_steps):
 
                 # Create feed dictionary for next mini batch (train)
-                with tf.device('/cpu:0'):
-                    inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_train.__next__()
+                inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
                     network.inputs: inputs,
                     network.labels: list2sparsetensor(labels_char,
@@ -166,7 +174,9 @@ def do_train(network, params):
                                                           padded_value=-1),
                     network.inputs_seq_len: inputs_seq_len,
                     network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden
+                    network.keep_prob_hidden: network.dropout_ratio_hidden,
+                    network.keep_prob_output: network.dropout_ratio_output,
+                    learning_rate_pl: learning_rate
                 }
 
                 # Update parameters
@@ -175,8 +185,7 @@ def do_train(network, params):
                 if (step + 1) % 10 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    with tf.device('/cpu:0'):
-                        inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_dev.__next__()
+                    inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_dev.__next__()
                     feed_dict_dev = {
                         network.inputs: inputs,
                         network.labels:  list2sparsetensor(labels_char,
@@ -184,8 +193,9 @@ def do_train(network, params):
                         network.labels_sub: list2sparsetensor(labels_phone,
                                                               padded_value=-1),
                         network.inputs_seq_len: inputs_seq_len,
-                        network.keep_prob_input: network.dropout_ratio_input,
-                        network.keep_prob_hidden: network.dropout_ratio_hidden
+                        network.keep_prob_input: 1.0,
+                        network.keep_prob_hidden: 1.0,
+                        network.keep_prob_output: 1.0
                     }
 
                     # Compute loss
@@ -198,8 +208,6 @@ def do_train(network, params):
                     # Change to evaluation mode
                     feed_dict_train[network.keep_prob_input] = 1.0
                     feed_dict_train[network.keep_prob_hidden] = 1.0
-                    feed_dict_dev[network.keep_prob_input] = 1.0
-                    feed_dict_dev[network.keep_prob_hidden] = 1.0
 
                     # Compute accuracy & update event file
                     cer_train, per_train, summary_str_train = sess.run(
@@ -217,9 +225,9 @@ def do_train(network, params):
                     summary_writer.flush()
 
                     duration_step = time.time() - start_time_step
-                    print("Step % d: loss = %.3f (%.3f) / cer = %.4f (%.4f) / per = % .4f (%.4f) (%.3f min)" %
+                    print("Step % d: loss = %.3f (%.3f) / cer = %.4f (%.4f) / per = % .4f (%.4f) / lr = %.5f (%.3f min)" %
                           (step + 1, loss_train, loss_dev, cer_train, cer_dev,
-                           per_train, per_dev, duration_step / 60))
+                           per_train, per_dev, learning_rate, duration_step / 60))
                     sys.stdout.flush()
                     start_time_step = time.time()
 
@@ -236,7 +244,7 @@ def do_train(network, params):
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
 
-                    if epoch >= 10:
+                    if epoch >= 20:
                         start_time_eval = time.time()
                         print('=== Dev Data Evaluation ===')
                         cer_dev_epoch = do_eval_cer(
@@ -286,8 +294,14 @@ def do_train(network, params):
                         print('Evaluation time: %.3f min' %
                               (duration_eval / 60))
 
-                        start_time_epoch = time.time()
-                        start_time_step = time.time()
+                        # Update learning rate
+                        learning_rate = lr_controller.decay_lr(
+                            learning_rate=learning_rate,
+                            epoch=epoch,
+                            value=cer_dev_epoch)
+
+                start_time_epoch = time.time()
+                start_time_step = time.time()
 
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
@@ -334,6 +348,7 @@ def main(config_path, model_save_path):
                        clip_activation=params['clip_activation'],
                        dropout_ratio_input=params['dropout_input'],
                        dropout_ratio_hidden=params['dropout_hidden'],
+                       dropout_ratio_output=params['dropout_output'],
                        num_proj=params['num_proj'],
                        weight_decay=params['weight_decay'])
 
@@ -349,6 +364,8 @@ def main(config_path, model_save_path):
         network.model_name += '_dropi' + str(params['dropout_input'])
     if params['dropout_hidden'] != 1:
         network.model_name += '_droph' + str(params['dropout_hidden'])
+    if params['dropout_output'] != 1:
+        network.model_name += '_dropo' + str(params['dropout_output'])
     if params['num_stack'] != 1:
         network.model_name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:

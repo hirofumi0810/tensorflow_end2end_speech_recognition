@@ -10,7 +10,7 @@ param:
   attention_type: hybrid
   decoder_num_unit: 256
   decoder_num_layer: 1
-  embedding_dim: 30
+  embedding_dim: 32
   max_decode_length: 50
   attention_smoothing: False
   attention_weights_tempareture: 0.5
@@ -25,4 +25,6 @@ param:
   clip_activation_decoder: 50
   dropout_input: 1.0
   dropout_hidden: 0.8
+  dropout_output: 1.0
   weight_decay: 1e-6
+  beam_width: 20

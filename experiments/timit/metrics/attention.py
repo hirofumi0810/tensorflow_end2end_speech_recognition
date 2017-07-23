@@ -9,20 +9,17 @@ from __future__ import print_function
 
 import re
 import Levenshtein
-import numpy as np
 
 from experiments.timit.metrics.mapping import map_to_39phone
 from experiments.timit.metrics.edit_distance import compute_edit_distance
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone, phone2num
-from experiments.utils.sparsetensor import list2sparsetensor
-from experiments.utils.exception_func import exception
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone, phone2num
+from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.progressbar import wrap_iterator
 
 
-@exception
 def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
-                eos_index, eval_batch_size=None, is_progressbar=False,
+                eos_index, eval_batch_size=None, progressbar=False,
                 is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
     Args:
@@ -34,7 +31,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         label_type: string, phone39 or phone48 or phone61
         eos_index: int, the index of <EOS> class
         eval_batch_size: int, the batch size when evaluating the model
-        is_progressbar: if True, visualize the progressbar
+        progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
     Returns:
         per_mean: An average of PER
@@ -62,7 +59,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         train_label_type + '_to_num.txt'
     phone2num_39_map_file_path = '../metrics/mapping_files/ctc/phone39_to_num.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
-    for step in wrap_iterator(range(iteration), is_progressbar):
+    for step in wrap_iterator(range(iteration), progressbar):
         # Create feed dictionary for next mini-batch
         if not is_multitask:
             inputs, labels_true, inputs_seq_len, _, _ = mini_batch.__next__()
@@ -73,13 +70,14 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
             network.inputs: inputs,
             network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.keep_prob_hidden: 1.0,
+            network.keep_prob_output: 1.0
         }
 
         batch_size_each = len(inputs_seq_len)
 
         # Evaluate by 39 phones
-        predicted_ids = session.run(decode_op, feed_dict=feed_dict)
+        labels_pred = session.run(decode_op, feed_dict=feed_dict)
 
         labels_pred_mapped, labels_true_mapped = [], []
         for i_batch in range(batch_size_each):
@@ -88,7 +86,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
             ###############
             # Convert from num to phone (-> list of phone strings)
             phone_pred_list = num2phone(
-                predicted_ids[i_batch],
+                labels_pred[i_batch],
                 train_phone2num_map_file_path).split(' ')
 
             # Mapping to 39 phones (-> list of phone strings)
@@ -134,9 +132,8 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     return per_mean
 
 
-@exception
 def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
-                is_progressbar=False, is_multitask=False):
+                progressbar=False, is_multitask=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
@@ -144,7 +141,7 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
         network: network to evaluate
         dataset: An instance of a `Dataset` class
         eval_batch_size: int, batch size when evaluating the model
-        is_progressbar: if True, visualize the progressbar
+        progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
     Return:
         cer_mean: An average of CER
@@ -154,17 +151,17 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
     else:
         batch_size = dataset.batch_size
 
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=batch_size)
-
     num_examples = dataset.data_num
     iteration = int(num_examples / batch_size)
     if (num_examples / batch_size) != int(num_examples / batch_size):
         iteration += 1
     cer_sum = 0
 
+    # Make data generator
+    mini_batch = dataset.next_batch(batch_size=batch_size)
+
     map_file_path = '../metrics/mapping_files/ctc/character_to_num.txt'
-    for step in wrap_iterator(range(iteration), is_progressbar):
+    for step in wrap_iterator(range(iteration), progressbar):
         # Create feed dictionary for next mini-batch
         if not is_multitask:
             inputs, labels_true, inputs_seq_len, _, _ = mini_batch.__next__()
@@ -175,21 +172,23 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
             network.inputs: inputs,
             network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.keep_prob_hidden: 1.0,
+            network.keep_prob_output: 1.0
         }
 
         batch_size_each = len(inputs_seq_len)
 
-        predicted_ids = session.run(decode_op, feed_dict=feed_dict)
+        labels_pred = session.run(decode_op, feed_dict=feed_dict)
+
         for i_batch in range(batch_size_each):
 
             # Convert from list to string
             str_true = num2char(labels_true[i_batch], map_file_path)
-            str_pred = num2char(predicted_ids[i_batch], map_file_path)
+            str_pred = num2char(labels_pred[i_batch], map_file_path)
 
             # Remove silence(_) labels
-            str_true = re.sub(r'[_<>,.\'-?!]+', "", str_true)
-            str_pred = re.sub(r'[_<>,.\'-?!]+', "", str_pred)
+            str_true = re.sub(r'[<>_\'\":;!?,.-]+', "", str_true)
+            str_pred = re.sub(r'[<>_\'\":;!?,.-]+', "", str_pred)
 
             # Compute edit distance
             cer_each = Levenshtein.distance(

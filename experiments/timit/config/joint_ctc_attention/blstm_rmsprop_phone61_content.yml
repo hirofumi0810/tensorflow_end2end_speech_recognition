@@ -24,6 +24,7 @@ param:
   clip_grad: 5.0
   clip_activation_encoder: 50
   clip_activation_decoder: 50
-  dropout_input: 1.0
-  dropout_hidden: 0.8
+  dropout_input: 0.8
+  dropout_hidden: 0.5
+  dropout_output: 1.0
   weight_decay: 1e-6

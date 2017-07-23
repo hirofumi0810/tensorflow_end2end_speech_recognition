@@ -1,7 +1,7 @@
 param:
   model: blstm_attention
   corpus: timit
-  label_type: phone61
+  label_type: character
   feature: fbank
   input_size: 123
   encoder_num_unit: 256
@@ -10,13 +10,13 @@ param:
   attention_type: hybrid
   decoder_num_unit: 256
   decoder_num_layer: 1
-  embedding_dim: 32
+  embedding_dim: 16
   max_decode_length: 50
-  attention_smoothing: True
+  attention_smoothing: False
   attention_weights_tempareture: 0.5
   logits_tempareture: 1.0
   batch_size: 64
-  optimizer: rmsprop
+  optimizer: adam
   learning_rate: 1e-3
   num_epoch: 50
   weight_init: 0.1
