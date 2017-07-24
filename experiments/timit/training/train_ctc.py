@@ -150,7 +150,7 @@ def do_train(network, params):
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
-            error_best = 1
+            ler_dev_best = 1
             learning_rate = float(params['learning_rate'])
             for step in range(max_steps):
 
@@ -239,8 +239,8 @@ def do_train(network, params):
                                 eval_batch_size=1)
                             print('  CER: %f %%' % (ler_dev_epoch * 100))
 
-                            if ler_dev_epoch < error_best:
-                                error_best = ler_dev_epoch
+                            if ler_dev_epoch < ler_dev_best:
+                                ler_dev_best = ler_dev_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
                                 print('=== Test Data Evaluation ===')
@@ -265,8 +265,8 @@ def do_train(network, params):
                                 eval_batch_size=1)
                             print('  PER: %f %%' % (ler_dev_epoch * 100))
 
-                            if ler_dev_epoch < error_best:
-                                error_best = ler_dev_epoch
+                            if ler_dev_epoch < ler_dev_best:
+                                ler_dev_best = ler_dev_epoch
                                 print('■■■ ↑Best Score (PER)↑ ■■■')
 
                                 print('=== Test Data Evaluation ===')
@@ -324,7 +324,7 @@ def main(config_path, model_save_path):
     elif params['label_type'] == 'character':
         params['num_classes'] = 28
     elif params['label_type'] == 'character_capital_divide':
-        params['num_classes'] = 72
+        params['num_classes'] = 71
 
     # Model setting
     CTCModel = load(model_type=params['model'])

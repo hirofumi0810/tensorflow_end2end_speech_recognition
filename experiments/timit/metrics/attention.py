@@ -132,14 +132,15 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     return per_mean
 
 
-def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
-                progressbar=False, is_multitask=False):
+def do_eval_cer(session, decode_op, network, dataset, label_type,
+                eval_batch_size=None, progressbar=False, is_multitask=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of a `Dataset` class
+        label_type: string, character or character_capital_divide
         eval_batch_size: int, batch size when evaluating the model
         progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
@@ -160,7 +161,10 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
     # Make data generator
     mini_batch = dataset.next_batch(batch_size=batch_size)
 
-    map_file_path = '../metrics/mapping_files/attention/character_to_num.txt'
+    if label_type == 'character':
+        map_file_path = '../metrics/mapping_files/attention/character_to_num.txt'
+    else:
+        map_file_path = '../metrics/mapping_files/attention/character_to_num_capital.txt'
     for step in wrap_iterator(range(iteration), progressbar):
         # Create feed dictionary for next mini-batch
         if not is_multitask:
@@ -189,6 +193,11 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
             # Remove silence(_) labels
             str_true = re.sub(r'[<>_\'\":;!?,.-]+', "", str_true)
             str_pred = re.sub(r'[<>_\'\":;!?,.-]+', "", str_pred)
+
+            # Convert to lower case
+            if label_type == 'character_capital_divide':
+                str_true = str_true.lower()
+                str_pred = str_pred.lower()
 
             # Compute edit distance
             cer_each = Levenshtein.distance(

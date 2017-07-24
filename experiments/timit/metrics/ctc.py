@@ -141,7 +141,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type: string, character or character_capital_devide
+        label_type: string, character or character_capital_divide
         eval_batch_size: int, the batch size when evaluating the model
         progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
@@ -195,6 +195,11 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
             # Remove silence(_) labels
             str_true = re.sub(r'[_\'\":;!?,.-]+', "", str_true)
             str_pred = re.sub(r'[_\'\":;!?,.-]+', "", str_pred)
+
+            # Convert to lower case
+            if label_type == 'character_capital_divide':
+                str_true = str_true.lower()
+                str_pred = str_pred.lower()
 
             # Compute edit distance
             cer_each = Levenshtein.distance(

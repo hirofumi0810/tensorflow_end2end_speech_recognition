@@ -105,6 +105,7 @@ def do_eval(network, params, epoch=None):
                 decode_op=decode_op_infer,
                 network=network,
                 dataset=test_data,
+                label_type=params['label_type'],
                 progressbar=True)
             print('  CER: %f %%' % (cer_test * 100))
         else:
@@ -138,7 +139,7 @@ def main(model_path, epoch):
     elif params['label_type'] == 'character':
         params['num_classes'] = 30
     elif params['label_type'] == 'character_capital_divide':
-        params['num_classes'] = 74
+        params['num_classes'] = 73
 
     # Model setting
     # AttentionModel = load(model_type=params['model'])
