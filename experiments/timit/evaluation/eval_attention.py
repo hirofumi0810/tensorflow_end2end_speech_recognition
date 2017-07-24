@@ -127,22 +127,16 @@ def main(model_path, epoch):
         config = yaml.load(f)
         params = config['param']
 
+    params['sos_index'] = 0
+    params['eos_index'] = 1
     if params['label_type'] == 'phone61':
         params['num_classes'] = 63
-        params['sos_index'] = 0
-        params['eos_index'] = 1
     elif params['label_type'] == 'phone48':
         params['num_classes'] = 50
-        params['sos_index'] = 0
-        params['eos_index'] = 1
     elif params['label_type'] == 'phone39':
         params['num_classes'] = 41
-        params['sos_index'] = 0
-        params['eos_index'] = 1
     elif params['label_type'] == 'character':
         params['num_classes'] = 35
-        params['sos_index'] = 1
-        params['eos_index'] = 2
 
     # Model setting
     # AttentionModel = load(model_type=params['model'])

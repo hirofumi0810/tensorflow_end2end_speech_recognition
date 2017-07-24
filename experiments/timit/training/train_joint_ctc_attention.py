@@ -357,26 +357,20 @@ def main(config_path, model_save_path):
         config = yaml.load(f)
         params = config['param']
 
+    params['sos_index'] = 0
+    params['eos_index'] = 1
     if params['label_type'] == 'phone61':
         params['att_num_classes'] = 63
         params['ctc_num_classes'] = 61
-        params['sos_index'] = 0
-        params['eos_index'] = 1
     elif params['label_type'] == 'phone48':
         params['att_num_classes'] = 50
         params['ctc_num_classes'] = 48
-        params['sos_index'] = 0
-        params['eos_index'] = 1
     elif params['label_type'] == 'phone39':
         params['att_num_classes'] = 41
         params['ctc_num_classes'] = 39
-        params['sos_index'] = 0
-        params['eos_index'] = 1
     elif params['label_type'] == 'character':
         params['att_num_classes'] = 35
         params['ctc_num_classes'] = 33
-        params['sos_index'] = 1
-        params['eos_index'] = 2
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
