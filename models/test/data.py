@@ -9,6 +9,7 @@ import numpy as np
 import scipy.io.wavfile
 from python_speech_features import mfcc, fbank, logfbank, hz2mel
 from experiments.utils.sparsetensor import list2sparsetensor
+from experiments.utils.labels.phone import num2phone, phone2num
 
 
 def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):
@@ -121,6 +122,9 @@ def generate_data(label_type, model, batch_size=1):
     #                            feature_type='mfcc',
     #                            batch_size=batch_size)
 
+    ctc_phone_map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
+    att_phone_map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone61_to_num.txt'
+
     if model == 'ctc':
         if label_type == 'character':
             transcript = read_text('./sample/LDC93S1.txt')
@@ -133,7 +137,8 @@ def generate_data(label_type, model, batch_size=1):
 
         elif label_type == 'phone':
             transcript = read_phone('./sample/LDC93S1.phn')
-            labels = [phone2num(transcript)] * batch_size
+            labels = [
+                phone2num(transcript.split(' '), ctc_phone_map_file_path)] * batch_size
 
             # Convert to SparseTensor
             labels = list2sparsetensor(labels, padded_value=-1)
@@ -144,7 +149,8 @@ def generate_data(label_type, model, batch_size=1):
             transcript_phone = read_phone('./sample/LDC93S1.phn')
             transcript_char = ' ' + transcript_char.replace('.', '') + ' '
             labels_char = [alpha2num(transcript_char)] * batch_size
-            labels_phone = [phone2num(transcript_phone)] * batch_size
+            labels_phone = [
+                phone2num(transcript_phone.split(' '), ctc_phone_map_file_path)] * batch_size
 
             # Convert to SparseTensor
             labels_char = list2sparsetensor(labels_char, padded_value=-1)
@@ -162,7 +168,8 @@ def generate_data(label_type, model, batch_size=1):
         elif label_type == 'phone':
             transcript = read_phone('./sample/LDC93S1.phn')
             transcript = '< ' + transcript + ' >'
-            labels = [phone2num(transcript)] * batch_size
+            labels = [phone2num(transcript.split(
+                ' '), att_phone_map_file_path)] * batch_size
             labels_seq_len = [len(labels[0])] * batch_size
             return inputs, labels, inputs_seq_len, labels_seq_len
 
@@ -172,7 +179,8 @@ def generate_data(label_type, model, batch_size=1):
             transcript_char = '<' + transcript_char.replace('.', '') + '>'
             transcript_phone = '< ' + transcript_phone + ' >'
             labels_char = [alpha2num(transcript_char)] * batch_size
-            labels_phone = [phone2num(transcript_phone)] * batch_size
+            labels_phone = [
+                phone2num(transcript_phone.split(' '), att_phone_map_file_path)] * batch_size
             target_len_char = [len(labels_char[0])] * batch_size
             target_len_phone = [len(labels_phone[0])] * batch_size
             return (inputs, labels_char, labels_phone,
@@ -194,64 +202,16 @@ def generate_data(label_type, model, batch_size=1):
         elif label_type == 'phone':
             transcript = read_phone('./sample/LDC93S1.phn')
             att_transcript = '< ' + transcript + ' >'
-            att_labels = [phone2num(att_transcript)] * batch_size
+            att_labels = [
+                phone2num(att_transcript.split(' '), att_phone_map_file_path)] * batch_size
             labels_seq_len = [len(att_labels[0])] * batch_size
-            ctc_labels = [phone2num(transcript)] * batch_size
+            ctc_labels = [
+                phone2num(transcript.split(' '), ctc_phone_map_file_path)] * batch_size
 
             # Convert to SparseTensor
             ctc_labels = list2sparsetensor(ctc_labels, padded_value=-1)
 
             return inputs, att_labels, inputs_seq_len, labels_seq_len, ctc_labels
-
-
-def phone2num(transcript):
-    """Convert from phone to number.
-    Args:
-        transcript: sequence of phones (string)
-    Returns:
-        index_list: list of indices of phone (int)
-    """
-    phone_list = transcript.split(' ')
-
-    # Read mapping file from phone to number
-    phone_dict = {}
-    with open('../../experiments/timit/metrics/mapping_files/ctc/phone2num_61.txt') as f:
-        for line in f:
-            line = line.strip().split()
-            phone_dict[line[0]] = int(line[1])
-        phone_dict['<'] = 61
-        phone_dict['>'] = 62
-
-    # Convert from phone to the corresponding number
-    index_list = []
-    for i in range(len(phone_list)):
-        if phone_list[i] in phone_dict.keys():
-            index_list.append(phone_dict[phone_list[i]])
-    return index_list
-
-
-def num2phone(index_list):
-    """Convert from number to phone.
-    Args:
-        index_list: list of indices of phone (int)
-    Returns:
-        transcript: sequence of phones (string)
-    """
-    # Read a phone mapping file
-    phone_dict = {}
-    with open('../../experiments/timit/metrics/mapping_files/ctc/phone2num_61.txt') as f:
-        for line in f:
-            line = line.strip().split()
-            phone_dict[int(line[1])] = line[0]
-        phone_dict[61] = '<'
-        phone_dict[62] = '>'
-
-    # Convert from num to the corresponding phone
-    phone_list = []
-    for i in range(len(index_list)):
-        phone_list.append(phone_dict[index_list[i]])
-    transcript = ' '.join(phone_list)
-    return transcript
 
 
 def alpha2num(transcript):

@@ -45,9 +45,9 @@ class PyramidalBLSTMEncoder(EncoderBase):
             inputs: A tensor of `[batch_size, time, input_dim]`
             inputs_seq_len: A tensor of `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
-                input-hidden layers
+                the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
-                hidden-hidden layers
+                the hidden-hidden layers
         Returns:
             EncoderOutput: A namedtuple of
                 `(outputs, final_state,

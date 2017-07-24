@@ -9,7 +9,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 from models.attention.decoders.beam_search.util import choose_top_k
-from models.attention.decoders.beam_search.namedtuple import BeamSearchConfig
 from models.attention.decoders.beam_search.beam_search_decoder import BeamSearchDecoder
 
 
@@ -58,31 +57,30 @@ class AttentionBase(object):
         # TODO: Consider shape of target_embedding
 
     def _beam_search_decoder_wrapper(self, decoder, beam_width=None,
-                                     length_penalty_weight=0.0):
+                                     length_penalty_weight=0.6):
         """Wraps a decoder into a Beam Search decoder.
         Args:
-            decoder: An instance of RNNDecoder class
+            decoder: An instance of `RNNDecoder` class
             beam_width: int, the number of beams to use
-            length_penalty_weight: Weight for the length penalty factor. 0.0
-                disables the penalty.
-            choose_successors_fn: A function used to choose beam successors
-                based on their scores.
-                Maps from (scores, config) => (chosen scores, chosen_ids)
+            length_penalty_weight: A float value, weight for the length penalty
+                factor. 0.0 disables the penalty.
         Returns:
-            A BeamSearchDecoder with the same interfaces as the decoder.
+            A callable BeamSearchDecoder with the same interfaces as the
+                attention decoder
         """
-        if beam_width is None or beam_width == 1:
+        if beam_width is None or beam_width <= 1:
             # Greedy decoding
+            self.use_beam_search = False
             return decoder
 
-        config = BeamSearchConfig(
+        self.use_beam_search = True
+        return BeamSearchDecoder(
+            decoder=decoder,
             beam_width=beam_width,
             vocab_size=self.num_classes,
-            eos_token=self.eos_index,
+            eos_index=self.eos_index,
             length_penalty_weight=length_penalty_weight,
             choose_successors_fn=choose_top_k)
-
-        return BeamSearchDecoder(decoder=decoder, config=config)
 
     def _decode_train(self, decoder, bridge, encoder_outputs, labels,
                       labels_seq_len):
@@ -142,9 +140,9 @@ class AttentionBase(object):
         """
         batch_size = tf.shape(encoder_outputs.outputs)[0]
 
-        # if self.use_beam_search:
-        #     batch_size = self.beam_width
-        # TODO: why?
+        if self.use_beam_search:
+            batch_size = self.beam_width
+        # TODO: make this batch version
 
         target_embedding = self._generate_target_embedding(reuse=True)
 
@@ -158,7 +156,6 @@ class AttentionBase(object):
         # Output tensor has shape [2, 3].
         # tf.fill([2, 3], 9) ==> [[9, 9, 9]
         #                         [9, 9, 9]]
-        # TODO: beam_search_decoder
 
         decoder_initial_state = bridge(reuse=True)
 
@@ -172,7 +169,8 @@ class AttentionBase(object):
         return (decoder_outputs, final_state)
 
     def compute_loss(self, inputs, labels, inputs_seq_len, labels_seq_len,
-                     keep_prob_input, keep_prob_hidden, num_gpu=1, scope=None):
+                     keep_prob_input, keep_prob_hidden, keep_prob_output,
+                     num_gpu=1, scope=None):
         """Operation for computing cross entropy sequence loss.
         Args:
             inputs: A tensor of `[batch_size, time, input_size]`
@@ -180,9 +178,11 @@ class AttentionBase(object):
             inputs_seq_len: A tensor of `[batch_size]`
             labels_seq_len: A tensor of `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
-                input-hidden layers
+                the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
-                hidden-hidden layers
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
             num_gpu: int, the number of GPUs
         Returns:
             loss: operation for computing total loss (cross entropy sequence
@@ -194,10 +194,10 @@ class AttentionBase(object):
         # Build model graph
         logits, decoder_outputs_train, decoder_outputs_infer = self._build(
             inputs, labels, inputs_seq_len, labels_seq_len,
-            keep_prob_input, keep_prob_hidden)
+            keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         # For prevent 0 * log(0) in crossentropy loss
-        epsilon = tf.constant(value=1e-10)  # shope??
+        epsilon = tf.constant(value=1e-10)
         logits = logits + epsilon
 
         # Weight decay
@@ -219,12 +219,9 @@ class AttentionBase(object):
                 targets=labels[:, 1:],
                 weights=loss_mask,
                 average_across_timesteps=True,
-                average_across_batch=False,
+                average_across_batch=True,
                 softmax_loss_function=None)
 
-            # Calculate the average log perplexity
-            # self.loss = tf.reduce_sum(losses) / tf.to_float(
-            #     tf.reduce_sum(self.labels_seq_len - 1))
             sequence_loss = tf.reduce_sum(sequence_losses,
                                           name='sequence_loss_mean')
             tf.add_to_collection('losses', sequence_loss)
@@ -241,13 +238,13 @@ class AttentionBase(object):
 
         return loss, logits, decoder_outputs_train, decoder_outputs_infer
 
-    def train(self, loss, optimizer, learning_rate_init=None,
-              clip_grad_by_norm=False, is_scheduled=False):
+    def train(self, loss, optimizer, learning_rate=None,
+              clip_grad_by_norm=False):
         """Operation for training.
         Args:
             loss: An operation for computing loss
             optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
-            learning_rate_init: initial learning rate
+            learning_rate: A float value, a learning rate
             clip_grad_by_norm: if True, clip gradients by norm of the
                 value of self.clip_grad
             is_scheduled: if True, schedule learning rate at each epoch
@@ -259,28 +256,21 @@ class AttentionBase(object):
             raise ValueError(
                 "Optimizer's name should be one of [%s], you provided %s." %
                 (", ".join(OPTIMIZER_CLS_NAMES), optimizer))
-        if learning_rate_init < 0.0:
-            raise ValueError("Invalid learning_rate %s.", learning_rate_init)
-
-        self.lr = tf.placeholder(tf.float32, name='learning_rate')
-
-        # Select optimizer
-        if is_scheduled:
-            learning_rate_init = self.lr
-
-        if optimizer == 'momentum':
-            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate_init,
-                momentum=0.9)
-        else:
-            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate_init)
-
-        # TODO: Optionally wrap with SyncReplicasOptimizer
-        # TODO: create_learning_rate_decay_fn
 
         # Create a variable to track the global step
         global_step = tf.Variable(0, name='global_step', trainable=False)
+
+        # Select optimizer
+        if optimizer == 'momentum':
+            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
+                learning_rate=learning_rate,
+                momentum=0.9)
+        else:
+            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
+                learning_rate=learning_rate)
+
+        # TODO: Optionally wrap with SyncReplicasOptimizer
+        # TODO: create_learning_rate_decay_fn
 
         if self.clip_grad is not None:
             # Gradient clipping
@@ -330,7 +320,8 @@ class AttentionBase(object):
 
                     # Add histograms for gradients.
                     # self.summaries_train.append(
-                    #     tf.summary.histogram(var.op.name + '/gradients', grad))
+                    #     tf.summary.histogram(var.op.name + '/gradients',
+                    #                          grad))
                     # TODO: Why None occured?
 
                     # self._tensorboard_statistics(trainable_vars)
@@ -347,29 +338,38 @@ class AttentionBase(object):
         """Adds scaled noise from a 0-mean normal distribution to gradients."""
         raise NotImplementedError
 
-    def decoder(self, decoder_outputs_train, decoder_outputs_infer,
-                decode_type, beam_width=None):
+    def decoder(self, decoder_outputs_train, decoder_outputs_infer):
         """Operation for decoding.
         Args:
-            decoder_outputs_train:
-            decoder_outputs_infer:
-            decode_type: greedy or beam_search
-            beam_width: beam width for beam search
+            decoder_outputs_train: An instance of ``
+            decoder_outputs_infer: An instance of ``
         Return:
-            decoded_train: operation for decoding in training
-            decoded_infer: operation for decoding in inference
+            decoded_train: operation for decoding in training. A tensor of
+                size `[batch_size, ]`
+            decoded_infer: operation for decoding in inference. A tensor of
+                size `[, max_decode_length]`
         """
-        if decode_type not in ['greedy', 'beam_search']:
-            raise ValueError('decode_type is "greedy" or "beam_search".')
+        decoded_train = decoder_outputs_train.predicted_ids
 
-        if decode_type == 'greedy':
-            decoded_train = decoder_outputs_train.predicted_ids
+        if self.use_beam_search:
+            # Beam search decoding
+            decoded_infer = decoder_outputs_infer.predicted_ids[0]
+
+            # predicted_ids = decoder_outputs_infer.beam_search_output.predicted_ids
+            # scores = decoder_outputs_infer.beam_search_output.scores[:, :, -1]
+            # argmax_score = tf.argmax(scores, axis=0)[0]
+            # NOTE: predicted_ids: `[time, 1, beam_width]`
+
+            # Convert to `[beam_width, 1, time]`
+            # predicted_ids = tf.transpose(predicted_ids, (2, 1, 0))
+
+            # decoded_infer = predicted_ids[argmax_score]
+            # decoded_infer = decoder_outputs_infer.predicted_ids[-1]
+        else:
+            # Greedy decoding
             decoded_infer = decoder_outputs_infer.predicted_ids
 
-        elif decode_type == 'beam_search':
-            if beam_width is None:
-                raise ValueError('Set beam_width.')
-            raise NotImplementedError
+            argmax_score = None
 
         return decoded_train, decoded_infer
 

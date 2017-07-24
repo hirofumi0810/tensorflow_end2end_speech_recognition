@@ -43,8 +43,7 @@ class EncoderBase(object):
         self.name = name
 
     def __call__(self, *args, **kwargs):
-        # TODO: variable_scope
-        with tf.name_scope('Encoder'):
+        with tf.variable_scope(self.name):
             return self._build(*args, **kwargs)
 
     def _build(self, inputs, inputs_seq_len):

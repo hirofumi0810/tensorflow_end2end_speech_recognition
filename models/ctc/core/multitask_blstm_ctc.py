@@ -30,10 +30,12 @@ class Multitask_BLSTM_CTC(ctcBase):
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden
+        dropout_ratio_input: A float value. Dropout ratio in the input-hidden
+            layer
+        dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
             layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
-            layers
+        dropout_ratio_output: A float value. Dropout ratio in the hidden-output
+            layer
         num_proj: int, the number of nodes in recurrent projection layer
         weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: int, the dimensions of the bottleneck layer
@@ -53,6 +55,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
+                 dropout_ratio_output=1.0,
                  num_proj=None,
                  weight_decay=0.0,
                  bottleneck_dim=None,
@@ -62,7 +65,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                          num_layer_main, num_classes_main, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
-                         weight_decay, name)
+                         dropout_ratio_output, weight_decay, name)
 
         self.num_proj = None if num_proj == 0 else num_proj
         self.bottleneck_dim = bottleneck_dim
@@ -79,17 +82,21 @@ class Multitask_BLSTM_CTC(ctcBase):
         self.sub_task_weight = 1 - main_task_weight
 
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
-               keep_prob_hidden):
+               keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of `[batch_size, max_time, input_dim]`
             inputs_seq_len: A tensor of `[batch_size]`
-            keep_prob_input:
-            keep_prob_hidden:
+            keep_prob_input: A float value. A probability to keep nodes in
+                the input-hidden layer
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
         Returns:
             logits: A tensor of size `[max_time, batch_size, input_size]`
         """
-        # Dropout for inputs
+        # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(inputs,
                                 keep_prob_input,
                                 name='dropout_input')
@@ -122,7 +129,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                     forget_bias=1.0,
                     state_is_tuple=True)
 
-                # Dropout for outputs of each layer
+                # Dropout for the hidden-hidden connections
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
                     lstm_fw,
                     output_keep_prob=keep_prob_hidden)
@@ -170,12 +177,16 @@ class Multitask_BLSTM_CTC(ctcBase):
 
                         # Reshape back to the original shape
                         logits_sub = tf.reshape(
-                            logits_sub_2d,
-                            shape=[batch_size, -1, self.num_classes_sub])
+                            logits_sub_2d, shape=[batch_size, -1, self.num_classes_sub])
 
-                        # Convert to time-major:
-                        # `[max_time, batch_size, num_classes]`
-                        logits_sub = tf.transpose(logits_sub, (1, 0, 2))
+                        # Convert to time-major: `[max_time, batch_size,
+                        # num_classes]'
+                        logits = tf.transpose(logits_sub, (1, 0, 2))
+
+                        # Dropout for the hidden-output connections
+                        logits_sub = tf.nn.dropout(logits_sub,
+                                                   keep_prob_output,
+                                                   name='dropout_output_sub')
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
@@ -195,6 +206,11 @@ class Multitask_BLSTM_CTC(ctcBase):
                 outputs = tf.matmul(outputs, W_bottleneck) + b_bottleneck
                 output_node = self.bottleneck_dim
 
+                # Dropout for the hidden-output connections
+                outputs = tf.nn.dropout(outputs,
+                                        keep_prob_output,
+                                        name='dropout_output_main_bottle')
+
         with tf.name_scope('output_main'):
             # Affine
             W_output_main = tf.Variable(tf.truncated_normal(
@@ -205,11 +221,16 @@ class Multitask_BLSTM_CTC(ctcBase):
             logits_main_2d = tf.matmul(outputs, W_output_main) + b_output_main
 
             # Reshape back to the original shape
-            logits_main = tf.reshape(
+            logits = tf.reshape(
                 logits_main_2d, shape=[batch_size, -1, self.num_classes])
 
             # Convert to time-major: `[max_time, batch_size, num_classes]'
-            logits_main = tf.transpose(logits_main, (1, 0, 2))
+            logits_main = tf.transpose(logits, (1, 0, 2))
+
+            # Dropout for the hidden-output connections
+            logits_main = tf.nn.dropout(logits_main,
+                                        keep_prob_output,
+                                        name='dropout_output_main')
 
             return logits_main, logits_sub
 

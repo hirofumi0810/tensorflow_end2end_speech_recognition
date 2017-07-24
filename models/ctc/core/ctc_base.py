@@ -37,6 +37,8 @@ class ctcBase(object):
             layers
         dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
             layers
+        dropout_ratio_output: A float value. Dropout ratio in hidden-output
+            layers
         weight_decay: A float value. Regularization parameter for weight decay
     """
 
@@ -51,6 +53,7 @@ class ctcBase(object):
                  clip_activation,
                  dropout_ratio_input,
                  dropout_ratio_hidden,
+                 dropout_ratio_output,
                  weight_decay,
                  name=None):
 
@@ -68,6 +71,7 @@ class ctcBase(object):
         self.clip_activation = clip_activation
         self.dropout_ratio_input = dropout_ratio_input
         self.dropout_ratio_hidden = dropout_ratio_hidden
+        self.dropout_ratio_output = dropout_ratio_output
         self.weight_decay = float(weight_decay)
 
         # Summaries for TensorBoard
@@ -103,16 +107,18 @@ class ctcBase(object):
         raise NotImplementedError
 
     def compute_loss(self, inputs, labels, inputs_seq_len, keep_prob_input,
-                     keep_prob_hidden, num_gpu=1, scope=None):
+                     keep_prob_hidden, keep_prob_output, num_gpu=1, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[batch_size, max_time, input_size]`
             labels: A SparseTensor of target labels
             inputs_seq_len: A tensor of size `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
-                input-hidden layers
+                the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
-                hidden-hidden layers
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
             num_gpu: int, the number of GPUs
         Returns:
             loss: operation for computing ctc loss
@@ -120,7 +126,8 @@ class ctcBase(object):
         """
         # Build model graph
         logits = self._build(
-            inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden)
+            inputs, inputs_seq_len,
+            keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         # Weight decay
         if self.weight_decay > 0:
@@ -155,18 +162,15 @@ class ctcBase(object):
 
         return loss, logits
 
-    def train(self, loss, optimizer, learning_rate_init=None,
-              clip_grad_by_norm=None, decay_steps=None, decay_rate=None):
+    def train(self, loss, optimizer, learning_rate=None,
+              clip_grad_by_norm=None):
         """Operation for training.
         Args:
             loss: An operation for computing loss
             optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
-            learning_rate_init: initial learning rate
+            learning_rate: A float value, a learning rate
             clip_grad_by_norm: if True, clip gradients by norm of the
                 value of self.clip_grad
-            decay_steps: int, the step to decay the current learning rate
-            decay_rate: A float value, the rate to decay the current learning
-                rate
         Returns:
             train_op: operation for training
         """
@@ -175,21 +179,9 @@ class ctcBase(object):
             raise ValueError(
                 "Optimizer name should be one of [%s], you provided %s." %
                 (", ".join(OPTIMIZER_CLS_NAMES), optimizer))
-        if learning_rate_init < 0.0:
-            raise ValueError("Invalid learning_rate %s.", learning_rate_init)
 
         # Create a variable to track the global step
         global_step = tf.Variable(0, name='global_step', trainable=False)
-
-        if decay_steps is None:
-            # Not schedule
-            learning_rate = learning_rate_init
-        else:
-            learning_rate = tf.train.exponential_decay(learning_rate_init,
-                                                       global_step,
-                                                       decay_steps=decay_steps,
-                                                       decay_rate=decay_rate,
-                                                       staircase=True)
 
         # Select optimizer
         if optimizer == 'momentum':

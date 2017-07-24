@@ -33,10 +33,12 @@ class CNN_CTC(ctcBase):
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden
+        dropout_ratio_input: A float value. Dropout ratio in the input-hidden
+            layer
+        dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
             layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
-            layers
+        dropout_ratio_output: A float value. Dropout ratio in the hidden-output
+            layer
         num_proj: not used
         weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: not used
@@ -53,6 +55,7 @@ class CNN_CTC(ctcBase):
                  clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
+                 dropout_ratio_output=1.0,
                  num_proj=None,  # not used
                  weight_decay=0.0,
                  bottleneck_dim=None,  # not used
@@ -62,18 +65,23 @@ class CNN_CTC(ctcBase):
                          num_classes, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
-                         weight_decay, name)
+                         dropout_ratio_output, weight_decay, name)
 
         self.num_proj = None
         self.splice = 0
 
-    def _build(self, inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden):
+    def _build(self, inputs, inputs_seq_len, keep_prob_input,
+               keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of `[batch_size, max_time, input_dim]`
             inputs_seq_len:  A tensor of `[batch_size]`
-            keep_prob_input:
-            keep_prob_hidden:
+            keep_prob_input: A float value. A probability to keep nodes in
+                the input-hidden layer
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
         Returns:
             logits:
         """
@@ -231,12 +239,16 @@ class CNN_CTC(ctcBase):
                 if i_layer != 13:
                     outputs = tf.nn.dropout(outputs, keep_prob_hidden)
 
-        # Reshape back to the original shape (batch_size, max_time,
-        # num_classes)
-        outputs_3d = tf.reshape(
-            outputs, shape=[batch_size, max_time, self.num_classes])
+        # Reshape back to the original shape
+        logits = tf.reshape(
+            logits_2d, shape=[batch_size, -1, self.num_classes])
 
-        # Convert to `[max_time, batch_size, num_classes]`
-        logits = tf.transpose(outputs_3d, (1, 0, 2))
+        # Convert to time-major: `[max_time, batch_size, num_classes]'
+        logits = tf.transpose(logits, (1, 0, 2))
+
+        # Dropout for the hidden-output connections
+        logits = tf.nn.dropout(logits,
+                               keep_prob_output,
+                               name='dropout_output')
 
         return logits

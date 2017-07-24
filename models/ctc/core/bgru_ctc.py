@@ -24,10 +24,12 @@ class BGRU_CTC(ctcBase):
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: not used
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden
+        dropout_ratio_input: A float value. Dropout ratio in the input-hidden
+            layer
+        dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
             layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
-            layers
+        dropout_ratio_output: A float value. Dropout ratio in the hidden-output
+            layer
         num_proj: not used
         weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: int, the dimensions of the bottleneck layer
@@ -44,6 +46,7 @@ class BGRU_CTC(ctcBase):
                  clip_activation=None,  # not used
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
+                 dropout_ratio_output=1.0,
                  num_proj=None,  # not used
                  weight_decay=0.0,
                  bottleneck_dim=None,
@@ -53,22 +56,26 @@ class BGRU_CTC(ctcBase):
                          num_classes, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
-                         weight_decay, name)
+                         dropout_ratio_output, weight_decay, name)
 
         self.bottleneck_dim = bottleneck_dim
 
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
-               keep_prob_hidden):
+               keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of `[batch_size, max_time, input_dim]`
             inputs_seq_len:  A tensor of `[batch_size]`
-            keep_prob_input:
-            keep_prob_hidden:
+            keep_prob_input: A float value. A probability to keep nodes in
+                the input-hidden layer
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
         Returns:
             logits:
         """
-        # Dropout for inputs
+        # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(inputs,
                                 keep_prob_input,
                                 name='dropout_input')
@@ -85,7 +92,7 @@ class BGRU_CTC(ctcBase):
                     gru_fw = tf.contrib.rnn.GRUCell(self.num_unit)
                     gru_bw = tf.contrib.rnn.GRUCell(self.num_unit)
 
-                # Dropout for outputs of each layer
+                # Dropout for the hidden-hidden connections
                 gru_fw = tf.contrib.rnn.DropoutWrapper(
                     gru_fw,
                     output_keep_prob=keep_prob_hidden)
@@ -129,6 +136,11 @@ class BGRU_CTC(ctcBase):
                 outputs = tf.matmul(outputs, W_bottleneck) + b_bottleneck
                 output_node = self.bottleneck_dim
 
+                # Dropout for the hidden-output connections
+                outputs = tf.nn.dropout(outputs,
+                                        keep_prob_output,
+                                        name='dropout_output_bottle')
+
         with tf.name_scope('output'):
             # Affine
             W_output = tf.Variable(tf.truncated_normal(
@@ -144,5 +156,10 @@ class BGRU_CTC(ctcBase):
 
             # Convert to time-major: `[max_time, batch_size, num_classes]'
             logits = tf.transpose(logits, (1, 0, 2))
+
+            # Dropout for the hidden-output connections
+            logits = tf.nn.dropout(logits,
+                                   keep_prob_output,
+                                   name='dropout_output')
 
             return logits

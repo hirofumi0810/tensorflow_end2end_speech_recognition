@@ -34,7 +34,8 @@ class BLSTMAttetion(AttentionBase):
         num_classes: int, the number of nodes in softmax layer
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
-        max_decode_length: int,
+        max_decode_length: int, the length of output sequences to stop
+            prediction when EOS token have not been emitted
         attention_smoothing: bool, if True, replace exp to sigmoid function in
             the softmax layer of computing attention weights
         attention_weights_tempareture: A float value,
@@ -45,12 +46,16 @@ class BLSTMAttetion(AttentionBase):
         clip_activation_encoder: A float value. Range of activation clipping in
             the encoder (> 0)
         clip_activation_decoder:
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden
+        dropout_ratio_input: A float value. Dropout ratio in the input-hidden
+            layer
+        dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
             layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
-            layers
+        dropout_ratio_output: A float value. Dropout ratio in the hidden-output
+            layer
+        beam_width: int, the number of beams to use. 1 diables the beam search
+            decoding (greedy decoding).
         weight_decay: A float value. Regularization parameter for weight decay
-        time-major:
+        time_major: bool,
     """
 
     def __init__(self,
@@ -76,8 +81,9 @@ class BLSTMAttetion(AttentionBase):
                  clip_activation_decoder=50,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
+                 dropout_ratio_output=1.0,
                  weight_decay=0.0,
-                 beam_width=1,
+                 beam_width=None,
                  time_major=False,
                  name='blstm_attention_seq2seq'):
 
@@ -106,6 +112,7 @@ class BLSTMAttetion(AttentionBase):
         self.clip_activation_decoder = float(clip_activation_decoder)
         self.dropout_ratio_input = float(dropout_ratio_input)
         self.dropout_ratio_hidden = float(dropout_ratio_hidden)
+        self.dropout_ratio_output = float(dropout_ratio_output)
         self.weight_decay = float(weight_decay)
         self.beam_width = int(beam_width)
         self.time_major = time_major
@@ -125,9 +132,9 @@ class BLSTMAttetion(AttentionBase):
         Args:
             inputs: A tensor of `[batch_size, time, input_size]`
             inputs_seq_len: A tensor of `[batch_size]`
-            keep_prob_input: A float value. A probability to keep nodes in
-                input-hidden layers
-            keep_prob_hidden: A float value. A probability to keep nodes in
+            keep_prob_input: A float value. A probability to keep nodes in the
+                input-hidden layer
+            keep_prob_hidden: A float value. A probability to keep nodes in the
                 hidden-hidden layers
         Returns:
             encoder_outputs: A namedtuple of
@@ -185,7 +192,7 @@ class BLSTMAttetion(AttentionBase):
         return decoder
 
     def _build(self, inputs, labels, inputs_seq_len, labels_seq_len,
-               keep_prob_input, keep_prob_hidden):
+               keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Define model graph.
         Args:
             inputs: A tensor of `[batch_size, time, input_size]`
@@ -193,9 +200,11 @@ class BLSTMAttetion(AttentionBase):
             inputs_seq_len: A tensor of `[batch_size]`
             labels_seq_len: A tensor of `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
-                input-hidden layers
+                the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
-                hidden-hidden layers
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
         Returns:
             logits:
             decoder_outputs_train:
@@ -211,12 +220,9 @@ class BLSTMAttetion(AttentionBase):
         # NOTE: initial_state and helper will be substituted in
         # self._decode_train() or self._decode_infer()
 
-        # Wrap decoder
-        # decoder_train = self._beam_search_decoder_wrapper(decoder_train,
-        #                                                   beam_width=20)
-        # decoder_infer = self._beam_search_decoder_wrapper(decoder_infer,
-        #                                                   beam_width=20)
-        # TODO: inferenceだけwrapしたい
+        # Wrap decoder only when inference
+        decoder_infer = self._beam_search_decoder_wrapper(
+            decoder_infer, beam_width=self.beam_width)
 
         # Connect between encoder and decoder
         bridge = InitialStateBridge(

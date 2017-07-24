@@ -54,10 +54,10 @@ class TestCTC(tf.test.TestCase):
             inputs_pl = tf.placeholder(tf.float32,
                                        shape=[None, None, inputs[0].shape[-1]],
                                        name='inputs')
-            indices_pl = tf.placeholder(tf.int64, name='indices')
-            values_pl = tf.placeholder(tf.int32, name='values')
-            shape_pl = tf.placeholder(tf.int64, name='shape')
-            labels_pl = tf.SparseTensor(indices_pl, values_pl, shape_pl)
+            labels_pl = tf.SparseTensor(
+                tf.placeholder(tf.int64, name='indices'),
+                tf.placeholder(tf.int32, name='values'),
+                tf.placeholder(tf.int64, name='shape'))
             inputs_seq_len_pl = tf.placeholder(tf.int64,
                                                shape=[None],
                                                name='inputs_seq_len')
@@ -65,6 +65,8 @@ class TestCTC(tf.test.TestCase):
                                                 name='keep_prob_input')
             keep_prob_hidden_pl = tf.placeholder(tf.float32,
                                                  name='keep_prob_hidden')
+            keep_prob_output_pl = tf.placeholder(tf.float32,
+                                                 name='keep_prob_output')
             learning_rate_pl = tf.placeholder(tf.float32,
                                               name='learning_rate')
 
@@ -80,9 +82,10 @@ class TestCTC(tf.test.TestCase):
                             parameter_init=0.1,
                             clip_grad=5.0,
                             clip_activation=50,
-                            dropout_ratio_input=1.0,
-                            dropout_ratio_hidden=1.0,
-                            num_proj=None,
+                            dropout_ratio_input=0.9,
+                            dropout_ratio_hidden=0.9,
+                            dropout_ratio_output=0.9,
+                            num_proj=256,
                             weight_decay=1e-6)
 
             # Add to the graph each operation
@@ -90,7 +93,8 @@ class TestCTC(tf.test.TestCase):
                                                    labels_pl,
                                                    inputs_seq_len_pl,
                                                    keep_prob_input_pl,
-                                                   keep_prob_hidden_pl)
+                                                   keep_prob_hidden_pl,
+                                                   keep_prob_output_pl)
             train_op = network.train(loss_op,
                                      optimizer='rmsprop',
                                      learning_rate=learning_rate_pl)
@@ -127,7 +131,8 @@ class TestCTC(tf.test.TestCase):
                 labels_pl: labels_true_st,
                 inputs_seq_len_pl: inputs_seq_len,
                 keep_prob_input_pl: network.dropout_ratio_input,
-                keep_prob_hidden_pl: network.dropout_ratio_hidden
+                keep_prob_hidden_pl: network.dropout_ratio_hidden,
+                keep_prob_output_pl: network.dropout_ratio_output
             }
 
             map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
@@ -167,6 +172,7 @@ class TestCTC(tf.test.TestCase):
                         # Change to evaluation mode
                         feed_dict[keep_prob_input_pl] = 1.0
                         feed_dict[keep_prob_hidden_pl] = 1.0
+                        feed_dict[keep_prob_output_pl] = 1.0
 
                         # Compute accuracy
                         ler_train = sess.run(ler_op, feed_dict=feed_dict)

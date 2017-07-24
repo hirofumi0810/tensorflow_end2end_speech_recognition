@@ -91,11 +91,11 @@ class TestAttention(tf.test.TestCase):
             network = BLSTMAttetion(
                 batch_size=batch_size,
                 input_size=inputs[0].shape[1],
-                encoder_num_unit=256,
+                encoder_num_unit=128,
                 encoder_num_layer=2,
-                attention_dim=128,
+                attention_dim=64,
                 attention_type=attention_type,
-                decoder_num_unit=256,
+                decoder_num_unit=128,
                 decoder_num_layer=1,
                 embedding_dim=20,
                 num_classes=num_classes,
@@ -112,7 +112,7 @@ class TestAttention(tf.test.TestCase):
                 dropout_ratio_input=1.0,
                 dropout_ratio_hidden=1.0,
                 weight_decay=0,
-                beam_width=0,
+                beam_width=5,
                 time_major=False)
 
             # Add to the graph each operation
@@ -130,9 +130,7 @@ class TestAttention(tf.test.TestCase):
                                      is_scheduled=False)
             decode_op_train, decode_op_infer = network.decoder(
                 decoder_outputs_train,
-                decoder_outputs_infer,
-                decode_type='greedy',
-                beam_width=1)
+                decoder_outputs_infer)
             ler_op = network.compute_ler(labels_st_true_pl,
                                          labels_st_pred_pl)
 
@@ -218,6 +216,7 @@ class TestAttention(tf.test.TestCase):
 
                         # Visualize
                         if label_type == 'character':
+                            map_file_path = '../../experiments/timit/metrics/mapping_files/attention/character.txt'
                             print('True            : %s' %
                                   num2alpha(labels[0]))
                             print('Pred (Training) : <%s' %
@@ -225,18 +224,19 @@ class TestAttention(tf.test.TestCase):
                             print('Pred (Inference): <%s' %
                                   num2alpha(predicted_ids_infer[0]))
                         else:
+                            map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone2num_61.txt'
                             print('True            : %s' %
-                                  num2phone(labels[0]))
+                                  num2phone(labels[0], map_file_path))
                             print('Pred (Training) : < %s' %
-                                  num2phone(predicted_ids_train[0]))
+                                  num2phone(predicted_ids_train[0], map_file_path))
                             print('Pred (Inference): < %s' %
-                                  num2phone(predicted_ids_infer[0]))
+                                  num2phone(predicted_ids_infer[0], map_file_path))
 
                         if ler_train >= ler_train_pre:
                             not_improved_count += 1
                         else:
                             not_improved_count = 0
-                        if not_improved_count >= 10:
+                        if not_improved_count >= 50:
                             print('Model is Converged.')
                             break
                         ler_train_pre = ler_train

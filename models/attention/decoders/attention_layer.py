@@ -13,14 +13,14 @@ import tensorflow as tf
 class AttentionLayer(object):
     """Attention layer. This implementation is based on
         https://arxiv.org/abs/1409.0473.
-            Bahdanau, Dzmitry, Kyunghyun Cho, and Yoshua Bengio.
+            Bahdanau, Dzmitry., et al.
             "Neural machine translation by jointly learning to align and
                 translate."
-            arXiv preprint arXiv:1409.0473 (2014).
+            in Processings of ICLR, 2015.
         https://arxiv.org/abs/1506.07503.
-            Chorowski, Jan K., et al. "Attention-based models for speech
-                recognition."
-            Advances in Neural Information Processing Systems (2015): 577-585.
+            Chorowski, Jan K., et al.
+            "Attention-based models for speech recognition."
+            in Processings of NIPS, 2015..
     Args:
         num_unit: Number of units used in the attention layer
         attention_smoothing: bool, if True, replace exp to sigmoid function in
@@ -39,8 +39,8 @@ class AttentionLayer(object):
         self.name = name
 
     def __call__(self, *args, **kwargs):
-        # TODO: variable_scope
-        return self._build(*args, **kwargs)
+        with tf.variable_scope(self.name):
+            return self._build(*args, **kwargs)
 
     def _build(self, encoder_states, current_decoder_state, values,
                values_length, attention_weights):
@@ -175,7 +175,9 @@ class AttentionLayer(object):
             ############################################################
             with tf.control_dependencies(None):
                 F = tf.Variable(tf.truncated_normal(
-                    shape=[100, 1, 10], stddev=0.1), name='filter')
+                    shape=[200, 1, 10],
+                    # shape=[100, 1, 10],
+                    stddev=0.1), name='filter')
 
             f = tf.nn.conv1d(tf.expand_dims(attention_weights, axis=2), F,
                              stride=1, padding='SAME',
@@ -204,7 +206,9 @@ class AttentionLayer(object):
             ############################################################
             with tf.control_dependencies(None):
                 F = tf.Variable(tf.truncated_normal(
-                    shape=[100, 1, 10], stddev=0.1), name='filter')
+                    shape=[200, 1, 10],
+                    # shape=[100, 1, 10],
+                    stddev=0.1), name='filter')
 
             f = tf.nn.conv1d(tf.expand_dims(attention_weights, axis=2), F,
                              stride=1, padding='SAME',
