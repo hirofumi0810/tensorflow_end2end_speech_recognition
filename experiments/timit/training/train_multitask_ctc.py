@@ -109,10 +109,11 @@ def do_train(network, params):
             network.labels, network.labels_sub)
 
         # Define learning rate controller
-        lr_controller = Controller(learning_rate_init=params['learning_rate'],
-                                   decay_start_epoch=20,
-                                   decay_rate=0.98,
-                                   lower_better=True)
+        lr_controller = Controller(
+            learning_rate_init=params['learning_rate'],
+            decay_start_epoch=params['decay_start_epoch'],
+            decay_rate=params['decay_rate'],
+            lower_better=True)
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -208,6 +209,7 @@ def do_train(network, params):
                     # Change to evaluation mode
                     feed_dict_train[network.keep_prob_input] = 1.0
                     feed_dict_train[network.keep_prob_hidden] = 1.0
+                    feed_dict_train[network.keep_prob_output] = 1.0
 
                     # Compute accuracy & update event file
                     cer_train, per_train, summary_str_train = sess.run(
@@ -340,7 +342,7 @@ def main(config_path, model_save_path):
                        num_unit=params['num_unit'],
                        num_layer_main=params['num_layer_main'],
                        num_layer_sub=params['num_layer_sub'],
-                       num_classes_main=33,
+                       num_classes_main=28,
                        num_classes_sub=params['num_classes_sub'],
                        main_task_weight=params['main_task_weight'],
                        parameter_init=params['weight_init'],
@@ -371,9 +373,6 @@ def main(config_path, model_save_path):
     if params['weight_decay'] != 0:
         network.model_name += '_weightdecay' + str(params['weight_decay'])
     network.model_name += '_taskweight' + str(params['main_task_weight'])
-    if params['decay_rate'] != 1:
-        network.model_name += '_lrdecay' + \
-            str(params['decay_steps'] + params['decay_rate'])
 
     # Set save path
     network.model_dir = mkdir(model_save_path)

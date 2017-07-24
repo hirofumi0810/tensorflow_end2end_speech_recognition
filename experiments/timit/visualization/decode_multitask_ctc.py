@@ -128,7 +128,7 @@ def main(model_path, epoch):
         num_unit=params['num_unit'],
         num_layer_main=params['num_layer_main'],
         num_layer_sub=params['num_layer_sub'],
-        num_classes_main=30,
+        num_classes_main=28,
         num_classes_sub=params['num_classes_sub'],
         main_task_weight=params['main_task_weight'],
         clip_grad=params['clip_grad'],

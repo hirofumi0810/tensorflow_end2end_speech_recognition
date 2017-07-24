@@ -99,10 +99,11 @@ def do_train(network, params):
         ler_op = network.compute_ler(decode_op, network.labels)
 
         # Define learning rate controller
-        lr_controller = Controller(learning_rate_init=params['learning_rate'],
-                                   decay_start_epoch=20,
-                                   decay_rate=0.98,
-                                   lower_better=True)
+        lr_controller = Controller(
+            learning_rate_init=params['learning_rate'],
+            decay_start_epoch=params['decay_start_epoch'],
+            decay_rate=params['decay_rate'],
+            lower_better=True)
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -192,6 +193,7 @@ def do_train(network, params):
                     # Change to evaluation mode
                     feed_dict_train[network.keep_prob_input] = 1.0
                     feed_dict_train[network.keep_prob_hidden] = 1.0
+                    feed_dict_train[network.keep_prob_output] = 1.0
 
                     # Compute accuracy & update event file
                     ler_train, summary_str_train = sess.run(
@@ -233,6 +235,7 @@ def do_train(network, params):
                                 decode_op=decode_op,
                                 network=network,
                                 dataset=dev_data,
+                                label_type=params['label_type'],
                                 eval_batch_size=1)
                             print('  CER: %f %%' % (ler_dev_epoch * 100))
 
@@ -246,6 +249,7 @@ def do_train(network, params):
                                     decode_op=decode_op,
                                     network=network,
                                     dataset=test_data,
+                                    label_type=params['label_type'],
                                     eval_batch_size=1)
                                 print('  CER: %f %%' % (ler_test * 100))
 
@@ -318,7 +322,9 @@ def main(config_path, model_save_path):
     elif params['label_type'] == 'phone39':
         params['num_classes'] = 39
     elif params['label_type'] == 'character':
-        params['num_classes'] = 33
+        params['num_classes'] = 28
+    elif params['label_type'] == 'character_capital_divide':
+        params['num_classes'] = 72
 
     # Model setting
     CTCModel = load(model_type=params['model'])
@@ -353,9 +359,6 @@ def main(config_path, model_save_path):
         network.model_name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:
         network.model_name += '_weightdecay' + str(params['weight_decay'])
-    if params['decay_rate'] != 1:
-        network.model_name += '_lrdecay' + \
-            str(params['decay_steps'] + params['decay_rate'])
 
     # Set save path
     network.model_dir = mkdir(model_save_path)

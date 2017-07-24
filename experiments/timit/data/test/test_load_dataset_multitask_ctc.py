@@ -12,9 +12,8 @@ import tensorflow as tf
 
 sys.path.append('../../../../')
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
-from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
 from experiments.utils.measure_time_func import measure_time
 
 
@@ -24,10 +23,8 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
         self.check_loading(num_gpu=1, sort_utt=True)
         self.check_loading(num_gpu=1, sort_utt=False)
 
+        # multi-GPU
         self.check_loading(num_gpu=2, sort_utt=True)
-        self.check_loading(num_gpu=2, sort_utt=False)
-
-        # For many GPUs
         self.check_loading(num_gpu=7, sort_utt=True)
 
     @measure_time
@@ -57,19 +54,14 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
             for i in range(iter_per_epoch + 1):
                 return_tuple = mini_batch.__next__()
                 inputs = return_tuple[0]
-                labels_char_st = return_tuple[1]
-                labels_phone_st = return_tuple[2]
+                labels_char = return_tuple[1]
+                labels_phone = return_tuple[2]
 
                 if num_gpu > 1:
-                    for inputs_gpu in inputs:
-                        print(inputs_gpu.shape)
-                    labels_char_st = labels_char_st[0]
-                    labels_phone_st = labels_phone_st[0]
-
-                labels_char = sparsetensor2list(
-                    labels_char_st, batch_size=len(inputs))
-                labels_phone = sparsetensor2list(
-                    labels_phone_st, batch_size=len(inputs))
+                    # for inputs_gpu in inputs:
+                    #     print(inputs_gpu.shape)
+                    labels_char = labels_char[0]
+                    labels_phone = labels_phone[0]
 
                 if num_gpu == 1:
                     for inputs_i, labels_i in zip(inputs, labels_char):

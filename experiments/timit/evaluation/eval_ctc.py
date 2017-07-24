@@ -89,6 +89,7 @@ def do_eval(network, params, epoch=None):
                 decode_op=decode_op,
                 network=network,
                 dataset=test_data,
+                label_type=params['label_type'],
                 progressbar=True)
             print('  CER: %f %%' % (cer_test * 100))
         else:
@@ -118,7 +119,9 @@ def main(model_path, epoch):
     elif params['label_type'] == 'phone39':
         params['num_classes'] = 39
     elif params['label_type'] == 'character':
-        params['num_classes'] = 33
+        params['num_classes'] = 28
+    elif params['label_type'] == 'character_capital_divide':
+        params['num_classes'] = 72
 
     # Model setting
     CTCModel = load(model_type=params['model'])

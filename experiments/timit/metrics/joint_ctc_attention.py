@@ -155,7 +155,7 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
     # Make data generator
     mini_batch = dataset.next_batch(batch_size=batch_size)
 
-    map_file_path = '../metrics/mapping_files/attention/char2num.txt'
+    map_file_path = '../metrics/mapping_files/attention/charcter_to_num.txt'
     for step in wrap_iterator(range(iteration), progressbar):
         # Create feed dictionary for next mini-batch
         inputs, att_labels_true, _, inputs_seq_len, _, _ = mini_batch.__next__()

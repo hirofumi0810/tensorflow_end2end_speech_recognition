@@ -104,10 +104,11 @@ def do_train(network, params):
                                      network.labels_pred_st)
 
         # Define learning rate controller
-        lr_controller = Controller(learning_rate_init=params['learning_rate'],
-                                   decay_start_epoch=20,
-                                   decay_rate=0.98,
-                                   lower_better=True)
+        lr_controller = Controller(
+            learning_rate_init=params['learning_rate'],
+            decay_start_epoch=params['decay_start_epoch'],
+            decay_rate=params['decay_rate'],
+            lower_better=True)
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
@@ -198,6 +199,7 @@ def do_train(network, params):
                     # Change to evaluation mode
                     feed_dict_train[network.keep_prob_input] = 1.0
                     feed_dict_train[network.keep_prob_hidden] = 1.0
+                    feed_dict_train[network.keep_prob_output] = 1.0
 
                     # Predict class ids &  update event file
                     predicted_ids_train, summary_str_train = sess.run(
@@ -355,7 +357,9 @@ def main(config_path, model_save_path):
     elif params['label_type'] == 'phone39':
         params['num_classes'] = 41
     elif params['label_type'] == 'character':
-        params['num_classes'] = 35
+        params['num_classes'] = 30
+    elif params['label_type'] == 'character_capital_divide':
+        params['num_classes'] = 74
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])

@@ -1,20 +1,20 @@
 param:
   model: blstm_ctc
   corpus: timit
-  label_type: phone61
+  label_type: character_capital_divide
   feature: fbank
   input_size: 123
-  num_stack: 3
-  num_skip: 3
+  num_stack: 1
+  num_skip: 1
   num_unit: 256
   num_proj: 0
   num_layer: 5
   bottleneck_dim: 0
   batch_size: 64
-  optimizer: rmsprop
+  optimizer: adam
   learning_rate: 1e-3
-  decay_steps: 2000
-  decay_rate: 1
+  decay_start_epoch: 20
+  decay_rate: 0.5
   num_epoch: 50
   weight_init: 0.1
   clip_grad: 5.0

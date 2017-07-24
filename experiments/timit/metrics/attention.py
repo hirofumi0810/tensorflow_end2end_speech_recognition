@@ -53,11 +53,11 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     # Make data generator
     mini_batch = dataset.next_batch(batch_size=batch_size)
 
-    train_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + \
+    train_phone2num_map_file_path = '../metrics/mapping_files/attention/' + \
         train_label_type + '_to_num.txt'
-    eval_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + \
+    eval_phone2num_map_file_path = '../metrics/mapping_files/attention/' + \
         train_label_type + '_to_num.txt'
-    phone2num_39_map_file_path = '../metrics/mapping_files/ctc/phone39_to_num.txt'
+    phone2num_39_map_file_path = '../metrics/mapping_files/attention/phone39_to_num.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     for step in wrap_iterator(range(iteration), progressbar):
         # Create feed dictionary for next mini-batch
@@ -160,7 +160,7 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
     # Make data generator
     mini_batch = dataset.next_batch(batch_size=batch_size)
 
-    map_file_path = '../metrics/mapping_files/ctc/character_to_num.txt'
+    map_file_path = '../metrics/mapping_files/attention/character_to_num.txt'
     for step in wrap_iterator(range(iteration), progressbar):
         # Create feed dictionary for next mini-batch
         if not is_multitask:

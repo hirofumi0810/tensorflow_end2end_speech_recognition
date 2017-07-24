@@ -12,27 +12,26 @@ import tensorflow as tf
 
 sys.path.append('../../../../')
 from experiments.timit.data.load_dataset_ctc import Dataset
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
-from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
 from experiments.utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetCTC(unittest.TestCase):
 
     def test(self):
-        self.check_loading(label_type='character', num_gpu=1, sort_utt=True)
+        # label_type
+        self.check_loading(label_type='character_capital_divide',
+                           num_gpu=1, sort_utt=False)
         self.check_loading(label_type='character', num_gpu=1, sort_utt=False)
-        self.check_loading(label_type='phone61', num_gpu=1, sort_utt=True)
         self.check_loading(label_type='phone61', num_gpu=1, sort_utt=False)
 
-        self.check_loading(label_type='character', num_gpu=2, sort_utt=True)
-        self.check_loading(label_type='character', num_gpu=2, sort_utt=False)
-        self.check_loading(label_type='phone61', num_gpu=2, sort_utt=True)
-        self.check_loading(label_type='phone61', num_gpu=2, sort_utt=False)
+        # sort
+        self.check_loading(label_type='phone61', num_gpu=1, sort_utt=True)
 
-        # For many GPUs
-        self.check_loading(label_type='character', num_gpu=7, sort_utt=True)
+        # multi-GPU
+        self.check_loading(label_type='phone61', num_gpu=2, sort_utt=True)
+        self.check_loading(label_type='phone61', num_gpu=7, sort_utt=True)
 
     @measure_time
     def check_loading(self, label_type, num_gpu, sort_utt):
@@ -49,8 +48,11 @@ class TestLoadDatasetCTC(unittest.TestCase):
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
             print('=> Loading mini-batch...')
-            map_file_path = '../../metrics/mapping_files/ctc/' + label_type + '_to_num.txt'
-            if label_type == 'character':
+            if label_type == 'character_capital_divide':
+                map_file_path = '../../metrics/mapping_files/ctc/character_to_num_capital.txt'
+            else:
+                map_file_path = '../../metrics/mapping_files/ctc/' + label_type + '_to_num.txt'
+            if label_type in ['character', 'character_capital_divide']:
                 map_fn = num2char
             else:
                 map_fn = num2phone
@@ -62,15 +64,12 @@ class TestLoadDatasetCTC(unittest.TestCase):
             for i in range(iter_per_epoch + 1):
                 return_tuple = mini_batch.__next__()
                 inputs = return_tuple[0]
-                labels_st = return_tuple[1]
+                labels = return_tuple[1]
 
                 if num_gpu > 1:
-                    for inputs_gpu in inputs:
-                        print(inputs_gpu.shape)
-                    labels_st = labels_st[0]
-
-                labels = sparsetensor2list(
-                    labels_st, batch_size=len(inputs))
+                    # for inputs_gpu in inputs:
+                    #     print(inputs_gpu.shape)
+                    labels = labels[0]
 
                 if num_gpu == 1:
                     for inputs_i, labels_i in zip(inputs, labels):

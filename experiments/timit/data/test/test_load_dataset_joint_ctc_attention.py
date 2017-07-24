@@ -12,27 +12,26 @@ import tensorflow as tf
 
 sys.path.append('../../../../')
 from experiments.timit.data.load_dataset_joint_ctc_attention import Dataset
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
-from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
+from experiments.utils.data.sparsetensor import sparsetensor2list
 from experiments.utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetJointCTCAttention(unittest.TestCase):
 
     def test(self):
-        self.check_loading(label_type='character', num_gpu=1, sort_utt=True)
+
+        # label_type
         self.check_loading(label_type='character', num_gpu=1, sort_utt=False)
-        self.check_loading(label_type='phone61', num_gpu=1, sort_utt=True)
         self.check_loading(label_type='phone61', num_gpu=1, sort_utt=False)
 
-        self.check_loading(label_type='character', num_gpu=2, sort_utt=True)
-        self.check_loading(label_type='character', num_gpu=2, sort_utt=False)
-        self.check_loading(label_type='phone61', num_gpu=2, sort_utt=True)
+        # sort
         self.check_loading(label_type='phone61', num_gpu=2, sort_utt=False)
 
-        # For many GPUs
-        self.check_loading(label_type='character', num_gpu=7, sort_utt=True)
+        # multi-GPU
+        self.check_loading(label_type='phone61', num_gpu=2, sort_utt=True)
+        self.check_loading(label_type='phone61', num_gpu=7, sort_utt=True)
 
     def check_loading(self, label_type, num_gpu, sort_utt):
         print('----- label_type: ' + label_type + ', num_gpu: ' +
@@ -64,19 +63,16 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
                 return_tuple = mini_batch.__next__()
                 inputs = return_tuple[0]
                 att_labels = return_tuple[1]
-                ctc_labels_st = return_tuple[2]
+                ctc_labels = return_tuple[2]
                 att_labels_seq_len = return_tuple[4]
 
                 if num_gpu > 1:
                     for inputs_gpu in inputs:
-                        print(inputs_gpu.shape)
-                    inputs = inputs[0]
+                    #     print(inputs_gpu.shape)
+                    # inputs = inputs[0]
                     att_labels = att_labels[0]
-                    ctc_labels_st = ctc_labels_st[0]
+                    ctc_labels = ctc_labels[0]
                     att_labels_seq_len = att_labels_seq_len[0]
-
-                ctc_labels = sparsetensor2list(
-                    ctc_labels_st, batch_size=len(inputs))
 
                 if num_gpu == 1:
                     for inputs_i, labels_i in zip(inputs, ctc_labels):

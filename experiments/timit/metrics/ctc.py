@@ -133,14 +133,15 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     return per_mean
 
 
-def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
-                progressbar=False, is_multitask=False):
+def do_eval_cer(session, decode_op, network, dataset, label_type,
+                eval_batch_size=None, progressbar=False, is_multitask=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of a `Dataset` class
+        label_type: string, character or character_capital_devide
         eval_batch_size: int, the batch size when evaluating the model
         progressbar: if True, visualize the progressbar
         is_multitask: if True, evaluate the multitask model
@@ -161,7 +162,10 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
     # Make data generator
     mini_batch = dataset.next_batch(batch_size=batch_size)
 
-    map_file_path = '../metrics/mapping_files/ctc/character_to_num.txt'
+    if label_type == 'character':
+        map_file_path = '../metrics/mapping_files/ctc/character_to_num.txt'
+    else:
+        map_file_path = '../metrics/mapping_files/ctc/character_to_num_capital.txt'
     for step in wrap_iterator(range(iteration), progressbar):
         # Create feed dictionary for next mini batch
         if not is_multitask:
@@ -173,7 +177,8 @@ def do_eval_cer(session, decode_op, network, dataset, eval_batch_size=None,
             network.inputs: inputs,
             network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.keep_prob_hidden: 1.0,
+            network.keep_prob_output: 1.0
         }
 
         batch_size_each = len(inputs_seq_len)

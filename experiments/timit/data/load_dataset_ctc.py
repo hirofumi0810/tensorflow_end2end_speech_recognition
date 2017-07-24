@@ -28,6 +28,7 @@ class Dataset(DatasetBase):
         Args:
             data_type: string, train or dev or test
             label_type: stirng, phone39 or phone48 or phone61 or character
+                or character_capital_divide
             batch_size: int, the size of mini-batch
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip

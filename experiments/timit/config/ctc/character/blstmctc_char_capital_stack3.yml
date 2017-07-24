@@ -1,7 +1,7 @@
 param:
   model: blstm_ctc
   corpus: timit
-  label_type: character
+  label_type: character_capital_divide
   feature: fbank
   input_size: 123
   num_stack: 3
@@ -11,10 +11,10 @@ param:
   num_layer: 5
   bottleneck_dim: 0
   batch_size: 64
-  optimizer: rmsprop
+  optimizer: adam
   learning_rate: 1e-3
-  decay_steps: 2000
-  decay_rate: 1
+  decay_start_epoch: 20
+  decay_rate: 0.5
   num_epoch: 50
   weight_init: 0.1
   clip_grad: 5.0

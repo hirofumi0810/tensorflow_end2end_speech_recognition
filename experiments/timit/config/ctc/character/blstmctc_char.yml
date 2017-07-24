@@ -4,8 +4,8 @@ param:
   label_type: character
   feature: fbank
   input_size: 123
-  num_stack: 3
-  num_skip: 3
+  num_stack: 1
+  num_skip: 1
   num_unit: 256
   num_proj: 0
   num_layer: 5
@@ -13,8 +13,8 @@ param:
   batch_size: 64
   optimizer: adam
   learning_rate: 1e-3
-  decay_steps: 2000
-  decay_rate: 1
+  decay_start_epoch: 20
+  decay_rate: 0.5
   num_epoch: 50
   weight_init: 0.1
   clip_grad: 5.0
