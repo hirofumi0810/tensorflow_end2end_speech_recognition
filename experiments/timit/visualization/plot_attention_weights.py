@@ -114,7 +114,7 @@ def main(model_path, epoch):
     elif params['label_type'] == 'character':
         params['num_classes'] = 30
     elif params['label_type'] == 'character_capital_divide':
-        params['num_classes'] = 73
+        params['num_classes'] = 74
 
     # Model setting
     # AttentionModel = load(model_type=params['model'])

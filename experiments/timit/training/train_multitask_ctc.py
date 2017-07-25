@@ -19,7 +19,7 @@ sys.path.append('../../../')
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
 from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from experiments.utils.data.sparsetensor import list2sparsetensor
-from experiments.utils.training.learning_rate_controller.epoch import Controller
+from experiments.utils.training.learning_rate_controller import Controller
 
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
@@ -113,6 +113,7 @@ def do_train(network, params):
             learning_rate_init=params['learning_rate'],
             decay_start_epoch=params['decay_start_epoch'],
             decay_rate=params['decay_rate'],
+            decay_patient_epoch=3,
             lower_better=True)
 
         # Build the summary tensor based on the TensorFlow collection of

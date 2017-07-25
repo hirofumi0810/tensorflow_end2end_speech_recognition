@@ -121,7 +121,7 @@ def main(model_path, epoch):
     elif params['label_type'] == 'character':
         params['num_classes'] = 28
     elif params['label_type'] == 'character_capital_divide':
-        params['num_classes'] = 71
+        params['num_classes'] = 72
 
     # Model setting
     CTCModel = load(model_type=params['model'])
