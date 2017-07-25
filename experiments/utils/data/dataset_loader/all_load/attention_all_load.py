@@ -41,8 +41,8 @@ class DatasetBase(object):
         next_epoch_flag = False
 
         while True:
-            # sorted dataset
-            if self.sort_utt:
+            # Sort all uttrances in each epoch
+            if self.sort_utt or self.sorta_grad:
                 if len(self.rest) > batch_size:
                     data_indices = list(self.rest)[:batch_size]
                     self.rest -= set(data_indices)
@@ -52,8 +52,13 @@ class DatasetBase(object):
                     next_epoch_flag = True
                     if self.data_type == 'train':
                         print('---Next epoch---')
+                    if self.sorta_grad:
+                        self.sorta_grad = False
 
-            # not sorted dataset
+                # Shuffle selected mini-batch
+                if not self.sorta_grad:
+                    random.shuffle(data_indices)
+
             else:
                 if len(self.rest) > batch_size:
                     # Randomly sample mini-batch

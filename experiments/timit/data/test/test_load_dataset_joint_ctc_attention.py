@@ -23,26 +23,34 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
     def test(self):
 
         # label_type
-        self.check_loading(label_type='character', num_gpu=1, sort_utt=False)
-        self.check_loading(label_type='phone61', num_gpu=1, sort_utt=False)
+        self.check_loading(label_type='character', num_gpu=1,
+                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='phone61', num_gpu=1,
+                           sort_utt=False, sorta_grad=False)
 
         # sort
-        self.check_loading(label_type='phone61', num_gpu=2, sort_utt=False)
+        self.check_loading(label_type='phone61', num_gpu=1,
+                           sort_utt=True, sorta_grad=False)
+        self.check_loading(label_type='phone61', num_gpu=1,
+                           sort_utt=False, sorta_grad=True)
 
         # multi-GPU
-        self.check_loading(label_type='phone61', num_gpu=2, sort_utt=True)
-        self.check_loading(label_type='phone61', num_gpu=7, sort_utt=True)
+        self.check_loading(label_type='phone61', num_gpu=2,
+                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='phone61', num_gpu=7,
+                           sort_utt=False, sorta_grad=False)
 
-    def check_loading(self, label_type, num_gpu, sort_utt):
+    def check_loading(self, label_type, num_gpu, sort_utt, sorta_grad):
         print('----- label_type: ' + label_type + ', num_gpu: ' +
-              str(num_gpu) + ', sort_utt: ' + str(sort_utt) + ' -----')
+              str(num_gpu) + ', sort_utt: ' + str(sort_utt) +
+              ', sorta_grad: ' + str(sorta_grad) + ' -----')
 
         batch_size = 64
-        eos_index = 2 if label_type == 'character' else 1
+        eos_index = 1
         dataset = Dataset(data_type='train', label_type=label_type,
                           batch_size=batch_size, eos_index=eos_index,
-                          sort_utt=sort_utt, progressbar=True,
-                          num_gpu=num_gpu)
+                          sort_utt=sort_utt, sorta_grad=sorta_grad,
+                          progressbar=True, num_gpu=num_gpu)
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
@@ -67,9 +75,9 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
                 att_labels_seq_len = return_tuple[4]
 
                 if num_gpu > 1:
-                    for inputs_gpu in inputs:
+                    # for inputs_gpu in inputs:
                     #     print(inputs_gpu.shape)
-                    # inputs = inputs[0]
+                    inputs = inputs[0]
                     att_labels = att_labels[0]
                     ctc_labels = ctc_labels[0]
                     att_labels_seq_len = att_labels_seq_len[0]

@@ -20,13 +20,19 @@ from experiments.utils.data.dataset_loader.all_load.attention_all_load import Da
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, label_type, batch_size, eos_index,
-                 sort_utt=True, progressbar=False, num_gpu=1):
+                 sort_utt=True, sorta_grad=False,
+                 progressbar=False, num_gpu=1):
         """A class for loading dataset.
         Args:
             data_type: string, train or dev or test
             label_type: string, phone39 or phone48 or phone61 or character
             eos_index: int , the index of <EOS> class
-            sort_utt: if True, sort all utterances by the number of frames
+            sort_utt: if True, sort all utterances by the number of frames and
+                utteraces in each mini-batch are shuffled
+            sorta_grad: if True, sorting utteraces are conducted only in the
+                first epoch (not shuffled in each mini-batch). After the first
+                epoch, training will revert back to a random order. If sort_utt
+                is also True, it will be False.
             progressbar: if True, visualize progressbar
             num_gpu: int, if more than 1, divide batch_size by num_gpu
         """
@@ -37,7 +43,8 @@ class Dataset(DatasetBase):
         self.label_type = label_type
         self.batch_size = batch_size * num_gpu
         self.eos_index = eos_index
-        self.sort_utt = sort_utt
+        self.sort_utt = sort_utt if not sorta_grad else False
+        self.sorta_grad = sorta_grad
         self.progressbar = progressbar
         self.num_gpu = num_gpu
 

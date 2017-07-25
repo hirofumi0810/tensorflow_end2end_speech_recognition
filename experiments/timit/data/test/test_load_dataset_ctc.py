@@ -21,29 +21,37 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
     def test(self):
         # label_type
-        self.check_loading(label_type='character_capital_divide',
-                           num_gpu=1, sort_utt=False)
-        self.check_loading(label_type='character', num_gpu=1, sort_utt=False)
-        self.check_loading(label_type='phone61', num_gpu=1, sort_utt=False)
+        self.check_loading(label_type='character', num_gpu=1,
+                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='character_capital_divide', num_gpu=1,
+                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='phone61', num_gpu=1,
+                           sort_utt=False, sorta_grad=False)
 
         # sort
-        self.check_loading(label_type='phone61', num_gpu=1, sort_utt=True)
+        self.check_loading(label_type='phone61', num_gpu=1,
+                           sort_utt=True, sorta_grad=False)
+        self.check_loading(label_type='phone61', num_gpu=1,
+                           sort_utt=False, sorta_grad=True)
 
         # multi-GPU
-        self.check_loading(label_type='phone61', num_gpu=2, sort_utt=True)
-        self.check_loading(label_type='phone61', num_gpu=7, sort_utt=True)
+        self.check_loading(label_type='phone61', num_gpu=2,
+                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='phone61', num_gpu=7,
+                           sort_utt=False, sorta_grad=False)
 
     @measure_time
-    def check_loading(self, label_type, num_gpu, sort_utt):
+    def check_loading(self, label_type, num_gpu, sort_utt, sorta_grad):
         print('----- label_type: ' + label_type + ', num_gpu: ' +
-              str(num_gpu) + ', sort_utt: ' + str(sort_utt) + ' -----')
+              str(num_gpu) + ', sort_utt: ' + str(sort_utt) +
+              ', sorta_grad: ' + str(sorta_grad) + ' -----')
 
         batch_size = 64
         dataset = Dataset(data_type='train', label_type=label_type,
                           batch_size=batch_size,
                           num_stack=3, num_skip=3,
-                          sort_utt=sort_utt, progressbar=True,
-                          num_gpu=num_gpu)
+                          sort_utt=sort_utt, sorta_grad=sorta_grad,
+                          progressbar=True, num_gpu=num_gpu)
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:

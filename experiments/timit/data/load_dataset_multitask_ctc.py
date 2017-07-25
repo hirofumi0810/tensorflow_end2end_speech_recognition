@@ -23,7 +23,8 @@ class Dataset(DatasetBase):
 
     def __init__(self, data_type, label_type_main, label_type_sub, batch_size,
                  num_stack=None, num_skip=None,
-                 sort_utt=True, progressbar=False, num_gpu=1):
+                 sort_utt=True, sorta_grad=False,
+                 progressbar=False, num_gpu=1):
         """A class for loading dataset.
         Args:
             data_type: string, train or dev or test
@@ -31,7 +32,12 @@ class Dataset(DatasetBase):
             batch_size: int, the size of mini-batch
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip
-            sort_utt: if True, sort all utterances by the number of frames
+            sort_utt: if True, sort all utterances by the number of frames and
+                utteraces in each mini-batch are shuffled
+            sorta_grad: if True, sorting utteraces are conducted only in the
+                first epoch (not shuffled in each mini-batch). After the first
+                epoch, training will revert back to a random order. If sort_utt
+                is also True, it will be False.
             progressbar: if True, visualize progressbar
             num_gpu: int, if more than 1, divide batch_size by num_gpu
         """
@@ -44,7 +50,8 @@ class Dataset(DatasetBase):
         self.batch_size = batch_size * num_gpu
         self.num_stack = num_stack
         self.num_skip = num_skip
-        self.sort_utt = sort_utt
+        self.sort_utt = sort_utt if not sorta_grad else False
+        self.sorta_grad = sorta_grad
         self.progressbar = progressbar
         self.num_gpu = num_gpu
 
