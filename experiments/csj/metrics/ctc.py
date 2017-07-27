@@ -10,15 +10,13 @@ from __future__ import print_function
 import re
 import Levenshtein
 
-from experiments.utils.labels.character import num2char
-from experiments.utils.sparsetensor import sparsetensor2list
-from experiments.utils.exception_func import exception
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.sparsetensor import sparsetensor2list
 from experiments.utils.progressbar import wrap_iterator
 
 
-@exception
 def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
-                eval_batch_size=None, is_progressbar=False,
+                eval_batch_size=None, progressbar=False,
                 is_multitask=False, is_main=False):
     """Evaluate trained model by Character Error Rate.
     Args:
@@ -29,7 +27,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
         label_type: string, kanji or kana or phone
         is_test: bool, set to True when evaluating by the test set
         eval_batch_size: int, the batch size when evaluating the model
-        is_progressbar: if True, visualize progressbar
+        progressbar: if True, visualize progressbar
         is_multitask: if True, evaluate the multitask model
         is_main: if True, evaluate the main task
     Return:
@@ -56,7 +54,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
     elif label_type == 'phone':
         map_file_path == '../metrics/mapping_files/ctc/phone2num.txt'
 
-    for step in wrap_iterator(range(iteration), is_progressbar):
+    for step in wrap_iterator(range(iteration), progressbar):
         # Create feed dictionary for next mini batch
         if not is_multitask:
             inputs, labels_true, inputs_seq_len, _ = mini_batch.__next__()
@@ -88,8 +86,8 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
             str_pred = num2char(labels_pred[i_batch], map_file_path)
 
             # Remove silence(_) & noise(NZ) labels
-            str_true = re.sub(r'[_NZー]+', "", str_true)
-            str_pred = re.sub(r'[_NZー]+', "", str_pred)
+            str_true = re.sub(r'[_NZー・]+', "", str_true)
+            str_pred = re.sub(r'[_NZー・]+', "", str_pred)
 
             # Compute edit distance
             cer_each = Levenshtein.distance(

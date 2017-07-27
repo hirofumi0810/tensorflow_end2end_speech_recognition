@@ -50,7 +50,8 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
             network.inputs: inputs,
             network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.keep_prob_hidden: 1.0,
+            network.keep_prob_output: 1.0
         }
 
         # Visualize

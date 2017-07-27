@@ -12,47 +12,38 @@ import tensorflow as tf
 
 sys.path.append('../../../../')
 from experiments.csj.data.load_dataset_multitask_ctc import Dataset
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
 from experiments.utils.measure_time_func import measure_time
 
 
 class TestReadDatasetCTC(unittest.TestCase):
 
     def test(self):
-        self.check_loading(label_type_main='kanji', label_type_sub='kana',
-                           num_gpu=1, sort_utt=True)
-        self.check_loading(label_type_main='kanji', label_type_sub='phone',
-                           num_gpu=1, sort_utt=True)
-        self.check_loading(label_type_main='kana', label_type_sub='phone',
-                           num_gpu=1, sort_utt=True)
-        self.check_loading(label_type_main='kanji', label_type_sub='kana',
-                           num_gpu=1, sort_utt=False)
-        self.check_loading(label_type_main='kanji', label_type_sub='phone',
-                           num_gpu=1, sort_utt=False)
-        self.check_loading(label_type_main='kana', label_type_sub='phone',
-                           num_gpu=1, sort_utt=False)
 
+        # label_type
         self.check_loading(label_type_main='kanji', label_type_sub='kana',
-                           num_gpu=2, sort_utt=True)
+                           num_gpu=1, sort_utt=False, sorta_grad=False)
         self.check_loading(label_type_main='kanji', label_type_sub='phone',
-                           num_gpu=2, sort_utt=True)
+                           num_gpu=1, sort_utt=False, sorta_grad=False)
         self.check_loading(label_type_main='kana', label_type_sub='phone',
-                           num_gpu=2, sort_utt=True)
-        self.check_loading(label_type_main='kanji', label_type_sub='kana',
-                           num_gpu=2, sort_utt=False)
-        self.check_loading(label_type_main='kanji', label_type_sub='phone',
-                           num_gpu=2, sort_utt=False)
-        self.check_loading(label_type_main='kana', label_type_sub='phone',
-                           num_gpu=2, sort_utt=False)
+                           num_gpu=1, sort_utt=False, sorta_grad=False)
 
-        # For many GPUs
+        # sort
         self.check_loading(label_type_main='kanji', label_type_sub='kana',
-                           num_gpu=7, sort_utt=True)
+                           num_gpu=1, sort_utt=True, sorta_grad=False)
+        self.check_loading(label_type_main='kanji', label_type_sub='kana',
+                           num_gpu=1, sort_utt=False, sorta_grad=True)
+
+        # multi-GPU
+        self.check_loading(label_type_main='kanji', label_type_sub='kana',
+                           num_gpu=2, sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type_main='kanji', label_type_sub='kana',
+                           num_gpu=7, sort_utt=False, sorta_grad=False)
 
     @measure_time
     def check_loading(self, label_type_main, label_type_sub, num_gpu,
-                      sort_utt):
+                      sort_utt, sorta_grad):
 
         print('----- num_gpu: ' + str(num_gpu) +
               ', sort_utt: ' + str(sort_utt) + ' -----')
@@ -63,8 +54,8 @@ class TestReadDatasetCTC(unittest.TestCase):
                           label_type_sub=label_type_sub,
                           batch_size=batch_size,
                           num_stack=3, num_skip=3,
-                          sort_utt=sort_utt, progressbar=True,
-                          num_gpu=num_gpu)
+                          sort_utt=sort_utt, sorta_grad=sorta_grad,
+                          progressbar=True, num_gpu=num_gpu)
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
@@ -91,8 +82,8 @@ class TestReadDatasetCTC(unittest.TestCase):
                 inputs, labels_main, labels_sub, inputs_seq_len, input_names = mini_batch.__next__()
 
                 if num_gpu > 1:
-                    for inputs_gpu in inputs:
-                        print(inputs_gpu.shape)
+                    # for inputs_gpu in inputs:
+                    #     print(inputs_gpu.shape)
                     labels_main = labels_main[0]
                     labels_sub = labels_sub[0]
 

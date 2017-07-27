@@ -12,34 +12,36 @@ import tensorflow as tf
 
 sys.path.append('../../../../')
 from experiments.csj.data.load_dataset_attention import Dataset
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
 from experiments.utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetAttention(unittest.TestCase):
+
     def test(self):
-        self.check_loading(label_type='kanji', num_gpu=1, sort_utt=True)
-        self.check_loading(label_type='kana', num_gpu=1, sort_utt=True)
-        self.check_loading(label_type='phone', num_gpu=1, sort_utt=True)
+        # label_type
+        self.check_loading(label_type='kanji', num_gpu=1,
+                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='kana', num_gpu=1,
+                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='phone', num_gpu=1,
+                           sort_utt=False, sorta_grad=False)
 
-        self.check_loading(label_type='kanji', num_gpu=1, sort_utt=False)
-        self.check_loading(label_type='kana', num_gpu=1, sort_utt=False)
-        self.check_loading(label_type='phone', num_gpu=1, sort_utt=False)
+        # sort
+        self.check_loading(label_type='kana', num_gpu=1,
+                           sort_utt=True, sorta_grad=False)
+        self.check_loading(label_type='kana', num_gpu=1,
+                           sort_utt=False, sorta_grad=True)
 
-        self.check_loading(label_type='kanji', num_gpu=2, sort_utt=True)
-        self.check_loading(label_type='kana', num_gpu=2, sort_utt=True)
-        self.check_loading(label_type='phone', num_gpu=2, sort_utt=True)
-
-        self.check_loading(label_type='kanji', num_gpu=2, sort_utt=False)
-        self.check_loading(label_type='kana', num_gpu=2, sort_utt=False)
-        self.check_loading(label_type='phone', num_gpu=2, sort_utt=False)
-
-        # For many GPUs
-        self.check_loading(label_type='kanji', num_gpu=7, sort_utt=True)
+        # multi-GPU
+        self.check_loading(label_type='kana', num_gpu=2,
+                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='kana', num_gpu=7,
+                           sort_utt=False, sorta_grad=False)
 
     @measure_time
-    def check_loading(self, label_type, num_gpu, sort_utt):
+    def check_loading(self, label_type, num_gpu, sort_utt, sorta_grad):
         print('----- label_type: ' + label_type + ', num_gpu: ' +
               str(num_gpu) + ', sort_utt: ' + str(sort_utt) + ' -----')
 
@@ -47,8 +49,8 @@ class TestLoadDatasetAttention(unittest.TestCase):
         dataset = Dataset(data_type='dev', train_data_size='default',
                           label_type=label_type, batch_size=batch_size,
                           eos_index=1,
-                          sort_utt=sort_utt, progressbar=True,
-                          num_gpu=num_gpu)
+                          sort_utt=sort_utt, sorta_grad=sorta_grad,
+                          progressbar=True, num_gpu=num_gpu)
 
         tf.reset_default_graph()
         with tf.Session().as_default() as sess:
@@ -71,8 +73,8 @@ class TestLoadDatasetAttention(unittest.TestCase):
                 inputs, labels, inputs_seq_len, labels_seq_len, _ = mini_batch.__next__()
 
                 if num_gpu > 1:
-                    for inputs_gpu in inputs:
-                        print(inputs_gpu.shape)
+                    # for inputs_gpu in inputs:
+                    #     print(inputs_gpu.shape)
                     inputs = inputs[0]
                     labels = labels[0]
                     labels_seq_len = labels_seq_len[0]

@@ -33,11 +33,11 @@ def decode_test(session, decode_op, network, dataset, label_type,
     mini_batch = dataset.next_batch(batch_size=1)
 
     if label_type == 'kanji':
-        map_file_path = '../metrics/mapping_files/ctc/kanji2num.txt'
+        map_file_path = '../../../metrics/mapping_files/ctc/kanji2num.txt'
     elif label_type == 'kana':
-        map_file_path = '../metrics/mapping_files/ctc/kana2num.txt'
+        map_file_path = '../../../metrics/mapping_files/ctc/kana2num.txt'
     elif label_type == 'phone':
-        map_file_path = '../metrics/mapping_files/ctc/phone2num.txt'
+        map_file_path = '../../../metrics/mapping_files/ctc/phone2num.txt'
 
     # if save_path is not None:
     #     sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
@@ -55,7 +55,8 @@ def decode_test(session, decode_op, network, dataset, label_type,
             network.inputs: inputs,
             network.inputs_seq_len: inputs_seq_len,
             network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.keep_prob_hidden: 1.0,
+            network.keep_prob_output: 1.0
         }
 
         # Visualize
