@@ -55,7 +55,6 @@ class Dataset(DatasetBase):
         self.progressbar = progressbar
         self.num_gpu = num_gpu
 
-        self.input_size = 123
         input_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/inputs/', data_type)
         label_main_path = join(
@@ -98,6 +97,7 @@ class Dataset(DatasetBase):
         self.input_list = np.array(input_list)
         self.label_main_list = np.array(label_main_list)
         self.label_sub_list = np.array(label_sub_list)
+        self.input_size = self.input_list[0].shape[1]
 
         # Frame stacking
         if (num_stack is not None) and (num_skip is not None):
@@ -108,6 +108,6 @@ class Dataset(DatasetBase):
                                           num_stack,
                                           num_skip,
                                           progressbar)
-            self.input_size = self.input_size * num_stack
+            self.input_size *= num_stack
 
         self.rest = set(range(0, self.data_num, 1))

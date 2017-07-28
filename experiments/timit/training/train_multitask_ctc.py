@@ -155,7 +155,7 @@ def do_train(network, params):
                     network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                     network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
                     network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
-                    network.learning_rate_pl_pl_list[0]: learning_rate
+                    network.learning_rate_pl_list[0]: learning_rate
                 }
 
                 # Update parameters
@@ -371,7 +371,6 @@ def main(config_path, model_save_path):
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
     sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
-    print(network.model_name)
     do_train(network=network, params=params)
 
 

@@ -3,7 +3,7 @@ param:
   corpus: timit
   label_type: character
   feature: fbank
-  input_size: 123
+  input_size: 120
   num_stack: 3
   num_skip: 3
   num_unit: 256

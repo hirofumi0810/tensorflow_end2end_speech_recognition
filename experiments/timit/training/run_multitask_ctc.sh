@@ -18,10 +18,10 @@ PYTHON=/home/lab5/inaguma/.pyenv/versions/anaconda3-4.1.1/bin/python
 
 config_path=$1
 gpu_index=$2
-filename=$(basename $config_path | awk -F. "{print $1}")
+filename=$(basename $config_path | awk -F. '{print $1}')
 
 # Background job version
-# CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_multitask_ctc.py $config_path $MODEL_SAVE_PATH > log/$filename".log" &
+CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_multitask_ctc.py $config_path $MODEL_SAVE_PATH > log/$filename".log" &
 
 # Standard output version
-CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_multitask_ctc.py $config_path $MODEL_SAVE_PATH
+# CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_multitask_ctc.py $config_path $MODEL_SAVE_PATH

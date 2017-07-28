@@ -48,7 +48,6 @@ class Dataset(DatasetBase):
         self.progressbar = progressbar
         self.num_gpu = num_gpu
 
-        self.input_size = 123
         input_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/inputs/', data_type)
         ctc_label_path = join(
@@ -85,5 +84,6 @@ class Dataset(DatasetBase):
         self.input_list = np.array(input_list)
         self.att_label_list = np.array(att_label_list)
         self.ctc_label_list = np.array(ctc_label_list)
+        self.input_size = self.input_list[0].shape[1]
 
         self.rest = set(range(0, self.data_num, 1))

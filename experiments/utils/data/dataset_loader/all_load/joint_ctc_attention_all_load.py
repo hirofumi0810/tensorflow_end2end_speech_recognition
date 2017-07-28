@@ -17,6 +17,9 @@ import tensorflow as tf
 
 class DatasetBase(object):
 
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError
+
     def next_batch(self, batch_size=None, session=None):
         """Make mini-batch.
         Args:

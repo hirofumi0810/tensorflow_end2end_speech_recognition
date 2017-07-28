@@ -19,6 +19,9 @@ from experiments.utils.data.frame_stacking import stack_frame
 
 class DatasetBase(object):
 
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError
+
     def next_batch(self, batch_size=None, session=None):
         """Make mini-batch.
         Args:

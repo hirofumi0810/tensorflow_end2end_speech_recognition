@@ -347,13 +347,14 @@ class Multitask_BLSTM_CTC(ctcBase):
         total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
         # Add a scalar summary for the snapshot of loss
-        with tf.name_scope("weight_loss_gpu" + str(gpu_index)):
-            self.summaries_train.append(
-                tf.summary.scalar('weight_loss_train',
-                                  weight_sum * self.weight_decay))
-            self.summaries_dev.append(
-                tf.summary.scalar('weight_loss_dev',
-                                  weight_sum * self.weight_decay))
+        if self.weight_decay > 0:
+            with tf.name_scope("weight_loss_gpu" + str(gpu_index)):
+                self.summaries_train.append(
+                    tf.summary.scalar('weight_loss_train',
+                                      weight_sum * self.weight_decay))
+                self.summaries_dev.append(
+                    tf.summary.scalar('weight_loss_dev',
+                                      weight_sum * self.weight_decay))
 
         with tf.name_scope("ctc_loss_main_gpu" + str(gpu_index)):
             self.summaries_train.append(

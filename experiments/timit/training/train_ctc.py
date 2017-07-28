@@ -163,8 +163,8 @@ def do_train(network, params):
                         network.labels_pl_list[0]: list2sparsetensor(labels, padded_value=-1),
                         network.inputs_seq_len_pl_list[0]: inputs_seq_len,
                         network.keep_prob_input_pl_list[0]: 1.0,
-                        network.keep_prob_hidden_pl_list[0: 1.0,
-                        network.keep_prob_output_pl_list[0: 1.0
+                        network.keep_prob_hidden_pl_list[0]: 1.0,
+                        network.keep_prob_output_pl_list[0]: 1.0
                     }
 
                     # Compute loss
@@ -176,8 +176,8 @@ def do_train(network, params):
 
                     # Change to evaluation mode
                     feed_dict_train[network.keep_prob_input_pl_list[0]] = 1.0
-                    feed_dict_train[network.keep_prob_hidden_pl_list{0] = 1.0
-                    feed_dict_train[network.keep_prob_output_pl_list{0] = 1.0
+                    feed_dict_train[network.keep_prob_hidden_pl_list[0]] = 1.0
+                    feed_dict_train[network.keep_prob_output_pl_list[0]] = 1.0
 
                     # Compute accuracy & update event file
                     ler_train, summary_str_train = sess.run(
@@ -313,18 +313,18 @@ def main(config_path, model_save_path):
     # Model setting
     model = load(model_type=params['model'])
     network = model(batch_size=params['batch_size'],
-                       input_size=params['input_size'] * params['num_stack'],
-                       num_unit=params['num_unit'],
-                       num_layer=params['num_layer'],
-                       num_classes=params['num_classes'],
-                       parameter_init=params['weight_init'],
-                       clip_grad=params['clip_grad'],
-                       clip_activation=params['clip_activation'],
-                       dropout_ratio_input=params['dropout_input'],
-                       dropout_ratio_output=params['dropout_output'],
-                       dropout_ratio_hidden=params['dropout_hidden'],
-                       num_proj=params['num_proj'],
-                       weight_decay=params['weight_decay'])
+                    input_size=params['input_size'] * params['num_stack'],
+                    num_unit=params['num_unit'],
+                    num_layer=params['num_layer'],
+                    num_classes=params['num_classes'],
+                    parameter_init=params['weight_init'],
+                    clip_grad=params['clip_grad'],
+                    clip_activation=params['clip_activation'],
+                    dropout_ratio_input=params['dropout_input'],
+                    dropout_ratio_output=params['dropout_output'],
+                    dropout_ratio_hidden=params['dropout_hidden'],
+                    num_proj=params['num_proj'],
+                    weight_decay=params['weight_decay'])
 
     network.model_name = params['model']
     network.model_name += '_' + str(params['num_unit'])
@@ -364,7 +364,6 @@ def main(config_path, model_save_path):
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
     sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
-    print(network.model_name)
     do_train(network=network, params=params)
 
 
