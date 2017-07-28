@@ -8,8 +8,8 @@ from __future__ import print_function
 import numpy as np
 import scipy.io.wavfile
 from python_speech_features import mfcc, fbank, logfbank, hz2mel
-from experiments.utils.sparsetensor import list2sparsetensor
-from experiments.utils.labels.phone import num2phone, phone2num
+from experiments.utils.data.sparsetensor import list2sparsetensor
+from experiments.utils.data.labels.phone import num2phone, phone2num
 
 
 def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):

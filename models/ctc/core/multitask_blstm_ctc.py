@@ -81,12 +81,53 @@ class Multitask_BLSTM_CTC(ctcBase):
         self.main_task_weight = main_task_weight
         self.sub_task_weight = 1 - main_task_weight
 
+        # Placeholder for multi-task
+        self.labels_sub_pl_list = []
+
+    def create_placeholders(self, gpu_index):
+        """
+        Args:
+            gpu_index: int, index of gpu
+        """
+        # Define placeholders in each gpu tower
+        self.inputs_pl_list.append(
+            tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                           name='input' + str(gpu_index)))
+        self.labels_pl_list.append(
+            tf.SparseTensor(
+                tf.placeholder(tf.int64, name='indices_gpu' + str(gpu_index)),
+                tf.placeholder(tf.int32,  name='values_gpu' + str(gpu_index)),
+                tf.placeholder(tf.int64, name='shape_gpu' + str(gpu_index))))
+        self.labels_sub_pl_list.append(
+            tf.SparseTensor(
+                tf.placeholder(tf.int64,
+                               name='indices_sub_gpu' + str(gpu_index)),
+                tf.placeholder(tf.int32,
+                               name='values_sub_gpu' + str(gpu_index)),
+                tf.placeholder(tf.int64,
+                               name='shape_sub_gpu' + str(gpu_index))))
+        self.inputs_seq_len_pl_list.append(
+            tf.placeholder(tf.int64, shape=[None],
+                           name='inputs_seq_len_gpu' + str(gpu_index)))
+        self.keep_prob_input_pl_list.append(
+            tf.placeholder(tf.float32,
+                           name='keep_prob_input_gpu' + str(gpu_index)))
+        self.keep_prob_hidden_pl_list.append(
+            tf.placeholder(tf.float32,
+                           name='keep_prob_hidden_gpu' + str(gpu_index)))
+        self.keep_prob_output_pl_list.append(
+            tf.placeholder(tf.float32,
+                           name='keep_prob_output_gpu' + str(gpu_index)))
+        self.learning_rate_pl_list.append(
+            tf.placeholder(tf.float32,
+                           name='learning_rate_gpu' + str(gpu_index)))
+
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
                keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of `[batch_size, max_time, input_dim]`
-            inputs_seq_len: A tensor of `[batch_size]`
+            inputs: A tensor of size `[batch_size, max_time, input_dim]`
+            inputs_seq_len: A tensor of size `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
@@ -94,8 +135,12 @@ class Multitask_BLSTM_CTC(ctcBase):
             keep_prob_output: A float value. A probability to keep nodes in
                 the hidden-output layer
         Returns:
-            logits: A tensor of size `[max_time, batch_size, input_size]`
+            logits_main: A tensor of size `[max_time, batch_size, input_size]`
+                in the main task
+            logits_sub: A tensor of size `[max_time, batch_size, input_size]`
+                in the sub task
         """
+
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(inputs,
                                 keep_prob_input,
@@ -145,7 +190,7 @@ class Multitask_BLSTM_CTC(ctcBase):
                 # initial_state_bw=_init_state_bw,
 
                 # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
+                (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
                     inputs=outputs,
@@ -177,11 +222,12 @@ class Multitask_BLSTM_CTC(ctcBase):
 
                         # Reshape back to the original shape
                         logits_sub = tf.reshape(
-                            logits_sub_2d, shape=[batch_size, -1, self.num_classes_sub])
+                            logits_sub_2d,
+                            shape=[batch_size, -1, self.num_classes_sub])
 
                         # Convert to time-major: `[max_time, batch_size,
                         # num_classes]'
-                        logits = tf.transpose(logits_sub, (1, 0, 2))
+                        logits_sub = tf.transpose(logits_sub, (1, 0, 2))
 
                         # Dropout for the hidden-output connections
                         logits_sub = tf.nn.dropout(logits_sub,
@@ -235,7 +281,8 @@ class Multitask_BLSTM_CTC(ctcBase):
             return logits_main, logits_sub
 
     def compute_loss(self, inputs, labels_main, labels_sub, inputs_seq_len,
-                     keep_prob_input, keep_prob_hidden, num_gpu=1, scope=None):
+                     keep_prob_input, keep_prob_hidden, keep_prob_output,
+                     gpu_index=0, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[batch_size, max_time, input_size]`
@@ -243,78 +290,94 @@ class Multitask_BLSTM_CTC(ctcBase):
             labels_sub: A SparseTensor of target labels in the sub task
             inputs_seq_len: A tensor of size `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
-                input-hidden layers
+                the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
-                hidden-hidden layers
-            num_gpu: the number of GPUs
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
+            gpu_index: int, index of gpu
         Returns:
-            loss: operation for computing ctc loss
+            total_loss: operation for computing total ctc loss
             logits_main: A tensor of size `[max_time, batch_size, input_size]`
             logits_sub: A tensor of size `[max_time, batch_size, input_size]`
         """
         # Build model graph
         logits_main, logits_sub = self._build(
-            inputs, inputs_seq_len, keep_prob_input, keep_prob_hidden)
+            inputs, inputs_seq_len,
+            keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         # Weight decay
-        with tf.name_scope("weight_decay_loss"):
-            weight_sum = 0
-            for var in tf.trainable_variables():
-                if 'bias' not in var.name.lower():
-                    weight_sum += tf.nn.l2_loss(var)
-            tf.add_to_collection('losses', weight_sum * self.weight_decay)
+        if self.weight_decay > 0:
+            with tf.name_scope("weight_decay_loss"):
+                weight_sum = 0
+                for var in tf.trainable_variables():
+                    if 'bias' not in var.name.lower():
+                        weight_sum += tf.nn.l2_loss(var)
+                tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss_main"):
-            ctc_losses = tf.nn.ctc_loss(labels_main,
-                                        logits_main,
-                                        tf.cast(inputs_seq_len, tf.int32),
-                                        preprocess_collapse_repeated=False,
-                                        ctc_merge_repeated=True,
-                                        ignore_longer_outputs_than_inputs=False,
-                                        time_major=True)
-            ctc_loss = tf.reduce_mean(
-                ctc_losses, name='ctc_loss_main')
+            ctc_losses = tf.nn.ctc_loss(
+                labels_main,
+                logits_main,
+                tf.cast(inputs_seq_len, tf.int32),
+                preprocess_collapse_repeated=False,
+                ctc_merge_repeated=True,
+                ignore_longer_outputs_than_inputs=False,
+                time_major=True)
+            ctc_loss_main = tf.reduce_mean(
+                ctc_losses, name='ctc_loss_mean_main')
             tf.add_to_collection(
-                'losses', ctc_loss * self.main_task_weight)
-
-            self.summaries_train.append(
-                tf.summary.scalar('ctc_loss_main_train',
-                                  ctc_loss * self.main_task_weight))
-            self.summaries_dev.append(
-                tf.summary.scalar('ctc_loss_main_dev',
-                                  ctc_loss * self.main_task_weight))
+                'losses', ctc_loss_main * self.main_task_weight)
 
         with tf.name_scope("ctc_loss_sub"):
-            ctc_losses = tf.nn.ctc_loss(labels_sub,
-                                        logits_sub,
-                                        tf.cast(inputs_seq_len, tf.int32),
-                                        preprocess_collapse_repeated=False,
-                                        ctc_merge_repeated=True,
-                                        ignore_longer_outputs_than_inputs=False,
-                                        time_major=True)
-            ctc_loss = tf.reduce_mean(
-                ctc_losses, name='ctc_loss_sub')
+            ctc_losses = tf.nn.ctc_loss(
+                labels_sub,
+                logits_sub,
+                tf.cast(inputs_seq_len, tf.int32),
+                preprocess_collapse_repeated=False,
+                ctc_merge_repeated=True,
+                ignore_longer_outputs_than_inputs=False,
+                time_major=True)
+            ctc_loss_sub = tf.reduce_mean(
+                ctc_losses, name='ctc_loss_mean_sub')
             tf.add_to_collection(
-                'losses', ctc_loss * self.sub_task_weight)
-
-            self.summaries_train.append(
-                tf.summary.scalar('ctc_loss_sub_train',
-                                  ctc_loss * self.sub_task_weight))
-            self.summaries_dev.append(
-                tf.summary.scalar('ctc_loss_sub_dev',
-                                  ctc_loss * self.sub_task_weight))
+                'losses', ctc_loss_sub * self.sub_task_weight)
 
         # Compute total loss
-        loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
         # Add a scalar summary for the snapshot of loss
-        with tf.name_scope("total_loss"):
+        with tf.name_scope("weight_loss_gpu" + str(gpu_index)):
             self.summaries_train.append(
-                tf.summary.scalar('total_loss_train', loss))
+                tf.summary.scalar('weight_loss_train',
+                                  weight_sum * self.weight_decay))
             self.summaries_dev.append(
-                tf.summary.scalar('total_loss_dev', loss))
+                tf.summary.scalar('weight_loss_dev',
+                                  weight_sum * self.weight_decay))
 
-        return loss, logits_main, logits_sub
+        with tf.name_scope("ctc_loss_main_gpu" + str(gpu_index)):
+            self.summaries_train.append(
+                tf.summary.scalar('ctc_loss_main_train',
+                                  ctc_loss_main * self.main_task_weight))
+            self.summaries_dev.append(
+                tf.summary.scalar('ctc_loss_main_dev',
+                                  ctc_loss_main * self.main_task_weight))
+
+        with tf.name_scope("ctc_loss_sub_gpu" + str(gpu_index)):
+            self.summaries_train.append(
+                tf.summary.scalar('ctc_loss_sub_train',
+                                  ctc_loss_sub * self.sub_task_weight))
+            self.summaries_dev.append(
+                tf.summary.scalar('ctc_loss_sub_dev',
+                                  ctc_loss_sub * self.sub_task_weight))
+
+        with tf.name_scope("total_loss_gpu" + str(gpu_index)):
+            self.summaries_train.append(
+                tf.summary.scalar('total_loss_train', total_loss))
+            self.summaries_dev.append(
+                tf.summary.scalar('total_loss_dev', total_loss))
+
+        return total_loss, logits_main, logits_sub
 
     def decoder(self, logits_main, logits_sub, inputs_seq_len, decode_type,
                 beam_width=None):

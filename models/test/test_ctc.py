@@ -8,15 +8,15 @@ from __future__ import print_function
 import sys
 import time
 import tensorflow as tf
-from tensorflow.python import debug as tf_debug
+# from tensorflow.python import debug as tf_debug
 
 sys.path.append('../../')
 from models.ctc.load_model import load
 from models.test.util import measure_time
 from models.test.data import generate_data, num2alpha, num2phone
-from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.data.sparsetensor import sparsetensor2list
 from experiments.utils.parameter import count_total_parameters
-from experiments.utils.training.learning_rate_controller.step import Controller
+from experiments.utils.training.learning_rate_controller import Controller
 
 
 class TestCTC(tf.test.TestCase):
@@ -40,35 +40,17 @@ class TestCTC(tf.test.TestCase):
         # self.check_training(model_type='cnn_ctc', label_type='character')
 
     def check_training(self, model_type, label_type):
-        print('----- ' + model_type + ', ' + label_type + ' -----')
+        print('----- model_type: %s, label_type: %s -----' %
+              (model_type, label_type))
+
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
-            batch_size = 4
+            batch_size = 2
             inputs, labels_true_st, inputs_seq_len = generate_data(
                 label_type=label_type,
                 model='ctc',
                 batch_size=batch_size)
-
-            # Define placeholders
-            inputs_pl = tf.placeholder(tf.float32,
-                                       shape=[None, None, inputs[0].shape[-1]],
-                                       name='inputs')
-            labels_pl = tf.SparseTensor(
-                tf.placeholder(tf.int64, name='indices'),
-                tf.placeholder(tf.int32, name='values'),
-                tf.placeholder(tf.int64, name='shape'))
-            inputs_seq_len_pl = tf.placeholder(tf.int64,
-                                               shape=[None],
-                                               name='inputs_seq_len')
-            keep_prob_input_pl = tf.placeholder(tf.float32,
-                                                name='keep_prob_input')
-            keep_prob_hidden_pl = tf.placeholder(tf.float32,
-                                                 name='keep_prob_hidden')
-            keep_prob_output_pl = tf.placeholder(tf.float32,
-                                                 name='keep_prob_output')
-            learning_rate_pl = tf.placeholder(tf.float32,
-                                              name='learning_rate')
 
             # Define model graph
             num_classes = 26 if label_type == 'character' else 61
@@ -86,30 +68,35 @@ class TestCTC(tf.test.TestCase):
                             dropout_ratio_hidden=0.9,
                             dropout_ratio_output=0.9,
                             num_proj=256,
-                            weight_decay=1e-6)
+                            weight_decay=1e-8)
+
+            # Define placeholders
+            network.create_placeholders(gpu_index=None)
 
             # Add to the graph each operation
-            loss_op, logits = network.compute_loss(inputs_pl,
-                                                   labels_pl,
-                                                   inputs_seq_len_pl,
-                                                   keep_prob_input_pl,
-                                                   keep_prob_hidden_pl,
-                                                   keep_prob_output_pl)
-            train_op = network.train(loss_op,
-                                     optimizer='rmsprop',
-                                     learning_rate=learning_rate_pl)
+            loss_op, logits = network.compute_loss(
+                network.inputs_pl_list[0],
+                network.labels_pl_list[0],
+                network.inputs_seq_len_pl_list[0],
+                network.keep_prob_input_pl_list[0],
+                network.keep_prob_hidden_pl_list[0],
+                network.keep_prob_output_pl_list[0])
+            train_op = network.train(
+                loss_op,
+                optimizer='adam',
+                learning_rate=network.learning_rate_pl_list[0])
             decode_op = network.decoder(logits,
-                                        inputs_seq_len_pl,
+                                        network.inputs_seq_len_pl_list[0],
                                         decode_type='beam_search',
                                         beam_width=20)
-            ler_op = network.compute_ler(decode_op, labels_pl)
+            ler_op = network.compute_ler(decode_op, network.labels_pl_list[0])
 
             # Define learning rate controller
             learning_rate = 1e-3
             lr_controller = Controller(learning_rate_init=learning_rate,
-                                       decay_start_step=10,
-                                       decay_steps=20,
+                                       decay_start_epoch=10,
                                        decay_rate=0.99,
+                                       decay_patient_epoch=5,
                                        lower_better=True)
 
             # Add the variable initializer operation
@@ -127,12 +114,13 @@ class TestCTC(tf.test.TestCase):
 
             # Make feed dict
             feed_dict = {
-                inputs_pl: inputs,
-                labels_pl: labels_true_st,
-                inputs_seq_len_pl: inputs_seq_len,
-                keep_prob_input_pl: network.dropout_ratio_input,
-                keep_prob_hidden_pl: network.dropout_ratio_hidden,
-                keep_prob_output_pl: network.dropout_ratio_output
+                network.inputs_pl_list[0]: inputs,
+                network.labels_pl_list[0]: labels_true_st,
+                network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
+                network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
+                network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                network.learning_rate_pl_list[0]: learning_rate
             }
 
             map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
@@ -152,12 +140,6 @@ class TestCTC(tf.test.TestCase):
                 not_improved_count = 0
                 for step in range(max_steps):
 
-                    learning_rate = lr_controller.decay_lr(
-                        learning_rate=learning_rate,
-                        step=step,
-                        value=ler_train_pre)
-                    feed_dict[learning_rate_pl] = learning_rate
-
                     # Compute loss
                     _, loss_train = sess.run(
                         [train_op, loss_op], feed_dict=feed_dict)
@@ -170,9 +152,9 @@ class TestCTC(tf.test.TestCase):
 
                     if (step + 1) % 10 == 0:
                         # Change to evaluation mode
-                        feed_dict[keep_prob_input_pl] = 1.0
-                        feed_dict[keep_prob_hidden_pl] = 1.0
-                        feed_dict[keep_prob_output_pl] = 1.0
+                        feed_dict[network.keep_prob_input_pl_list[0]] = 1.0
+                        feed_dict[network.keep_prob_hidden_pl_list[0]] = 1.0
+                        feed_dict[network.keep_prob_output_pl_list[0]] = 1.0
 
                         # Compute accuracy
                         ler_train = sess.run(ler_op, feed_dict=feed_dict)
@@ -206,6 +188,14 @@ class TestCTC(tf.test.TestCase):
                             print('Modle is Converged.')
                             break
                         ler_train_pre = ler_train
+
+                        # Update learning rate
+                        learning_rate = lr_controller.decay_lr(
+                            learning_rate=learning_rate,
+                            epoch=step,
+                            value=ler_train)
+                        feed_dict[network.learning_rate_pl_list[0]
+                                  ] = learning_rate
 
                 duration_global = time.time() - start_time_global
                 print('Total time: %.3f sec' % (duration_global))

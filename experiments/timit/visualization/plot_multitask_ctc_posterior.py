@@ -35,37 +35,17 @@ def do_plot(network, params, epoch=None):
                         sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.inputs = tf.placeholder(
-        tf.float32,
-        shape=[None, None, network.input_size],
-        name='input')
-    network.labels = tf.SparseTensor(
-        tf.placeholder(tf.int64, name='indices'),
-        tf.placeholder(tf.int32, name='values'),
-        tf.placeholder(tf.int64, name='shape'))
-    network.labels_sub = tf.SparseTensor(
-        tf.placeholder(tf.int64, name='indices_sub'),
-        tf.placeholder(tf.int32, name='values_sub'),
-        tf.placeholder(tf.int64, name='shape_sub'))
-    network.inputs_seq_len = tf.placeholder(tf.int64,
-                                            shape=[None],
-                                            name='inputs_seq_len')
-    network.keep_prob_input = tf.placeholder(tf.float32,
-                                             name='keep_prob_input')
-    network.keep_prob_hidden = tf.placeholder(tf.float32,
-                                              name='keep_prob_hidden')
-    network.keep_prob_output = tf.placeholder(tf.float32,
-                                              name='keep_prob_output')
+    network.create_placeholders(gpu_index=None)
 
     # Add to the graph each operation (including model definition)
     _, logits_main, logits_sub = network.compute_loss(
-        network.inputs,
-        network.labels,
-        network.labels_sub,
-        network.inputs_seq_len,
-        network.keep_prob_input,
-        network.keep_prob_hidden,
-        network.keep_prob_output)
+        network.inputs_pl_list[0],
+        network.labels_pl_list[0],
+        network.labels_sub_pl_list[0],
+        network.inputs_seq_len_pl_list[0],
+        network.keep_prob_input_pl_list[0],
+        network.keep_prob_hidden_pl_list[0],
+        network.keep_prob_output_pl_list[0])
     posteriors_op_main, posteriors_op_sub = network.posteriors(
         logits_main, logits_sub)
 
@@ -114,8 +94,8 @@ def main(model_path, epoch):
         params['num_classes_sub'] = 39
 
     # Model setting
-    CTCModel = load(model_type=config['model_name'])
-    network = CTCModel(
+    model = load(model_type=config['model_name'])
+    network = model(
         batch_size=1,
         input_size=params['input_size'] * params['num_stack'],
         num_unit=params['num_unit'],

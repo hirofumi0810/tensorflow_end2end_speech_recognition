@@ -10,9 +10,9 @@ from __future__ import print_function
 from os.path import join
 import sys
 
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
-from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
+from experiments.utils.data.sparsetensor import sparsetensor2list
 
 
 def decode_test(session, decode_op, network, dataset, label_type,
@@ -39,8 +39,8 @@ def decode_test(session, decode_op, network, dataset, label_type,
     elif label_type == 'phone':
         map_file_path = '../../../metrics/mapping_files/ctc/phone2num.txt'
 
-    # if save_path is not None:
-    #     sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
+    if save_path is not None:
+        sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
 
     for step in range(iteration):
         # Create feed dictionary for next mini batch
@@ -48,15 +48,15 @@ def decode_test(session, decode_op, network, dataset, label_type,
         # NOTE: labels_true is expected to be a list of string when evaluation
         # using dataset where label_type is kanji or kana
 
-        if input_names[0] not in ['A03M0106_0057', 'A03M0016_0014']:
-            continue
+        # if input_names[0] not in ['A03M0106_0057', 'A03M0016_0014']:
+        #     continue
 
         feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0,
-            network.keep_prob_output: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize

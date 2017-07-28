@@ -65,8 +65,8 @@ class LSTM_CTC(ctcBase):
                keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of `[batch_size, max_time, input_dim]`
-            inputs_seq_len:  A tensor of `[batch_size]`
+            inputs: A tensor of size `[batch_size, max_time, input_dim]`
+            inputs_seq_len:  A tensor of size `[batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
@@ -74,7 +74,7 @@ class LSTM_CTC(ctcBase):
             keep_prob_output: A float value. A probability to keep nodes in
                 the hidden-output layer
         Returns:
-            logits:
+            logits: A tensor of size `[max_time, batch_size, num_classes]`
         """
         # Dropout for the input-hidden connection
         inputs = tf.nn.dropout(inputs,
@@ -109,10 +109,10 @@ class LSTM_CTC(ctcBase):
             lstm_list, state_is_tuple=True)
 
         # Ignore 2nd return (the last state)
-        outputs, final_state = tf.nn.dynamic_rnn(cell=stacked_lstm,
-                                                 inputs=inputs,
-                                                 sequence_length=inputs_seq_len,
-                                                 dtype=tf.float32)
+        outputs, _ = tf.nn.dynamic_rnn(cell=stacked_lstm,
+                                       inputs=inputs,
+                                       sequence_length=inputs_seq_len,
+                                       dtype=tf.float32)
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:

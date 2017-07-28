@@ -62,51 +62,30 @@ def do_train(network, params):
     with tf.Graph().as_default():
 
         # Define placeholders
-        network.inputs = tf.placeholder(
-            tf.float32,
-            shape=[None, None, network.input_size],
-            name='input')
-        network.labels = tf.SparseTensor(
-            tf.placeholder(tf.int64, name='indices'),
-            tf.placeholder(tf.int32, name='values'),
-            tf.placeholder(tf.int64, name='shape'))
-        network.labels_sub = tf.SparseTensor(
-            tf.placeholder(tf.int64, name='indices_sub'),
-            tf.placeholder(tf.int32, name='values_sub'),
-            tf.placeholder(tf.int64, name='shape_sub'))
-        network.inputs_seq_len = tf.placeholder(tf.int64,
-                                                shape=[None],
-                                                name='inputs_seq_len')
-        network.keep_prob_input = tf.placeholder(tf.float32,
-                                                 name='keep_prob_input')
-        network.keep_prob_hidden = tf.placeholder(tf.float32,
-                                                  name='keep_prob_hidden')
-        network.keep_prob_output = tf.placeholder(tf.float32,
-                                                  name='keep_prob_output')
-        learning_rate_pl = tf.placeholder(tf.float32,
-                                          name='learning_rate')
+        network.create_placeholders(gpu_index=0)
 
         # Add to the graph each operation
         loss_op, logits_main, logits_sub = network.compute_loss(
-            network.inputs,
-            network.labels,
-            network.labels_sub,
-            network.inputs_seq_len,
-            network.keep_prob_input,
-            network.keep_prob_hidden,
-            network.keep_prob_output)
-        train_op = network.train(loss_op,
-                                 optimizer=params['optimizer'],
-                                 learning_rate=learning_rate_pl)
+            network.inputs_pl_list[0],
+            network.labels_pl_list[0],
+            network.labels_sub_pl_list[0],
+            network.inputs_seq_len_pl_list[0],
+            network.keep_prob_input_pl_list[0],
+            network.keep_prob_hidden_pl_list[0],
+            network.keep_prob_output_pl_list[0])
+        train_op = network.train(
+            loss_op,
+            optimizer=params['optimizer'],
+            learning_rate=network.learning_rate_pl_list[0])
         decode_op_main, decode_op_sub = network.decoder(
             logits_main,
             logits_sub,
-            network.inputs_seq_len,
+            network.inputs_seq_len_pl_list[0],
             decode_type='beam_search',
             beam_width=20)
-        ler_op_main, ler_op_sub = network.compute_ler(
+        cer_op, per_op = network.compute_ler(
             decode_op_main, decode_op_sub,
-            network.labels, network.labels_sub)
+            network.labels_pl_list[0], network.labels_sub_pl_list[0])
 
         # Define learning rate controller
         lr_controller = Controller(
@@ -169,16 +148,14 @@ def do_train(network, params):
                 # Create feed dictionary for next mini batch (train)
                 inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
-                    network.inputs: inputs,
-                    network.labels: list2sparsetensor(labels_char,
-                                                      padded_value=-1),
-                    network.labels_sub: list2sparsetensor(labels_phone,
-                                                          padded_value=-1),
-                    network.inputs_seq_len: inputs_seq_len,
-                    network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.keep_prob_output: network.dropout_ratio_output,
-                    learning_rate_pl: learning_rate
+                    network.inputs_pl_list[0]: inputs,
+                    network.labels_pl_list[0]: list2sparsetensor(labels_char, padded_value=-1),
+                    network.labels_sub_pl_list[0]: list2sparsetensor(labels_phone, padded_value=-1),
+                    network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                    network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
+                    network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
+                    network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                    network.learning_rate_pl_pl_list[0]: learning_rate
                 }
 
                 # Update parameters
@@ -189,15 +166,13 @@ def do_train(network, params):
                     # Create feed dictionary for next mini batch (dev)
                     inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_dev.__next__()
                     feed_dict_dev = {
-                        network.inputs: inputs,
-                        network.labels:  list2sparsetensor(labels_char,
-                                                           padded_value=-1),
-                        network.labels_sub: list2sparsetensor(labels_phone,
-                                                              padded_value=-1),
-                        network.inputs_seq_len: inputs_seq_len,
-                        network.keep_prob_input: 1.0,
-                        network.keep_prob_hidden: 1.0,
-                        network.keep_prob_output: 1.0
+                        network.inputs_pl_list[0]: inputs,
+                        network.labels_pl_list[0]: list2sparsetensor(labels_char, padded_value=-1),
+                        network.labels_sub_pl_list[0]: list2sparsetensor(labels_phone, padded_value=-1),
+                        network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                        network.keep_prob_input_pl_list[0]: 1.0,
+                        network.keep_prob_hidden_pl_list[0]: 1.0,
+                        network.keep_prob_output_pl_list[0]: 1.0
                     }
 
                     # Compute loss
@@ -208,16 +183,16 @@ def do_train(network, params):
                     csv_loss_dev.append(loss_dev)
 
                     # Change to evaluation mode
-                    feed_dict_train[network.keep_prob_input] = 1.0
-                    feed_dict_train[network.keep_prob_hidden] = 1.0
-                    feed_dict_train[network.keep_prob_output] = 1.0
+                    feed_dict_train[network.keep_prob_input_pl_list[0]] = 1.0
+                    feed_dict_train[network.keep_prob_hidden_pl_list[0]] = 1.0
+                    feed_dict_train[network.keep_prob_output_pl_list[0]] = 1.0
 
                     # Compute accuracy & update event file
                     cer_train, per_train, summary_str_train = sess.run(
-                        [ler_op_main, ler_op_sub, summary_train],
+                        [cer_op, per_op, summary_train],
                         feed_dict=feed_dict_train)
                     cer_dev, per_dev, summary_str_dev = sess.run(
-                        [ler_op_main, ler_op_sub,  summary_dev],
+                        [cer_op, per_op,  summary_dev],
                         feed_dict=feed_dict_dev)
                     csv_cer_train.append(cer_train)
                     csv_cer_dev.append(cer_dev)
@@ -261,7 +236,7 @@ def do_train(network, params):
                         per_dev_epoch = do_eval_per(
                             session=sess,
                             decode_op=decode_op_sub,
-                            per_op=ler_op_sub,
+                            per_op=per_op,
                             network=network,
                             dataset=dev_data,
                             label_type=params['label_type_sub'],
@@ -285,7 +260,7 @@ def do_train(network, params):
                             per_test = do_eval_per(
                                 session=sess,
                                 decode_op=decode_op_sub,
-                                per_op=ler_op_sub,
+                                per_op=per_op,
                                 network=network,
                                 dataset=test_data,
                                 label_type=params['label_type_sub'],
@@ -337,23 +312,23 @@ def main(config_path, model_save_path):
         params['num_classes_sub'] = 39
 
     # Model setting
-    CTCModel = load(model_type=params['model'])
-    network = CTCModel(batch_size=params['batch_size'],
-                       input_size=params['input_size'] * params['num_stack'],
-                       num_unit=params['num_unit'],
-                       num_layer_main=params['num_layer_main'],
-                       num_layer_sub=params['num_layer_sub'],
-                       num_classes_main=28,
-                       num_classes_sub=params['num_classes_sub'],
-                       main_task_weight=params['main_task_weight'],
-                       parameter_init=params['weight_init'],
-                       clip_grad=params['clip_grad'],
-                       clip_activation=params['clip_activation'],
-                       dropout_ratio_input=params['dropout_input'],
-                       dropout_ratio_hidden=params['dropout_hidden'],
-                       dropout_ratio_output=params['dropout_output'],
-                       num_proj=params['num_proj'],
-                       weight_decay=params['weight_decay'])
+    model = load(model_type=params['model'])
+    network = model(batch_size=params['batch_size'],
+                    input_size=params['input_size'] * params['num_stack'],
+                    num_unit=params['num_unit'],
+                    num_layer_main=params['num_layer_main'],
+                    num_layer_sub=params['num_layer_sub'],
+                    num_classes_main=28,
+                    num_classes_sub=params['num_classes_sub'],
+                    main_task_weight=params['main_task_weight'],
+                    parameter_init=params['weight_init'],
+                    clip_grad=params['clip_grad'],
+                    clip_activation=params['clip_activation'],
+                    dropout_ratio_input=params['dropout_input'],
+                    dropout_ratio_hidden=params['dropout_hidden'],
+                    dropout_ratio_output=params['dropout_output'],
+                    num_proj=params['num_proj'],
+                    weight_decay=params['weight_decay'])
 
     network.model_name = params['model']
     network.model_name += '_' + str(params['num_unit'])

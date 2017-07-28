@@ -45,8 +45,8 @@ def do_train(network, params):
                        num_stack=params['num_stack'],
                        num_skip=params['num_skip'],
                        sort_utt=False)
-    if params['label_type'] == 'character':
-        test_data = Dataset(data_type='test', label_type='character',
+    if params['label_type'] in ['character', 'character_capital_divide']:
+        test_data = Dataset(data_type='test', label_type=params['label_type'],
                             batch_size=1,
                             num_stack=params['num_stack'],
                             num_skip=params['num_skip'],
@@ -62,41 +62,25 @@ def do_train(network, params):
     with tf.Graph().as_default():
 
         # Define placeholders
-        network.inputs = tf.placeholder(
-            tf.float32,
-            shape=[None, None, network.input_size],
-            name='input')
-        network.labels = tf.SparseTensor(
-            tf.placeholder(tf.int64, name='indices'),
-            tf.placeholder(tf.int32, name='values'),
-            tf.placeholder(tf.int64, name='shape'))
-        network.inputs_seq_len = tf.placeholder(tf.int64,
-                                                shape=[None],
-                                                name='inputs_seq_len')
-        network.keep_prob_input = tf.placeholder(tf.float32,
-                                                 name='keep_prob_input')
-        network.keep_prob_hidden = tf.placeholder(tf.float32,
-                                                  name='keep_prob_hidden')
-        network.keep_prob_output = tf.placeholder(tf.float32,
-                                                  name='keep_prob_output')
-        learning_rate_pl = tf.placeholder(tf.float32,
-                                          name='learning_rate')
+        network.create_placeholders(gpu_index=0)
 
         # Add to the graph each operation (including model definition)
-        loss_op, logits = network.compute_loss(network.inputs,
-                                               network.labels,
-                                               network.inputs_seq_len,
-                                               network.keep_prob_input,
-                                               network.keep_prob_hidden,
-                                               network.keep_prob_output)
-        train_op = network.train(loss_op,
-                                 optimizer=params['optimizer'],
-                                 learning_rate=learning_rate_pl)
+        loss_op, logits = network.compute_loss(
+            network.inputs_pl_list[0],
+            network.labels_pl_list[0],
+            network.inputs_seq_len_pl_list[0],
+            network.keep_prob_input_pl_list[0],
+            network.keep_prob_hidden_pl_list[0],
+            network.keep_prob_output_pl_list[0])
+        train_op = network.train(
+            loss_op,
+            optimizer=params['optimizer'],
+            learning_rate=network.learning_rate_pl_list[0])
         decode_op = network.decoder(logits,
-                                    network.inputs_seq_len,
+                                    network.inputs_seq_len_pl_list[0],
                                     decode_type='beam_search',
                                     beam_width=20)
-        ler_op = network.compute_ler(decode_op, network.labels)
+        ler_op = network.compute_ler(decode_op, network.labels_pl_list[0])
 
         # Define learning rate controller
         lr_controller = Controller(
@@ -158,13 +142,13 @@ def do_train(network, params):
                 # Create feed dictionary for next mini batch (train)
                 inputs, labels, inputs_seq_len, _ = mini_batch_train.__next__()
                 feed_dict_train = {
-                    network.inputs: inputs,
-                    network.labels: list2sparsetensor(labels, padded_value=-1),
-                    network.inputs_seq_len: inputs_seq_len,
-                    network.keep_prob_input: network.dropout_ratio_input,
-                    network.keep_prob_hidden: network.dropout_ratio_hidden,
-                    network.keep_prob_output: network.dropout_ratio_output,
-                    learning_rate_pl: learning_rate
+                    network.inputs_pl_list[0]: inputs,
+                    network.labels_pl_list[0]: list2sparsetensor(labels, padded_value=-1),
+                    network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                    network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
+                    network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
+                    network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                    network.learning_rate_pl_list[0]: learning_rate
                 }
 
                 # Update parameters
@@ -175,13 +159,12 @@ def do_train(network, params):
                     # Create feed dictionary for next mini batch (dev)
                     inputs, labels, inputs_seq_len, _ = mini_batch_dev.__next__()
                     feed_dict_dev = {
-                        network.inputs: inputs,
-                        network.labels: list2sparsetensor(labels,
-                                                          padded_value=-1),
-                        network.inputs_seq_len: inputs_seq_len,
-                        network.keep_prob_input: 1.0,
-                        network.keep_prob_hidden: 1.0,
-                        network.keep_prob_output: 1.0
+                        network.inputs_pl_list[0]: inputs,
+                        network.labels_pl_list[0]: list2sparsetensor(labels, padded_value=-1),
+                        network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                        network.keep_prob_input_pl_list[0]: 1.0,
+                        network.keep_prob_hidden_pl_list[0: 1.0,
+                        network.keep_prob_output_pl_list[0: 1.0
                     }
 
                     # Compute loss
@@ -192,9 +175,9 @@ def do_train(network, params):
                     csv_loss_dev.append(loss_dev)
 
                     # Change to evaluation mode
-                    feed_dict_train[network.keep_prob_input] = 1.0
-                    feed_dict_train[network.keep_prob_hidden] = 1.0
-                    feed_dict_train[network.keep_prob_output] = 1.0
+                    feed_dict_train[network.keep_prob_input_pl_list[0]] = 1.0
+                    feed_dict_train[network.keep_prob_hidden_pl_list{0] = 1.0
+                    feed_dict_train[network.keep_prob_output_pl_list{0] = 1.0
 
                     # Compute accuracy & update event file
                     ler_train, summary_str_train = sess.run(
@@ -328,8 +311,8 @@ def main(config_path, model_save_path):
         params['num_classes'] = 72
 
     # Model setting
-    CTCModel = load(model_type=params['model'])
-    network = CTCModel(batch_size=params['batch_size'],
+    model = load(model_type=params['model'])
+    network = model(batch_size=params['batch_size'],
                        input_size=params['input_size'] * params['num_stack'],
                        num_unit=params['num_unit'],
                        num_layer=params['num_layer'],

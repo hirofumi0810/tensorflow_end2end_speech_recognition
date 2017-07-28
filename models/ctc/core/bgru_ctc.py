@@ -64,8 +64,8 @@ class BGRU_CTC(ctcBase):
                keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of `[batch_size, max_time, input_dim]`
-            inputs_seq_len:  A tensor of `[batch_size]`
+            inputs: A tensor of size`[batch_size, max_time, input_dim]`
+            inputs_seq_len:  A tensor of size` [batch_size]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
@@ -73,7 +73,7 @@ class BGRU_CTC(ctcBase):
             keep_prob_output: A float value. A probability to keep nodes in
                 the hidden-output layer
         Returns:
-            logits:
+            logits: A tensor of size `[max_time, batch_size, num_classes]`
         """
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(inputs,
@@ -108,7 +108,7 @@ class BGRU_CTC(ctcBase):
                 # initial_state_bw = _init_state_bw,
 
                 # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
+                (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(
                     cell_fw=gru_fw,
                     cell_bw=gru_bw,
                     inputs=outputs,

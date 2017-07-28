@@ -40,6 +40,7 @@ class ctcBase(object):
         dropout_ratio_output: A float value. Dropout ratio in hidden-output
             layers
         weight_decay: A float value. Regularization parameter for weight decay
+        name: string, model name
     """
 
     def __init__(self,
@@ -55,7 +56,7 @@ class ctcBase(object):
                  dropout_ratio_hidden,
                  dropout_ratio_output,
                  weight_decay,
-                 name=None):
+                 name):
 
         # Network size
         self.batch_size = batch_size
@@ -64,6 +65,7 @@ class ctcBase(object):
         self.num_unit = num_unit
         self.num_layer = num_layer
         self.num_classes = num_classes + 1  # plus blank label
+        self.name = name
 
         # Regularization
         self.parameter_init = parameter_init
@@ -78,7 +80,66 @@ class ctcBase(object):
         self.summaries_train = []
         self.summaries_dev = []
 
-        self.name = name
+        # Placeholders
+        self.inputs_pl_list = []
+        self.labels_pl_list = []
+        self.inputs_seq_len_pl_list = []
+        self.keep_prob_input_pl_list = []
+        self.keep_prob_hidden_pl_list = []
+        self.keep_prob_output_pl_list = []
+        self.learning_rate_pl_list = []
+
+    def create_placeholders(self, gpu_index=None):
+        """
+        Args:
+            gpu_index: int, index of gpu
+        """
+        if gpu_index is None:
+            # For CPU or sigle GPU
+            self.inputs_pl_list.append(
+                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                               name='input'))
+            self.labels_pl_list.append(
+                tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
+                                tf.placeholder(tf.int32, name='values'),
+                                tf.placeholder(tf.int64, name='shape')))
+            self.inputs_seq_len_pl_list.append(
+                tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
+            self.keep_prob_input_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_input'))
+            self.keep_prob_hidden_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_hidden'))
+            self.keep_prob_output_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_output'))
+            self.learning_rate_pl_list.append(
+                tf.placeholder(tf.float32, name='learning_rate'))
+        else:
+            # Define placeholders in each gpu tower
+            self.inputs_pl_list.append(
+                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                               name='input_gpu' + str(gpu_index)))
+            self.labels_pl_list.append(
+                tf.SparseTensor(
+                    tf.placeholder(
+                        tf.int64, name='indices_gpu' + str(gpu_index)),
+                    tf.placeholder(
+                        tf.int32,  name='values_gpu' + str(gpu_index)),
+                    tf.placeholder(tf.int64, name='shape_gpu' + str(gpu_index))))
+            self.inputs_seq_len_pl_list.append(
+                tf.placeholder(tf.int64, shape=[None],
+                               name='inputs_seq_len_gpu' + str(gpu_index)))
+            self.keep_prob_input_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_input_gpu' + str(gpu_index)))
+            self.keep_prob_hidden_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_hidden_gpu' + str(gpu_index)))
+            self.keep_prob_output_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_output_gpu' + str(gpu_index)))
+            self.learning_rate_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='learning_rate_gpu' + str(gpu_index)))
 
     def _add_gaussian_noise_to_inputs(self, inputs, stddev=0.075):
         """Add gaussian noise to the inputs.
@@ -88,12 +149,13 @@ class ctcBase(object):
         Returns:
             inputs: Input features plus noise.
         """
-        if stddev != 0:
-            with tf.variable_scope("input_noise"):
-                # Add input noise with a standart deviation of stddev.
-                inputs = tf.random_normal(
-                    tf.shape(inputs), 0.0, stddev) + inputs
-        return inputs
+        # if stddev != 0:
+        #     with tf.variable_scope("input_noise"):
+        #         # Add input noise with a standart deviation of stddev.
+        #         inputs = tf.random_normal(
+        #             tf.shape(inputs), 0.0, stddev) + inputs
+        # return inputs
+        raise NotImplementedError
 
     def _add_noise_to_gradients(grads_and_vars, gradient_noise_scale,
                                 stddev=0.075):
@@ -106,8 +168,9 @@ class ctcBase(object):
         """
         raise NotImplementedError
 
-    def compute_loss(self, inputs, labels, inputs_seq_len, keep_prob_input,
-                     keep_prob_hidden, keep_prob_output, num_gpu=1, scope=None):
+    def compute_loss(self, inputs, labels, inputs_seq_len,
+                     keep_prob_input, keep_prob_hidden, keep_prob_output,
+                     gpu_index=0, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[batch_size, max_time, input_size]`
@@ -119,9 +182,9 @@ class ctcBase(object):
                 the hidden-hidden layers
             keep_prob_output: A float value. A probability to keep nodes in
                 the hidden-output layer
-            num_gpu: int, the number of GPUs
+            gpu_index: int, index of gpu
         Returns:
-            loss: operation for computing ctc loss
+            total_loss: operation for computing total ctc loss
             logits: A tensor of size `[max_time, batch_size, input_size]`
         """
         # Build model graph
@@ -139,28 +202,42 @@ class ctcBase(object):
                 tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("ctc_loss"):
-            ctc_losses = tf.nn.ctc_loss(labels,
-                                        logits,
-                                        tf.cast(inputs_seq_len, tf.int32),
-                                        preprocess_collapse_repeated=False,
-                                        ctc_merge_repeated=True,
-                                        ignore_longer_outputs_than_inputs=False,
-                                        time_major=True)
+            ctc_losses = tf.nn.ctc_loss(
+                labels,
+                logits,
+                tf.cast(inputs_seq_len, tf.int32),
+                preprocess_collapse_repeated=False,
+                ctc_merge_repeated=True,
+                ignore_longer_outputs_than_inputs=False,
+                time_major=True)
             ctc_loss = tf.reduce_mean(ctc_losses, name='ctc_loss_mean')
             tf.add_to_collection('losses', ctc_loss)
 
         # Compute total loss
-        loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
-        if num_gpu == 1:
-            # Add a scalar summary for the snapshot of loss
-            with tf.name_scope("total_loss"):
-                self.summaries_train.append(
-                    tf.summary.scalar('loss_train', loss))
-                self.summaries_dev.append(
-                    tf.summary.scalar('loss_dev', loss))
+        # Add a scalar summary for the snapshot of loss
+        with tf.name_scope("weight_loss_gpu" + str(gpu_index)):
+            self.summaries_train.append(
+                tf.summary.scalar('weight_loss_train',
+                                  weight_sum * self.weight_decay))
+            self.summaries_dev.append(
+                tf.summary.scalar('weight_loss_dev',
+                                  weight_sum * self.weight_decay))
 
-        return loss, logits
+        with tf.name_scope("ctc_loss_gpu" + str(gpu_index)):
+            self.summaries_train.append(
+                tf.summary.scalar('ctc_loss_train', ctc_loss))
+            self.summaries_dev.append(
+                tf.summary.scalar('ctc_loss_dev', ctc_loss))
+
+        with tf.name_scope("total_loss_gpu" + str(gpu_index)):
+            self.summaries_train.append(
+                tf.summary.scalar('total_loss_train', total_loss))
+            self.summaries_dev.append(
+                tf.summary.scalar('total_loss_dev', total_loss))
+
+        return total_loss, logits
 
     def train(self, loss, optimizer, learning_rate=None,
               clip_grad_by_norm=None):
@@ -228,7 +305,7 @@ class ctcBase(object):
                 clip_value_max=self.clip_grad) for g in grads]
 
         # TODO: Add histograms for variables, gradients (norms)
-        # self._tensorboard_statistics(trainable_vars)
+        # self._tensorboard(trainable_vars)
 
         # Create gradient updates
         train_op = optimizer.apply_gradients(
@@ -293,7 +370,6 @@ class ctcBase(object):
         # Compute LER (normalize by label length)
         ler_op = tf.reduce_mean(tf.edit_distance(
             decode_op, labels, normalize=True))
-        # NOTE: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
 
         # Add a scalar summary for the snapshot of LER
         with tf.name_scope("ler"):
@@ -304,7 +380,7 @@ class ctcBase(object):
 
         return ler_op
 
-    def _tensorboard_statistics(self, trainable_vars):
+    def _tensorboard(self, trainable_vars):
         """Compute statistics for TensorBoard plot.
         Args:
             trainable_vars:

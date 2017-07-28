@@ -47,10 +47,11 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
         inputs, _, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize
@@ -106,10 +107,11 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
         inputs, _, _, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize

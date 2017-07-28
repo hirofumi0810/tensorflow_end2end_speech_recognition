@@ -65,10 +65,12 @@ def do_eval_cer(session, decode_op, network, dataset, label_type, is_test=None,
                 inputs, _, labels_true, inputs_seq_len, _ = mini_batch.__next__()
 
         feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.inputs_pl_list[-1]: inputs,
+            network.inputs_seq_len_pl_list[-1]: inputs_seq_len,
+            network.keep_prob_input_pl_list[-1]: 1.0,
+            network.keep_prob_hidden_pl_list[-1]: 1.0
+            network.keep_prob_hidden_pl_list[-1]: 1.0,
+            network.keep_prob_output_pl_list[-1]: 1.0
         }
 
         batch_size_each = len(inputs_seq_len)

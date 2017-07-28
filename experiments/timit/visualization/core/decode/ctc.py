@@ -10,9 +10,9 @@ from __future__ import print_function
 from os.path import join
 import sys
 
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
-from experiments.utils.sparsetensor import sparsetensor2list
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
+from experiments.utils.data.sparsetensor import sparsetensor2list
 
 
 def decode_test(session, decode_op, network, dataset, label_type,
@@ -33,9 +33,9 @@ def decode_test(session, decode_op, network, dataset, label_type,
     mini_batch = dataset.next_batch(batch_size=1)
 
     if label_type == 'character':
-        map_file_path = '../metrics/mapping_files/ctc/char2num.txt'
+        map_file_path = '../../../metrics/mapping_files/ctc/char2num.txt'
     else:
-        map_file_path = '../metrics/mapping_files/ctc/phone2num_' + \
+        map_file_path = '../../../metrics/mapping_files/ctc/phone2num_' + \
             label_type[5:7] + '.txt'
 
     if save_path is not None:
@@ -46,10 +46,11 @@ def decode_test(session, decode_op, network, dataset, label_type,
         inputs, labels_true_st, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize
@@ -96,16 +97,17 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
 
     # Decode character
     print('===== character =====')
-    map_file_path = '../metrics/mapping_files/ctc/char2num.txt'
+    map_file_path = '../../../metrics/mapping_files/ctc/char2num.txt'
     for step in range(iteration):
         # Create feed dictionary for next mini batch
         inputs, labels_true_st, _, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize
@@ -121,17 +123,18 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
 
     # Decode phone
     print('\n===== phone =====')
-    map_file_path = '../metrics/mapping_files/ctc/phone2num_' + \
+    map_file_path = '../../../metrics/mapping_files/ctc/phone2num_' + \
         label_type_second[5:7] + '.txt'
     for step in range(iteration):
         # Create feed dictionary for next mini batch
         inputs, _, labels_true_st, inputs_seq_len, input_names = mini_batch.__next__()
 
         feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize

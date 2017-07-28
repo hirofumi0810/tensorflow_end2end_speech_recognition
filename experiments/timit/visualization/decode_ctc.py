@@ -33,33 +33,17 @@ def do_decode(network, params, epoch=None):
                         sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.inputs = tf.placeholder(
-        tf.float32,
-        shape=[None, None, network.input_size],
-        name='input')
-    network.labels = tf.SparseTensor(
-        tf.placeholder(tf.int64, name='indices'),
-        tf.placeholder(tf.int32, name='values'),
-        tf.placeholder(tf.int64, name='shape'))
-    network.inputs_seq_len = tf.placeholder(tf.int64,
-                                            shape=[None],
-                                            name='inputs_seq_len')
-    network.keep_prob_input = tf.placeholder(tf.float32,
-                                             name='keep_prob_input')
-    network.keep_prob_hidden = tf.placeholder(tf.float32,
-                                              name='keep_prob_hidden')
-    network.keep_prob_output = tf.placeholder(tf.float32,
-                                              name='keep_prob_output')
+    network.create_placeholders(gpu_index=None)
 
     # Add to the graph each operation (including model definition)
-    _, logits = network.compute_loss(network.inputs,
-                                     network.labels,
-                                     network.inputs_seq_len,
-                                     network.keep_prob_input,
-                                     network.keep_prob_hidden,
-                                     network.keep_prob_output)
+    _, logits = network.compute_loss(network.inputs_pl_list[0],
+                                     network.labels_pl_list[0],
+                                     network.inputs_seq_len_pl_list[0],
+                                     network.keep_prob_input_pl_list[0],
+                                     network.keep_prob_hidden_pl_list[0],
+                                     network.keep_prob_output_pl_list[0])
     decode_op = network.decoder(logits,
-                                network.inputs_seq_len,
+                                network.inputs_seq_len_pl_list[0],
                                 decode_type='beam_search',
                                 beam_width=20)
 
@@ -110,8 +94,8 @@ def main(model_path, epoch):
         params['num_classes'] = 72
 
     # Model setting
-    CTCModel = load(model_type=params['model'])
-    network = CTCModel(
+    model = load(model_type=params['model'])
+    network = model(
         batch_size=1,
         input_size=params['input_size'] * params['num_stack'],
         num_unit=params['num_unit'],
@@ -127,7 +111,6 @@ def main(model_path, epoch):
         weight_decay=params['weight_decay'])
 
     network.model_dir = model_path
-    print(network.model_dir)
     do_decode(network=network, params=params, epoch=epoch)
 
 
