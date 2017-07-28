@@ -14,19 +14,19 @@ class Controller(object):
         learning_rate_init: A float value, the initial learning rate
         decay_start_epoch: int, the epoch to start decay
         decay_rate: A float value,  the rate to decay the current learning rate
-        decay_patient_time: int, decay learning rate if results have not been
-            improved for 'decay_patient_time'
+        decay_patient_epoch: int, decay learning rate if results have not been
+            improved for 'decay_patient_epoch'
         lower_better: If True, the lower, the better.
                       If False, the higher, the better.
         worst_value: A flaot value, the worst value of evaluation
     """
 
     def __init__(self, learning_rate_init, decay_start_epoch, decay_rate,
-                 decay_patient_time=1, lower_better=True, worst_value=1):
+                 decay_patient_epoch=1, lower_better=True, worst_value=1):
         self.learning_rate_init = learning_rate_init
         self.decay_start_epoch = decay_start_epoch
         self.decay_rate = decay_rate
-        self.decay_patient_time = decay_patient_time
+        self.decay_patient_epoch = decay_patient_epoch
         self.not_improved_epoch = 0
         self.lower_better = lower_better
         self.best_value = worst_value
@@ -54,7 +54,7 @@ class Controller(object):
             self.best_value = value
             self.not_improved_epoch = 0
             return learning_rate
-        elif self.not_improved_epoch < self.decay_patient_time:
+        elif self.not_improved_epoch < self.decay_patient_epoch:
             # Not improved, but learning rate will be not decayed
             self.not_improved_epoch += 1
             return learning_rate
