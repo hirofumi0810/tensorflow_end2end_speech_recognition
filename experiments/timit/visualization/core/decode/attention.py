@@ -7,8 +7,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
+from os.path import join
+import sys
+
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
 
 
 def decode_test(session, decode_op, network, dataset, label_type,
@@ -19,40 +22,33 @@ def decode_test(session, decode_op, network, dataset, label_type,
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type: stirng, phone39 or phone48 or phone61 or character
+        label_type: stirng, phone39 or phone48 or phone61 or character or
+            character_capital_divide
         save_path: path to save decoding results
     """
+    map_file_path = '../metrics/mapping_files/attention/' + \
+        label_type + '_to_num.txt'
+
+    if save_path is not None:
+        sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
+
     # Batch size is expected to be 1
-    iteration = dataset.data_num
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=1)
-
-    if label_type == 'character':
-        map_file_path = '../metrics/mapping_files/attention/char2num.txt'
-    else:
-        map_file_path = '../metrics/mapping_files/attention/phone2num_' + \
-            label_type[5:7] + '.txt'
-
-    # if save_path is not None:
-    #     sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
-
-    for step in range(iteration):
+    for data, next_epoch_flag in dataset(batch_size=1):
         # Create feed dictionary for next mini batch
-        inputs, labels_true, inputs_seq_len, _, input_names = mini_batch.__next__()
+        inputs, labels_true, inputs_seq_len, _, input_names = data
 
         feed_dict = {
-            network.inputs: inputs,
-            network.labels: labels_true,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize
         labels_pred = session.run(decode_op, feed_dict=feed_dict)
 
-        if label_type == 'character':
+        if label_type in ['character', 'character_capital_divide']:
             print('----- wav: %s -----' % input_names[0])
             print('True: %s' % num2char(
                 labels_true[0][1:-1], map_file_path))
@@ -65,3 +61,6 @@ def decode_test(session, decode_op, network, dataset, label_type,
                 labels_true[0][1:-1], map_file_path))
             print('Pred: %s' % num2phone(
                 labels_pred[0], map_file_path).replace('>', ''))
+
+        if next_epoch_flag:
+            break

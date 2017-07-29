@@ -42,13 +42,11 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
     @measure_time
     def check_loading(self, label_type, num_gpu, sort_utt, sorta_grad):
-        print('----- label_type: ' + label_type + ', num_gpu: ' +
-              str(num_gpu) + ', sort_utt: ' + str(sort_utt) +
-              ', sorta_grad: ' + str(sorta_grad) + ' -----')
+        print('----- label_type: %s, num_gpu: %d, sort_utt: %s, sorta_grad: %s -----' %
+              (label_type, num_gpu, str(sort_utt), str(sorta_grad)))
 
-        batch_size = 64
-        dataset = Dataset(data_type='train', label_type=label_type,
-                          batch_size=batch_size,
+        dataset = Dataset(data_type='dev', label_type=label_type,
+                          batch_size=64,
                           num_stack=3, num_skip=3,
                           sort_utt=sort_utt, sorta_grad=sorta_grad,
                           progressbar=True, num_gpu=num_gpu)
@@ -65,18 +63,12 @@ class TestLoadDatasetCTC(unittest.TestCase):
             else:
                 map_fn = num2phone
 
-            mini_batch = dataset.next_batch(session=sess)
-
-            iter_per_epoch = int(dataset.data_num /
-                                 (batch_size * num_gpu)) + 1
-            for i in range(iter_per_epoch + 1):
-                return_tuple = mini_batch.__next__()
-                inputs = return_tuple[0]
-                labels = return_tuple[1]
-
+            for data, next_epoch_flag in dataset(session=sess):
+                inputs, labels, _, _ = data
                 if num_gpu > 1:
                     # for inputs_gpu in inputs:
                     #     print(inputs_gpu.shape)
+                    inputs = inputs[0]
                     labels = labels[0]
 
                 if num_gpu == 1:
@@ -89,6 +81,9 @@ class TestLoadDatasetCTC(unittest.TestCase):
                 str_true = map_fn(labels[0], map_file_path)
                 str_true = re.sub(r'_', ' ', str_true)
                 print(str_true)
+
+                if next_epoch_flag:
+                    break
 
 
 if __name__ == '__main__':

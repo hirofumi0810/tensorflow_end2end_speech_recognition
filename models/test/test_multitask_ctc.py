@@ -32,7 +32,7 @@ class TestCTC(tf.test.TestCase):
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
-            batch_size = 2
+            batch_size = 1
             inputs, labels_true_char_st, labels_true_phone_st, inputs_seq_len = generate_data(
                 label_type='multitask',
                 model='ctc',
@@ -61,7 +61,7 @@ class TestCTC(tf.test.TestCase):
                 weight_decay=1e-8)
 
             # Define placeholders
-            network.create_placeholders(gpu_index=0)
+            network.create_placeholders(gpu_index=None)
 
             # Add to the graph each operation
             loss_op, logits_main, logits_sub = network.compute_loss(

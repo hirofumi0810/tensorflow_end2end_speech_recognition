@@ -18,7 +18,7 @@ from experiments.timit.visualization.core.plot.attention import attention_test
 from models.attention import blstm_attention_seq2seq
 
 
-def do_plot(network, param, s epoch=None):
+def do_plot(network, params, epoch=None):
     """Plot attention weights.
     Args:
         network: model to restore
@@ -26,46 +26,26 @@ def do_plot(network, param, s epoch=None):
         epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test', label_type=params['label_type'],
-                        batch_size=1,
-                        eos_index=params['eos_index'],
-                        sort_utt=False, progressbar=True)
+    test_data = Dataset(
+        data_type='test', label_type=params['label_type'], batch_size=1,
+        eos_index=params['eos_index'], sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.inputs = tf.placeholder(tf.float32,
-                                    shape=[None, None, network.input_size],
-                                    name='input')
-    network.labels = tf.placeholder(tf.int32,
-                                    shape=[None, None],
-                                    name='label')
-    network.inputs_seq_len = tf.placeholder(tf.int32,
-                                            shape=[None],
-                                            name='inputs_seq_len')
-    network.labels_seq_len = tf.placeholder(tf.int32,
-                                            shape=[None],
-                                            name='labels_seq_len')
-    network.keep_prob_input = tf.placeholder(tf.float32,
-                                             name='keep_prob_input')
-    network.keep_prob_hidden = tf.placeholder(tf.float32,
-                                              name='keep_prob_hidden')
-    network.keep_prob_output = tf.placeholder(tf.float32,
-                                              name='keep_prob_output')
+    network.create_placeholders(gpu_index=None)
 
     # Add to the graph each operation (including model definition)
     _, _, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
-        network.inputs,
-        network.labels,
-        network.inputs_seq_len,
-        network.labels_seq_len,
-        network.keep_prob_input,
-        network.keep_prob_hidden,
-        network.keep_prob_output)
+        network.inputs_pl_list[0],
+        network.labels_pl_list[0],
+        network.inputs_seq_len_pl_list[0],
+        network.labels_seq_len_pl_list[0],
+        network.keep_prob_input_pl_list[0],
+        network.keep_prob_hidden_pl_list[0],
+        network.keep_prob_output_pl_list[0])
     _, decode_op_infer = network.decoder(
         decoder_outputs_train,
-        decoder_outputs_infer,
-        decode_type='greedy',
-        beam_width=20)
-    attention_weights_op = decoder_outputs_infer.attention_scores
+        decoder_outputs_infer)
+    attention_weights_op = decoder_outputs_infer.attention_weights
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()

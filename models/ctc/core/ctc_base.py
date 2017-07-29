@@ -59,21 +59,21 @@ class ctcBase(object):
                  name):
 
         # Network size
-        self.batch_size = batch_size
-        self.input_size = input_size
-        self.num_classes = num_classes
-        self.num_unit = num_unit
-        self.num_layer = num_layer
-        self.num_classes = num_classes + 1  # plus blank label
+        self.batch_size = int(batch_size)
+        self.input_size = int(input_size)
+        self.num_classes = int(num_classes)
+        self.num_unit = int(num_unit)
+        self.num_layer = int(num_layer)
+        self.num_classes = int(num_classes) + 1  # plus blank label
         self.name = name
 
         # Regularization
-        self.parameter_init = parameter_init
-        self.clip_grad = clip_grad
-        self.clip_activation = clip_activation
-        self.dropout_ratio_input = dropout_ratio_input
-        self.dropout_ratio_hidden = dropout_ratio_hidden
-        self.dropout_ratio_output = dropout_ratio_output
+        self.parameter_init = float(parameter_init)
+        self.clip_grad = float(clip_grad)
+        self.clip_activation = float(clip_activation)
+        self.dropout_ratio_input = float(dropout_ratio_input)
+        self.dropout_ratio_hidden = float(dropout_ratio_hidden)
+        self.dropout_ratio_output = float(dropout_ratio_output)
         self.weight_decay = float(weight_decay)
 
         # Summaries for TensorBoard

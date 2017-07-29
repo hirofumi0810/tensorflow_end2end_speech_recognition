@@ -83,7 +83,7 @@ class BLSTMAttetion(AttentionBase):
                  dropout_ratio_hidden=1.0,
                  dropout_ratio_output=1.0,
                  weight_decay=0.0,
-                 beam_width=None,
+                 beam_width=1,
                  time_major=False,
                  name='blstm_attention_seq2seq'):
 
@@ -125,6 +125,16 @@ class BLSTMAttetion(AttentionBase):
         # Summaries for TensorBoard
         self.summaries_train = []
         self.summaries_dev = []
+
+        # Placeholders
+        self.inputs_pl_list = []
+        self.labels_pl_list = []
+        self.inputs_seq_len_pl_list = []
+        self.labels_seq_len_pl_list = []
+        self.keep_prob_input_pl_list = []
+        self.keep_prob_hidden_pl_list = []
+        self.keep_prob_output_pl_list = []
+        self.learning_rate_pl_list = []
 
     def _encode(self, inputs, inputs_seq_len,
                 keep_prob_input, keep_prob_hidden):

@@ -26,11 +26,16 @@ def do_eval(network, params, epoch=None):
         epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test', label_type='phone39',
-                        batch_size=1,
-                        num_stack=params['num_stack'],
-                        num_skip=params['num_skip'],
-                        sort_utt=False, progressbar=True)
+    if 'phone' in params['label_type']:
+        test_data = Dataset(
+            data_type='test', label_type='phone39', batch_size=1,
+            num_stack=params['num_stack'], num_skip=params['num_skip'],
+            sort_utt=False, progressbar=True)
+    else:
+        test_data = Dataset(
+            data_type='test', label_type=params['label_type'], batch_size=1,
+            num_stack=params['num_stack'], num_skip=params['num_skip'],
+            sort_utt=False, progressbar=True)
 
     # Define placeholders
     network.create_placeholders(gpu_index=None)
@@ -74,6 +79,7 @@ def do_eval(network, params, epoch=None):
                 network=network,
                 dataset=test_data,
                 label_type=params['label_type'],
+                eval_batch_size=1,
                 progressbar=True)
             print('  CER: %f %%' % (cer_test * 100))
         else:
@@ -84,6 +90,7 @@ def do_eval(network, params, epoch=None):
                 network=network,
                 dataset=test_data,
                 label_type=params['label_type'],
+                eval_batch_size=1,
                 progressbar=True)
             print('  PER: %f %%' % (per_test * 100))
 

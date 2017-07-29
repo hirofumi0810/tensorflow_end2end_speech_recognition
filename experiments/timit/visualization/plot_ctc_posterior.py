@@ -26,11 +26,10 @@ def do_plot(network, params, epoch=None):
         epoch: epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test', label_type=params['label_type'],
-                        batch_size=1,
-                        num_stack=params['num_stack'],
-                        num_skip=params['num_skip'],
-                        is_sorted=False, is_progressbar=True)
+    test_data = Dataset(
+        data_type='test', label_type=params['label_type'], batch_size=1,
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False, progressbar=True)
 
     # Define placeholders
     network.create_placeholders(gpu_index=None)
@@ -68,7 +67,7 @@ def do_plot(network, params, epoch=None):
                        dataset=test_data,
                        label_type=params['label_type'],
                        save_path=network.model_dir,
-                       show=True)
+                       show=False)
 
 
 def main(model_path, epoch):

@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-from experiments.utils.labels.character import num2char
-from experiments.utils.labels.phone import num2phone
+from experiments.utils.data.labels.character import num2char
+from experiments.utils.data.labels.phone import num2phone
 from experiments.utils.directory import mkdir_join
 
 plt.style.use('ggplot')
@@ -34,23 +34,15 @@ def attention_test(session, decode_op, attention_weights_op, network, dataset,
         attention_weights_op: operation for computing attention weights
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type: string, phone39 or phone48 or phone61 or character
+        label_type: string, phone39 or phone48 or phone61 or character or
+            character_capital_divide
         save_path: path to save attention weights plotting
         show: if True, show each figure
     """
-    # Batch size is expected to be 1
-    iteration = dataset.data_num
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=1)
-
     save_path = mkdir_join(save_path, 'attention_weights')
 
-    if label_type == 'character':
-        map_file_path = '../metrics/mapping_files/attention/char2num.txt'
-    else:
-        map_file_path = '../metrics/mapping_files/attention/phone2num_' + \
-            label_type[5:7] + '.txt'
+    map_file_path = '../metrics/mapping_files/attention/' + \
+        label_type + '_to_num.txt'
 
     # Load mapping file
     map_dict = {}
@@ -59,15 +51,17 @@ def attention_test(session, decode_op, attention_weights_op, network, dataset,
             line = line.strip().split()
             map_dict[int(line[1])] = line[0]
 
-    for step in range(iteration):
+    # Batch size is expected to be 1
+    for data, next_epoch_flag in dataset(batch_size=1):
         # Create feed dictionary for next mini batch
-        inputs, _, inputs_seq_len, _, input_names = mini_batch.__next__()
+        inputs, _, inputs_seq_len, _, input_names = data
 
         feed_dict = {
-            network.inputs: inputs,
-            network.inputs_seq_len: inputs_seq_len,
-            network.keep_prob_input: 1.0,
-            network.keep_prob_hidden: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize
@@ -101,3 +95,6 @@ def attention_test(session, decode_op, attention_weights_op, network, dataset,
         if save_path is not None:
             save_path = join(save_path, input_names[0] + '.png')
             plt.savefig(save_path, dvi=500)
+
+        if next_epoch_flag:
+            break

@@ -26,13 +26,11 @@ def do_plot(network, params, epoch=None):
         epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test',
-                        label_type_main='character',
-                        label_type_sub=params['label_type_sub'],
-                        batch_size=1,
-                        num_stack=params['num_stack'],
-                        num_skip=params['num_skip'],
-                        sort_utt=False, progressbar=True)
+    test_data = Dataset(
+        data_type='test', label_type_main=params['label_type_main'],
+        label_type_sub=params['label_type_sub'], batch_size=1,
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False, progressbar=True)
 
     # Define placeholders
     network.create_placeholders(gpu_index=None)
@@ -73,6 +71,7 @@ def do_plot(network, params, epoch=None):
                                  posteriors_op_sub=posteriors_op_sub,
                                  network=network,
                                  dataset=test_data,
+                                 label_type_main=params['label_type_main'],
                                  label_type_sub=params['label_type_sub'],
                                  save_path=network.model_dir,
                                  show=False)
@@ -86,6 +85,11 @@ def main(model_path, epoch):
         params = config['param']
 
     # Except for a blank label
+    if params['label_type_main'] == 'character':
+        params['num_classes_main'] = 28
+    elif params['label_type_main'] == 'character_capital_divide':
+        params['num_classes_main'] = 72
+
     if params['label_type_sub'] == 'phone61':
         params['num_classes_sub'] = 61
     elif params['label_type_sub'] == 'phone48':
@@ -94,14 +98,14 @@ def main(model_path, epoch):
         params['num_classes_sub'] = 39
 
     # Model setting
-    model = load(model_type=config['model_name'])
+    model = load(model_type=params['model'])
     network = model(
         batch_size=1,
         input_size=params['input_size'] * params['num_stack'],
         num_unit=params['num_unit'],
         num_layer_main=params['num_layer_main'],
         num_layer_sub=params['num_layer_sub'],
-        num_classes_main=28,
+        num_classes_main=params['num_classes_main'],
         num_classes_sub=params['num_classes_sub'],
         main_task_weight=params['main_task_weight'],
         clip_grad=params['clip_grad'],
@@ -113,7 +117,6 @@ def main(model_path, epoch):
         weight_decay=params['weight_decay'])
 
     network.model_dir = model_path
-    print(network.model_dir)
     do_plot(network=network, params=params, epoch=epoch)
 
 

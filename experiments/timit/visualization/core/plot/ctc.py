@@ -30,21 +30,17 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
         posteriois_op: operation for computing posteriors
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type: string, phone39 or phone48 or phone61 or character
+        label_type: string, phone39 or phone48 or phone61 or character or
+            character_capital_divide
         save_path: path to save ctc outputs
         show: if True, show each figure
     """
-    # Batch size is expected to be 1
-    iteration = dataset.data_num
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=1)
-
     save_path = mkdir_join(save_path, 'ctc_output')
 
-    for step in range(iteration):
+    # Batch size is expected to be 1
+    for data, next_epoch_flag in dataset(batch_size=1):
         # Create feed dictionary for next mini batch
-        inputs, _, inputs_seq_len, input_names = mini_batch.__next__()
+        inputs, _, inputs_seq_len, input_names = data
 
         feed_dict = {
             network.inputs_pl_list[0]: inputs,
@@ -61,50 +57,57 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
         i_batch = 0  # index in mini-batch
         posteriors_index = np.array(
             [i_batch * max_frame_num + i for i in range(max_frame_num)])
+        posteriors = posteriors[posteriors_index][:int(inputs_seq_len[0]), :]
 
-        if label_type != 'character':
-            plot_probs_ctc_phone(
-                probs=posteriors[posteriors_index][:int(
-                    inputs_seq_len[0]), :],
-                wav_index=input_names[0],
-                label_type=label_type,
-                save_path=save_path,
-                show=show)
-        else:
-            plot_probs_ctc_char(
-                probs=posteriors[posteriors_index][:int(
-                    inputs_seq_len[0]), :],
-                wav_index=input_names[0],
-                save_path=save_path,
-                show=show)
+        plt.clf()
+        plt.figure(figsize=(10, 4))
+        duration = posteriors.shape[0]
+        times_probs = np.arange(len(posteriors))
+
+        # NOTE: Blank class is set to the last class in TensorFlow
+        for i in range(0, posteriors.shape[1] - 1, 1):
+            plt.plot(times_probs, posteriors[:, i])
+        plt.plot(times_probs, posteriors[:, -1],
+                 ':', label='blank', color='grey')
+        plt.xlabel('Time [sec]', fontsize=12)
+        plt.ylabel('Posteriors', fontsize=12)
+        plt.xlim([0, duration])
+        plt.ylim([0.05, 1.05])
+        plt.xticks(list(range(0, int(len(posteriors) / 100) + 1, 1)))
+        plt.yticks(list(range(0, 2, 1)))
+        plt.legend(loc="upper right", fontsize=12)
+
+        if show:
+            plt.show()
+
+        # Save as a png file
+        if save_path is not None:
+            plt.savefig(join(save_path, input_names[0] + '.png'), dvi=500)
+
+        if next_epoch_flag:
+            break
 
 
-def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
-                             network, dataset, label_type_second,
+def posterior_test_multitask(session, posteriors_op_main, posteriors_op_sub,
+                             network, dataset, label_type_main, label_type_sub,
                              save_path=None, show=False):
     """Visualize label posteriors of the multi-task CTC model.
     Args:
         session: session of training model
         posteriois_op_main: operation for computing posteriors in the main task
-        posteriois_op_second: operation for computing posteriors in the second
-            task
+        posteriois_op_sub: operation for computing posteriors in the sub task
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type_second: string, phone39 or phone48 or phone61
+        label_type_sub: string, phone39 or phone48 or phone61
         save_path: path to save ctc outpus
         show: if True, show each figure
     """
-    # Batch size is expected to be 1
-    iteration = dataset.data_num
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=1)
-
     save_path = mkdir_join(save_path, 'ctc_output')
 
-    for step in range(iteration):
+    # Batch size is expected to be 1
+    for data, next_epoch_flag in dataset(batch_size=1):
         # Create feed dictionary for next mini batch
-        inputs, _, _, inputs_seq_len, input_names = mini_batch.__next__()
+        inputs, _, _, inputs_seq_len, input_names = data
 
         feed_dict = {
             network.inputs_pl_list[0]: inputs,
@@ -119,167 +122,56 @@ def posterior_test_multitask(session, posteriors_op_main, posteriors_op_second,
         posteriors_char = session.run(
             posteriors_op_main, feed_dict=feed_dict)
         posteriors_phone = session.run(
-            posteriors_op_second, feed_dict=feed_dict)
+            posteriors_op_sub, feed_dict=feed_dict)
 
         i_batch = 0  # index in mini-batch
         posteriors_index = np.array(
             [i_batch * max_frame_num + i for i in range(max_frame_num)])
+        posteriors_char = posteriors_char[posteriors_index][:int(
+            inputs_seq_len[0]), :]
+        posteriors_phone = posteriors_phone[posteriors_index][:int(
+            inputs_seq_len[0]), :]
 
-        plot_probs_ctc_char_phone(
-            probs_char=posteriors_char[posteriors_index][:int(
-                inputs_seq_len[0]), :],
-            probs_phone=posteriors_phone[posteriors_index][:int(
-                inputs_seq_len[0]), :],
-            wav_index=input_names[0],
-            label_type_second=label_type_second,
-            save_path=save_path,
-            show=show)
+        plt.clf()
+        plt.figure(figsize=(10, 4))
+        duration = posteriors_char.shape[0]
+        times_probs = np.arange(len(posteriors_char))
 
+        # NOTE: Blank class is set to the last class in TensorFlow
+        # Plot characters
+        plt.subplot(211)
+        for i in range(0, posteriors_char.shape[1] - 1, 1):
+            plt.plot(times_probs, posteriors_char[:, i])
+        plt.plot(times_probs, posteriors_char[:, -1],
+                 ':', label='blank', color='grey')
+        plt.xlabel('Time [sec]', fontsize=12)
+        plt.ylabel('Characters', fontsize=12)
+        plt.xlim([0, duration])
+        plt.ylim([0.05, 1.05])
+        plt.xticks(list(range(0, int(len(posteriors_char) / 100) + 1, 1)))
+        plt.yticks(list(range(0, 2, 1)))
+        plt.legend(loc="upper right", fontsize=12)
 
-def plot_probs_ctc_phone(probs, wav_index, label_type, save_path, show):
-    """Plot posteriors of phones.
-    Args:
-        probs:
-        wav_index: string,
-        label_type: string, phone39 or phone48 or phone61
-        save_path: path to save ctc outpus
-        show: if True, show each figure
-    """
-    duration = probs.shape[0]
-    times_probs = np.arange(len(probs))
-    plt.clf()
-    plt.figure(figsize=(10, 4))
+        # Plot phones
+        plt.subplot(212)
+        for i in range(0, posteriors_phone.shape[1] - 1, 1):
+            plt.plot(times_probs, posteriors_phone[:, i])
+        plt.plot(times_probs, posteriors_phone[:, -1],
+                 ':', label='blank', color='grey')
+        plt.xlabel('Time [sec]', fontsize=12)
+        plt.ylabel('Phones', fontsize=12)
+        plt.xlim([0, duration])
+        plt.ylim([0.05, 1.05])
+        plt.xticks(list(range(0, int(len(posteriors_phone) / 100) + 1, 1)))
+        plt.yticks(list(range(0, 2, 1)))
+        plt.legend(loc="upper right", fontsize=12)
 
-    # Blank class is set to the last class in TensorFlow
-    if label_type == 'phone39':
-        blank_index = 39
-    elif label_type == 'phone48':
-        blank_index = 48
-    elif label_type == 'phone61':
-        blank_index = 61
+        if show:
+            plt.show()
 
-    # Plot phones
-    plt.plot(times_probs, probs[:, 0],
-             label='silence', color='black', linewidth=2)
-    for i in range(1, blank_index, 1):
-        plt.plot(times_probs, probs[:, i])
-    plt.plot(times_probs, probs[:, blank_index],
-             ':', label='blank', color='grey')
-    plt.xlabel('Time[sec]', fontsize=12)
-    plt.ylabel('Phones', fontsize=12)
-    plt.xlim([0, duration])
-    plt.ylim([0.05, 1.05])
-    plt.xticks(list(range(0, int(len(probs) / 100) + 1, 1)))
-    plt.yticks(list(range(0, 2, 1)))
-    plt.legend(loc="upper right", fontsize=12)
-    if show:
-        plt.show()
+        # Save as a png file
+        if save_path is not None:
+            plt.savefig(join(save_path, input_names[0] + '.png'), dvi=500)
 
-    # Save as a png file
-    if save_path is not None:
-        save_path = join(save_path, wav_index + '.png')
-        plt.savefig(save_path, dvi=500)
-
-
-def plot_probs_ctc_char(probs, wav_index, save_path, show):
-    """Plot posteriors of characters.
-    Args:
-        probs:
-        wav_index: string,
-        save_path: path to save ctc outpus
-        show: if True, show each figure
-    """
-    duration = probs.shape[0]
-    times_probs = np.arange(len(probs))
-    plt.clf()
-    plt.figure(figsize=(10, 4))
-
-    # Blank class is set to the last class in TensorFlow
-    blank_index = 30
-
-    # Plot characters
-    plt.plot(times_probs, probs[:, 0],
-             label='silence', color='black', linewidth=2)
-    for i in range(1, blank_index, 1):
-        plt.plot(times_probs, probs[:, i])
-    plt.plot(times_probs, probs[:, blank_index],
-             ':', label='blank', color='grey')
-    plt.xlabel('Time[sec]', fontsize=12)
-    plt.ylabel('Characters', fontsize=12)
-    plt.xlim([0, duration])
-    plt.ylim([0.05, 1.05])
-    plt.xticks(list(range(0, int(len(probs) / 100) + 1, 1)))
-    plt.yticks(list(range(0, 2, 1)))
-    plt.legend(loc="upper right", fontsize=12)
-    if show:
-        plt.show()
-
-    # Save as a png file
-    if save_path is not None:
-        save_path = join(save_path, wav_index + '.png')
-        plt.savefig(save_path, dvi=500)
-
-
-def plot_probs_ctc_char_phone(probs_char, probs_phone, wav_index,
-                              label_type_second, save_path, show):
-    """Plot posteriors of characters and phones.
-    Args:
-        probs_char:
-        probs_phone:
-        wav_index: int
-        label_type_second: string, phone39 or phone48, phone61
-        save_path:
-        show: if True, show each figure
-    """
-    duration = probs_char.shape[0]
-    times_probs = np.arange(len(probs_char))
-    plt.clf()
-    plt.figure(figsize=(10, 4))
-
-    # Blank class is set to the last class in TensorFlow
-    blank_index_char = 30
-    if label_type_second == 'phone39':
-        blank_index_phone = 39
-    elif label_type_second == 'phone48':
-        blank_index_phone = 48
-    elif label_type_second == 'phone61':
-        blank_index_phone = 61
-
-    # Plot characters
-    plt.subplot(211)
-    plt.plot(times_probs, probs_char[:, 0],
-             label='silence', color='black', linewidth=2)
-    for i in range(1, blank_index_char, 1):
-        plt.plot(times_probs, probs_char[:, i])
-    plt.plot(times_probs, probs_char[:, blank_index_char],
-             ':', label='blank', color='grey')
-    plt.xlabel('Time[sec]', fontsize=12)
-    plt.ylabel('Characters', fontsize=12)
-    plt.xlim([0, duration])
-    plt.ylim([0.05, 1.05])
-    plt.xticks(list(range(0, int(len(probs_char) / 100) + 1, 1)))
-    plt.yticks(list(range(0, 2, 1)))
-    plt.legend(loc="upper right", fontsize=12)
-
-    # Plot phones
-    plt.subplot(212)
-    plt.plot(times_probs, probs_phone[:, 0],
-             label='silence', color='black', linewidth=2)
-    for i in range(1, blank_index_phone, 1):
-        plt.plot(times_probs, probs_phone[:, i])
-    plt.plot(times_probs, probs_phone[:, blank_index_phone],
-             ':', label='blank', color='grey')
-    plt.xlabel('Time[sec]', fontsize=12)
-    plt.ylabel('Phones', fontsize=12)
-    plt.xlim([0, duration])
-    plt.ylim([0.05, 1.05])
-    plt.xticks(list(range(0, int(len(probs_phone) / 100) + 1, 1)))
-    plt.yticks(list(range(0, 2, 1)))
-    plt.legend(loc="upper right", fontsize=12)
-    if show:
-        plt.show()
-
-    # Save as a png file
-    if save_path is not None:
-        save_path = join(save_path, wav_index + '.png')
-        plt.savefig(save_path, dvi=500)
+        if next_epoch_flag:
+            break

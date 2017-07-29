@@ -35,28 +35,26 @@ def do_train(network, params):
         params: A dictionary of parameters
     """
     # Load dataset
-    train_data = Dataset(data_type='train', label_type=params['label_type'],
-                         batch_size=params['batch_size'],
-                         num_stack=params['num_stack'],
-                         num_skip=params['num_skip'],
-                         sort_utt=True)
-    dev_data = Dataset(data_type='dev', label_type=params['label_type'],
-                       batch_size=params['batch_size'],
-                       num_stack=params['num_stack'],
-                       num_skip=params['num_skip'],
-                       sort_utt=False)
+    train_data = Dataset(
+        data_type='train', label_type=params['label_type'],
+        batch_size=params['batch_size'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=True)
+    dev_data = Dataset(
+        data_type='dev', label_type=params['label_type'],
+        batch_size=params['batch_size'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
     if params['label_type'] in ['character', 'character_capital_divide']:
-        test_data = Dataset(data_type='test', label_type=params['label_type'],
-                            batch_size=1,
-                            num_stack=params['num_stack'],
-                            num_skip=params['num_skip'],
-                            sort_utt=False)
+        test_data = Dataset(
+            data_type='test', label_type=params['label_type'], batch_size=1,
+            num_stack=params['num_stack'], num_skip=params['num_skip'],
+            sort_utt=False)
     else:
-        test_data = Dataset(data_type='test', label_type='phone39',
-                            batch_size=1,
-                            num_stack=params['num_stack'],
-                            num_skip=params['num_skip'],
-                            sort_utt=False)
+        test_data = Dataset(
+            data_type='test', label_type='phone39', batch_size=1,
+            num_stack=params['num_stack'], num_skip=params['num_skip'],
+            sort_utt=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -87,7 +85,7 @@ def do_train(network, params):
             learning_rate_init=params['learning_rate'],
             decay_start_epoch=params['decay_start_epoch'],
             decay_rate=params['decay_rate'],
-            decay_patient_epoch=3,
+            decay_patient_epoch=params['decay_patient_epoch'],
             lower_better=True)
 
         # Build the summary tensor based on the TensorFlow collection of
@@ -110,10 +108,6 @@ def do_train(network, params):
               (len(parameters_dict.keys()),
                "{:,}".format(total_parameters / 1000000)))
 
-        # Make mini-batch generator
-        mini_batch_train = train_data.next_batch()
-        mini_batch_dev = dev_data.next_batch()
-
         csv_steps, csv_loss_train, csv_loss_dev = [], [], []
         csv_ler_train, csv_ler_dev = [], []
         # Create a session for running operation on the graph
@@ -127,20 +121,16 @@ def do_train(network, params):
             sess.run(init_op)
 
             # Train model
-            iter_per_epoch = int(train_data.data_num / params['batch_size'])
-            train_step = train_data.data_num / params['batch_size']
-            if train_step != int(train_step):
-                iter_per_epoch += 1
-            max_steps = iter_per_epoch * params['num_epoch']
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
             ler_dev_best = 1
             learning_rate = float(params['learning_rate'])
-            for step in range(max_steps):
+            epoch = 1
+            for step, (data, next_epoch_flag) in enumerate(train_data()):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels, inputs_seq_len, _ = mini_batch_train.__next__()
+                inputs, labels, inputs_seq_len, _ = data
                 feed_dict_train = {
                     network.inputs_pl_list[0]: inputs,
                     network.labels_pl_list[0]: list2sparsetensor(labels, padded_value=-1),
@@ -157,7 +147,7 @@ def do_train(network, params):
                 if (step + 1) % 10 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    inputs, labels, inputs_seq_len, _ = mini_batch_dev.__next__()
+                    (inputs, labels, inputs_seq_len, _), _ = dev_data().__next__()
                     feed_dict_dev = {
                         network.inputs_pl_list[0]: inputs,
                         network.labels_pl_list[0]: list2sparsetensor(labels, padded_value=-1),
@@ -179,7 +169,7 @@ def do_train(network, params):
                     feed_dict_train[network.keep_prob_hidden_pl_list[0]] = 1.0
                     feed_dict_train[network.keep_prob_output_pl_list[0]] = 1.0
 
-                    # Compute accuracy & update event file
+                    # Compute accuracy & update event files
                     ler_train, summary_str_train = sess.run(
                         [ler_op, summary_train], feed_dict=feed_dict_train)
                     ler_dev, summary_str_dev = sess.run(
@@ -198,9 +188,8 @@ def do_train(network, params):
                     start_time_step = time.time()
 
                 # Save checkpoint and evaluate model per epoch
-                if (step + 1) % iter_per_epoch == 0 or (step + 1) == max_steps:
+                if next_epoch_flag:
                     duration_epoch = time.time() - start_time_epoch
-                    epoch = (step + 1) // iter_per_epoch
                     print('-----EPOCH:%d (%.3f min)-----' %
                           (epoch, duration_epoch / 60))
 
@@ -274,7 +263,12 @@ def do_train(network, params):
                             epoch=epoch,
                             value=ler_dev_epoch)
 
-                start_time_epoch = time.time()
+                        if epoch == params['num_epoch']:
+                            break
+
+                    epoch += 1
+                    start_time_epoch = time.time()
+
                 start_time_step = time.time()
 
             duration_train = time.time() - start_time_train

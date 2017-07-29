@@ -36,27 +36,23 @@ def do_train(network, params):
         params: A dictionary of parameters
     """
     # Load dataset
-    train_data = Dataset(data_type='train',
-                         label_type_main='character',
-                         label_type_sub=params['label_type_sub'],
-                         batch_size=params['batch_size'],
-                         num_stack=params['num_stack'],
-                         num_skip=params['num_skip'],
-                         sort_utt=True)
-    dev_data = Dataset(data_type='dev',
-                       label_type_main='character',
-                       label_type_sub=params['label_type_sub'],
-                       batch_size=params['batch_size'],
-                       num_stack=params['num_stack'],
-                       num_skip=params['num_skip'],
-                       sort_utt=False)
-    test_data = Dataset(data_type='test',
-                        label_type_main='character',
-                        label_type_sub='phone39',
-                        batch_size=1,
-                        num_stack=params['num_stack'],
-                        num_skip=params['num_skip'],
-                        sort_utt=False)
+    train_data = Dataset(
+        data_type='train', label_type_main=params['label_type_main'],
+        label_type_sub=params['label_type_sub'],
+        batch_size=params['batch_size'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=True)
+    dev_data = Dataset(
+        data_type='dev', label_type_main=params['label_type_main'],
+        label_type_sub=params['label_type_sub'],
+        batch_size=params['batch_size'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
+    test_data = Dataset(
+        data_type='test', label_type_main=params['label_type_main'],
+        label_type_sub='phone39', batch_size=1,
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -92,7 +88,7 @@ def do_train(network, params):
             learning_rate_init=params['learning_rate'],
             decay_start_epoch=params['decay_start_epoch'],
             decay_rate=params['decay_rate'],
-            decay_patient_epoch=3,
+            decay_patient_epoch=params['decay_patient_epoch'],
             lower_better=True)
 
         # Build the summary tensor based on the TensorFlow collection of
@@ -128,25 +124,17 @@ def do_train(network, params):
             # Initialize parameters
             sess.run(init_op)
 
-            # Make mini-batch generator
-            mini_batch_train = train_data.next_batch()
-            mini_batch_dev = dev_data.next_batch()
-
             # Train model
-            iter_per_epoch = int(train_data.data_num / params['batch_size'])
-            train_step = train_data.data_num / params['batch_size']
-            if train_step != int(train_step):
-                iter_per_epoch += 1
-            max_steps = iter_per_epoch * params['num_epoch']
             start_time_train = time.time()
             start_time_epoch = time.time()
             start_time_step = time.time()
             cer_dev_best = 1
             learning_rate = float(params['learning_rate'])
-            for step in range(max_steps):
+            epoch = 1
+            for step, (data, next_epoch_flag) in enumerate(train_data()):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_train.__next__()
+                inputs, labels_char, labels_phone, inputs_seq_len, _ = data
                 feed_dict_train = {
                     network.inputs_pl_list[0]: inputs,
                     network.labels_pl_list[0]: list2sparsetensor(labels_char, padded_value=-1),
@@ -164,7 +152,8 @@ def do_train(network, params):
                 if (step + 1) % 10 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    inputs, labels_char, labels_phone, inputs_seq_len, _ = mini_batch_dev.__next__()
+                    (inputs, labels_char, labels_phone,
+                     inputs_seq_len, _), _ = dev_data().__next__()
                     feed_dict_dev = {
                         network.inputs_pl_list[0]: inputs,
                         network.labels_pl_list[0]: list2sparsetensor(labels_char, padded_value=-1),
@@ -187,7 +176,7 @@ def do_train(network, params):
                     feed_dict_train[network.keep_prob_hidden_pl_list[0]] = 1.0
                     feed_dict_train[network.keep_prob_output_pl_list[0]] = 1.0
 
-                    # Compute accuracy & update event file
+                    # Compute accuracy & update event files
                     cer_train, per_train, summary_str_train = sess.run(
                         [cer_op, per_op, summary_train],
                         feed_dict=feed_dict_train)
@@ -210,9 +199,8 @@ def do_train(network, params):
                     start_time_step = time.time()
 
                 # Save checkpoint and evaluate model per epoch
-                if (step + 1) % iter_per_epoch == 0 or (step + 1) == max_steps:
+                if next_epoch_flag:
                     duration_epoch = time.time() - start_time_epoch
-                    epoch = (step + 1) // iter_per_epoch
                     print('-----EPOCH:%d (%.3f min)-----' %
                           (epoch, duration_epoch / 60))
 
@@ -230,6 +218,7 @@ def do_train(network, params):
                             decode_op=decode_op_main,
                             network=network,
                             dataset=dev_data,
+                            label_type=params['label_type_main'],
                             eval_batch_size=1,
                             is_multitask=True)
                         print('  CER: %f %%' % (cer_dev_epoch * 100))
@@ -254,6 +243,7 @@ def do_train(network, params):
                                 decode_op=decode_op_main,
                                 network=network,
                                 dataset=test_data,
+                                label_type=params['label_type_main'],
                                 eval_batch_size=1,
                                 is_multitask=True)
                             print('  CER: %f %%' % (cer_test * 100))
@@ -278,7 +268,12 @@ def do_train(network, params):
                             epoch=epoch,
                             value=cer_dev_epoch)
 
-                start_time_epoch = time.time()
+                        if epoch == params['num_epoch']:
+                            break
+
+                    epoch += 1
+                    start_time_epoch = time.time()
+
                 start_time_step = time.time()
 
             duration_train = time.time() - start_time_train
@@ -304,6 +299,12 @@ def main(config_path, model_save_path):
         config = yaml.load(f)
         params = config['param']
 
+    # Except for a blank class
+    if params['label_type_main'] == 'character':
+        params['num_classes_main'] = 28
+    elif params['label_type_main'] == 'character_capital_divide':
+        params['num_classes_main'] = 72
+
     if params['label_type_sub'] == 'phone61':
         params['num_classes_sub'] = 61
     elif params['label_type_sub'] == 'phone48':
@@ -318,7 +319,7 @@ def main(config_path, model_save_path):
                     num_unit=params['num_unit'],
                     num_layer_main=params['num_layer_main'],
                     num_layer_sub=params['num_layer_sub'],
-                    num_classes_main=28,
+                    num_classes_main=params['num_classes_main'],
                     num_classes_sub=params['num_classes_sub'],
                     main_task_weight=params['main_task_weight'],
                     parameter_init=params['weight_init'],

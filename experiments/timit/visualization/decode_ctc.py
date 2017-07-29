@@ -26,11 +26,10 @@ def do_decode(network, params, epoch=None):
         epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test', label_type=params['label_type'],
-                        batch_size=1,
-                        num_stack=params['num_stack'],
-                        num_skip=params['num_skip'],
-                        sort_utt=False, progressbar=True)
+    test_data = Dataset(
+        data_type='test', label_type=params['label_type'], batch_size=1,
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False, progressbar=True)
 
     # Define placeholders
     network.create_placeholders(gpu_index=None)
@@ -71,7 +70,8 @@ def do_decode(network, params, epoch=None):
                     network=network,
                     dataset=test_data,
                     label_type=params['label_type'],
-                    save_path=network.model_dir)
+                    save_path=None)
+        # save_path=network.model_dir)
 
 
 def main(model_path, epoch):

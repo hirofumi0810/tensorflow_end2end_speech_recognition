@@ -42,8 +42,69 @@ class AttentionBase(object):
         beam_width: if equal to 1, use greedy decoding
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, *args, **kwargs):
+        NotImplementedError
+
+    def create_placeholders(self, gpu_index=None):
+        """
+        Args:
+            gpu_index: int, index of gpu
+        """
+        if gpu_index is None:
+            # For CPU or sigle GPU
+            self.inputs_pl_list.append(
+                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                               name='input'))
+            self.labels_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None, None], name='labels'))
+            self.inputs_seq_len_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
+            self.labels_seq_len_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None], name='labels_seq_len'))
+            self.keep_prob_input_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_input'))
+            self.keep_prob_hidden_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_hidden'))
+            self.keep_prob_output_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_output'))
+            self.learning_rate_pl_list.append(
+                tf.placeholder(tf.float32, name='learning_rate'))
+        else:
+            # Define placeholders in each gpu tower
+            self.inputs_pl_list.append(
+                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                               name='input_gpu' + str(gpu_index)))
+            self.labels_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None, None],
+                               name='labels_gpu' + str(gpu_index)))
+            self.inputs_seq_len_pl_list.append(
+                tf.placeholder(tf.int64, shape=[None],
+                               name='inputs_seq_len_gpu' + str(gpu_index)))
+            self.labels_seq_len_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None],
+                               name='labels_seq_len_gpu' + str(gpu_index)))
+            self.keep_prob_input_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_input_gpu' + str(gpu_index)))
+            self.keep_prob_hidden_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_hidden_gpu' + str(gpu_index)))
+            self.keep_prob_output_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_output_gpu' + str(gpu_index)))
+            self.learning_rate_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='learning_rate_gpu' + str(gpu_index)))
+
+        # These are prepared for computing LER
+        self.labels_st_true_pl = tf.SparseTensor(
+            tf.placeholder(tf.int64, name='indices_true'),
+            tf.placeholder(tf.int32, name='values_true'),
+            tf.placeholder(tf.int64, name='shape_true'))
+        self.labels_st_pred_pl = tf.SparseTensor(
+            tf.placeholder(tf.int64, name='indices_pred'),
+            tf.placeholder(tf.int32, name='values_pred'),
+            tf.placeholder(tf.int64, name='shape_pred'))
 
     def _generate_target_embedding(self, reuse):
         """Returns the embedding used for the target sequence."""
@@ -384,7 +445,6 @@ class AttentionBase(object):
         # Compute LER (normalize by label length)
         ler_op = tf.reduce_mean(tf.edit_distance(
             labels_pred, labels_true, normalize=True))
-        # TODO: ここでの編集距離はラベルだから，文字に変換しないと正しいCERは得られない
         # TODO: パディングを考慮して計算する
 
         # Add a scalar summary for the snapshot of LER

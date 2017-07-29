@@ -58,8 +58,9 @@ class BLSTM_CTC(ctcBase):
                          dropout_ratio_input, dropout_ratio_hidden,
                          dropout_ratio_output, weight_decay, name)
 
-        self.num_proj = None if num_proj == 0 else num_proj
-        self.bottleneck_dim = bottleneck_dim
+        self.num_proj = int(num_proj) if num_proj not in [None, 0] else None
+        self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
+            None, 0] else None
 
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
                keep_prob_hidden, keep_prob_output):

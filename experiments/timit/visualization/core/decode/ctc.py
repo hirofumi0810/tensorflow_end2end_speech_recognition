@@ -23,27 +23,19 @@ def decode_test(session, decode_op, network, dataset, label_type,
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type: string, phone39 or phone48 or phone61 or character
+        label_type: string, phone39 or phone48 or phone61 or character or
+            character_capital_divide
         save_path: path to save decoding results
     """
-    # Batch size is expected to be 1
-    iteration = dataset.data_num
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=1)
-
-    if label_type == 'character':
-        map_file_path = '../../../metrics/mapping_files/ctc/char2num.txt'
-    else:
-        map_file_path = '../../../metrics/mapping_files/ctc/phone2num_' + \
-            label_type[5:7] + '.txt'
+    map_file_path = '../metrics/mapping_files/ctc/' + label_type + '_to_num.txt'
 
     if save_path is not None:
         sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
 
-    for step in range(iteration):
+    # Batch size is expected to be 1
+    for data, next_epoch_flag in dataset(batch_size=1):
         # Create feed dictionary for next mini batch
-        inputs, labels_true_st, inputs_seq_len, input_names = mini_batch.__next__()
+        inputs, labels_true, inputs_seq_len, input_names = data
 
         feed_dict = {
             network.inputs_pl_list[0]: inputs,
@@ -55,10 +47,9 @@ def decode_test(session, decode_op, network, dataset, label_type,
 
         # Visualize
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_true = sparsetensor2list(labels_true_st, batch_size=1)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
 
-        if label_type == 'character':
+        if label_type in ['character', 'character_capital_divide']:
             print('----- wav: %s -----' % input_names[0])
             print('True: %s' % num2char(
                 labels_true[0], map_file_path))
@@ -69,38 +60,37 @@ def decode_test(session, decode_op, network, dataset, label_type,
             print('----- wav: %s -----' % input_names[0])
             print('True: %s' % num2phone(
                 labels_true[0], map_file_path))
-
             print('Pred: %s' % num2phone(
                 labels_pred[0], map_file_path))
 
+        if next_epoch_flag:
+            break
 
-def decode_test_multitask(session, decode_op_main, decode_op_second, network,
-                          dataset, label_type_second, save_path=None):
+
+def decode_test_multitask(session, decode_op_main, decode_op_sub, network,
+                          dataset, label_type_main, label_type_sub,
+                          save_path=None):
     """Visualize label outputs of Multi-task CTC model.
     Args:
         session: session of training model
         decode_op_main: operation for decoding in the main task
-        decode_op_second: operation for decoding in the second task
+        decode_op_sub: operation for decoding in the sub task
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type_second: string, phone39 or phone48 or phone61
+        label_type_main: string, character or character_capital_divide
+        label_type_sub: string, phone39 or phone48 or phone61
         save_path: path to save decoding results
     """
-    # Batch size is expected to be 1
-    iteration = dataset.data_num
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=1)
-
     if save_path is not None:
         sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
 
     # Decode character
-    print('===== character =====')
-    map_file_path = '../../../metrics/mapping_files/ctc/char2num.txt'
-    for step in range(iteration):
+    print('===== ' + label_type_main + ' =====')
+    map_file_path = '../metrics/mapping_files/ctc/' + label_type_main + '_to_num.txt'
+    # Batch size is expected to be 1
+    for data, next_epoch_flag in dataset(batch_size=1):
         # Create feed dictionary for next mini batch
-        inputs, labels_true_st, _, inputs_seq_len, input_names = mini_batch.__next__()
+        inputs, labels_true, _, inputs_seq_len, input_names = data
 
         feed_dict = {
             network.inputs_pl_list[0]: inputs,
@@ -112,7 +102,6 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
 
         # Visualize
         labels_pred_st = session.run(decode_op_main, feed_dict=feed_dict)
-        labels_true = sparsetensor2list(labels_true_st, batch_size=1)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
 
         print('----- wav: %s -----' % input_names[0])
@@ -121,13 +110,17 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
         print('Pred: %s' % num2char(
             labels_pred[0], map_file_path))
 
+        if next_epoch_flag:
+            break
+
     # Decode phone
-    print('\n===== phone =====')
-    map_file_path = '../../../metrics/mapping_files/ctc/phone2num_' + \
-        label_type_second[5:7] + '.txt'
-    for step in range(iteration):
+    print('\n===== ' + label_type_sub + ' =====')
+    map_file_path = '../metrics/mapping_files/ctc/' + \
+        label_type_sub + '_to_num.txt'
+    # Batch size is expected to be 1
+    for data, next_epoch_flag in dataset(batch_size=1):
         # Create feed dictionary for next mini batch
-        inputs, _, labels_true_st, inputs_seq_len, input_names = mini_batch.__next__()
+        inputs, _, labels_true, inputs_seq_len, input_names = data
 
         feed_dict = {
             network.inputs_pl_list[0]: inputs,
@@ -138,13 +131,14 @@ def decode_test_multitask(session, decode_op_main, decode_op_second, network,
         }
 
         # Visualize
-        labels_pred_st = session.run(decode_op_second, feed_dict=feed_dict)
-        labels_true = sparsetensor2list(labels_true_st, batch_size=1)
+        labels_pred_st = session.run(decode_op_sub, feed_dict=feed_dict)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
 
         print('----- wav: %s -----' % input_names[0])
         print('True: %s' % num2phone(
             labels_true[0], map_file_path))
-
         print('Pred: %s' % num2phone(
             labels_pred[0], map_file_path))
+
+        if next_epoch_flag:
+            break

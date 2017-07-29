@@ -46,7 +46,7 @@ class TestCTC(tf.test.TestCase):
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
-            batch_size = 2
+            batch_size = 1
             inputs, labels_true_st, inputs_seq_len = generate_data(
                 label_type=label_type,
                 model='ctc',

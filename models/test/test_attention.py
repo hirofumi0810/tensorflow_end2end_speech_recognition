@@ -7,16 +7,16 @@ from __future__ import print_function
 
 import sys
 import time
-import numpy as np
 import tensorflow as tf
-from tensorflow.python import debug as tf_debug
+# from tensorflow.python import debug as tf_debug
 
 sys.path.append('../../')
 from models.attention.blstm_attention_seq2seq import BLSTMAttetion
 from models.test.util import measure_time
 from models.test.data import generate_data, num2alpha, num2phone
-from experiments.utils.sparsetensor import list2sparsetensor
+from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.parameter import count_total_parameters
+from experiments.utils.training.learning_rate_controller import Controller
 
 
 class TestAttention(tf.test.TestCase):
@@ -50,41 +50,6 @@ class TestAttention(tf.test.TestCase):
                 model='attention',
                 batch_size=batch_size)
 
-            # Define placeholders
-            inputs_pl = tf.placeholder(tf.float32,
-                                       shape=[batch_size, None,
-                                              inputs.shape[-1]],
-                                       name='inputs')
-
-            # `[batch_size, max_time]`
-            labels_pl = tf.placeholder(tf.int32,
-                                       shape=[None, None],
-                                       name='labels')
-
-            # These are prepared for computing LER
-            indices_true_pl = tf.placeholder(tf.int64, name='indices')
-            values_true_pl = tf.placeholder(tf.int32, name='values')
-            shape_true_pl = tf.placeholder(tf.int64, name='shape')
-            labels_st_true_pl = tf.SparseTensor(indices_true_pl,
-                                                values_true_pl,
-                                                shape_true_pl)
-            indices_pred_pl = tf.placeholder(tf.int64, name='indices')
-            values_pred_pl = tf.placeholder(tf.int32, name='values')
-            shape_pred_pl = tf.placeholder(tf.int64, name='shape')
-            labels_st_pred_pl = tf.SparseTensor(indices_pred_pl,
-                                                values_pred_pl,
-                                                shape_pred_pl)
-            inputs_seq_len_pl = tf.placeholder(tf.int32,
-                                               shape=[None],
-                                               name='inputs_seq_len')
-            labels_seq_len_pl = tf.placeholder(tf.int32,
-                                               shape=[None],
-                                               name='labels_seq_len')
-            keep_prob_input_pl = tf.placeholder(tf.float32,
-                                                name='keep_prob_input')
-            keep_prob_hidden_pl = tf.placeholder(tf.float32,
-                                                 name='keep_prob_hidden')
-
             # Define model graph
             num_classes = 26 + 2 if label_type == 'character' else 61 + 2
             # model = load(model_type=model_type)
@@ -109,30 +74,42 @@ class TestAttention(tf.test.TestCase):
                 clip_grad=5.0,
                 clip_activation_encoder=50,
                 clip_activation_decoder=50,
-                dropout_ratio_input=1.0,
-                dropout_ratio_hidden=1.0,
+                dropout_ratio_input=0.9,
+                dropout_ratio_hidden=0.9,
+                dropout_ratio_output=1.0,
                 weight_decay=0,
-                beam_width=5,
+                beam_width=1,
                 time_major=False)
+
+            # Define placeholders
+            network.create_placeholders(gpu_index=None)
 
             # Add to the graph each operation
             loss_op, logits, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
-                inputs_pl,
-                labels_pl,
-                inputs_seq_len_pl,
-                labels_seq_len_pl,
-                keep_prob_input_pl,
-                keep_prob_hidden_pl)
-            learning_rate = 1e-3
-            train_op = network.train(loss_op,
-                                     optimizer='rmsprop',
-                                     learning_rate_init=learning_rate,
-                                     is_scheduled=False)
+                network.inputs_pl_list[0],
+                network.labels_pl_list[0],
+                network.inputs_seq_len_pl_list[0],
+                network.labels_seq_len_pl_list[0],
+                network.keep_prob_input_pl_list[0],
+                network.keep_prob_hidden_pl_list[0],
+                network.keep_prob_output_pl_list[0])
+            train_op = network.train(
+                loss_op,
+                optimizer='adam',
+                learning_rate=network.learning_rate_pl_list[0])
             decode_op_train, decode_op_infer = network.decoder(
                 decoder_outputs_train,
                 decoder_outputs_infer)
-            ler_op = network.compute_ler(labels_st_true_pl,
-                                         labels_st_pred_pl)
+            ler_op = network.compute_ler(network.labels_st_true_pl,
+                                         network.labels_st_pred_pl)
+
+            # Define learning rate controller
+            learning_rate = 1e-3
+            lr_controller = Controller(learning_rate_init=learning_rate,
+                                       decay_start_epoch=10,
+                                       decay_rate=0.99,
+                                       decay_patient_epoch=5,
+                                       lower_better=True)
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
@@ -149,14 +126,17 @@ class TestAttention(tf.test.TestCase):
 
             # Make feed dict
             feed_dict = {
-                inputs_pl: inputs,
-                labels_pl: labels,
-                inputs_seq_len_pl: inputs_seq_len,
-                labels_seq_len_pl: labels_seq_len,
-                keep_prob_input_pl: network.dropout_ratio_input,
-                keep_prob_hidden_pl: network.dropout_ratio_hidden,
-                network.lr: learning_rate
+                network.inputs_pl_list[0]: inputs,
+                network.labels_pl_list[0]: labels,
+                network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                network.labels_seq_len_pl_list[0]: labels_seq_len,
+                network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
+                network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
+                network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                network.learning_rate_pl_list[0]: learning_rate
             }
+
+            map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone61_to_num.txt'
 
             with tf.Session() as sess:
 
@@ -186,8 +166,9 @@ class TestAttention(tf.test.TestCase):
 
                     if (step + 1) % 10 == 0:
                         # Change to evaluation mode
-                        feed_dict[keep_prob_input_pl] = 1.0
-                        feed_dict[keep_prob_hidden_pl] = 1.0
+                        feed_dict[network.keep_prob_input_pl_list[0]] = 1.0
+                        feed_dict[network.keep_prob_hidden_pl_list[0]] = 1.0
+                        feed_dict[network.keep_prob_output_pl_list[0]] = 1.0
 
                         # Predict class ids
                         predicted_ids_train, predicted_ids_infer = sess.run(
@@ -197,12 +178,12 @@ class TestAttention(tf.test.TestCase):
                         # Compute accuracy
                         try:
                             feed_dict_ler = {
-                                labels_st_true_pl: list2sparsetensor(
+                                network.labels_st_true_pl: list2sparsetensor(
                                     labels,
-                                    padded_value=0),
-                                labels_st_pred_pl: list2sparsetensor(
+                                    padded_value=27),
+                                network.labels_st_pred_pl: list2sparsetensor(
                                     predicted_ids_infer,
-                                    padded_value=0)
+                                    padded_value=27)
                             }
                             ler_train = sess.run(
                                 ler_op, feed_dict=feed_dict_ler)
@@ -210,13 +191,12 @@ class TestAttention(tf.test.TestCase):
                             ler_train = 1
 
                         duration_step = time.time() - start_time_step
-                        print('Step %d: loss = %.3f / ler = %.4f (%.3f sec)' %
-                              (step + 1, loss_train, ler_train, duration_step))
+                        print('Step %d: loss = %.3f / ler = %.4f (%.3f sec) / lr = %.5f' %
+                              (step + 1, loss_train, ler_train, duration_step, learning_rate))
                         start_time_step = time.time()
 
                         # Visualize
                         if label_type == 'character':
-                            map_file_path = '../../experiments/timit/metrics/mapping_files/attention/character.txt'
                             print('True            : %s' %
                                   num2alpha(labels[0]))
                             print('Pred (Training) : <%s' %
@@ -224,7 +204,6 @@ class TestAttention(tf.test.TestCase):
                             print('Pred (Inference): <%s' %
                                   num2alpha(predicted_ids_infer[0]))
                         else:
-                            map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone2num_61.txt'
                             print('True            : %s' %
                                   num2phone(labels[0], map_file_path))
                             print('Pred (Training) : < %s' %
@@ -236,10 +215,18 @@ class TestAttention(tf.test.TestCase):
                             not_improved_count += 1
                         else:
                             not_improved_count = 0
-                        if not_improved_count >= 50:
+                        if not_improved_count >= 10:
                             print('Model is Converged.')
                             break
                         ler_train_pre = ler_train
+
+                        # Update learning rate
+                        learning_rate = lr_controller.decay_lr(
+                            learning_rate=learning_rate,
+                            epoch=step,
+                            value=ler_train)
+                        feed_dict[network.learning_rate_pl_list[0]
+                                  ] = learning_rate
 
                 duration_global = time.time() - start_time_global
                 print('Total time: %.3f sec' % (duration_global))

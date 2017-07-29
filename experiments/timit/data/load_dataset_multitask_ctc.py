@@ -28,6 +28,7 @@ class Dataset(DatasetBase):
         """A class for loading dataset.
         Args:
             data_type: string, train or dev or test
+            label_type_main: string, character or character_capital_divide
             label_type_sub: string, phone39 or phone48 or phone61
             batch_size: int, the size of mini-batch
             num_stack: int, the number of frames to stack
@@ -45,7 +46,7 @@ class Dataset(DatasetBase):
             raise ValueError('data_type is "train" or "dev" or "test".')
 
         self.data_type = data_type
-        self.label_type_main = 'character'
+        self.label_type_main = label_type_main
         self.label_type_sub = label_type_sub
         self.batch_size = batch_size * num_gpu
         self.num_stack = num_stack
@@ -56,12 +57,12 @@ class Dataset(DatasetBase):
         self.num_gpu = num_gpu
 
         input_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/inputs/', data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/inputs', data_type)
         label_main_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc/character/',
-            data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc',
+            label_type_main, data_type)
         label_sub_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc/',
+            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc',
             label_type_sub, data_type)
 
         # Load the frame number dictionary

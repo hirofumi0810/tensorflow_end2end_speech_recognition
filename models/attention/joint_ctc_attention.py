@@ -134,6 +134,84 @@ class JointCTCAttention(AttentionBase):
         self.summaries_train = []
         self.summaries_dev = []
 
+        # Placeholders for multi-task
+        self.inputs_pl_list = []
+        self.att_labels_pl_list = []
+        self.ctc_labels_pl_list = []
+        self.inputs_seq_len_pl_list = []
+        self.att_labels_seq_len_pl_list = []
+        self.keep_prob_input_pl_list = []
+        self.keep_prob_hidden_pl_list = []
+        self.keep_prob_output_pl_list = []
+        self.learning_rate_pl_list = []
+
+    def create_placeholders(self, gpu_index=None):
+        """
+        Args:
+            gpu_index: int, index of gpu
+        """
+        if gpu_index is None:
+            # For CPU or sigle GPU
+            self.inputs_pl_list.append(
+                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                               name='input'))
+            self.att_labels_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None, None],
+                               name='att_labels'))
+            self.ctc_labels_pl_list.append(tf.SparseTensor(
+                tf.placeholder(tf.int64, name='ctc_indices'),
+                tf.placeholder(tf.int32, name='ctc_values'),
+                tf.placeholder(tf.int64, name='ctc_shape')))
+            self.inputs_seq_len_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
+            self.att_labels_seq_len_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None],
+                               name='att_labels_seq_len'))
+            self.keep_prob_input_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_input'))
+            self.keep_prob_hidden_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_hidden'))
+            self.keep_prob_output_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_output'))
+            self.learning_rate_pl_list.append(
+                tf.placeholder(tf.float32, name='learning_rate'))
+        else:
+            # Define placeholders in each gpu tower
+            self.inputs_pl_list.append(
+                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                               name='input_gpu' + str(gpu_index)))
+            self.att_labels_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None, None],
+                               name='att_labels_gpu' + str(gpu_index)))
+            self.inputs_seq_len_pl_list.append(
+                tf.placeholder(tf.int64, shape=[None],
+                               name='inputs_seq_len_gpu' + str(gpu_index)))
+            self.att_labels_seq_len_pl_list.append(
+                tf.placeholder(tf.int32, shape=[None],
+                               name='labels_seq_len_gpu' + str(gpu_index)))
+            self.keep_prob_input_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_input_gpu' + str(gpu_index)))
+            self.keep_prob_hidden_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_hidden_gpu' + str(gpu_index)))
+            self.keep_prob_output_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_output_gpu' + str(gpu_index)))
+            self.learning_rate_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='learning_rate_gpu' + str(gpu_index)))
+
+        # These are prepared for computing LER
+        self.att_labels_st_true_pl = tf.SparseTensor(
+            tf.placeholder(tf.int64, name='indices_true'),
+            tf.placeholder(tf.int32, name='values_true'),
+            tf.placeholder(tf.int64, name='shape_true'))
+        self.att_labels_st_pred_pl = tf.SparseTensor(
+            tf.placeholder(tf.int64, name='indices_pred'),
+            tf.placeholder(tf.int32, name='values_pred'),
+            tf.placeholder(tf.int64, name='shape_pred'))
+
     def _encode(self, inputs, inputs_seq_len,
                 keep_prob_input, keep_prob_hidden):
         """Encode input features.

@@ -15,7 +15,7 @@ from experiments.timit.metrics.edit_distance import compute_edit_distance
 from experiments.utils.data.labels.character import num2char
 from experiments.utils.data.labels.phone import num2phone, phone2num
 from experiments.utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
-from experiments.utils.progressbar import wrap_iterator
+from experiments.utils.progressbar import wrap_generator
 
 
 def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
@@ -46,27 +46,19 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     else:
         eval_label_type = dataset.label_type
 
-    num_examples = dataset.data_num
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
-    per_mean = 0
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=batch_size)
-
     train_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + \
         train_label_type + '_to_num.txt'
     eval_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + \
         eval_label_type + '_to_num.txt'
     phone2num_39_map_file_path = '../metrics/mapping_files/ctc/phone39_to_num.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
-    for step in wrap_iterator(range(iteration), progressbar):
+    per_mean = 0
+    for data, next_epoch_flag in wrap_generator(dataset(batch_size), progressbar, total=dataset.data_num):
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, inputs_seq_len, _ = mini_batch.__next__()
+            inputs, labels_true, inputs_seq_len, _ = data
         else:
-            inputs, _, labels_true, inputs_seq_len, _ = mini_batch.__next__()
+            inputs, _, labels_true, inputs_seq_len, _ = data
 
         feed_dict = {
             network.inputs_pl_list[-1]: inputs,
@@ -128,6 +120,9 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                                          labels_pred_st)
         per_mean += per_each * batch_size_each
 
+        if next_epoch_flag:
+            break
+
     per_mean /= dataset.data_num
 
     return per_mean
@@ -153,25 +148,14 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
     else:
         batch_size = dataset.batch_size
 
-    num_examples = dataset.data_num
-    iteration = int(num_examples / batch_size)
-    if (num_examples / batch_size) != int(num_examples / batch_size):
-        iteration += 1
-    cer_sum = 0
-
-    # Make data generator
-    mini_batch = dataset.next_batch(batch_size=batch_size)
-
-    if label_type == 'character':
-        map_file_path = '../metrics/mapping_files/ctc/character_to_num.txt'
-    else:
-        map_file_path = '../metrics/mapping_files/ctc/character_to_num_capital.txt'
-    for step in wrap_iterator(range(iteration), progressbar):
+    map_file_path = '../metrics/mapping_files/ctc/' + label_type + '_to_num.txt'
+    cer_mean = 0
+    for data, next_epoch_flag in wrap_generator(dataset(batch_size), progressbar, total=dataset.data_num):
         # Create feed dictionary for next mini batch
         if not is_multitask:
-            inputs, labels_true, inputs_seq_len, _ = mini_batch.__next__()
+            inputs, labels_true, inputs_seq_len, _ = data
         else:
-            inputs, labels_true, _, inputs_seq_len, _ = mini_batch.__next__()
+            inputs, labels_true, _, inputs_seq_len, _ = data
 
         feed_dict = {
             network.inputs_pl_list[-1]: inputs,
@@ -204,8 +188,11 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
             # Compute edit distance
             cer_each = Levenshtein.distance(
                 str_pred, str_true) / len(list(str_true))
-            cer_sum += cer_each
+            cer_mean += cer_each
 
-    cer_mean = cer_sum / dataset.data_num
+        if next_epoch_flag:
+            break
+
+    cer_mean /= dataset.data_num
 
     return cer_mean

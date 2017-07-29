@@ -26,59 +26,32 @@ def do_eval(network, params, epoch=None):
         epoch: int the epoch to restore
     """
     # Load dataset
-    test_data = Dataset(data_type='test', label_type=params['label_type'],
-                        batch_size=1,
-                        eos_index=params['eos_index'],
-                        sort_utt=False, progressbar=True)
+    if 'phone' in params['label_type']:
+        test_data = Dataset(
+            data_type='test', label_type='phone39', batch_size=1,
+            eos_index=params['eos_index'], sort_utt=False, progressbar=True)
+    else:
+        test_data = Dataset(
+            data_type='test', label_type=params['label_type'], batch_size=1,
+            eos_index=params['eos_index'], sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.inputs = tf.placeholder(tf.float32,
-                                    shape=[None, None, network.input_size],
-                                    name='input')
-    network.labels = tf.placeholder(tf.int32,
-                                    shape=[None, None],
-                                    name='label')
-    network.inputs_seq_len = tf.placeholder(tf.int32,
-                                            shape=[None],
-                                            name='inputs_seq_len')
-    network.labels_seq_len = tf.placeholder(tf.int32,
-                                            shape=[None],
-                                            name='labels_seq_len')
-    network.keep_prob_input = tf.placeholder(tf.float32,
-                                             name='keep_prob_input')
-    network.keep_prob_hidden = tf.placeholder(tf.float32,
-                                              name='keep_prob_hidden')
-    network.keep_prob_output = tf.placeholder(tf.float32,
-                                              name='keep_prob_output')
-
-    # These are prepared for computing LER
-    indices_true_pl = tf.placeholder(tf.int64, name='indices_pred')
-    values_true_pl = tf.placeholder(tf.int32, name='values_pred')
-    shape_true_pl = tf.placeholder(tf.int64, name='shape_pred')
-    network.labels_st_true = tf.SparseTensor(indices_true_pl,
-                                             values_true_pl,
-                                             shape_true_pl)
-    indices_pred_pl = tf.placeholder(tf.int64, name='indices_pred')
-    values_pred_pl = tf.placeholder(tf.int32, name='values_pred')
-    shape_pred_pl = tf.placeholder(tf.int64, name='shape_pred')
-    network.labels_st_pred = tf.SparseTensor(indices_pred_pl,
-                                             values_pred_pl,
-                                             shape_pred_pl)
+    network.create_placeholders(gpu_index=None)
 
     # Add to the graph each operation (including model definition)
     _, _, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
-        network.inputs,
-        network.labels,
-        network.inputs_seq_len,
-        network.labels_seq_len,
-        network.keep_prob_input,
-        network.keep_prob_hidden,
-        network.keep_prob_output)
+        network.inputs_pl_list[0],
+        network.labels_pl_list[0],
+        network.inputs_seq_len_pl_list[0],
+        network.labels_seq_len_pl_list[0],
+        network.keep_prob_input_pl_list[0],
+        network.keep_prob_hidden_pl_list[0],
+        network.keep_prob_output_pl_list[0])
     _, decode_op_infer = network.decoder(
         decoder_outputs_train,
         decoder_outputs_infer)
-    per_op = network.compute_ler(network.labels_st_true,
-                                 network.labels_st_pred)
+    per_op = network.compute_ler(network.labels_st_true_pl,
+                                 network.labels_st_pred_pl)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -99,13 +72,14 @@ def do_eval(network, params, epoch=None):
             raise ValueError('There are not any checkpoints.')
 
         print('Test Data Evaluation:')
-        if params['label_type'] == 'character':
+        if params['label_type'] in ['character', 'character_capital_divide']:
             cer_test = do_eval_cer(
                 session=sess,
                 decode_op=decode_op_infer,
                 network=network,
                 dataset=test_data,
                 label_type=params['label_type'],
+                eval_batch_size=1,
                 progressbar=True)
             print('  CER: %f %%' % (cer_test * 100))
         else:
@@ -117,6 +91,7 @@ def do_eval(network, params, epoch=None):
                 dataset=test_data,
                 label_type=params['label_type'],
                 eos_index=params['eos_index'],
+                eval_batch_size=1,
                 progressbar=True)
             print('  PER: %f %%' % (per_test * 100))
 
@@ -171,7 +146,6 @@ def main(model_path, epoch):
         beam_width=20)
 
     network.model_dir = model_path
-    print(network.model_dir)
     do_eval(network=network, params=params, epoch=epoch)
 
 

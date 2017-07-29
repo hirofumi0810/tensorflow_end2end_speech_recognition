@@ -26,6 +26,7 @@ class Dataset(DatasetBase):
         Args:
             data_type: string, train or dev or test
             label_type: string, phone39 or phone48 or phone61 or character
+                or character_capital_divide
             eos_index: int , the index of <EOS> class
             sort_utt: if True, sort all utterances by the number of frames and
                 utteraces in each mini-batch are shuffled
@@ -49,9 +50,9 @@ class Dataset(DatasetBase):
         self.num_gpu = num_gpu
 
         input_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/inputs/', data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/inputs', data_type)
         label_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/labels/attention/',
+            '/n/sd8/inaguma/corpus/timit/dataset/labels/attention',
             label_type, data_type)
 
         # Load the frame number dictionary

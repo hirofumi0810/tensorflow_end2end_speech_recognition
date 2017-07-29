@@ -67,60 +67,88 @@ class Multitask_BLSTM_CTC(ctcBase):
                          dropout_ratio_input, dropout_ratio_hidden,
                          dropout_ratio_output, weight_decay, name)
 
-        self.num_proj = None if num_proj == 0 else num_proj
-        self.bottleneck_dim = bottleneck_dim
+        self.num_proj = int(num_proj) if num_proj not in [None, 0] else None
+        self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
+            None, 0] else None
 
-        if num_layer_sub < 1 or num_layer_sub > num_layer_main:
+        if int(num_layer_sub) < 1 or int(num_layer_main) < int(num_layer_sub):
             raise ValueError(
                 'Set num_layer_sub between 1 to num_layer_main.')
-        self.num_layer_sub = num_layer_sub
-        self.num_classes_sub = num_classes_sub + 1  # plus blank label
+        self.num_layer_sub = int(num_layer_sub)
+        self.num_classes_sub = int(num_classes_sub) + 1  # plus blank label
 
-        if main_task_weight < 0 or main_task_weight > 1:
+        if float(main_task_weight) < 0 or float(main_task_weight) > 1:
             raise ValueError('Set main_task_weight between 0 to 1.')
-        self.main_task_weight = main_task_weight
-        self.sub_task_weight = 1 - main_task_weight
+        self.main_task_weight = float(main_task_weight)
+        self.sub_task_weight = 1 - self.main_task_weight
 
         # Placeholder for multi-task
         self.labels_sub_pl_list = []
 
-    def create_placeholders(self, gpu_index):
+    def create_placeholders(self, gpu_index=None):
         """
         Args:
             gpu_index: int, index of gpu
         """
-        # Define placeholders in each gpu tower
-        self.inputs_pl_list.append(
-            tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                           name='input' + str(gpu_index)))
-        self.labels_pl_list.append(
-            tf.SparseTensor(
-                tf.placeholder(tf.int64, name='indices_gpu' + str(gpu_index)),
-                tf.placeholder(tf.int32,  name='values_gpu' + str(gpu_index)),
-                tf.placeholder(tf.int64, name='shape_gpu' + str(gpu_index))))
-        self.labels_sub_pl_list.append(
-            tf.SparseTensor(
-                tf.placeholder(tf.int64,
-                               name='indices_sub_gpu' + str(gpu_index)),
-                tf.placeholder(tf.int32,
-                               name='values_sub_gpu' + str(gpu_index)),
-                tf.placeholder(tf.int64,
-                               name='shape_sub_gpu' + str(gpu_index))))
-        self.inputs_seq_len_pl_list.append(
-            tf.placeholder(tf.int64, shape=[None],
-                           name='inputs_seq_len_gpu' + str(gpu_index)))
-        self.keep_prob_input_pl_list.append(
-            tf.placeholder(tf.float32,
-                           name='keep_prob_input_gpu' + str(gpu_index)))
-        self.keep_prob_hidden_pl_list.append(
-            tf.placeholder(tf.float32,
-                           name='keep_prob_hidden_gpu' + str(gpu_index)))
-        self.keep_prob_output_pl_list.append(
-            tf.placeholder(tf.float32,
-                           name='keep_prob_output_gpu' + str(gpu_index)))
-        self.learning_rate_pl_list.append(
-            tf.placeholder(tf.float32,
-                           name='learning_rate_gpu' + str(gpu_index)))
+        if gpu_index is None:
+            # For CPU or sigle GPU
+            self.inputs_pl_list.append(
+                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                               name='input'))
+            self.labels_pl_list.append(
+                tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
+                                tf.placeholder(tf.int32, name='values'),
+                                tf.placeholder(tf.int64, name='shape')))
+            self.labels_sub_pl_list.append(
+                tf.SparseTensor(tf.placeholder(tf.int64, name='indices_sub'),
+                                tf.placeholder(tf.int32, name='values_sub'),
+                                tf.placeholder(tf.int64, name='shape_sub')))
+            self.inputs_seq_len_pl_list.append(
+                tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
+            self.keep_prob_input_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_input'))
+            self.keep_prob_hidden_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_hidden'))
+            self.keep_prob_output_pl_list.append(
+                tf.placeholder(tf.float32, name='keep_prob_output'))
+            self.learning_rate_pl_list.append(
+                tf.placeholder(tf.float32, name='learning_rate'))
+        else:
+            # Define placeholders in each gpu tower
+            self.inputs_pl_list.append(
+                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                               name='input' + str(gpu_index)))
+            self.labels_pl_list.append(
+                tf.SparseTensor(
+                    tf.placeholder(
+                        tf.int64, name='indices_gpu' + str(gpu_index)),
+                    tf.placeholder(
+                        tf.int32, name='values_gpu' + str(gpu_index)),
+                    tf.placeholder(
+                        tf.int64, name='shape_gpu' + str(gpu_index))))
+            self.labels_sub_pl_list.append(
+                tf.SparseTensor(
+                    tf.placeholder(tf.int64,
+                                   name='indices_sub_gpu' + str(gpu_index)),
+                    tf.placeholder(tf.int32,
+                                   name='values_sub_gpu' + str(gpu_index)),
+                    tf.placeholder(tf.int64,
+                                   name='shape_sub_gpu' + str(gpu_index))))
+            self.inputs_seq_len_pl_list.append(
+                tf.placeholder(tf.int64, shape=[None],
+                               name='inputs_seq_len_gpu' + str(gpu_index)))
+            self.keep_prob_input_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_input_gpu' + str(gpu_index)))
+            self.keep_prob_hidden_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_hidden_gpu' + str(gpu_index)))
+            self.keep_prob_output_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='keep_prob_output_gpu' + str(gpu_index)))
+            self.learning_rate_pl_list.append(
+                tf.placeholder(tf.float32,
+                               name='learning_rate_gpu' + str(gpu_index)))
 
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
                keep_prob_hidden, keep_prob_output):
