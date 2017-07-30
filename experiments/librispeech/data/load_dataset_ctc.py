@@ -10,7 +10,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import join
+from os.path import join, isfile
 import pickle
 import numpy as np
 
@@ -26,10 +26,10 @@ class Dataset(DatasetBase):
         """A class for loading dataset.
         Args:
             data_type: string, train_clean100 or train_clean360 or
-                train_other500 or dev_clean or dev_other or test_clean or
-                test_other
+                train_other500 or train_all or dev_clean or dev_other or
+                test_clean or test_other
             train_data_size: string, train_clean100 or train_clean360 or
-                train_other500
+                train_other500 or train_all
             label_type: string, character or character_capital_divide or word
             batch_size: int, the size of mini-batch
             num_stack: int, the number of frames to stack
@@ -48,12 +48,13 @@ class Dataset(DatasetBase):
                 you will use to reduce data-communication time between servers.
         """
         if data_type not in ['train_clean100', 'train_clean360',
-                             'train_other500', 'dev_clean', 'dev_other',
+                             'train_other500', 'train_all',
+                             'dev_clean', 'dev_other',
                              'test_clean', 'test_other']:
             raise ValueError(
                 'data_type is "train_clean100" or "train_clean360" or ' +
-                '"train_other500" or "dev_clean" or "dev_other" or ' +
-                '"test_clean" "test_other".')
+                '"train_other500" or "train_all" or "dev_clean" or ' +
+                '"dev_other" or "test_clean" "test_other".')
 
         self.data_type = data_type
         self.train_data_size = train_data_size
@@ -65,45 +66,89 @@ class Dataset(DatasetBase):
         self.sorta_grad = sorta_grad
         self.progressbar = progressbar
         self.num_gpu = num_gpu
-        self.input_size = 120
+        self.input_size = None
 
         if is_gpu:
             # GPU server
-            input_path = join('/data/inaguma/librispeech/inputs',
-                              train_data_size, data_type)
-            label_path = join('/data/inaguma/librispeech/labels/ctc',
-                              train_data_size, label_type, data_type)
+            if data_type == 'train_all':
+                input_path_list = [
+                    '/data/inaguma/librispeech/inputs/train_clean100/train_clean100',
+                    '/data/inaguma/librispeech/inputs/train_clean360/train_clean360',
+                    '/data/inaguma/librispeech/inputs/train_other500/train_other500']
+                label_path_list = [
+                    join('/data/inaguma/librispeech/labels/ctc/train_clean100',
+                         label_type, 'train_clean100'),
+                    join('/data/inaguma/librispeech/labels/ctc/train_clean360',
+                         label_type, 'train_clean360'),
+                    join('/data/inaguma/librispeech/labels/ctc/train_other500',
+                         label_type, 'train_other500')]
+            else:
+                input_path_list = [
+                    join('/data/inaguma/librispeech/inputs',
+                         train_data_size, data_type)]
+                label_path_list = [
+                    join('/data/inaguma/librispeech/labels/ctc',
+                         train_data_size, label_type, data_type)]
         else:
             # CPU
-            input_path = join(
-                '/n/sd8/inaguma/corpus/librispeech/dataset/inputs',
-                train_data_size, data_type)
-            label_path = join(
-                '/n/sd8/inaguma/corpus/librispeech/dataset/labels/ctc',
-                train_data_size, label_type, data_type)
+            if data_type == 'train_all':
+                input_path_list = [
+                    '/n/sd8/inaguma/corpus/librispeech/dataset/inputs/train_clean100/train_clean100',
+                    '/n/sd8/inaguma/corpus/librispeech/dataset/inputs/train_clean360/train_clean360',
+                    '/n/sd8/inaguma/corpus/librispeech/dataset/inputs/train_other500/train_other500']
+                label_path_list = [
+                    join('/n/sd8/inaguma/corpus/librispeech/dataset/labels/ctc/train_clean100',
+                         label_type, 'train_clean100'),
+                    join('/n/sd8/inaguma/corpus/librispeech/dataset/labels/ctc/train_clean360',
+                         label_type, 'train_clean360'),
+                    join('/n/sd8/inaguma/corpus/librispeech/dataset/labels/ctc/train_other500',
+                         label_type, 'train_other500')]
+            else:
+                input_path_list = [
+                    join('/n/sd8/inaguma/corpus/librispeech/dataset/inputs',
+                         train_data_size, data_type)]
+                label_path_list = [
+                    join('/n/sd8/inaguma/corpus/librispeech/dataset/labels/ctc',
+                         train_data_size, label_type, data_type)]
 
         # Load the frame number dictionary
-        with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
-            self.frame_num_dict = pickle.load(f)
+        if data_type == 'train_all':
+            self.frame_num_dict = {}
+            for input_path in input_path_list:
+                with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
+                    self.frame_num_dict.update(pickle.load(f))
+        else:
+            with open(join(input_path_list[0], 'frame_num.pickle'), 'rb') as f:
+                self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label by frame num
         frame_num_tuple_sorted = sorted(self.frame_num_dict.items(),
                                         key=lambda x: x[1])
         input_paths, label_paths = [], []
-        for input_name, frame_num in frame_num_tuple_sorted:
+        from tqdm import tqdm
+        for input_name, frame_num in tqdm(frame_num_tuple_sorted):
             speaker_name = input_name.split('-')[0]
-            input_paths.append(
-                join(input_path, speaker_name, input_name + '.npy'))
-            label_paths.append(
-                join(label_path, speaker_name, input_name + '.npy'))
+            for i, input_path in enumerate(input_path_list):
+                if isfile(join(input_path, speaker_name, input_name + '.npy')):
+                    input_paths.append(
+                        join(input_path, speaker_name, input_name + '.npy'))
+                    break
+            for i, label_path in enumerate(label_path_list):
+                if isfile(join(label_path_list[i], speaker_name, input_name + '.npy')):
+                    label_paths.append(
+                        join(label_path_list[i], speaker_name, input_name + '.npy'))
+                    break
         self.input_paths = np.array(input_paths)
         self.label_paths = np.array(label_paths)
         self.data_num = len(self.input_paths)
-        print(self.data_num)
-
-        if (self.num_stack is not None) and (self.num_skip is not None):
-            self.input_size = self.input_size * num_stack
         # NOTE: Not load dataset yet
+
+        print(label_path_list)
+        print(len(self.input_paths))
+        print(len(self.label_paths))
+
+        assert len(self.input_paths) == len(
+            self.label_paths), "Inputs and labels must have the same number of files."
 
         self.rest = set(range(0, self.data_num, 1))
 
