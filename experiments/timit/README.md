@@ -1,55 +1,53 @@
 ## Usage
-
-At first, please choose the corpus and
-```
-cd each_corpus
-```
-
 ### Training
 ```
 cd training
-```
-and
-```
 ./run_*.sh path_to_config_file gpu_index
 ```
 For example,
 ```
+cd training
 ./run_ctc.sh ../config/ctc/blstm_rmsprop_phone61.yml 0
 ```
 
 ### Restoration & Evaluation
 ```
 cd evaluation
-```
-and
-```
 python eval_*.py path_to_trained_model
 ```
 
 ### Visualization
-```
-cd visualization
-```
 #### Plot LER in training
 ```
+cd visualization
 python plot_ler.py path_to_trained_model
 ```
 #### Plot loss in training
 ```
+cd visualization
 python plot_loss.py path_to_trained_model
 ```
 #### CTC
 ##### Plot CTC posteriors
 ```
-python plot_ctc_posteriors.py path_to_trained_model
+cd visualization
+python plot_(multitask_)ctc_posteriors.py path_to_trained_model
 ```
 ##### Decoding
 ```
-python decode_ctc.py path_to_trained_model
+cd visualization
+python decode_(multitask_)ctc.py path_to_trained_model
 ```
 #### Attention
-comming soon
-
-### Restoration & Fine-tuning
+##### Plot attention weights
+```
+cd visualization
+python plot_attention_weights.py path_to_trained_model
+```
+##### Decoding
+```
+cd visualization
+python decode_attention.py path_to_trained_model
+```
+#### Joint CTC-Attention
 comming soon
