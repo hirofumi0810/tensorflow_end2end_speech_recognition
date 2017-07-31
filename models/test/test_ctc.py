@@ -55,8 +55,7 @@ class TestCTC(tf.test.TestCase):
             # Define model graph
             num_classes = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
-            network = model(batch_size=batch_size,
-                            input_size=inputs[0].shape[-1],
+            network = model(input_size=inputs[0].shape[-1],
                             num_unit=256,
                             num_layer=2,
                             bottleneck_dim=0,
@@ -72,6 +71,7 @@ class TestCTC(tf.test.TestCase):
 
             # Define placeholders
             network.create_placeholders(gpu_index=None)
+            learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
             # Add to the graph each operation
             loss_op, logits = network.compute_loss(
@@ -84,7 +84,7 @@ class TestCTC(tf.test.TestCase):
             train_op = network.train(
                 loss_op,
                 optimizer='adam',
-                learning_rate=network.learning_rate_pl_list[0])
+                learning_rate=learning_rate_pl)
             decode_op = network.decoder(logits,
                                         network.inputs_seq_len_pl_list[0],
                                         decode_type='beam_search',
@@ -120,7 +120,7 @@ class TestCTC(tf.test.TestCase):
                 network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                 network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
                 network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
-                network.learning_rate_pl_list[0]: learning_rate
+                learning_rate_pl: learning_rate
             }
 
             map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
@@ -194,8 +194,7 @@ class TestCTC(tf.test.TestCase):
                             learning_rate=learning_rate,
                             epoch=step,
                             value=ler_train)
-                        feed_dict[network.learning_rate_pl_list[0]
-                                  ] = learning_rate
+                        feed_dict[learning_rate_pl] = learning_rate
 
                 duration_global = time.time() - start_time_global
                 print('Total time: %.3f sec' % (duration_global))

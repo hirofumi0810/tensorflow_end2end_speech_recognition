@@ -31,14 +31,11 @@ class DatasetBase(object):
             batch_size: int, the size of mini-batch
             session: set when using multiple GPUs
         Returns:
-            A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len,
-                        input_names)`, each size of `[batch_size]`
-                inputs: list of input data
-                labels: list of target labels
-                inputs_seq_len: list of length of inputs
-                labels_seq_len: list of length of target labels
-                input_names: list of file name of input data
-                If num_gpu > 1, each is divide into list of size `[num_gpu]`
+            A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
+                inputs: list of input data of size `[num_gpu, B, T, input_dim]`
+                labels: list of target labels of size `[num_gpu, B, T]`
+                inputs_seq_len: list of length of inputs of size `[num_gpu, B]`
+                input_names: list of file name of input data of size `[num_gpu, B]`
             next_epoch_flag: If true, one epoch is finished
         """
         if session is None and self.num_gpu != 1:
@@ -98,9 +95,13 @@ class DatasetBase(object):
             input_names = list(
                 map(lambda path: basename(path).split('.')[0],
                     np.take(self.input_paths, data_indices, axis=0)))
+            if self.input_size is None:
+                self.input_size = input_list[0].shape[1]
+                if self.num_stack is not None and self.num_skip is not None:
+                    self.input_size *= self.num_stack
 
             # Frame stacking
-            if not((self.num_stack is None) or (self.num_skip is None)):
+            if self.num_stack is not None and self.num_skip is not None:
                 input_list = stack_frame(
                     input_list,
                     self.input_paths[data_indices],
@@ -158,10 +159,16 @@ class DatasetBase(object):
                 input_names = tf.split(input_names, divide_num, axis=0)
 
                 # Convert from SparseTensor to numpy.ndarray
-                inputs = list(map(session.run, inputs))
-                labels = list(map(session.run, labels))
-                inputs_seq_len = list(map(session.run, inputs_seq_len))
-                input_names = list(map(session.run, input_names))
+                inputs = np.array(list(map(session.run, inputs)))
+                labels = np.array(list(map(session.run, labels)))
+                inputs_seq_len = np.array(
+                    list(map(session.run, inputs_seq_len)))
+                input_names = np.array(list(map(session.run, input_names)))
+            else:
+                inputs = inputs[np.newaxis, :, :, :]
+                labels = labels[np.newaxis, :, :]
+                inputs_seq_len = inputs_seq_len[np.newaxis, :]
+                input_names = np.array(input_names)[np.newaxis, :]
 
             yield (inputs, labels, inputs_seq_len,
                    input_names), next_epoch_flag

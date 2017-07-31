@@ -302,8 +302,6 @@ def do_train(network, params):
                     epoch += 1
                     start_time_epoch = time.time()
 
-                start_time_step = time.time()
-
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
 
@@ -343,7 +341,6 @@ def main(config_path, model_save_path):
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
     network = JointCTCAttention(
-        batch_size=params['batch_size'],
         input_size=params['input_size'],
         encoder_num_unit=params['encoder_num_unit'],
         encoder_num_layer=params['encoder_num_layer'],

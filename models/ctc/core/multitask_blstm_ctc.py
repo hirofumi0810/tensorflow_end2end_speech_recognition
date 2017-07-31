@@ -14,7 +14,6 @@ from models.ctc.core.ctc_base import ctcBase
 class Multitask_BLSTM_CTC(ctcBase):
     """Multi-task Bidirectional LSTM-CTC model.
     Args:
-        batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer_main: int, the number of layers of the main task
@@ -42,7 +41,6 @@ class Multitask_BLSTM_CTC(ctcBase):
     """
 
     def __init__(self,
-                 batch_size,
                  input_size,
                  num_unit,
                  num_layer_main,
@@ -61,8 +59,8 @@ class Multitask_BLSTM_CTC(ctcBase):
                  bottleneck_dim=None,
                  name='multitask_blstm_ctc'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_unit,
-                         num_layer_main, num_classes_main, parameter_init,
+        ctcBase.__init__(self, input_size, num_unit, num_layer_main,
+                         num_classes_main, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          dropout_ratio_output, weight_decay, name)
@@ -111,8 +109,6 @@ class Multitask_BLSTM_CTC(ctcBase):
                 tf.placeholder(tf.float32, name='keep_prob_hidden'))
             self.keep_prob_output_pl_list.append(
                 tf.placeholder(tf.float32, name='keep_prob_output'))
-            self.learning_rate_pl_list.append(
-                tf.placeholder(tf.float32, name='learning_rate'))
         else:
             # Define placeholders in each gpu tower
             self.inputs_pl_list.append(
@@ -146,9 +142,6 @@ class Multitask_BLSTM_CTC(ctcBase):
             self.keep_prob_output_pl_list.append(
                 tf.placeholder(tf.float32,
                                name='keep_prob_output_gpu' + str(gpu_index)))
-            self.learning_rate_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='learning_rate_gpu' + str(gpu_index)))
 
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
                keep_prob_hidden, keep_prob_output):
@@ -168,7 +161,6 @@ class Multitask_BLSTM_CTC(ctcBase):
             logits_sub: A tensor of size `[max_time, batch_size, input_size]`
                 in the sub task
         """
-
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(inputs,
                                 keep_prob_input,

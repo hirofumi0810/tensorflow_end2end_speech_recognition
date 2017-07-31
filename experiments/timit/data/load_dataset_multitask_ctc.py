@@ -3,7 +3,7 @@
 
 """Load dataset for the multitask CTC model (TIMIT corpus).
    In addition, frame stacking and skipping are used.
-   You can use the multi-GPU version.
+   You can use only the single GPU version.
 """
 
 from __future__ import absolute_import
@@ -23,8 +23,7 @@ class Dataset(DatasetBase):
 
     def __init__(self, data_type, label_type_main, label_type_sub, batch_size,
                  num_stack=None, num_skip=None,
-                 sort_utt=True, sorta_grad=False,
-                 progressbar=False, num_gpu=1):
+                 sort_utt=True, sorta_grad=False, progressbar=False):
         """A class for loading dataset.
         Args:
             data_type: string, train or dev or test
@@ -40,7 +39,6 @@ class Dataset(DatasetBase):
                 epoch, training will revert back to a random order. If sort_utt
                 is also True, it will be False.
             progressbar: if True, visualize progressbar
-            num_gpu: int, if more than 1, divide batch_size by num_gpu
         """
         if data_type not in ['train', 'dev', 'test']:
             raise ValueError('data_type is "train" or "dev" or "test".')
@@ -48,13 +46,12 @@ class Dataset(DatasetBase):
         self.data_type = data_type
         self.label_type_main = label_type_main
         self.label_type_sub = label_type_sub
-        self.batch_size = batch_size * num_gpu
+        self.batch_size = batch_size
         self.num_stack = num_stack
         self.num_skip = num_skip
         self.sort_utt = sort_utt if not sorta_grad else False
         self.sorta_grad = sorta_grad
         self.progressbar = progressbar
-        self.num_gpu = num_gpu
 
         input_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/inputs', data_type)

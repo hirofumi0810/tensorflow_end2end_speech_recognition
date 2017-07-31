@@ -143,10 +143,6 @@ class Dataset(DatasetBase):
         self.data_num = len(self.input_paths)
         # NOTE: Not load dataset yet
 
-        print(label_path_list)
-        print(len(self.input_paths))
-        print(len(self.label_paths))
-
         assert len(self.input_paths) == len(
             self.label_paths), "Inputs and labels must have the same number of files."
 

@@ -62,34 +62,23 @@ class TestLoadDatasetCTC(unittest.TestCase):
                 map_file_path = '../../metrics/mapping_files/ctc/character2num_capital.txt'
                 map_fn = num2char
             elif label_type == 'word':
-                map_file_path = '../../metrics/mapping_files/ctc/word2num_train_clean100.txt'
+                map_file_path = '../../metrics/mapping_files/ctc/word2num_train_other500.txt'
                 map_fn = num2word
 
             for data, next_epoch_flag in dataset(session=sess):
-                inputs, labels, _, _ = data
                 inputs, labels, inputs_seq_len, input_names = data
 
-                if num_gpu > 1:
-                    # for inputs_gpu in inputs:
-                    #     print(inputs_gpu.shape)
-                    inputs = inputs[0]
-                    labels = labels[0]
-
-                if num_gpu == 1:
-                    for inputs_i, labels_i in zip(inputs, labels):
-                        if len(inputs_i) < len(labels_i):
-                            print(len(inputs_i))
-                            print(len(labels_i))
-                            raise ValueError
+                # for inputs_gpu in inputs:
+                #     print(inputs_gpu.shape)
 
                 if label_type == 'word':
-                    word_list = num2word(labels[0], map_file_path)
+                    word_list = num2word(labels[0, 0], map_file_path)
                     str_true = ' '.join(word_list)
                 else:
-                    str_true = map_fn(labels[0], map_file_path)
+                    str_true = map_fn(labels[0, 0], map_file_path)
                     str_true = re.sub(r'_', ' ', str_true)
+                print('----- %s -----' % input_names[0, 0])
                 print(str_true)
-                print('-----')
 
                 if next_epoch_flag:
                     break

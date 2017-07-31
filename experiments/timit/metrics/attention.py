@@ -36,16 +36,9 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     Returns:
         per_mean: An average of PER
     """
-    if eval_batch_size is not None:
-        batch_size = eval_batch_size
-    else:
-        batch_size = dataset.batch_size
-
+    batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
     train_label_type = label_type
-    if is_multitask:
-        eval_label_type = dataset.label_type_sub
-    else:
-        eval_label_type = dataset.label_type
+    eval_label_type = dataset.label_type_sub if is_multitask else dataset.label_type
 
     train_phone2num_map_file_path = '../metrics/mapping_files/attention/' + \
         train_label_type + '_to_num.txt'
@@ -54,7 +47,12 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     phone2num_39_map_file_path = '../metrics/mapping_files/attention/phone39_to_num.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     per_mean = 0
-    for data, next_epoch_flag in wrap_generator(dataset(batch_size), progressbar, total=dataset.data_num):
+    total_step = int(dataset.data_num / batch_size)
+    if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
+        total_step += 1
+    for data, next_epoch_flag in wrap_generator(dataset(batch_size),
+                                                progressbar,
+                                                total=total_step):
         # Create feed dictionary for next mini-batch
         if not is_multitask:
             inputs, labels_true, inputs_seq_len, _, _ = data
@@ -62,11 +60,11 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
             inputs, _, labels_true, inputs_seq_len, _, _ = data
 
         feed_dict = {
-            network.inputs_pl_list[-1]: inputs,
-            network.inputs_seq_len_pl_list[-1]: inputs_seq_len,
-            network.keep_prob_input_pl_list[-1]: 1.0,
-            network.keep_prob_hidden_pl_list[-1]: 1.0,
-            network.keep_prob_output_pl_list[-1]: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         batch_size_each = len(inputs_seq_len)
@@ -145,14 +143,16 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
     Return:
         cer_mean: An average of CER
     """
-    if eval_batch_size is not None:
-        batch_size = eval_batch_size
-    else:
-        batch_size = dataset.batch_size
+    batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
 
     map_file_path = '../metrics/mapping_files/attention/' + label_type + '_to_num.txt'
     cer_mean = 0
-    for data, next_epoch_flag in wrap_generator(dataset(batch_size), progressbar, total=dataset.data_num):
+    total_step = int(dataset.data_num / batch_size)
+    if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
+        total_step += 1
+    for data, next_epoch_flag in wrap_generator(dataset(batch_size),
+                                                progressbar,
+                                                total=total_step):
         # Create feed dictionary for next mini-batch
         if not is_multitask:
             inputs, labels_true, inputs_seq_len, _, _ = data
@@ -160,11 +160,11 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
             inputs, labels_true, _, inputs_seq_len, _, _ = data
 
         feed_dict = {
-            network.inputs_pl_list[-1]: inputs,
-            network.inputs_seq_len_pl_list[-1]: inputs_seq_len,
-            network.keep_prob_input_pl_list[-1]: 1.0,
-            network.keep_prob_hidden_pl_list[-1]: 1.0,
-            network.keep_prob_output_pl_list[-1]: 1.0
+            network.inputs_pl_list[0]: inputs,
+            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            network.keep_prob_input_pl_list[0]: 1.0,
+            network.keep_prob_hidden_pl_list[0]: 1.0,
+            network.keep_prob_output_pl_list[0]: 1.0
         }
 
         batch_size_each = len(inputs_seq_len)

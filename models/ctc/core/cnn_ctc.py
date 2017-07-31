@@ -23,7 +23,6 @@ class CNN_CTC(ctcBase):
                 neural networks."
                arXiv preprint arXiv:1701.02720 (2017).
     Args:
-        batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
@@ -45,7 +44,6 @@ class CNN_CTC(ctcBase):
     """
 
     def __init__(self,
-                 batch_size,
                  input_size,
                  num_unit,  # TODO: not used
                  num_layer,
@@ -61,9 +59,8 @@ class CNN_CTC(ctcBase):
                  bottleneck_dim=None,  # not used
                  name='cnn_ctc'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
-                         num_classes, parameter_init,
-                         clip_grad, clip_activation,
+        ctcBase.__init__(self, input_size, num_unit, num_layer, num_classes,
+                         parameter_init, clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          dropout_ratio_output, weight_decay, name)
 

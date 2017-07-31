@@ -119,7 +119,6 @@ def main(model_path, epoch):
     # Model setting
     # AttentionModel = load(model_type=params['model'])
     network = blstm_attention_seq2seq.BLSTMAttetion(
-        batch_size=1,
         input_size=params['input_size'],
         encoder_num_unit=params['encoder_num_unit'],
         encoder_num_layer=params['encoder_num_layer'],

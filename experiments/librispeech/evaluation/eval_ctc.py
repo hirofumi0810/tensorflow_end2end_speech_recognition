@@ -76,7 +76,7 @@ def do_eval(network, params, epoch=None):
         if params['label_type'] in ['character', 'character_capital_divide']:
             cer_clean_test = do_eval_cer(
                 session=sess,
-                decode_op=decode_op,
+                decode_ops=[decode_op],
                 network=network,
                 dataset=test_clean_data,
                 label_type=params['label_type'],
@@ -86,7 +86,7 @@ def do_eval(network, params, epoch=None):
 
             cer_other_test = do_eval_cer(
                 session=sess,
-                decode_op=decode_op,
+                decode_ops=[decode_op],
                 network=network,
                 dataset=test_other_data,
                 label_type=params['label_type'],
@@ -96,7 +96,7 @@ def do_eval(network, params, epoch=None):
         else:
             wer_clean_test = do_eval_wer(
                 session=sess,
-                decode_op=decode_op,
+                decode_ops=[decode_op],
                 network=network,
                 dataset=test_clean_data,
                 train_data_size=params['train_data_size'],
@@ -107,7 +107,7 @@ def do_eval(network, params, epoch=None):
 
             wer_other_test = do_eval_wer(
                 session=sess,
-                decode_op=decode_op,
+                decode_ops=[decode_op],
                 network=network,
                 dataset=test_other_data,
                 train_data_size=params['train_data_size'],
@@ -142,7 +142,6 @@ def main(model_path, epoch):
     # Model setting
     model = load(model_type=params['model'])
     network = model(
-        batch_size=1,
         input_size=params['input_size'] * params['num_stack'],
         num_unit=params['num_unit'],
         num_layer=params['num_layer'],

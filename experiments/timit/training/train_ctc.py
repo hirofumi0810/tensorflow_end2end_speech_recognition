@@ -269,8 +269,6 @@ def do_train(network, params):
                     epoch += 1
                     start_time_epoch = time.time()
 
-                start_time_step = time.time()
-
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
 
@@ -306,8 +304,7 @@ def main(config_path, model_save_path):
 
     # Model setting
     model = load(model_type=params['model'])
-    network = model(batch_size=params['batch_size'],
-                    input_size=params['input_size'] * params['num_stack'],
+    network = model(input_size=params['input_size'] * params['num_stack'],
                     num_unit=params['num_unit'],
                     num_layer=params['num_layer'],
                     num_classes=params['num_classes'],

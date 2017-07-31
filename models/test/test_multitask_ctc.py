@@ -42,26 +42,25 @@ class TestCTC(tf.test.TestCase):
             num_classes_main = 26
             num_classes_sub = 61
             model = load(model_type=model_type)
-            network = model(
-                batch_size=batch_size,
-                input_size=inputs[0].shape[1],
-                num_unit=256,
-                num_layer_main=2,
-                num_layer_sub=1,
-                num_classes_main=num_classes_main,
-                num_classes_sub=num_classes_sub,
-                main_task_weight=0.8,
-                parameter_init=0.1,
-                clip_grad=5.0,
-                clip_activation=50,
-                dropout_ratio_input=0.9,
-                dropout_ratio_hidden=0.9,
-                dropout_ratio_output=0.9,
-                num_proj=None,
-                weight_decay=1e-8)
+            network = model(input_size=inputs[0].shape[1],
+                            num_unit=256,
+                            num_layer_main=2,
+                            num_layer_sub=1,
+                            num_classes_main=num_classes_main,
+                            num_classes_sub=num_classes_sub,
+                            main_task_weight=0.8,
+                            parameter_init=0.1,
+                            clip_grad=5.0,
+                            clip_activation=50,
+                            dropout_ratio_input=0.9,
+                            dropout_ratio_hidden=0.9,
+                            dropout_ratio_output=0.9,
+                            num_proj=None,
+                            weight_decay=1e-8)
 
             # Define placeholders
             network.create_placeholders(gpu_index=None)
+            learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
             # Add to the graph each operation
             loss_op, logits_main, logits_sub = network.compute_loss(
@@ -74,8 +73,8 @@ class TestCTC(tf.test.TestCase):
                 network.keep_prob_output_pl_list[0])
             train_op = network.train(
                 loss_op,
-                optimizer='rmsprop',
-                learning_rate=network.learning_rate_pl_list[0])
+                optimizer='adam',
+                learning_rate=learning_rate_pl)
             decode_op_main, decode_op_sub = network.decoder(
                 logits_main,
                 logits_sub,
@@ -116,7 +115,7 @@ class TestCTC(tf.test.TestCase):
                 network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                 network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
                 network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
-                network.learning_rate_pl_list[0]: learning_rate
+                learning_rate_pl: learning_rate
             }
 
             map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
@@ -198,8 +197,7 @@ class TestCTC(tf.test.TestCase):
                             learning_rate=learning_rate,
                             epoch=step,
                             value=ler_train_char)
-                        feed_dict[network.learning_rate_pl_list[0]
-                                  ] = learning_rate
+                        feed_dict[learning_rate_pl] = learning_rate
 
                 duration_global = time.time() - start_time_global
                 print('Total time: %.3f sec' % (duration_global))

@@ -104,7 +104,6 @@ def main(model_path, epoch):
     # Model setting
     model = load(model_type=params['model'])
     network = model(
-        batch_size=1,
         input_size=params['input_size'] * params['num_stack'],
         num_unit=params['num_unit'],
         num_layer_main=params['num_layer_main'],

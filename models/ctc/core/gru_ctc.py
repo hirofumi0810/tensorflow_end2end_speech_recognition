@@ -10,7 +10,6 @@ from models.ctc.core.ctc_base import ctcBase
 class GRU_CTC(ctcBase):
     """GRU-CTC model.
     Args:
-        batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
@@ -32,7 +31,6 @@ class GRU_CTC(ctcBase):
     """
 
     def __init__(self,
-                 batch_size,
                  input_size,
                  num_unit,
                  num_layer,
@@ -48,9 +46,8 @@ class GRU_CTC(ctcBase):
                  bottleneck_dim=None,
                  name='gru_ctc'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
-                         num_classes, parameter_init,
-                         clip_grad, clip_activation,
+        ctcBase.__init__(self, input_size, num_unit, num_layer, num_classes,
+                         parameter_init, clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          dropout_ratio_output, weight_decay, name)
 

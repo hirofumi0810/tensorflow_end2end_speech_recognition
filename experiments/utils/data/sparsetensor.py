@@ -46,6 +46,7 @@ def sparsetensor2list(labels_st, batch_size):
             sequence of target labels of an input.
     """
     if isinstance(labels_st, tf.SparseTensorValue):
+        # Output of TensorFlow
         indices = labels_st.indices
         values = labels_st.values
     else:
@@ -55,7 +56,7 @@ def sparsetensor2list(labels_st, batch_size):
         # TODO: Remove later
 
     if batch_size == 1:
-        return labels_st.values.reshape((1, -1))
+        return values.reshape((1, -1))
 
     labels = []
     batch_boundary = np.where(indices[:, 1] == 0)[0]

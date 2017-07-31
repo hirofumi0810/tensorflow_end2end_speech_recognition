@@ -105,6 +105,11 @@ def main(model_path, epoch):
         params = config['param']
 
     # Except for a blank label
+    if params['label_type_main'] == 'character':
+        params['num_classes_main'] = 28
+    elif params['label_type_main'] == 'character_capital_divide':
+        params['num_classes_main'] = 72
+
     if params['label_type_sub'] == 'phone61':
         params['num_classes_sub'] = 61
     elif params['label_type_sub'] == 'phone48':
@@ -115,12 +120,11 @@ def main(model_path, epoch):
     # Model setting
     model = load(model_type=params['model'])
     network = model(
-        batch_size=1,
         input_size=params['input_size'] * params['num_stack'],
         num_unit=params['num_unit'],
         num_layer_main=params['num_layer_main'],
         num_layer_sub=params['num_layer_sub'],
-        num_classes_main=28,
+        num_classes_main=params['num_classes_main'],
         num_classes_sub=params['num_classes_sub'],
         main_task_weight=params['main_task_weight'],
         parameter_init=params['weight_init'],

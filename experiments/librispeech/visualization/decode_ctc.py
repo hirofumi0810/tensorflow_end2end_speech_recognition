@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Plot the trained CTC posteriors (TIMIT corpus)."""
+"""Decode the trained CTC outputs (Librispeech corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -13,23 +13,31 @@ import tensorflow as tf
 import yaml
 
 sys.path.append('../../../')
-from experiments.timit.data.load_dataset_ctc import Dataset
-from experiments.timit.visualization.core.plot.ctc import posterior_test
+from experiments.librispeech.data.load_dataset_ctc import Dataset
+from experiments.librispeech.visualization.core.decode.ctc import decode_test
 from models.ctc.load_model import load
 
 
-def do_plot(network, params, epoch=None):
-    """Plot the CTC posteriors.
+def do_decode(network, params, epoch=None):
+    """Decode the CTC outputs.
     Args:
         network: model to restore
         params: A dictionary of parameters
-        epoch: epoch to restore
+        epoch: int, the epoch to restore
     """
     # Load dataset
-    test_data = Dataset(
-        data_type='test', label_type=params['label_type'], batch_size=1,
+    test_clean_data = Dataset(
+        data_type='test_clean',
+        train_data_size=params['train_data_size'],
+        label_type=params['label_type'], batch_size=params['batch_size'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False, progressbar=True)
+        sort_utt=False)
+    test_other_data = Dataset(
+        data_type='test_other',
+        train_data_size=params['train_data_size'],
+        label_type=params['label_type'], batch_size=params['batch_size'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
 
     # Define placeholders
     network.create_placeholders(gpu_index=None)
@@ -41,7 +49,10 @@ def do_plot(network, params, epoch=None):
                                      network.keep_prob_input_pl_list[0],
                                      network.keep_prob_hidden_pl_list[0],
                                      network.keep_prob_output_pl_list[0])
-    posteriors_op = network.posteriors(logits)
+    decode_op = network.decoder(logits,
+                                network.inputs_seq_len_pl_list[0],
+                                decode_type='beam_search',
+                                beam_width=20)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -61,13 +72,22 @@ def do_plot(network, params, epoch=None):
         else:
             raise ValueError('There are not any checkpoints.')
 
-        posterior_test(session=sess,
-                       posteriors_op=posteriors_op,
-                       network=network,
-                       dataset=test_data,
-                       label_type=params['label_type'],
-                       save_path=network.model_dir,
-                       show=False)
+        # Visualize
+        decode_test(session=sess,
+                    decode_op=decode_op,
+                    network=network,
+                    dataset=test_clean_data,
+                    label_type=params['label_type'],
+                    save_path=None)
+        # save_path=network.model_dir)
+
+        decode_test(session=sess,
+                    decode_op=decode_op,
+                    network=network,
+                    dataset=test_other_data,
+                    label_type=params['label_type'],
+                    save_path=None)
+        # save_path=network.model_dir)
 
 
 def main(model_path, epoch):
@@ -77,17 +97,20 @@ def main(model_path, epoch):
         config = yaml.load(f)
         params = config['param']
 
-    # Except for a blank label
-    if params['label_type'] == 'phone61':
-        params['num_classes'] = 61
-    elif params['label_type'] == 'phone48':
-        params['num_classes'] = 48
-    elif params['label_type'] == 'phone39':
-        params['num_classes'] = 39
-    elif params['label_type'] == 'character':
+    # Except for a blank class
+    if params['label_type'] == 'character':
         params['num_classes'] = 28
     elif params['label_type'] == 'character_capital_divide':
-        params['num_classes'] = 72
+        params['num_classes'] = 77
+    elif params['label_type'] == 'word':
+        if params['train_data_size'] == 'train_clean100':
+            params['num_classes'] = 7213
+        elif params['train_data_size'] == 'train_clean360':
+            params['num_classes'] = 16287
+        elif params['train_data_size'] == 'train_other500':
+            params['num_classes'] = 18669
+        elif params['train_data_size'] == 'train_all':
+            params['num_classes'] = 0
 
     # Model setting
     model = load(model_type=params['model'])
@@ -106,7 +129,7 @@ def main(model_path, epoch):
         weight_decay=params['weight_decay'])
 
     network.model_dir = model_path
-    do_plot(network=network, params=params, epoch=epoch)
+    do_decode(network=network, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':
@@ -121,5 +144,5 @@ if __name__ == '__main__':
     else:
         raise ValueError(
             ("Set a path to saved model.\n"
-             "Usase: python plot_ctc_posterior.py path_to_saved_model"))
+             "Usase: python decode_ctc.py path_to_saved_model"))
     main(model_path=model_path, epoch=epoch)

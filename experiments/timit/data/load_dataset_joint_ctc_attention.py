@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """Load dataset for the Joint CTC-Attention model (TIMIT corpus).
-   You can use the multi-GPU version.
+   You can use only the single GPU version.
 """
 
 from __future__ import absolute_import
@@ -20,8 +20,7 @@ from experiments.utils.data.dataset_loader.all_load.joint_ctc_attention_all_load
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, label_type, batch_size, eos_index,
-                 sort_utt=True, sorta_grad=False,
-                 progressbar=False, num_gpu=1):
+                 sort_utt=True, sorta_grad=False, progressbar=False):
         """A class for loading dataset.
         Args:
             data_type: string, train or dev or test
@@ -35,19 +34,17 @@ class Dataset(DatasetBase):
                 epoch, training will revert back to a random order. If sort_utt
                 is also True, it will be False.
             progressbar: if True, visualize progressbar
-            num_gpu: int, if more than 1, divide batch_size by num_gpu
         """
         if data_type not in ['train', 'dev', 'test']:
             raise ValueError('data_type is "train" or "dev" or "test".')
 
         self.data_type = data_type
         self.label_type = label_type
-        self.batch_size = batch_size * num_gpu
+        self.batch_size = batch_size
         self.eos_index = eos_index
         self.sort_utt = sort_utt if not sorta_grad else False
         self.sorta_grad = sorta_grad
         self.progressbar = progressbar
-        self.num_gpu = num_gpu
 
         input_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/inputs', data_type)

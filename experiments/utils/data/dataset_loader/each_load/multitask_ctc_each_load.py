@@ -22,30 +22,23 @@ class DatasetBase(object):
     def __init__(self, *args, **kwargs):
         raise NotImplementedError
 
-    s DatasetBase(object):
+    def __call__(self, batch_size=None, session=None):
+        return self.__next_mini_batch(batch_size, session)
 
-        def __init__(self, *args, **kwargs):
-            raise NotImplementedError
-
-        def __call__(self, batch_size=None, session=None):
-            return self.__next_mini_batch(batch_size, session)
-
-        def __next_mini_batch(self, batch_size=None, session=None):
-            """Generate each mini-batch.
-            Args:
-                batch_size: int, the size of mini-batch
-                session: set when using multiple GPUs
-            Returns:
-                A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len,
-                            input_names)`, each size of `[batch_size]`
-                    inputs: list of input data
-                    labels_main: list of target labels in the main task
-                    labels_sub: list of target labels in the sub task
-                    inputs_seq_len: list of length of inputs
-                    input_names: list of file name of input data
-                    If num_gpu > 1, each is divide into list of size `[num_gpu]`
-                next_epoch_flag: If true, one epoch is finished
-            """
+    def __next_mini_batch(self, batch_size=None, session=None):
+        """Generate each mini-batch.
+        Args:
+            batch_size: int, the size of mini-batch
+            session: set when using multiple GPUs
+        Returns:
+            A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
+                inputs: list of input data of size `[num_gpu, B, T, input_dim]`
+                labels_main: list of target labels in the main task, of size `[num_gpu, B, T]`
+                labels_sub: list of target labels in the sub task, of size `[num_gpu, B, T]`
+                inputs_seq_len: list of length of inputs of size `[num_gpu, B]`
+                input_names: list of file name of input data of size `[num_gpu, B]`
+            next_epoch_flag: If true, one epoch is finished
+        """
         if session is None and self.num_gpu != 1:
             raise ValueError('Set session when using multiple GPUs.')
 
@@ -108,9 +101,13 @@ class DatasetBase(object):
             input_names = list(
                 map(lambda path: basename(path).split('.')[0],
                     np.take(self.input_paths, data_indices, axis=0)))
+            if self.input_size is None:
+                self.input_size = input_list[0].shape[1]
+                if self.num_stack is not None and self.num_skip is not None:
+                    self.input_size *= self.num_stack
 
             # Frame stacking
-            if not ((self.num_stack is None) or (self.num_skip is None)):
+            if self.num_stack is not None and self.num_skip is not None:
                 input_list = stack_frame(
                     input_list,
                     self.input_paths[data_indices],
@@ -181,7 +178,13 @@ class DatasetBase(object):
                 labels_main = list(map(session.run, labels_main))
                 labels_sub = list(map(session.run, labels_sub))
                 inputs_seq_len = list(map(session.run, inputs_seq_len))
-                input_names = list(map(session.run, input_names))
+                input_names = np.array(list(map(session.run, input_names)))
+            else:
+                inputs = inputs[np.newaxis, :, :, :]
+                labels_main = labels_main[np.newaxis, :, :]
+                labels_sub = labels_sub[np.newaxis, :, :]
+                inputs_seq_len = inputs_seq_len[np.newaxis, :]
+                input_names = np.array(input_names)[np.newaxis, :]
 
             yield (inputs, labels_main, labels_sub, inputs_seq_len,
                    input_names), next_epoch_flag

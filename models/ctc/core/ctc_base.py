@@ -23,7 +23,6 @@ OPTIMIZER_CLS_NAMES = {
 class ctcBase(object):
     """Connectionist Temporal Classification (CTC) network.
     Args:
-        batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
@@ -44,7 +43,6 @@ class ctcBase(object):
     """
 
     def __init__(self,
-                 batch_size,
                  input_size,
                  num_unit,
                  num_layer,
@@ -59,7 +57,6 @@ class ctcBase(object):
                  name):
 
         # Network size
-        self.batch_size = int(batch_size)
         self.input_size = int(input_size)
         self.num_classes = int(num_classes)
         self.num_unit = int(num_unit)
@@ -87,7 +84,6 @@ class ctcBase(object):
         self.keep_prob_input_pl_list = []
         self.keep_prob_hidden_pl_list = []
         self.keep_prob_output_pl_list = []
-        self.learning_rate_pl_list = []
 
     def create_placeholders(self, gpu_index=None):
         """
@@ -111,8 +107,6 @@ class ctcBase(object):
                 tf.placeholder(tf.float32, name='keep_prob_hidden'))
             self.keep_prob_output_pl_list.append(
                 tf.placeholder(tf.float32, name='keep_prob_output'))
-            self.learning_rate_pl_list.append(
-                tf.placeholder(tf.float32, name='learning_rate'))
         else:
             # Define placeholders in each gpu tower
             self.inputs_pl_list.append(
@@ -123,8 +117,9 @@ class ctcBase(object):
                     tf.placeholder(
                         tf.int64, name='indices_gpu' + str(gpu_index)),
                     tf.placeholder(
-                        tf.int32,  name='values_gpu' + str(gpu_index)),
-                    tf.placeholder(tf.int64, name='shape_gpu' + str(gpu_index))))
+                        tf.int32, name='values_gpu' + str(gpu_index)),
+                    tf.placeholder(tf.int64,
+                                   name='shape_gpu' + str(gpu_index))))
             self.inputs_seq_len_pl_list.append(
                 tf.placeholder(tf.int64, shape=[None],
                                name='inputs_seq_len_gpu' + str(gpu_index)))
@@ -137,9 +132,6 @@ class ctcBase(object):
             self.keep_prob_output_pl_list.append(
                 tf.placeholder(tf.float32,
                                name='keep_prob_output_gpu' + str(gpu_index)))
-            self.learning_rate_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='learning_rate_gpu' + str(gpu_index)))
 
     def _add_gaussian_noise_to_inputs(self, inputs, stddev=0.075):
         """Add gaussian noise to the inputs.
@@ -168,9 +160,8 @@ class ctcBase(object):
         """
         raise NotImplementedError
 
-    def compute_loss(self, inputs, labels, inputs_seq_len,
-                     keep_prob_input, keep_prob_hidden, keep_prob_output,
-                     gpu_index=0, scope=None):
+    def compute_loss(self, inputs, labels, inputs_seq_len, keep_prob_input,
+                     keep_prob_hidden, keep_prob_output, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[batch_size, max_time, input_size]`
@@ -182,7 +173,7 @@ class ctcBase(object):
                 the hidden-hidden layers
             keep_prob_output: A float value. A probability to keep nodes in
                 the hidden-output layer
-            gpu_index: int, index of gpu
+            scope: A scope in the model tower
         Returns:
             total_loss: operation for computing total ctc loss
             logits: A tensor of size `[max_time, batch_size, input_size]`
@@ -214,31 +205,53 @@ class ctcBase(object):
             tf.add_to_collection('losses', ctc_loss)
 
         # Compute total loss
-        total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        total_loss = tf.add_n(tf.get_collection('losses', scope),
+                              name='total_loss')
 
         # Add a scalar summary for the snapshot of loss
         if self.weight_decay > 0:
-            with tf.name_scope("weight_loss_gpu" + str(gpu_index)):
+            with tf.name_scope("weight_loss"):
                 self.summaries_train.append(
                     tf.summary.scalar('weight_loss_train',
                                       weight_sum * self.weight_decay))
                 self.summaries_dev.append(
                     tf.summary.scalar('weight_loss_dev',
                                       weight_sum * self.weight_decay))
-
-        with tf.name_scope("ctc_loss_gpu" + str(gpu_index)):
+        with tf.name_scope("ctc_loss"):
             self.summaries_train.append(
                 tf.summary.scalar('ctc_loss_train', ctc_loss))
             self.summaries_dev.append(
                 tf.summary.scalar('ctc_loss_dev', ctc_loss))
-
-        with tf.name_scope("total_loss_gpu" + str(gpu_index)):
+        with tf.name_scope("total_loss"):
             self.summaries_train.append(
                 tf.summary.scalar('total_loss_train', total_loss))
             self.summaries_dev.append(
                 tf.summary.scalar('total_loss_dev', total_loss))
 
         return total_loss, logits
+
+    def set_optimizer(self, optimizer_name, learning_rate):
+        """Set optimizer.
+        Args:
+            optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
+            learning_rate: A float value, a learning rate
+        Returns:
+            optimizer:
+        """
+        optimizer_name = optimizer_name.lower()
+        if optimizer_name not in OPTIMIZER_CLS_NAMES:
+            raise ValueError(
+                "Optimizer name should be one of [%s], you provided %s." %
+                (", ".join(OPTIMIZER_CLS_NAMES), optimizer_name))
+
+        # Select optimizer
+        if optimizer_name == 'momentum':
+            return OPTIMIZER_CLS_NAMES[optimizer_name](
+                learning_rate=learning_rate,
+                momentum=0.9)
+        else:
+            return OPTIMIZER_CLS_NAMES[optimizer_name](
+                learning_rate=learning_rate)
 
     def train(self, loss, optimizer, learning_rate=None,
               clip_grad_by_norm=None):
@@ -252,28 +265,16 @@ class ctcBase(object):
         Returns:
             train_op: operation for training
         """
-        optimizer = optimizer.lower()
-        if optimizer not in OPTIMIZER_CLS_NAMES:
-            raise ValueError(
-                "Optimizer name should be one of [%s], you provided %s." %
-                (", ".join(OPTIMIZER_CLS_NAMES), optimizer))
-
         # Create a variable to track the global step
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        # Select optimizer
-        if optimizer == 'momentum':
-            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate,
-                momentum=0.9)
-        else:
-            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate)
+        # Set optimizer
+        self.optimizer = self.set_optimizer(optimizer, learning_rate)
 
         if self.clip_grad is not None:
             # Gradient clipping
             train_op = self._gradient_clipping(loss,
-                                               optimizer,
+                                               self.optimizer,
                                                clip_grad_by_norm,
                                                global_step)
 
@@ -332,11 +333,9 @@ class ctcBase(object):
         if decode_type == 'greedy':
             decoded, _ = tf.nn.ctc_greedy_decoder(
                 logits, tf.cast(inputs_seq_len, tf.int32))
-
         elif decode_type == 'beam_search':
             if beam_width is None:
                 raise ValueError('Set beam_width.')
-
             decoded, _ = tf.nn.ctc_beam_search_decoder(
                 logits, tf.cast(inputs_seq_len, tf.int32),
                 beam_width=beam_width)
