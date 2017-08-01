@@ -45,12 +45,13 @@ def do_train(network, params, gpu_indices):
         train_data_size=params['train_data_size'],
         label_type=params['label_type'], batch_size=params['batch_size'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sorta_grad=True, num_gpu=len(gpu_indices))
+        sort_utt=True, sort_stop_epoch=1,
+        num_gpu=len(gpu_indices), is_gpu=False)
     dev_data = Dataset(
         data_type=dev, train_data_size=params['train_data_size'],
         label_type=params['label_type'], batch_size=params['batch_size'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False, num_gpu=len(gpu_indices))
+        sort_utt=False, num_gpu=len(gpu_indices), is_gpu=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default(), tf.device('/cpu:0'):
@@ -74,7 +75,7 @@ def do_train(network, params, gpu_indices):
                 with tf.device(all_devices[i_gpu]):
                     with tf.name_scope('tower_gpu%d' % i_gpu) as scope:
                         # Define placeholders in each tower
-                        network.create_placeholders(gpu_index=i_gpu)
+                        network.create_placeholders(gpu_index=None)
 
                         # Calculate the total loss for the current tower of the
                         # model. This function constructs the entire model but
@@ -176,7 +177,7 @@ def do_train(network, params, gpu_indices):
             ler_dev_best = 1
             learning_rate = float(params['learning_rate'])
             epoch = 1
-            for step, (data, next_epoch_flag) in enumerate(train_data(session=sess)):
+            for step, (data, next_epoch_flag) in enumerate(train_data()):
 
                 # Create feed dictionary for next mini batch (train)
                 inputs, labels, inputs_seq_len, _ = data
@@ -202,8 +203,7 @@ def do_train(network, params, gpu_indices):
                 if (step + 1) % 10 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    (inputs, labels, inputs_seq_len, _), _ = dev_data(
-                        session=sess).__next__()
+                    (inputs, labels, inputs_seq_len, _), _ = dev_data().__next__()
                     feed_dict_dev = {}
                     for i_gpu in range(len(gpu_indices)):
                         feed_dict_dev[network.inputs_pl_list[i_gpu]

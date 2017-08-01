@@ -44,7 +44,7 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
     total_step = int(dataset.data_num / batch_size)
     if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
         total_step += 1
-    for data, next_epoch_flag in wrap_generator(dataset(batch_size, session),
+    for data, next_epoch_flag in wrap_generator(dataset(batch_size),
                                                 progressbar,
                                                 total=total_step):
         # Create feed dictionary for next mini batch
@@ -68,13 +68,14 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
 
         labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
 
-        for labels_pred_st in labels_pred_st_list:
+        for i_device, labels_pred_st in enumerate(labels_pred_st_list):
             labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
 
             for i_batch in range(batch_size_each):
 
                 # Convert from list to string
-                str_true = num2char(labels_true[i_batch], map_file_path)
+                str_true = num2char(
+                    labels_true[i_device, i_batch], map_file_path)
                 str_pred = num2char(labels_pred[i_batch], map_file_path)
 
                 # Remove silence(_) labels

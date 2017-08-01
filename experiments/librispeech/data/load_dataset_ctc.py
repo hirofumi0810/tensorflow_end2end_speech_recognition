@@ -21,7 +21,7 @@ class Dataset(DatasetBase):
 
     def __init__(self, data_type, train_data_size, label_type, batch_size,
                  num_stack=None, num_skip=None,
-                 sort_utt=True, sorta_grad=False,
+                 sort_utt=True, sort_stop_epoch=None,
                  progressbar=False, num_gpu=1, is_gpu=True):
         """A class for loading dataset.
         Args:
@@ -36,10 +36,8 @@ class Dataset(DatasetBase):
             num_skip: int, the number of frames to skip
             sort_utt: if True, sort all utterances by the number of frames and
                 utteraces in each mini-batch are shuffled
-            sorta_grad: if True, sorting utteraces are conducted only in the
-                first epoch (not shuffled in each mini-batch). After the first
-                epoch, training will revert back to a random order. If sort_utt
-                is also True, it will be False.
+            sort_stop_epoch: After sort_stop_epoch, training will revert back
+                to a random order
             progressbar: if True, visualize progressbar
             num_gpu: int, if more than 1, divide batch_size by num_gpu
             is_gpu: bool, if True, use dataset in the GPU server. This is
@@ -55,6 +53,15 @@ class Dataset(DatasetBase):
                 'data_type is "train_clean100" or "train_clean360" or ' +
                 '"train_other500" or "train_all" or "dev_clean" or ' +
                 '"dev_other" or "test_clean" "test_other".')
+        if data_type in ['train_clean100', 'train_clean360',
+                         'train_other500', 'train_all']:
+            self.is_training = True
+        else:
+            self.is_training = False
+        if data_type in ['test_clean', 'test_other'] and label_type == 'word':
+            self.is_test = True
+        else:
+            self.is_test = False
 
         self.data_type = data_type
         self.train_data_size = train_data_size
@@ -62,8 +69,9 @@ class Dataset(DatasetBase):
         self.batch_size = batch_size * num_gpu
         self.num_stack = num_stack
         self.num_skip = num_skip
-        self.sort_utt = sort_utt if not sorta_grad else False
-        self.sorta_grad = sorta_grad
+        self.sort_utt = sort_utt
+        self.sort_stop_epoch = sort_stop_epoch
+        self.epoch = 0
         self.progressbar = progressbar
         self.num_gpu = num_gpu
         self.input_size = None
@@ -143,12 +151,7 @@ class Dataset(DatasetBase):
         self.data_num = len(self.input_paths)
         # NOTE: Not load dataset yet
 
-        assert len(self.input_paths) == len(
-            self.label_paths), "Inputs and labels must have the same number of files."
+        assert len(self.input_paths) == len(self.label_paths), "Inputs and labels must have the same number of files (inputs: {0}, labels: {1}).".format(
+            len(self.input_paths), len(self.label_paths))
 
         self.rest = set(range(0, self.data_num, 1))
-
-        if data_type in ['test_clean', 'test_other'] and label_type == 'word':
-            self.is_test = True
-        else:
-            self.is_test = False

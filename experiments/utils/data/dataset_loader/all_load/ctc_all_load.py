@@ -27,7 +27,6 @@ class DatasetBase(object):
         """Generate each mini-batch.
         Args:
             _batch_size: int, the size of mini-batch
-            session: set when using multiple GPUs
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size `[B, T, input_dim]`
@@ -47,34 +46,35 @@ class DatasetBase(object):
                 next_epoch_flag = False
 
             # Sort all uttrances
-            if self.sort_utt or self.sorta_grad:
+            if self.sort_utt:
                 if len(self.rest) > _batch_size:
                     data_indices = list(self.rest)[:_batch_size]
                     self.rest -= set(data_indices)
                 else:
+                    # Last mini-batch
                     data_indices = list(self.rest)
                     self.rest = set(range(0, self.data_num, 1))
                     next_epoch_flag = True
-                    if self.data_type == 'train':
+                    if self.is_training:
                         print('---Next epoch---')
-                    if self.sorta_grad:
-                        self.sorta_grad = False
+                    self.epoch += 1
+                    if self.epoch == self.sort_stop_epoch:
+                        self.sort_utt = False
 
                 # Shuffle selected mini-batch
-                if not self.sorta_grad:
-                    random.shuffle(data_indices)
+                random.shuffle(data_indices)
 
             else:
                 if len(self.rest) > _batch_size:
                     # Randomly sample mini-batch
-                    data_indices = random.sample(
-                        list(self.rest), _batch_size)
+                    data_indices = random.sample(list(self.rest), _batch_size)
                     self.rest -= set(data_indices)
                 else:
+                    # Last mini-batch
                     data_indices = list(self.rest)
                     self.rest = set(range(0, self.data_num, 1))
                     next_epoch_flag = True
-                    if self.data_type == 'train':
+                    if self.is_training:
                         print('---Next epoch---')
 
                     # Shuffle selected mini-batch

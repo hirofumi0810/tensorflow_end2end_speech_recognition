@@ -21,28 +21,26 @@ class TestLoadDatasetAttention(unittest.TestCase):
     def test(self):
 
         # label_type
-        self.check_loading(label_type='character',
-                           sort_utt=False, sorta_grad=False)
+        self.check_loading(label_type='character', sort_utt=False)
         self.check_loading(label_type='character_capital_divide',
-                           sort_utt=False, sorta_grad=False)
-        self.check_loading(label_type='phone61',
-                           sort_utt=False, sorta_grad=False)
+                           sort_utt=False)
+        self.check_loading(label_type='phone61', sort_utt=False)
 
         # sort
-        self.check_loading(label_type='phone61',
-                           sort_utt=True, sorta_grad=False)
-        self.check_loading(label_type='phone61',
-                           sort_utt=False, sorta_grad=True)
+        self.check_loading(label_type='phone61', sort_utt=True)
+        self.check_loading(label_type='phone61', sort_utt=True,
+                           sort_stop_epoch=2)
 
     @measure_time
-    def check_loading(self, label_type, sort_utt, sorta_grad):
-        print('----- label_type: %s, sort_utt: %s, sorta_grad: %s -----' %
-              (label_type, str(sort_utt), str(sorta_grad)))
+    def check_loading(self, label_type, sort_utt, sort_stop_epoch=None):
+        print('----- label_type: %s, sort_utt: %s, sort_stop_epoch: %s -----' %
+              (label_type, str(sort_utt), str(sort_stop_epoch)))
 
         dataset = Dataset(
             data_type='dev', label_type=label_type,
             batch_size=64, eos_index=1,
-            sort_utt=sort_utt, sorta_grad=sorta_grad, progressbar=True)
+            sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
+            progressbar=True)
 
         print('=> Loading mini-batch...')
         map_file_path = '../../metrics/mapping_files/attention/' + label_type + '_to_num.txt'

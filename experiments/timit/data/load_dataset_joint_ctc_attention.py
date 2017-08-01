@@ -20,7 +20,7 @@ from experiments.utils.data.dataset_loader.all_load.joint_ctc_attention_all_load
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, label_type, batch_size, eos_index,
-                 sort_utt=True, sorta_grad=False, progressbar=False):
+                 sort_utt=True, sort_stop_epoch=None, progressbar=False):
         """A class for loading dataset.
         Args:
             data_type: string, train or dev or test
@@ -29,21 +29,21 @@ class Dataset(DatasetBase):
             eos_index: int , the index of <EOS> class
             sort_utt: if True, sort all utterances by the number of frames and
                 utteraces in each mini-batch are shuffled
-            sorta_grad: if True, sorting utteraces are conducted only in the
-                first epoch (not shuffled in each mini-batch). After the first
-                epoch, training will revert back to a random order. If sort_utt
-                is also True, it will be False.
+        sort_stop_epoch: Aftersort_stop_epoch, training will revert back
+                to a random order
             progressbar: if True, visualize progressbar
         """
         if data_type not in ['train', 'dev', 'test']:
             raise ValueError('data_type is "train" or "dev" or "test".')
+        self.is_training = True if data_type == 'train' else False
 
         self.data_type = data_type
         self.label_type = label_type
         self.batch_size = batch_size
         self.eos_index = eos_index
-        self.sort_utt = sort_utt if not sorta_grad else False
-        self.sorta_grad = sorta_grad
+        self.sort_utt = sort_utt
+        self.sort_stop_epoch = sort_stop_epoch
+        self.epoch = 0
         self.progressbar = progressbar
 
         input_path = join(
@@ -73,7 +73,7 @@ class Dataset(DatasetBase):
         self.data_num = len(self.input_paths)
 
         # Load all dataset in advance
-        print('=> Loading ' + data_type + ' dataset (' + label_type + ')...')
+        print('=> Loading dataset (%s, %s)...' % (data_type, label_type))
         input_list, att_label_list, ctc_label_list = [], [], []
         for i in wrap_iterator(range(self.data_num), self.progressbar):
             input_list.append(np.load(self.input_paths[i]))

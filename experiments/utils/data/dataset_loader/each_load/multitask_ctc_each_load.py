@@ -12,7 +12,6 @@ from __future__ import print_function
 from os.path import basename
 import random
 import numpy as np
-import tensorflow as tf
 
 from experiments.utils.data.frame_stacking import stack_frame
 
@@ -22,14 +21,13 @@ class DatasetBase(object):
     def __init__(self, *args, **kwargs):
         raise NotImplementedError
 
-    def __call__(self, batch_size=None, session=None):
-        return self.__next_mini_batch(batch_size, session)
+    def __call__(self, batch_size=None):
+        return self.__next_mini_batch(batch_size)
 
-    def __next_mini_batch(self, batch_size=None, session=None):
+    def __next_mini_batch(self, batch_size=None):
         """Generate each mini-batch.
         Args:
             batch_size: int, the size of mini-batch
-            session: set when using multiple GPUs
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size `[num_gpu, B, T, input_dim]`
@@ -39,9 +37,6 @@ class DatasetBase(object):
                 input_names: list of file name of input data of size `[num_gpu, B]`
             next_epoch_flag: If true, one epoch is finished
         """
-        if session is None and self.num_gpu != 1:
-            raise ValueError('Set session when using multiple GPUs.')
-
         if batch_size is None:
             batch_size = self.batch_size
 
@@ -53,34 +48,35 @@ class DatasetBase(object):
                 next_epoch_flag = False
 
             # Sort all uttrances
-            if self.sort_utt or self.sorta_grad:
+            if self.sort_utt:
                 if len(self.rest) > batch_size:
                     data_indices = list(self.rest)[:batch_size]
                     self.rest -= set(data_indices)
                 else:
+                    # Last mini-batch
                     data_indices = list(self.rest)
                     self.rest = set(range(0, self.data_num, 1))
                     next_epoch_flag = True
-                    if self.data_type == 'train':
+                    if self.is_training:
                         print('---Next epoch---')
-                    if self.sorta_grad:
-                        self.sorta_grad = False
+                    self.epoch += 1
+                    if self.epoch == self.sort_stop_epoch:
+                        self.sort_utt = False
 
                 # Shuffle selected mini-batch
-                if not self.sorta_grad:
-                    random.shuffle(data_indices)
+                random.shuffle(data_indices)
 
             else:
                 if len(self.rest) > batch_size:
                     # Randomly sample mini-batch
-                    data_indices = random.sample(
-                        list(self.rest), batch_size)
+                    data_indices = random.sample(list(self.rest), batch_size)
                     self.rest -= set(data_indices)
                 else:
+                    # Last mini-batch
                     data_indices = list(self.rest)
                     self.rest = set(range(0, self.data_num, 1))
                     next_epoch_flag = True
-                    if self.data_type == 'train':
+                    if self.is_training:
                         print('---Next epoch---')
 
                     # Shuffle selected mini-batch
@@ -101,6 +97,7 @@ class DatasetBase(object):
             input_names = list(
                 map(lambda path: basename(path).split('.')[0],
                     np.take(self.input_paths, data_indices, axis=0)))
+
             if self.input_size is None:
                 self.input_size = input_list[0].shape[1]
                 if self.num_stack is not None and self.num_skip is not None:
@@ -159,26 +156,13 @@ class DatasetBase(object):
             # Multi-GPUs
             ###############
             if self.num_gpu > 1:
-                divide_num = self.num_gpu
-                if next_epoch_flag:
-                    for i in range(self.num_gpu, 0, -1):
-                        if len(data_indices) % i == 0:
-                            divide_num = i
-                            break
-
                 # Now we split the mini-batch data by num_gpu
-                inputs = tf.split(inputs, divide_num, axis=0)
-                labels_main = tf.split(labels_main, divide_num, axis=0)
-                labels_sub = tf.split(labels_sub, divide_num, axis=0)
-                inputs_seq_len = tf.split(inputs_seq_len, divide_num, axis=0)
-                input_names = tf.split(input_names, divide_num, axis=0)
-
-                # Convert from SparseTensor to numpy.ndarray
-                inputs = list(map(session.run, inputs))
-                labels_main = list(map(session.run, labels_main))
-                labels_sub = list(map(session.run, labels_sub))
-                inputs_seq_len = list(map(session.run, inputs_seq_len))
-                input_names = np.array(list(map(session.run, input_names)))
+                inputs = np.array_split(inputs, self.num_gpu, axis=0)
+                labels_main = np.array_split(labels_main, self.num_gpu, axis=0)
+                labels_sub = np.array_split(labels_sub, self.num_gpu, axis=0)
+                inputs_seq_len = np.array_split(
+                    inputs_seq_len, self.num_gpu, axis=0)
+                input_names = np.array_split(input_names, self.num_gpu, axis=0)
             else:
                 inputs = inputs[np.newaxis, :, :, :]
                 labels_main = labels_main[np.newaxis, :, :]
