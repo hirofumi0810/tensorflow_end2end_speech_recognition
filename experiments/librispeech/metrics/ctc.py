@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Define evaluation method for CTC network (TIMIT corpus)."""
+"""Define evaluation method for CTC network (Librispeech corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -64,18 +64,18 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
                       ] = 1.0
             feed_dict[network.keep_prob_output_pl_list[i_device]
                       ] = 1.0
-        batch_size_each = len(inputs_seq_len[0])
 
         labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
 
         for i_device, labels_pred_st in enumerate(labels_pred_st_list):
-            labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
+            batch_size_device = len(inputs_seq_len[i_device])
+            labels_pred = sparsetensor2list(labels_pred_st, batch_size_device)
 
-            for i_batch in range(batch_size_each):
+            for i_batch in range(batch_size_device):
 
                 # Convert from list to string
                 str_true = num2char(
-                    labels_true[i_device, i_batch], map_file_path)
+                    labels_true[i_device][i_batch], map_file_path)
                 str_pred = num2char(labels_pred[i_batch], map_file_path)
 
                 # Remove silence(_) labels

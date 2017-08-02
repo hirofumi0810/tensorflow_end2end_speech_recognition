@@ -18,3 +18,6 @@ read_dataset_multitask_ctc_cluster.py
 *_ss.py
 *_ss.txt
 csj/fine_tuning
+
+# librispeech
+word2num*.txt

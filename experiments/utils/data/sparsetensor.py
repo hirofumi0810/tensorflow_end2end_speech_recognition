@@ -61,15 +61,15 @@ def sparsetensor2list(labels_st, batch_size):
     labels = []
     batch_boundary = np.where(indices[:, 1] == 0)[0]
 
-    # TODO: fix error occurred when ctc models do not output any labels
+    # TODO: Some errors occurred when ctc models do not output any labels
     # print(batch_boundary)
     # if len(batch_boundary) != batch_size:
     #     batch_boundary = np.array(batch_boundary.tolist() + [max(batch_boundary) + 1])
     # print(indices)
 
     for i in range(batch_size - 1):
-        label_each_wav = values[batch_boundary[i]:batch_boundary[i + 1]]
-        labels.append(label_each_wav)
+        label_each_utt = values[batch_boundary[i]:batch_boundary[i + 1]]
+        labels.append(label_each_utt)
     # Last one
     labels.append(values[batch_boundary[-1]:])
 

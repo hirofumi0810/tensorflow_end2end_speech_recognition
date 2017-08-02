@@ -122,8 +122,7 @@ class DatasetBase(object):
                                   * len(data_indices), dtype=np.int32)
             else:
                 labels = [None] * len(data_indices)
-            inputs_seq_len = np.empty(
-                (len(data_indices),), dtype=np.int32)
+            inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
 
             # Set values of each data in mini-batch
             for i_batch in range(len(data_indices)):

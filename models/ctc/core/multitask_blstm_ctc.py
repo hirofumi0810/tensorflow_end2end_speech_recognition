@@ -83,72 +83,34 @@ class Multitask_BLSTM_CTC(ctcBase):
         # Placeholder for multi-task
         self.labels_sub_pl_list = []
 
-    def create_placeholders(self, gpu_index=None):
-        """
-        Args:
-            gpu_index: int, index of gpu
-        """
-        if gpu_index is None:
-            # For CPU or sigle GPU
-            self.inputs_pl_list.append(
-                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                               name='input'))
-            self.labels_pl_list.append(
-                tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
-                                tf.placeholder(tf.int32, name='values'),
-                                tf.placeholder(tf.int64, name='shape')))
-            self.labels_sub_pl_list.append(
-                tf.SparseTensor(tf.placeholder(tf.int64, name='indices_sub'),
-                                tf.placeholder(tf.int32, name='values_sub'),
-                                tf.placeholder(tf.int64, name='shape_sub')))
-            self.inputs_seq_len_pl_list.append(
-                tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
-            self.keep_prob_input_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_input'))
-            self.keep_prob_hidden_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_hidden'))
-            self.keep_prob_output_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_output'))
-        else:
-            # Define placeholders in each gpu tower
-            self.inputs_pl_list.append(
-                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                               name='input' + str(gpu_index)))
-            self.labels_pl_list.append(
-                tf.SparseTensor(
-                    tf.placeholder(
-                        tf.int64, name='indices_gpu' + str(gpu_index)),
-                    tf.placeholder(
-                        tf.int32, name='values_gpu' + str(gpu_index)),
-                    tf.placeholder(
-                        tf.int64, name='shape_gpu' + str(gpu_index))))
-            self.labels_sub_pl_list.append(
-                tf.SparseTensor(
-                    tf.placeholder(tf.int64,
-                                   name='indices_sub_gpu' + str(gpu_index)),
-                    tf.placeholder(tf.int32,
-                                   name='values_sub_gpu' + str(gpu_index)),
-                    tf.placeholder(tf.int64,
-                                   name='shape_sub_gpu' + str(gpu_index))))
-            self.inputs_seq_len_pl_list.append(
-                tf.placeholder(tf.int64, shape=[None],
-                               name='inputs_seq_len_gpu' + str(gpu_index)))
-            self.keep_prob_input_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_input_gpu' + str(gpu_index)))
-            self.keep_prob_hidden_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_hidden_gpu' + str(gpu_index)))
-            self.keep_prob_output_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_output_gpu' + str(gpu_index)))
+    def create_placeholders(self):
+        """Create placeholders and append them to list."""
+        self.inputs_pl_list.append(
+            tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                           name='input'))
+        self.labels_pl_list.append(
+            tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
+                            tf.placeholder(tf.int32, name='values'),
+                            tf.placeholder(tf.int64, name='shape')))
+        self.labels_sub_pl_list.append(
+            tf.SparseTensor(tf.placeholder(tf.int64, name='indices_sub'),
+                            tf.placeholder(tf.int32, name='values_sub'),
+                            tf.placeholder(tf.int64, name='shape_sub')))
+        self.inputs_seq_len_pl_list.append(
+            tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
+        self.keep_prob_input_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_input'))
+        self.keep_prob_hidden_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_hidden'))
+        self.keep_prob_output_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_output'))
 
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
                keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of size `[batch_size, max_time, input_dim]`
-            inputs_seq_len: A tensor of size `[batch_size]`
+            inputs: A tensor of size `[B, T, input_size]`
+            inputs_seq_len: A tensor of size `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
@@ -156,9 +118,9 @@ class Multitask_BLSTM_CTC(ctcBase):
             keep_prob_output: A float value. A probability to keep nodes in
                 the hidden-output layer
         Returns:
-            logits_main: A tensor of size `[max_time, batch_size, input_size]`
+            logits_main: A tensor of size `[T, B, input_size]`
                 in the main task
-            logits_sub: A tensor of size `[max_time, batch_size, input_size]`
+            logits_sub: A tensor of size `[T, B, input_size]`
                 in the sub task
         """
         # Dropout for the input-hidden connection
@@ -302,24 +264,24 @@ class Multitask_BLSTM_CTC(ctcBase):
 
     def compute_loss(self, inputs, labels_main, labels_sub, inputs_seq_len,
                      keep_prob_input, keep_prob_hidden, keep_prob_output,
-                     gpu_index=0, scope=None):
+                     scope=None):
         """Operation for computing ctc loss.
         Args:
-            inputs: A tensor of size `[batch_size, max_time, input_size]`
+            inputs: A tensor of size `[B, T, input_size]`
             labels_main: A SparseTensor of target labels in the main task
             labels_sub: A SparseTensor of target labels in the sub task
-            inputs_seq_len: A tensor of size `[batch_size]`
+            inputs_seq_len: A tensor of size `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
                 the hidden-hidden layers
             keep_prob_output: A float value. A probability to keep nodes in
                 the hidden-output layer
-            gpu_index: int, index of gpu
+            scope: A scope in the model tower
         Returns:
             total_loss: operation for computing total ctc loss
-            logits_main: A tensor of size `[max_time, batch_size, input_size]`
-            logits_sub: A tensor of size `[max_time, batch_size, input_size]`
+            logits_main: A tensor of size `[T, B, input_size]`
+            logits_sub: A tensor of size `[T, B, input_size]`
         """
         # Build model graph
         logits_main, logits_sub = self._build(
@@ -364,39 +326,35 @@ class Multitask_BLSTM_CTC(ctcBase):
                 'losses', ctc_loss_sub * self.sub_task_weight)
 
         # Compute total loss
-        total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        total_loss = tf.add_n(tf.get_collection('losses', scope),
+                              name='total_loss')
 
         # Add a scalar summary for the snapshot of loss
         if self.weight_decay > 0:
-            with tf.name_scope("weight_loss_gpu" + str(gpu_index)):
-                self.summaries_train.append(
-                    tf.summary.scalar('weight_loss_train',
-                                      weight_sum * self.weight_decay))
-                self.summaries_dev.append(
-                    tf.summary.scalar('weight_loss_dev',
-                                      weight_sum * self.weight_decay))
-
-        with tf.name_scope("ctc_loss_main_gpu" + str(gpu_index)):
             self.summaries_train.append(
-                tf.summary.scalar('ctc_loss_main_train',
-                                  ctc_loss_main * self.main_task_weight))
+                tf.summary.scalar('weight_loss_train',
+                                  weight_sum * self.weight_decay))
             self.summaries_dev.append(
-                tf.summary.scalar('ctc_loss_main_dev',
-                                  ctc_loss_main * self.main_task_weight))
-
-        with tf.name_scope("ctc_loss_sub_gpu" + str(gpu_index)):
-            self.summaries_train.append(
-                tf.summary.scalar('ctc_loss_sub_train',
-                                  ctc_loss_sub * self.sub_task_weight))
-            self.summaries_dev.append(
-                tf.summary.scalar('ctc_loss_sub_dev',
-                                  ctc_loss_sub * self.sub_task_weight))
-
-        with tf.name_scope("total_loss_gpu" + str(gpu_index)):
+                tf.summary.scalar('weight_loss_dev',
+                                  weight_sum * self.weight_decay))
             self.summaries_train.append(
                 tf.summary.scalar('total_loss_train', total_loss))
             self.summaries_dev.append(
                 tf.summary.scalar('total_loss_dev', total_loss))
+
+        self.summaries_train.append(
+            tf.summary.scalar('ctc_loss_main_train',
+                              ctc_loss_main * self.main_task_weight))
+        self.summaries_dev.append(
+            tf.summary.scalar('ctc_loss_main_dev',
+                              ctc_loss_main * self.main_task_weight))
+
+        self.summaries_train.append(
+            tf.summary.scalar('ctc_loss_sub_train',
+                              ctc_loss_sub * self.sub_task_weight))
+        self.summaries_dev.append(
+            tf.summary.scalar('ctc_loss_sub_dev',
+                              ctc_loss_sub * self.sub_task_weight))
 
         return total_loss, logits_main, logits_sub
 
@@ -404,9 +362,9 @@ class Multitask_BLSTM_CTC(ctcBase):
                 beam_width=None):
         """Operation for decoding.
         Args:
-            logits_main: A tensor of size `[max_time, batch_size, input_size]`
-            logits_sub: A tensor of size `[max_time, batch_size, input_size]`
-            inputs_seq_len: A tensor of size `[batch_size]`
+            logits_main: A tensor of size `[T, B, input_size]`
+            logits_sub: A tensor of size `[T, B, input_size]`
+            inputs_seq_len: A tensor of size `[B]`
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
         Return:
@@ -441,8 +399,8 @@ class Multitask_BLSTM_CTC(ctcBase):
     def posteriors(self, logits_main, logits_sub):
         """Operation for computing posteriors of each time steps.
         Args:
-            logits_main: A tensor of size `[max_time, batch_size, input_size]`
-            logits_sub: A tensor of size `[max_time, batch_size, input_size]`
+            logits_main: A tensor of size `[T, B, input_size]`
+            logits_sub: A tensor of size `[T, B, input_size]`
         Return:
             posteriors_op_main: operation for computing posteriors for each
                 class in the main task
@@ -482,14 +440,13 @@ class Multitask_BLSTM_CTC(ctcBase):
             decode_op_sub, labels_sub, normalize=True))
 
         # Add a scalar summary for the snapshot of LER
-        with tf.name_scope("ler"):
-            self.summaries_train.append(tf.summary.scalar(
-                'ler_main_train', ler_op_main))
-            self.summaries_train.append(tf.summary.scalar(
-                'ler_sub_train', ler_op_sub))
-            self.summaries_dev.append(tf.summary.scalar(
-                'ler_main_dev', ler_op_main))
-            self.summaries_dev.append(tf.summary.scalar(
-                'ler_sub_dev', ler_op_sub))
+        self.summaries_train.append(tf.summary.scalar(
+            'ler_main_train', ler_op_main))
+        self.summaries_train.append(tf.summary.scalar(
+            'ler_sub_train', ler_op_sub))
+        self.summaries_dev.append(tf.summary.scalar(
+            'ler_main_dev', ler_op_main))
+        self.summaries_dev.append(tf.summary.scalar(
+            'ler_sub_dev', ler_op_sub))
 
         return ler_op_main, ler_op_sub

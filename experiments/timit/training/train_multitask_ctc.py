@@ -58,7 +58,7 @@ def do_train(network, params):
     with tf.Graph().as_default():
 
         # Define placeholders
-        network.create_placeholders(gpu_index=0)
+        network.create_placeholders()
 
         # Add to the graph each operation
         loss_op, logits_main, logits_sub = network.compute_loss(

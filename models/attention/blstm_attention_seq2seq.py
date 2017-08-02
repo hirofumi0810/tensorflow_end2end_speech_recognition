@@ -20,7 +20,6 @@ from models.attention.bridge import InitialStateBridge
 class BLSTMAttetion(AttentionBase):
     """Bidirectional LSTM based Attention model.
     Args:
-        batch_size: int, batch size of mini batch
         input_size: int, the dimension of input vectors
         encoder_num_unit: int, the number of units in each layer of the
             encoder
@@ -55,11 +54,10 @@ class BLSTMAttetion(AttentionBase):
         beam_width: int, the number of beams to use. 1 diables the beam search
             decoding (greedy decoding).
         weight_decay: A float value. Regularization parameter for weight decay
-        time_major: bool,
+        time_major: bool, if True, time-major computatoin will be performed
     """
 
     def __init__(self,
-                 batch_size,
                  input_size,
                  encoder_num_unit,
                  encoder_num_layer,
@@ -89,7 +87,6 @@ class BLSTMAttetion(AttentionBase):
 
         # AttentionBase.__init__(self)
 
-        self.batch_size = int(batch_size)
         self.input_size = int(input_size)
         self.encoder_num_unit = int(encoder_num_unit)
         self.encoder_num_layer = int(encoder_num_layer)
@@ -140,8 +137,8 @@ class BLSTMAttetion(AttentionBase):
                 keep_prob_input, keep_prob_hidden):
         """Encode input features.
         Args:
-            inputs: A tensor of `[batch_size, time, input_size]`
-            inputs_seq_len: A tensor of `[batch_size]`
+            inputs: A tensor of `[B, T, input_size]`
+            inputs_seq_len: A tensor of `[B]`
             keep_prob_input: A float value. A probability to keep nodes in the
                 input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in the
@@ -170,7 +167,7 @@ class BLSTMAttetion(AttentionBase):
         Args:
             encoder_outputs: A namedtuple of `(outputs, final_state,
                 attention_values, attention_values_length)`
-            labels: Target labels of size `[batch_size, time]`
+            labels: Target labels of size `[B, T]`
         Returns:
             decoder: An instance of the decoder class
         """
@@ -205,10 +202,10 @@ class BLSTMAttetion(AttentionBase):
                keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Define model graph.
         Args:
-            inputs: A tensor of `[batch_size, time, input_size]`
-            labels: A tensor of `[batch_size, time]`
-            inputs_seq_len: A tensor of `[batch_size]`
-            labels_seq_len: A tensor of `[batch_size]`
+            inputs: A tensor of `[B, T, input_size]`
+            labels: A tensor of `[B, T]`
+            inputs_seq_len: A tensor of `[B]`
+            labels_seq_len: A tensor of `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in

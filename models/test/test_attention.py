@@ -21,7 +21,6 @@ from experiments.utils.training.learning_rate_controller import Controller
 
 class TestAttention(tf.test.TestCase):
 
-    @measure_time
     def test_attention(self):
         print("Attention Working check.")
         self.check_training(attention_type='hybrid', label_type='phone')
@@ -36,6 +35,7 @@ class TestAttention(tf.test.TestCase):
         self.check_training(attention_type='layer_dot', label_type='phone')
         self.check_training(attention_type='layer_dot', label_type='character')
 
+    @measure_time
     def check_training(self, attention_type, label_type):
 
         print('----- attention_type: ' + attention_type + ', label_type: ' +
@@ -53,36 +53,35 @@ class TestAttention(tf.test.TestCase):
             # Define model graph
             num_classes = 26 + 2 if label_type == 'character' else 61 + 2
             # model = load(model_type=model_type)
-            network = BLSTMAttetion(
-                batch_size=batch_size,
-                input_size=inputs[0].shape[1],
-                encoder_num_unit=128,
-                encoder_num_layer=2,
-                attention_dim=64,
-                attention_type=attention_type,
-                decoder_num_unit=128,
-                decoder_num_layer=1,
-                embedding_dim=20,
-                num_classes=num_classes,
-                sos_index=num_classes - 2,
-                eos_index=num_classes - 1,
-                max_decode_length=50,
-                # attention_smoothing=True,
-                attention_weights_tempareture=0.5,
-                logits_tempareture=1.0,
-                parameter_init=0.1,
-                clip_grad=5.0,
-                clip_activation_encoder=50,
-                clip_activation_decoder=50,
-                dropout_ratio_input=0.9,
-                dropout_ratio_hidden=0.9,
-                dropout_ratio_output=1.0,
-                weight_decay=0,
-                beam_width=1,
-                time_major=False)
+            network = BLSTMAttetion(input_size=inputs[0].shape[1],
+                                    encoder_num_unit=128,
+                                    encoder_num_layer=2,
+                                    attention_dim=64,
+                                    attention_type=attention_type,
+                                    decoder_num_unit=128,
+                                    decoder_num_layer=1,
+                                    embedding_dim=20,
+                                    num_classes=num_classes,
+                                    sos_index=num_classes - 2,
+                                    eos_index=num_classes - 1,
+                                    max_decode_length=50,
+                                    # attention_smoothing=True,
+                                    attention_weights_tempareture=0.5,
+                                    logits_tempareture=1.0,
+                                    parameter_init=0.1,
+                                    clip_grad=5.0,
+                                    clip_activation_encoder=50,
+                                    clip_activation_decoder=50,
+                                    dropout_ratio_input=0.9,
+                                    dropout_ratio_hidden=0.9,
+                                    dropout_ratio_output=1.0,
+                                    weight_decay=1e-8,
+                                    beam_width=1,
+                                    time_major=False)
 
             # Define placeholders
-            network.create_placeholders(gpu_index=None)
+            network.create_placeholders()
+            learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
             # Add to the graph each operation
             loss_op, logits, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
@@ -93,10 +92,9 @@ class TestAttention(tf.test.TestCase):
                 network.keep_prob_input_pl_list[0],
                 network.keep_prob_hidden_pl_list[0],
                 network.keep_prob_output_pl_list[0])
-            train_op = network.train(
-                loss_op,
-                optimizer='adam',
-                learning_rate=network.learning_rate_pl_list[0])
+            train_op = network.train(loss_op,
+                                     optimizer='adam',
+                                     learning_rate=learning_rate_pl)
             decode_op_train, decode_op_infer = network.decoder(
                 decoder_outputs_train,
                 decoder_outputs_infer)
@@ -107,7 +105,7 @@ class TestAttention(tf.test.TestCase):
             learning_rate = 1e-3
             lr_controller = Controller(learning_rate_init=learning_rate,
                                        decay_start_epoch=10,
-                                       decay_rate=0.99,
+                                       decay_rate=0.98,
                                        decay_patient_epoch=5,
                                        lower_better=True)
 
@@ -133,7 +131,7 @@ class TestAttention(tf.test.TestCase):
                 network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                 network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
                 network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
-                network.learning_rate_pl_list[0]: learning_rate
+                learning_rate_pl: learning_rate
             }
 
             map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone61_to_num.txt'
@@ -225,8 +223,7 @@ class TestAttention(tf.test.TestCase):
                             learning_rate=learning_rate,
                             epoch=step,
                             value=ler_train)
-                        feed_dict[network.learning_rate_pl_list[0]
-                                  ] = learning_rate
+                        feed_dict[learning_rate_pl] = learning_rate
 
                 duration_global = time.time() - start_time_global
                 print('Total time: %.3f sec' % (duration_global))

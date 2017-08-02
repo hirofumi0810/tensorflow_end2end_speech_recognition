@@ -31,7 +31,7 @@ def do_plot(network, params, epoch=None):
         eos_index=params['eos_index'], sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.create_placeholders(gpu_index=None)
+    network.create_placeholders()
 
     # Add to the graph each operation (including model definition)
     _, _, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(

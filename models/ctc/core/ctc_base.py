@@ -85,55 +85,25 @@ class ctcBase(object):
         self.keep_prob_hidden_pl_list = []
         self.keep_prob_output_pl_list = []
 
-    def create_placeholders(self, gpu_index=None):
-        """
-        Args:
-            gpu_index: int, index of gpu
-        """
-        if gpu_index is None:
-            # For CPU or sigle GPU
-            self.inputs_pl_list.append(
-                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                               name='input'))
-            self.labels_pl_list.append(
-                tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
-                                tf.placeholder(tf.int32, name='values'),
-                                tf.placeholder(tf.int64, name='shape')))
-            self.inputs_seq_len_pl_list.append(
-                tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
-            self.keep_prob_input_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_input'))
-            self.keep_prob_hidden_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_hidden'))
-            self.keep_prob_output_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_output'))
-        else:
-            # Define placeholders in each gpu tower
-            self.inputs_pl_list.append(
-                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                               name='input_gpu' + str(gpu_index)))
-            self.labels_pl_list.append(
-                tf.SparseTensor(
-                    tf.placeholder(
-                        tf.int64, name='indices_gpu' + str(gpu_index)),
-                    tf.placeholder(
-                        tf.int32, name='values_gpu' + str(gpu_index)),
-                    tf.placeholder(tf.int64,
-                                   name='shape_gpu' + str(gpu_index))))
-            self.inputs_seq_len_pl_list.append(
-                tf.placeholder(tf.int64, shape=[None],
-                               name='inputs_seq_len_gpu' + str(gpu_index)))
-            self.keep_prob_input_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_input_gpu' + str(gpu_index)))
-            self.keep_prob_hidden_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_hidden_gpu' + str(gpu_index)))
-            self.keep_prob_output_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_output_gpu' + str(gpu_index)))
+    def create_placeholders(self):
+        """Create placeholders and append them to list."""
+        self.inputs_pl_list.append(
+            tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                           name='input'))
+        self.labels_pl_list.append(
+            tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
+                            tf.placeholder(tf.int32, name='values'),
+                            tf.placeholder(tf.int64, name='shape')))
+        self.inputs_seq_len_pl_list.append(
+            tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
+        self.keep_prob_input_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_input'))
+        self.keep_prob_hidden_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_hidden'))
+        self.keep_prob_output_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_output'))
 
-    def _add_gaussian_noise_to_inputs(self, inputs, stddev=0.075):
+    def _add_noise_to_inputs(self, inputs, stddev=0.075):
         """Add gaussian noise to the inputs.
         Args:
             inputs: the noise free input-features.
@@ -164,9 +134,9 @@ class ctcBase(object):
                      keep_prob_hidden, keep_prob_output, scope=None):
         """Operation for computing ctc loss.
         Args:
-            inputs: A tensor of size `[batch_size, max_time, input_size]`
+            inputs: A tensor of size `[B, T, input_size]`
             labels: A SparseTensor of target labels
-            inputs_seq_len: A tensor of size `[batch_size]`
+            inputs_seq_len: A tensor of size `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
@@ -176,7 +146,7 @@ class ctcBase(object):
             scope: A scope in the model tower
         Returns:
             total_loss: operation for computing total ctc loss
-            logits: A tensor of size `[max_time, batch_size, input_size]`
+            logits: A tensor of size `[T, B, input_size]`
         """
         # Build model graph
         logits = self._build(
@@ -210,23 +180,21 @@ class ctcBase(object):
 
         # Add a scalar summary for the snapshot of loss
         if self.weight_decay > 0:
-            with tf.name_scope("weight_loss"):
-                self.summaries_train.append(
-                    tf.summary.scalar('weight_loss_train',
-                                      weight_sum * self.weight_decay))
-                self.summaries_dev.append(
-                    tf.summary.scalar('weight_loss_dev',
-                                      weight_sum * self.weight_decay))
-        with tf.name_scope("ctc_loss"):
             self.summaries_train.append(
-                tf.summary.scalar('ctc_loss_train', ctc_loss))
+                tf.summary.scalar('weight_loss_train',
+                                  weight_sum * self.weight_decay))
             self.summaries_dev.append(
-                tf.summary.scalar('ctc_loss_dev', ctc_loss))
-        with tf.name_scope("total_loss"):
+                tf.summary.scalar('weight_loss_dev',
+                                  weight_sum * self.weight_decay))
             self.summaries_train.append(
                 tf.summary.scalar('total_loss_train', total_loss))
             self.summaries_dev.append(
                 tf.summary.scalar('total_loss_dev', total_loss))
+
+        self.summaries_train.append(
+            tf.summary.scalar('ctc_loss_train', ctc_loss))
+        self.summaries_dev.append(
+            tf.summary.scalar('ctc_loss_dev', ctc_loss))
 
         return total_loss, logits
 
@@ -253,15 +221,13 @@ class ctcBase(object):
             return OPTIMIZER_CLS_NAMES[optimizer_name](
                 learning_rate=learning_rate)
 
-    def train(self, loss, optimizer, learning_rate=None,
-              clip_grad_by_norm=None):
-        """Operation for training.
+    def train(self, loss, optimizer, learning_rate=None, clip_norm=False):
+        """Operation for training. Only the sigle GPU training is supported.
         Args:
             loss: An operation for computing loss
             optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
             learning_rate: A float value, a learning rate
-            clip_grad_by_norm: if True, clip gradients by norm of the
-                value of self.clip_grad
+            clip_norm: if True, clip gradients norm by self.clip_grad
         Returns:
             train_op: operation for training
         """
@@ -272,56 +238,63 @@ class ctcBase(object):
         self.optimizer = self.set_optimizer(optimizer, learning_rate)
 
         if self.clip_grad is not None:
-            # Gradient clipping
-            train_op = self._gradient_clipping(loss,
-                                               self.optimizer,
-                                               clip_grad_by_norm,
-                                               global_step)
+            # Compute gradients
+            grads_and_vars = self.optimizer.compute_gradients(loss)
+
+            # Clip gradients
+            clipped_grads_and_vars = self._clip_gradients(grads_and_vars,
+                                                          clip_norm)
+
+            # Create gradient updates
+            train_op = self.optimizer.apply_gradients(
+                clipped_grads_and_vars,
+                global_step=global_step)
 
         else:
             # Use the optimizer to apply the gradients that minimize the loss
             # and also increment the global step counter as a single training
             # step
-            train_op = optimizer.minimize(loss, global_step=global_step)
+            train_op = self.optimizer.minimize(loss, global_step=global_step)
 
         return train_op
 
-    def _gradient_clipping(self, loss, optimizer, clip_grad_by_norm,
-                           global_step):
-        # Compute gradients
-        trainable_vars = tf.trainable_variables()
-        grads = tf.gradients(loss, trainable_vars)
-
+    def _clip_gradients(self, grads_and_vars, _clip_norm):
+        """Clip gradients.
+        Args:
+            grads_and_vars: list of (grads, vars) tuples
+            _clip_norm: if True, clip gradients norm by self.clip_grad
+        Returns:
+            clipped_grads_and_vars: list of (clipped grads, vars)
+        """
         # TODO: Optionally add gradient noise
 
-        if clip_grad_by_norm:
-            # Clip by norm
-            clipped_grads = [tf.clip_by_norm(
-                g,
-                clip_norm=self.clip_grad) for g in grads]
+        clipped_grads_and_vars = []
+
+        if _clip_norm:
+            # Clip gradient norm
+            for grad, var in grads_and_vars:
+                if grad is not None:
+                    clipped_grads_and_vars.append(
+                        (tf.clip_by_norm(grad, clip_norm=self.clip_grad), var))
         else:
-            # Clip by absolute values
-            clipped_grads = [tf.clip_by_value(
-                g,
-                clip_value_min=-self.clip_grad,
-                clip_value_max=self.clip_grad) for g in grads]
+            # Clip gradient
+            for grad, var in grads_and_vars:
+                if grad is not None:
+                    clipped_grads_and_vars.append(
+                        (tf.clip_by_value(grad,
+                                          clip_value_min=-self.clip_grad,
+                                          clip_value_max=self.clip_grad), var))
 
         # TODO: Add histograms for variables, gradients (norms)
         # self._tensorboard(trainable_vars)
 
-        # Create gradient updates
-        train_op = optimizer.apply_gradients(
-            zip(clipped_grads, trainable_vars),
-            global_step=global_step,
-            name='train')
-
-        return train_op
+        return clipped_grads_and_vars
 
     def decoder(self, logits, inputs_seq_len, decode_type, beam_width=None):
         """Operation for decoding.
         Args:
-            logits: A tensor of size `[max_time, batch_size, input_size]`
-            inputs_seq_len: A tensor of size `[batch_size]`
+            logits: A tensor of size `[T, B, input_size]`
+            inputs_seq_len: A tensor of size `[B]`
             decode_type: greedy or beam_search
             beam_width: beam width for beam search
         Return:
@@ -347,7 +320,7 @@ class ctcBase(object):
     def posteriors(self, logits):
         """Operation for computing posteriors of each time steps.
         Args:
-            logits: A tensor of size `[max_time, batch_size, input_size]`
+            logits: A tensor of size `[T, B, input_size]`
         Return:
             posteriors_op: operation for computing posteriors for each class
         """
@@ -372,11 +345,8 @@ class ctcBase(object):
             decode_op, labels, normalize=True))
 
         # Add a scalar summary for the snapshot of LER
-        with tf.name_scope("ler"):
-            self.summaries_train.append(tf.summary.scalar(
-                'ler_train', ler_op))
-            self.summaries_dev.append(tf.summary.scalar(
-                'ler_dev', ler_op))
+        self.summaries_train.append(tf.summary.scalar('ler_train', ler_op))
+        self.summaries_dev.append(tf.summary.scalar('ler_dev', ler_op))
 
         return ler_op
 

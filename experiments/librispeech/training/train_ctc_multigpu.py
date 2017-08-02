@@ -20,12 +20,12 @@ from experiments.librispeech.data.load_dataset_ctc import Dataset
 from experiments.librispeech.metrics.ctc import do_eval_cer, do_eval_wer
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.training.learning_rate_controller import Controller
+from experiments.utils.training.multi_gpu import average_gradients
 
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.csv import save_loss, save_ler
 from models.ctc.load_model import load
-from experiments.utils.multi_gpu import average_gradients
 
 
 def do_train(network, params, gpu_indices):
@@ -45,13 +45,13 @@ def do_train(network, params, gpu_indices):
         train_data_size=params['train_data_size'],
         label_type=params['label_type'], batch_size=params['batch_size'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True, sort_stop_epoch=1,
-        num_gpu=len(gpu_indices), is_gpu=False)
+        sort_utt=True, sort_stop_epoch=5,
+        num_gpu=len(gpu_indices), is_gpu=True)
     dev_data = Dataset(
         data_type=dev, train_data_size=params['train_data_size'],
         label_type=params['label_type'], batch_size=params['batch_size'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False, num_gpu=len(gpu_indices), is_gpu=False)
+        sort_utt=False, num_gpu=len(gpu_indices), is_gpu=True)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default(), tf.device('/cpu:0'):
@@ -66,7 +66,7 @@ def do_train(network, params, gpu_indices):
             params['optimizer'], network.learning_rate_pl)
 
         # Calculate the gradients for each model tower
-        total_grads, total_losses = [], []
+        total_grads_and_vars, total_losses = [], []
         decode_ops, ler_ops = [], []
         all_devices = ['/gpu:%d' % i_gpu for i_gpu in range(len(gpu_indices))]
         # NOTE: /cpu:0 is prepared for evaluation
@@ -75,7 +75,7 @@ def do_train(network, params, gpu_indices):
                 with tf.device(all_devices[i_gpu]):
                     with tf.name_scope('tower_gpu%d' % i_gpu) as scope:
                         # Define placeholders in each tower
-                        network.create_placeholders(gpu_index=None)
+                        network.create_placeholders()
 
                         # Calculate the total loss for the current tower of the
                         # model. This function constructs the entire model but
@@ -88,6 +88,7 @@ def do_train(network, params, gpu_indices):
                             network.keep_prob_hidden_pl_list[i_gpu],
                             network.keep_prob_output_pl_list[i_gpu],
                             scope)
+                        tower_loss = tf.expand_dims(tower_loss, axis=0)
                         total_losses.append(tower_loss)
 
                         # Reuse variables for the next tower
@@ -95,13 +96,17 @@ def do_train(network, params, gpu_indices):
 
                         # Calculate the gradients for the batch of data on this
                         # tower
-                        tower_grads = optimizer.compute_gradients(tower_loss)
+                        tower_grads_and_vars = optimizer.compute_gradients(
+                            tower_loss)
 
-                        # TODO: gradient clipping
+                        # Gradient clipping
+                        tower_grads_and_vars = network._clip_gradients(
+                            tower_grads_and_vars, _clip_norm=False)
+
                         # TODO: Optionally add gradient noise
 
                         # Keep track of the gradients across all towers
-                        total_grads.append(tower_grads)
+                        total_grads_and_vars.append(tower_grads_and_vars)
 
                         # Add to the graph each operation per tower
                         decode_op_tower = network.decoder(
@@ -112,18 +117,21 @@ def do_train(network, params, gpu_indices):
                         decode_ops.append(decode_op_tower)
                         ler_op_tower = network.compute_ler(
                             decode_op_tower, network.labels_pl_list[i_gpu])
+                        ler_op_tower = tf.expand_dims(ler_op_tower, axis=0)
                         ler_ops.append(ler_op_tower)
 
         # Aggregate losses, then calculate average loss
-        loss_op = tf.add_n(total_losses) / len(gpu_indices)
-        ler_op = tf.add_n(ler_ops) / len(gpu_indices)
+        total_losses = tf.concat(axis=0, values=total_losses)
+        loss_op = tf.reduce_mean(total_losses, axis=0)
+        ler_ops = tf.concat(axis=0, values=ler_ops)
+        ler_op = tf.reduce_mean(ler_ops, axis=0)
 
         # We must calculate the mean of each gradient. Note that this is the
         # synchronization point across all towers
-        grads = average_gradients(total_grads)
+        average_grads_and_vars = average_gradients(total_grads_and_vars)
 
         # Apply the gradients to adjust the shared variables.
-        train_op = optimizer.apply_gradients(grads,
+        train_op = optimizer.apply_gradients(average_grads_and_vars,
                                              global_step=global_step)
 
         # Define learning rate controller
@@ -200,7 +208,7 @@ def do_train(network, params, gpu_indices):
                 # Update parameters
                 sess.run(train_op, feed_dict=feed_dict_train)
 
-                if (step + 1) % 10 == 0:
+                if (step + 1) % 50 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels, inputs_seq_len, _), _ = dev_data().__next__()
@@ -259,7 +267,7 @@ def do_train(network, params, gpu_indices):
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
 
-                    if epoch >= 1:
+                    if epoch >= 10:
                         start_time_eval = time.time()
                         if params['label_type'] != 'word':
                             print('=== Dev Data Evaluation ===')

@@ -39,20 +39,21 @@ def do_eval(network, params, epoch=None):
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
 
-    # Define placeholders
-    network.create_placeholders(gpu_index=None)
+    with tf.name_scope('tower_gpu0'):
+        # Define placeholders
+        network.create_placeholders()
 
-    # Add to the graph each operation (including model definition)
-    _, logits = network.compute_loss(network.inputs_pl_list[0],
-                                     network.labels_pl_list[0],
-                                     network.inputs_seq_len_pl_list[0],
-                                     network.keep_prob_input_pl_list[0],
-                                     network.keep_prob_hidden_pl_list[0],
-                                     network.keep_prob_output_pl_list[0])
-    decode_op = network.decoder(logits,
-                                network.inputs_seq_len_pl_list[0],
-                                decode_type='beam_search',
-                                beam_width=20)
+        # Add to the graph each operation (including model definition)
+        _, logits = network.compute_loss(network.inputs_pl_list[0],
+                                         network.labels_pl_list[0],
+                                         network.inputs_seq_len_pl_list[0],
+                                         network.keep_prob_input_pl_list[0],
+                                         network.keep_prob_hidden_pl_list[0],
+                                         network.keep_prob_output_pl_list[0])
+        decode_op = network.decoder(logits,
+                                    network.inputs_seq_len_pl_list[0],
+                                    decode_type='beam_search',
+                                    beam_width=20)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -137,7 +138,7 @@ def main(model_path, epoch):
         elif params['train_data_size'] == 'train_other500':
             params['num_classes'] = 18669
         elif params['train_data_size'] == 'train_all':
-            params['num_classes'] = 0
+            raise NotImplementedError
 
     # Model setting
     model = load(model_type=params['model'])

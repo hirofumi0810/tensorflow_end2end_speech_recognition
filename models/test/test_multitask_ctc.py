@@ -21,11 +21,11 @@ from experiments.utils.training.learning_rate_controller import Controller
 
 class TestCTC(tf.test.TestCase):
 
-    @measure_time
     def test_multiask_ctc(self):
         print("Multitask CTC Working check.")
         self.check_training(model_type='multitask_blstm_ctc')
 
+    @measure_time
     def check_training(self, model_type):
         print('----- model_type: %s -----' % model_type)
 
@@ -59,7 +59,7 @@ class TestCTC(tf.test.TestCase):
                             weight_decay=1e-8)
 
             # Define placeholders
-            network.create_placeholders(gpu_index=None)
+            network.create_placeholders()
             learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
             # Add to the graph each operation
@@ -89,7 +89,7 @@ class TestCTC(tf.test.TestCase):
             learning_rate = 1e-3
             lr_controller = Controller(learning_rate_init=learning_rate,
                                        decay_start_epoch=10,
-                                       decay_rate=0.99,
+                                       decay_rate=0.98,
                                        decay_patient_epoch=5,
                                        lower_better=True)
 

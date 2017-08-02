@@ -22,7 +22,7 @@ class Dataset(DatasetBase):
     def __init__(self, data_type, train_data_size, label_type, batch_size,
                  num_stack=None, num_skip=None,
                  sort_utt=True, sort_stop_epoch=None,
-                 progressbar=False, num_gpu=1, is_gpu=True):
+                 progressbar=False, num_gpu=1, is_gpu=False):
         """A class for loading dataset.
         Args:
             data_type: string, train_clean100 or train_clean360 or

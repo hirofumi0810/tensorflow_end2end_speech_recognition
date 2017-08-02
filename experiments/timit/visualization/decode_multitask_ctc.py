@@ -33,7 +33,7 @@ def do_decode(network, params, epoch=None):
         sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.create_placeholders(gpu_index=None)
+    network.create_placeholders()
 
     # Add to the graph each operation (including model definition)
     _, logits_main, logits_sub = network.compute_loss(

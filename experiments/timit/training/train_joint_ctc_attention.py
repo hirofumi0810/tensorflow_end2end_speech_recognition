@@ -56,7 +56,7 @@ def do_train(network, params):
     with tf.Graph().as_default():
 
         # Define placeholders
-        network.create_placeholders(gpu_index=0)
+        network.create_placeholders()
 
         # Add to the graph each operation (including model definition)
         loss_op, att_logits, ctc_logits, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(

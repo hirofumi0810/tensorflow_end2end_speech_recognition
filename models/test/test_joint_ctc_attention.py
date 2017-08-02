@@ -21,12 +21,12 @@ from experiments.utils.training.learning_rate_controller import Controller
 
 class TestAttention(tf.test.TestCase):
 
-    @measure_time
     def test_attention(self):
         print("Joint CTC-Attention Working check.")
-        # self.check_training(label_type='phone')
+        self.check_training(label_type='phone')
         self.check_training(label_type='character')
 
+    @measure_time
     def check_training(self, label_type):
         print('----- ' + label_type + ' -----')
         tf.reset_default_graph()
@@ -42,36 +42,36 @@ class TestAttention(tf.test.TestCase):
             att_num_classes = 26 + 2 if label_type == 'character' else 61 + 2
             ctc_num_classes = 26 if label_type == 'character' else 61
             # model = load(model_type=model_type)
-            network = JointCTCAttention(
-                batch_size=batch_size,
-                input_size=inputs[0].shape[1],
-                encoder_num_unit=256,
-                encoder_num_layer=2,
-                attention_dim=128,
-                attention_type='content',
-                decoder_num_unit=256,
-                decoder_num_layer=1,
-                embedding_dim=20,
-                att_num_classes=att_num_classes,
-                ctc_num_classes=ctc_num_classes,
-                att_task_weight=0.5,
-                sos_index=att_num_classes - 2,
-                eos_index=att_num_classes - 1,
-                max_decode_length=50,
-                attention_weights_tempareture=1.0,
-                logits_tempareture=1.0,
-                parameter_init=0.1,
-                clip_grad=5.0,
-                clip_activation_encoder=50,
-                clip_activation_decoder=50,
-                dropout_ratio_input=1.0,
-                dropout_ratio_hidden=1.0,
-                weight_decay=0,
-                beam_width=1,
-                time_major=False)
+            network = JointCTCAttention(input_size=inputs[0].shape[1],
+                                        encoder_num_unit=256,
+                                        encoder_num_layer=2,
+                                        attention_dim=128,
+                                        attention_type='content',
+                                        decoder_num_unit=256,
+                                        decoder_num_layer=1,
+                                        embedding_dim=20,
+                                        att_num_classes=att_num_classes,
+                                        ctc_num_classes=ctc_num_classes,
+                                        att_task_weight=0.5,
+                                        sos_index=att_num_classes - 2,
+                                        eos_index=att_num_classes - 1,
+                                        max_decode_length=50,
+                                        attention_weights_tempareture=1.0,
+                                        logits_tempareture=1.0,
+                                        parameter_init=0.1,
+                                        clip_grad=5.0,
+                                        clip_activation_encoder=50,
+                                        clip_activation_decoder=50,
+                                        dropout_ratio_input=0.9,
+                                        dropout_ratio_hidden=0.9,
+                                        dropout_ratio_output=1.0,
+                                        weight_decay=1e-8,
+                                        beam_width=1,
+                                        time_major=False)
 
             # Define placeholders
-            network.create_placeholders(gpu_index=None)
+            network.create_placeholders()
+            learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
             # Add to the graph each operation
             loss_op, att_logits, ctc_logits, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
@@ -83,15 +83,12 @@ class TestAttention(tf.test.TestCase):
                 network.keep_prob_input_pl_list[0],
                 network.keep_prob_hidden_pl_list[0],
                 network.keep_prob_output_pl_list[0])
-            train_op = network.train(
-                loss_op,
-                optimizer='adam',
-                learning_rate=network.learning_rate_pl_list[0])
+            train_op = network.train(loss_op,
+                                     optimizer='adam',
+                                     learning_rate=learning_rate_pl)
             decode_op_train, decode_op_infer = network.decoder(
                 decoder_outputs_train,
-                decoder_outputs_infer,
-                decode_type='greedy',
-                beam_width=1)
+                decoder_outputs_infer)
             ler_op = network.compute_ler(network.att_labels_st_true_pl,
                                          network.att_labels_st_pred_pl)
 
@@ -126,7 +123,7 @@ class TestAttention(tf.test.TestCase):
                 network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                 network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
                 network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
-                network.learning_rate_pl_list[0]: learning_rate
+                learning_rate_pl: learning_rate
             }
 
             map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone61_to_num.txt'
@@ -171,10 +168,10 @@ class TestAttention(tf.test.TestCase):
                         # Compute accuracy
                         try:
                             feed_dict_ler = {
-                                network.labels_st_true_pl: list2sparsetensor(
-                                    labels,
+                                network.att_labels_st_true_pl: list2sparsetensor(
+                                    att_labels,
                                     padded_value=27),
-                                network.labels_st_pred_pl: list2sparsetensor(
+                                network.att_labels_st_pred_pl: list2sparsetensor(
                                     predicted_ids_infer,
                                     padded_value=27)
                             }
@@ -218,8 +215,7 @@ class TestAttention(tf.test.TestCase):
                             learning_rate=learning_rate,
                             epoch=step,
                             value=ler_train)
-                        feed_dict[network.learning_rate_pl_list[0]
-                                  ] = learning_rate
+                        feed_dict[learning_rate_pl] = learning_rate
 
                 duration_global = time.time() - start_time_global
                 print('Total time: %.3f sec' % (duration_global))

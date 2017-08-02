@@ -30,7 +30,6 @@ HELPERS = {
 class AttentionBase(object):
     """Attention Mechanism based seq2seq model.
     Args:
-        batch_size: int, batch size of mini batch
         input_size: int, the dimension of input vectors
         attention_dim: int, the dimension of attention vecors
         num_classes: int, the number of nodes in output layer
@@ -45,56 +44,25 @@ class AttentionBase(object):
     def __init__(self, *args, **kwargs):
         NotImplementedError
 
-    def create_placeholders(self, gpu_index=None):
-        """
-        Args:
-            gpu_index: int, index of gpu
-        """
-        if gpu_index is None:
-            # For CPU or sigle GPU
-            self.inputs_pl_list.append(
-                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                               name='input'))
-            self.labels_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None, None], name='labels'))
-            self.inputs_seq_len_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
-            self.labels_seq_len_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None], name='labels_seq_len'))
-            self.keep_prob_input_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_input'))
-            self.keep_prob_hidden_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_hidden'))
-            self.keep_prob_output_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_output'))
-            self.learning_rate_pl_list.append(
-                tf.placeholder(tf.float32, name='learning_rate'))
-        else:
-            # Define placeholders in each gpu tower
-            self.inputs_pl_list.append(
-                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                               name='input_gpu' + str(gpu_index)))
-            self.labels_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None, None],
-                               name='labels_gpu' + str(gpu_index)))
-            self.inputs_seq_len_pl_list.append(
-                tf.placeholder(tf.int64, shape=[None],
-                               name='inputs_seq_len_gpu' + str(gpu_index)))
-            self.labels_seq_len_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None],
-                               name='labels_seq_len_gpu' + str(gpu_index)))
-            self.keep_prob_input_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_input_gpu' + str(gpu_index)))
-            self.keep_prob_hidden_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_hidden_gpu' + str(gpu_index)))
-            self.keep_prob_output_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_output_gpu' + str(gpu_index)))
-            self.learning_rate_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='learning_rate_gpu' + str(gpu_index)))
+    def create_placeholders(self):
+        """Create placeholders and append them to list."""
+        self.inputs_pl_list.append(
+            tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                           name='input'))
+        self.labels_pl_list.append(
+            tf.placeholder(tf.int32, shape=[None, None], name='labels'))
+        self.inputs_seq_len_pl_list.append(
+            tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
+        self.labels_seq_len_pl_list.append(
+            tf.placeholder(tf.int32, shape=[None], name='labels_seq_len'))
+        self.keep_prob_input_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_input'))
+        self.keep_prob_hidden_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_hidden'))
+        self.keep_prob_output_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_output'))
+        self.learning_rate_pl_list.append(
+            tf.placeholder(tf.float32, name='learning_rate'))
 
         # These are prepared for computing LER
         self.labels_st_true_pl = tf.SparseTensor(
@@ -105,6 +73,32 @@ class AttentionBase(object):
             tf.placeholder(tf.int64, name='indices_pred'),
             tf.placeholder(tf.int32, name='values_pred'),
             tf.placeholder(tf.int64, name='shape_pred'))
+
+    def _add_noise_to_inputs(self, inputs, stddev=0.075):
+        """Add gaussian noise to the inputs.
+        Args:
+            inputs: the noise free input-features.
+            stddev: The standart deviation of the noise.
+        Returns:
+            inputs: Input features plus noise.
+        """
+        # if stddev != 0:
+        #     with tf.variable_scope("input_noise"):
+        #         # Add input noise with a standart deviation of stddev.
+        #         inputs = tf.random_normal(
+        #             tf.shape(inputs), 0.0, stddev) + inputs
+        # return inputs
+        raise NotImplementedError
+
+    def _add_noise_to_gradients(grads_and_vars, gradient_noise_scale):
+        """Adds scaled noise from a 0-mean normal distribution to gradients.
+        Args:
+            grads_and_vars:
+            gradient_noise_scale:
+            stddev:
+        Returns:
+        """
+        raise NotImplementedError
 
     def _generate_target_embedding(self, reuse):
         """Returns the embedding used for the target sequence."""
@@ -150,7 +144,7 @@ class AttentionBase(object):
             decoder: An instance of the decoder class
             bridge:
             encoder_outputs:
-            labels: Target labels of size `[batch_size, max_time, num_classes]`
+            labels: Target labels of size `[B, T, num_classes]`
             labels_seq_len: The length of target labels
         Returns:
             decoder_outputs: A tuple of `(AttentionDecoderOutput, final_state)`
@@ -231,20 +225,19 @@ class AttentionBase(object):
 
     def compute_loss(self, inputs, labels, inputs_seq_len, labels_seq_len,
                      keep_prob_input, keep_prob_hidden, keep_prob_output,
-                     num_gpu=1, scope=None):
+                     scope=None):
         """Operation for computing cross entropy sequence loss.
         Args:
-            inputs: A tensor of `[batch_size, time, input_size]`
-            labels: A tensor of `[batch_size, time]`
-            inputs_seq_len: A tensor of `[batch_size]`
-            labels_seq_len: A tensor of `[batch_size]`
+            inputs: A tensor of `[B, T, input_size]`
+            labels: A tensor of `[B, T]`
+            inputs_seq_len: A tensor of `[B]`
+            labels_seq_len: A tensor of `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
                 the hidden-hidden layers
             keep_prob_output: A float value. A probability to keep nodes in
                 the hidden-output layer
-            num_gpu: int, the number of GPUs
         Returns:
             loss: operation for computing total loss (cross entropy sequence
                 loss + L2). This is a single scalar tensor to minimize.
@@ -288,116 +281,121 @@ class AttentionBase(object):
             tf.add_to_collection('losses', sequence_loss)
 
         # Compute total loss
-        loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
-        if num_gpu == 1:
-            # Add a scalar summary for the snapshot of loss
+        # Add a scalar summary for the snapshot of loss
+        if self.weight_decay > 0:
             self.summaries_train.append(
-                tf.summary.scalar('loss_train', loss))
+                tf.summary.scalar('weight_loss_train',
+                                  weight_sum * self.weight_decay))
             self.summaries_dev.append(
-                tf.summary.scalar('loss_dev', loss))
+                tf.summary.scalar('weight_loss_dev',
+                                  weight_sum * self.weight_decay))
+            self.summaries_train.append(
+                tf.summary.scalar('total_loss_train', total_loss))
+            self.summaries_dev.append(
+                tf.summary.scalar('total_loss_dev', total_loss))
 
-        return loss, logits, decoder_outputs_train, decoder_outputs_infer
+        self.summaries_train.append(
+            tf.summary.scalar('sequence_loss_train', sequence_loss))
+        self.summaries_dev.append(
+            tf.summary.scalar('sequence_loss_dev', sequence_loss))
 
-    def train(self, loss, optimizer, learning_rate=None,
-              clip_grad_by_norm=False):
-        """Operation for training.
+        return total_loss, logits, decoder_outputs_train, decoder_outputs_infer
+
+    def set_optimizer(self, optimizer_name, learning_rate):
+        """Set optimizer.
+        Args:
+            optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
+            learning_rate: A float value, a learning rate
+        Returns:
+            optimizer:
+        """
+        optimizer_name = optimizer_name.lower()
+        if optimizer_name not in OPTIMIZER_CLS_NAMES:
+            raise ValueError(
+                "Optimizer name should be one of [%s], you provided %s." %
+                (", ".join(OPTIMIZER_CLS_NAMES), optimizer_name))
+
+        # Select optimizer
+        if optimizer_name == 'momentum':
+            return OPTIMIZER_CLS_NAMES[optimizer_name](
+                learning_rate=learning_rate,
+                momentum=0.9)
+        else:
+            return OPTIMIZER_CLS_NAMES[optimizer_name](
+                learning_rate=learning_rate)
+
+    def train(self, loss, optimizer, learning_rate=None, clip_norm=False):
+        """Operation for training. Only the sigle GPU training is supported.
         Args:
             loss: An operation for computing loss
             optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
             learning_rate: A float value, a learning rate
-            clip_grad_by_norm: if True, clip gradients by norm of the
-                value of self.clip_grad
-            is_scheduled: if True, schedule learning rate at each epoch
+            clip_norm: if True, clip gradients norm by self.clip_grad
         Returns:
             train_op: operation for training
         """
-        optimizer = optimizer.lower()
-        if optimizer not in OPTIMIZER_CLS_NAMES:
-            raise ValueError(
-                "Optimizer's name should be one of [%s], you provided %s." %
-                (", ".join(OPTIMIZER_CLS_NAMES), optimizer))
-
         # Create a variable to track the global step
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        # Select optimizer
-        if optimizer == 'momentum':
-            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate,
-                momentum=0.9)
-        else:
-            optimizer = OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate)
+        # Set optimizer
+        self.optimizer = self.set_optimizer(optimizer, learning_rate)
 
         # TODO: Optionally wrap with SyncReplicasOptimizer
-        # TODO: create_learning_rate_decay_fn
 
         if self.clip_grad is not None:
-            # Gradient clipping
-            train_op = self._gradient_clipping(loss,
-                                               optimizer,
-                                               clip_grad_by_norm,
-                                               global_step)
+            # Compute gradients
+            grads_and_vars = self.optimizer.compute_gradients(loss)
+
+            # Clip gradients
+            clipped_grads_and_vars = self._clip_gradients(grads_and_vars,
+                                                          clip_norm)
+
+            # Create gradient updates
+            train_op = self.optimizer.apply_gradients(
+                clipped_grads_and_vars,
+                global_step=global_step)
+
         else:
             # Use the optimizer to apply the gradients that minimize the loss
             # and also increment the global step counter as a single training
             # step
-            train_op = optimizer.minimize(loss, global_step=global_step)
+            train_op = self.optimizer.minimize(loss, global_step=global_step)
 
         return train_op
 
-    def _gradient_clipping(self, loss, optimizer, clip_grad_by_norm,
-                           global_step):
-        # Compute gradients
-        trainable_vars = tf.trainable_variables()
-        grads = tf.gradients(loss, trainable_vars)
-
+    def _clip_gradients(self, grads_and_vars, _clip_norm):
+        """Clip gradients.
+        Args:
+            grads_and_vars: list of (grads, vars) tuples
+            _clip_norm: if True, clip gradients norm by self.clip_grad
+        Returns:
+            clipped_grads_and_vars: list of (clipped grads, vars)
+        """
         # TODO: Optionally add gradient noise
 
-        if clip_grad_by_norm:
-            # Clip by norm
-            clipped_grads = []
-            for grad, var in zip(grads, trainable_vars):
+        clipped_grads_and_vars = []
+
+        if _clip_norm:
+            # Clip gradient norm
+            for grad, var in grads_and_vars:
                 if grad is not None:
-                    grad = tf.clip_by_norm(grad,
-                                           clip_norm=self.clip_grad)
-                    clipped_grads.append(grad)
-
-                    # Add histograms for gradients.
-                    # self.summaries_train.append(
-                    # tf.summary.histogram(var.op.name + '/gradients', grad))
-
+                    clipped_grads_and_vars.append(
+                        (tf.clip_by_norm(grad, clip_norm=self.clip_grad), var))
         else:
-            # Clip by absolute values
-            clipped_grads = []
-            for grad, var in zip(grads, trainable_vars):
+            # Clip gradient
+            for grad, var in grads_and_vars:
                 if grad is not None:
-                    grad = tf.clip_by_value(
-                        grad,
-                        clip_value_min=-self.clip_grad,
-                        clip_value_max=self.clip_grad)
-                    clipped_grads.append(grad)
+                    clipped_grads_and_vars.append(
+                        (tf.clip_by_value(grad,
+                                          clip_value_min=-self.clip_grad,
+                                          clip_value_max=self.clip_grad), var))
 
-                    # Add histograms for gradients.
-                    # self.summaries_train.append(
-                    #     tf.summary.histogram(var.op.name + '/gradients',
-                    #                          grad))
-                    # TODO: Why None occured?
+        # TODO: Add histograms for variables, gradients (norms)
+        # self._tensorboard(trainable_vars)
 
-                    # self._tensorboard_statistics(trainable_vars)
-
-        # Create gradient updates
-        train_op = optimizer.apply_gradients(
-            zip(clipped_grads, trainable_vars),
-            global_step=global_step,
-            name='train')
-
-        return train_op
-
-    def _add_scaled_noise_to_gradients(grads_and_vars, gradient_noise_scale):
-        """Adds scaled noise from a 0-mean normal distribution to gradients."""
-        raise NotImplementedError
+        return clipped_grads_and_vars
 
     def decoder(self, decoder_outputs_train, decoder_outputs_infer):
         """Operation for decoding.
@@ -406,7 +404,7 @@ class AttentionBase(object):
             decoder_outputs_infer: An instance of ``
         Return:
             decoded_train: operation for decoding in training. A tensor of
-                size `[batch_size, ]`
+                size `[B, ]`
             decoded_infer: operation for decoding in inference. A tensor of
                 size `[, max_decode_length]`
         """

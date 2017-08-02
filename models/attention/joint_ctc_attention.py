@@ -28,7 +28,6 @@ from models.attention.bridge import InitialStateBridge
 class JointCTCAttention(AttentionBase):
     """Joint CTC-Attention model. Encoder is BLSTM as in the paper.
     Args:
-        batch_size: int, batch size of mini batch
         input_size: int, the dimension of input vectors
         encoder_num_unit: int, the number of units in each layer of the
             encoder
@@ -42,7 +41,8 @@ class JointCTCAttention(AttentionBase):
         att_num_classes: int, the number of nodes in softmax layer
         sos_index: index of the start of sentence tag (<SOS>)
         eos_index: index of the end of sentence tag (<EOS>)
-        max_decode_length: int,
+        max_decode_length: int, the length of output sequences to stop
+            prediction when EOS token have not been emitted
         attention_smoothing: bool, if True, replace exp to sigmoid function in
             the softmax layer of computing attention weights
         attention_weights_tempareture: A float value,
@@ -53,16 +53,17 @@ class JointCTCAttention(AttentionBase):
         clip_activation_encoder: A float value. Range of activation clipping in
             the encoder (> 0)
         clip_activation_decoder:
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden
+        dropout_ratio_input: A float value. Dropout ratio in the input-hidden
+            layer
+        dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
             layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
-            layers
+        dropout_ratio_output: A float value. Dropout ratio in the hidden-output
+            layer
         weight_decay: A float value. Regularization parameter for weight decay
-        time_major:
+        time_major: bool, if True, time-major computatoin will be performed
     """
 
     def __init__(self,
-                 batch_size,
                  input_size,
                  encoder_num_unit,
                  encoder_num_layer,
@@ -86,6 +87,7 @@ class JointCTCAttention(AttentionBase):
                  clip_activation_decoder=50,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
+                 dropout_ratio_output=1.0,
                  weight_decay=0.0,
                  beam_width=0,
                  time_major=False,
@@ -93,7 +95,6 @@ class JointCTCAttention(AttentionBase):
 
         # AttentionBase.__init__(self)
 
-        self.batch_size = int(batch_size)
         self.input_size = int(input_size)
         self.encoder_num_unit = int(encoder_num_unit)
         self.encoder_num_layer = int(encoder_num_layer)
@@ -116,6 +117,7 @@ class JointCTCAttention(AttentionBase):
         self.clip_activation_decoder = float(clip_activation_decoder)
         self.dropout_ratio_input = float(dropout_ratio_input)
         self.dropout_ratio_hidden = float(dropout_ratio_hidden)
+        self.dropout_ratio_output = float(dropout_ratio_output)
         self.weight_decay = float(weight_decay)
         self.beam_width = int(beam_width)
         self.time_major = time_major
@@ -145,62 +147,29 @@ class JointCTCAttention(AttentionBase):
         self.keep_prob_output_pl_list = []
         self.learning_rate_pl_list = []
 
-    def create_placeholders(self, gpu_index=None):
-        """
-        Args:
-            gpu_index: int, index of gpu
-        """
-        if gpu_index is None:
-            # For CPU or sigle GPU
-            self.inputs_pl_list.append(
-                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                               name='input'))
-            self.att_labels_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None, None],
-                               name='att_labels'))
-            self.ctc_labels_pl_list.append(tf.SparseTensor(
-                tf.placeholder(tf.int64, name='ctc_indices'),
-                tf.placeholder(tf.int32, name='ctc_values'),
-                tf.placeholder(tf.int64, name='ctc_shape')))
-            self.inputs_seq_len_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
-            self.att_labels_seq_len_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None],
-                               name='att_labels_seq_len'))
-            self.keep_prob_input_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_input'))
-            self.keep_prob_hidden_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_hidden'))
-            self.keep_prob_output_pl_list.append(
-                tf.placeholder(tf.float32, name='keep_prob_output'))
-            self.learning_rate_pl_list.append(
-                tf.placeholder(tf.float32, name='learning_rate'))
-        else:
-            # Define placeholders in each gpu tower
-            self.inputs_pl_list.append(
-                tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                               name='input_gpu' + str(gpu_index)))
-            self.att_labels_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None, None],
-                               name='att_labels_gpu' + str(gpu_index)))
-            self.inputs_seq_len_pl_list.append(
-                tf.placeholder(tf.int64, shape=[None],
-                               name='inputs_seq_len_gpu' + str(gpu_index)))
-            self.att_labels_seq_len_pl_list.append(
-                tf.placeholder(tf.int32, shape=[None],
-                               name='labels_seq_len_gpu' + str(gpu_index)))
-            self.keep_prob_input_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_input_gpu' + str(gpu_index)))
-            self.keep_prob_hidden_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_hidden_gpu' + str(gpu_index)))
-            self.keep_prob_output_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='keep_prob_output_gpu' + str(gpu_index)))
-            self.learning_rate_pl_list.append(
-                tf.placeholder(tf.float32,
-                               name='learning_rate_gpu' + str(gpu_index)))
+    def create_placeholders(self):
+        """Create placeholders and append them to list."""
+        self.inputs_pl_list.append(
+            tf.placeholder(tf.float32, shape=[None, None, self.input_size],
+                           name='input'))
+        self.att_labels_pl_list.append(
+            tf.placeholder(tf.int32, shape=[None, None],
+                           name='att_labels'))
+        self.ctc_labels_pl_list.append(tf.SparseTensor(
+            tf.placeholder(tf.int64, name='ctc_indices'),
+            tf.placeholder(tf.int32, name='ctc_values'),
+            tf.placeholder(tf.int64, name='ctc_shape')))
+        self.inputs_seq_len_pl_list.append(
+            tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
+        self.att_labels_seq_len_pl_list.append(
+            tf.placeholder(tf.int32, shape=[None],
+                           name='att_labels_seq_len'))
+        self.keep_prob_input_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_input'))
+        self.keep_prob_hidden_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_hidden'))
+        self.keep_prob_output_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_output'))
 
         # These are prepared for computing LER
         self.att_labels_st_true_pl = tf.SparseTensor(
@@ -278,20 +247,22 @@ class JointCTCAttention(AttentionBase):
         return decoder
 
     def _build(self, inputs, labels, inputs_seq_len, labels_seq_len,
-               keep_prob_input, keep_prob_hidden):
+               keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Define model graph.
         Args:
-            inputs: A tensor of `[batch_size, time, input_size]`
-            labels: A tensor of `[batch_size, time]`
-            inputs_seq_len: A tensor of `[batch_size]`
-            labels_seq_len: A tensor of `[batch_size]`
+            inputs: A tensor of `[B, T, input_size]`
+            labels: A tensor of `[B, T]`
+            inputs_seq_len: A tensor of `[B]`
+            labels_seq_len: A tensor of `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
-                input-hidden layers
+                the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
-                hidden-hidden layers
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
         Returns:
             att_logits:
-            ctc_logits: A tensor of `[time, batch_size, input_size]`
+            ctc_logits: A tensor of `[T, B, input_size]`
             decoder_outputs_train:
             decoder_outputs_infer:
         """
@@ -306,10 +277,10 @@ class JointCTCAttention(AttentionBase):
         # self._decode_train() or self._decode_infer()
 
         # Wrap decoder
-        # decoder_train = self._beam_search_decoder_wrapper(decoder_train,
-        #                                                   beam_width=20)
-        # decoder_infer = self._beam_search_decoder_wrapper(decoder_infer,
-        #                                                   beam_width=20)
+        decoder_train = self._beam_search_decoder_wrapper(
+            decoder_train, beam_width=self.beam_width)
+        decoder_infer = self._beam_search_decoder_wrapper(
+            decoder_infer, beam_width=self.beam_width)
 
         # Connect between encoder and decoder
         bridge = InitialStateBridge(
@@ -402,32 +373,34 @@ class JointCTCAttention(AttentionBase):
 
     def compute_loss(self, inputs, att_labels, inputs_seq_len,
                      att_labels_seq_len, ctc_labels,
-                     keep_prob_input, keep_prob_hidden, num_gpu=1, scope=None):
+                     keep_prob_input, keep_prob_hidden, keep_prob_output,
+                     scope=None):
         """Operation for computing cross entropy sequence loss.
         Args:
-            inputs: A tensor of `[batch_size, time, input_size]`
-            att_labels: A tensor of `[batch_size, time]`
-            inputs_seq_len: A tensor of `[batch_size]`
-            att_labels_seq_len: A tensor of `[batch_size]`
+            inputs: A tensor of `[B, T, input_size]`
+            att_labels: A tensor of `[B, T]`
+            inputs_seq_len: A tensor of `[B]`
+            att_labels_seq_len: A tensor of `[B]`
             ctc_labels:
             keep_prob_input: A float value. A probability to keep nodes in
-                input-hidden layers
+                the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
-                hidden-hidden layers
-            num_gpu: int, the number of GPUs
+                the hidden-hidden layers
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output layer
         Returns:
             loss: operation for computing total loss (cross entropy sequence
                 loss + ctc loss + L2).
                 This is a single scalar tensor to minimize.
             att_logits:
-            ctc_logits: A tensor of `[time, batch_size, input_size]`
+            ctc_logits: A tensor of `[T, B, input_size]`
             decoder_outputs_train:
             decoder_outputs_infer:
         """
         # Build model graph
         att_logits, ctc_logits, decoder_outputs_train, decoder_outputs_infer = self._build(
             inputs, att_labels, inputs_seq_len, att_labels_seq_len,
-            keep_prob_input, keep_prob_hidden)
+            keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         # For prevent 0 * log(0) in crossentropy loss
         epsilon = tf.constant(value=1e-10)  # shope??
@@ -442,6 +415,7 @@ class JointCTCAttention(AttentionBase):
                         weight_sum += tf.nn.l2_loss(var)
                 tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
+        # Attention loss
         with tf.name_scope("sequence_loss"):
             max_time = tf.shape(att_labels[:, 1:])[1]
             loss_mask = tf.sequence_mask(
@@ -478,14 +452,33 @@ class JointCTCAttention(AttentionBase):
             tf.add_to_collection('losses', ctc_loss * self.ctc_task_weight)
 
         # Compute total loss
-        loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
 
-        if num_gpu == 1:
-            # Add a scalar summary for the snapshot of loss
+        # Add a scalar summary for the snapshot of loss
+        if self.weight_decay > 0:
             self.summaries_train.append(
-                tf.summary.scalar('loss_train', loss))
+                tf.summary.scalar('weight_loss_train',
+                                  weight_sum * self.weight_decay))
             self.summaries_dev.append(
-                tf.summary.scalar('loss_dev', loss))
+                tf.summary.scalar('weight_loss_dev',
+                                  weight_sum * self.weight_decay))
+            self.summaries_train.append(
+                tf.summary.scalar('total_loss_train', total_loss))
+            self.summaries_dev.append(
+                tf.summary.scalar('total_loss_dev', total_loss))
 
-        return (loss, ctc_logits, att_logits,
+        self.summaries_train.append(
+            tf.summary.scalar('sequence_loss_train',
+                              sequence_loss * self.att_task_weight))
+        self.summaries_dev.append(
+            tf.summary.scalar('sequence_loss_dev',
+                              sequence_loss * self.att_task_weight))
+        self.summaries_train.append(
+            tf.summary.scalar('ctc_loss_train',
+                              ctc_loss * self.ctc_task_weight))
+        self.summaries_dev.append(
+            tf.summary.scalar('ctc_loss_dev',
+                              ctc_loss * self.ctc_task_weight))
+
+        return (total_loss, ctc_logits, att_logits,
                 decoder_outputs_train, decoder_outputs_infer)
