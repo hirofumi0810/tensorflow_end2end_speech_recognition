@@ -57,6 +57,7 @@ def do_train(network, params):
 
         # Define placeholders
         network.create_placeholders()
+        learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
         # Add to the graph each operation (including model definition)
         loss_op, logits, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
@@ -70,7 +71,7 @@ def do_train(network, params):
         train_op = network.train(
             loss_op,
             optimizer=params['optimizer'],
-            learning_rate=network.learning_rate_pl_list[0])
+            learning_rate=learning_rate_pl)
         _, decode_op_infer = network.decoder(
             decoder_outputs_train,
             decoder_outputs_infer)
@@ -136,7 +137,7 @@ def do_train(network, params):
                     network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                     network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
                     network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
-                    network.learning_rate_pl_list[0]: learning_rate
+                    learning_rate_pl: learning_rate
                 }
 
                 # Update parameters

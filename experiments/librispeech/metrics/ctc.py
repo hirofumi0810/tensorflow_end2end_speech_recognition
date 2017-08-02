@@ -12,7 +12,8 @@ import Levenshtein
 
 from experiments.utils.data.labels.character import num2char
 from experiments.utils.data.labels.word import num2word
-from experiments.utils.data.sparsetensor import sparsetensor2list
+from experiments.utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
+from experiments.utils.evaluation.edit_distance import compute_edit_distance
 from experiments.utils.progressbar import wrap_generator
 
 
@@ -33,6 +34,9 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
     """
     assert isinstance(decode_ops, list), "decode_ops must be a list."
 
+    # Reset data counter
+    dataset.reset()
+
     batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
 
     if label_type == 'character':
@@ -48,10 +52,10 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
                                                 progressbar,
                                                 total=total_step):
         # Create feed dictionary for next mini batch
-        if not is_multitask:
-            inputs, labels_true, inputs_seq_len, _ = data
+        if is_multitask:
+            inputs, _, labels_true, inputs_seq_len, _ = data
         else:
-            inputs, labels_true, _, inputs_seq_len, _ = data
+            inputs, labels_true, inputs_seq_len, _ = data
 
         feed_dict = {}
         for i_device in range(len(decode_ops)):
@@ -88,9 +92,8 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
                     str_pred = str_pred.lower()
 
                 # Compute edit distance
-                cer_each = Levenshtein.distance(
+                cer_mean = Levenshtein.distance(
                     str_pred, str_true) / len(list(str_true))
-                cer_mean += cer_each
 
         if next_epoch_flag:
             break
@@ -117,4 +120,57 @@ def do_eval_wer(session, decode_ops, network, dataset, train_data_size, is_test,
     Return:
         wer_mean: An average of WER
     """
-    raise NotImplementedError
+    assert isinstance(decode_ops, list), "decode_ops must be a list."
+
+    # Reset data counter
+    dataset.reset()
+
+    batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
+
+    # map_file_path = '../metrics/mapping_files/ctc/word2num_' + train_data_size + '.txt'
+
+    wer_mean = 0
+    total_step = int(dataset.data_num / batch_size)
+    if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
+        total_step += 1
+    for data, next_epoch_flag in wrap_generator(dataset(batch_size),
+                                                progressbar,
+                                                total=total_step):
+        # Create feed dictionary for next mini batch
+        if is_multitask:
+            inputs, labels_true, _, inputs_seq_len, _ = data
+        else:
+            inputs, labels_true, inputs_seq_len, _ = data
+
+        feed_dict = {}
+        for i_device in range(len(decode_ops)):
+            feed_dict[network.inputs_pl_list[i_device]] = inputs[i_device]
+            feed_dict[network.inputs_seq_len_pl_list[i_device]
+                      ] = inputs_seq_len[i_device]
+            feed_dict[network.keep_prob_input_pl_list[i_device]
+                      ] = 1.0
+            feed_dict[network.keep_prob_hidden_pl_list[i_device]
+                      ] = 1.0
+            feed_dict[network.keep_prob_output_pl_list[i_device]
+                      ] = 1.0
+
+        labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
+
+        for i_device, labels_pred_st in enumerate(labels_pred_st_list):
+            batch_size_device = len(inputs_seq_len[i_device])
+            labels_pred = sparsetensor2list(labels_pred_st, batch_size_device)
+
+            # Compute edit distance
+            labels_true_st = list2sparsetensor(labels_true, padded_value=-1)
+            labels_pred_st = list2sparsetensor(labels_pred, padded_value=-1)
+            wer_mean += compute_edit_distance(session,
+                                              labels_true_st,
+                                              labels_pred_st)
+
+        if next_epoch_flag:
+            break
+
+    wer_mean /= dataset.data_num
+    # TODO: This is just edit distance.
+
+    return wer_mean

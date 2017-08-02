@@ -24,6 +24,12 @@ class DatasetBase(object):
     def __call__(self, batch_size=None):
         return self.__next_mini_batch(batch_size)
 
+    def reset(self):
+        """Reset data counter. This is useful when you'd like to evaluate
+        overall data during training.
+        """
+        self.rest = set(range(0, self.data_num, 1))
+        
     def __next_mini_batch(self, batch_size=None):
         """Generate each mini-batch.
         Args:

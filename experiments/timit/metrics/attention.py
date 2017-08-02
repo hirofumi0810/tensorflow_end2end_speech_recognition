@@ -9,12 +9,13 @@ from __future__ import print_function
 
 import re
 import Levenshtein
+import numpy as np
 
 from experiments.timit.metrics.mapping import map_to_39phone
-from experiments.timit.metrics.edit_distance import compute_edit_distance
 from experiments.utils.data.labels.character import num2char
 from experiments.utils.data.labels.phone import num2phone, phone2num
 from experiments.utils.data.sparsetensor import list2sparsetensor
+from experiments.utils.evaluation.edit_distance import compute_edit_distance
 from experiments.utils.progressbar import wrap_generator
 
 
@@ -36,6 +37,9 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     Returns:
         per_mean: An average of PER
     """
+    # Reset data counter
+    dataset.reset()
+
     batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
     train_label_type = label_type
     eval_label_type = dataset.label_type_sub if is_multitask else dataset.label_type
@@ -54,10 +58,11 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                                                 progressbar,
                                                 total=total_step):
         # Create feed dictionary for next mini-batch
-        if not is_multitask:
-            inputs, labels_true, inputs_seq_len, _, _ = data
-        else:
+        if is_multitask:
             inputs, _, labels_true, inputs_seq_len, _, _ = data
+
+        else:
+            inputs, labels_true, inputs_seq_len, _, _ = data
 
         feed_dict = {
             network.inputs_pl_list[0]: inputs,
@@ -115,10 +120,10 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                                            padded_value=eos_index)
         labels_pred_st = list2sparsetensor(labels_pred_mapped,
                                            padded_value=eos_index)
-        per_each = compute_edit_distance(session,
+        per_list = compute_edit_distance(session,
                                          labels_true_st,
                                          labels_pred_st)
-        per_mean += per_each * batch_size_each
+        per_mean += np.sum(per_list)
 
         if next_epoch_flag:
             break
@@ -143,6 +148,9 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
     Return:
         cer_mean: An average of CER
     """
+    # Reset data counter
+    dataset.reset()
+
     batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
 
     map_file_path = '../metrics/mapping_files/attention/' + label_type + '_to_num.txt'
@@ -154,10 +162,10 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
                                                 progressbar,
                                                 total=total_step):
         # Create feed dictionary for next mini-batch
-        if not is_multitask:
-            inputs, labels_true, inputs_seq_len, _, _ = data
-        else:
+        if is_multitask:
             inputs, labels_true, _, inputs_seq_len, _, _ = data
+        else:
+            inputs, labels_true, inputs_seq_len, _, _ = data
 
         feed_dict = {
             network.inputs_pl_list[0]: inputs,
@@ -187,9 +195,8 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
                 str_pred = str_pred.lower()
 
             # Compute edit distance
-            cer_each = Levenshtein.distance(
+            cer_mean += Levenshtein.distance(
                 str_pred, str_true) / len(list(str_true))
-            cer_mean += cer_each
 
         if next_epoch_flag:
             break

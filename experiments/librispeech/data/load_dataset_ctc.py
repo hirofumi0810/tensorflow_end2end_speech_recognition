@@ -133,18 +133,17 @@ class Dataset(DatasetBase):
         frame_num_tuple_sorted = sorted(self.frame_num_dict.items(),
                                         key=lambda x: x[1])
         input_paths, label_paths = [], []
-        from tqdm import tqdm
-        for input_name, frame_num in tqdm(frame_num_tuple_sorted):
+        for input_name, frame_num in frame_num_tuple_sorted:
             speaker_name = input_name.split('-')[0]
-            for i, input_path in enumerate(input_path_list):
+            for input_path in input_path_list:
                 if isfile(join(input_path, speaker_name, input_name + '.npy')):
                     input_paths.append(
                         join(input_path, speaker_name, input_name + '.npy'))
                     break
-            for i, label_path in enumerate(label_path_list):
-                if isfile(join(label_path_list[i], speaker_name, input_name + '.npy')):
+            for label_path in label_path_list:
+                if isfile(join(label_path, speaker_name, input_name + '.npy')):
                     label_paths.append(
-                        join(label_path_list[i], speaker_name, input_name + '.npy'))
+                        join(label_path, speaker_name, input_name + '.npy'))
                     break
         self.input_paths = np.array(input_paths)
         self.label_paths = np.array(label_paths)

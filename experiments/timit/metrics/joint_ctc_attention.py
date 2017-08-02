@@ -9,12 +9,13 @@ from __future__ import print_function
 
 import re
 import Levenshtein
+import numpy as np
 
 from experiments.timit.metrics.mapping import map_to_39phone
-from experiments.timit.metrics.edit_distance import compute_edit_distance
 from experiments.utils.data.labels.character import num2char
 from experiments.utils.data.labels.phone import num2phone, phone2num
 from experiments.utils.data.sparsetensor import list2sparsetensor
+from experiments.utils.evaluation.edit_distance import compute_edit_distance
 from experiments.utils.progressbar import wrap_generator
 
 
@@ -34,6 +35,9 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     Returns:
         per_mean: An average of PER
     """
+    # Reset data counter
+    dataset.reset()
+    
     batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
     train_label_type = label_type
     eval_label_type = dataset.label_type
@@ -111,10 +115,10 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
             att_labels_true_mapped, padded_value=eos_index)
         labels_pred_st = list2sparsetensor(
             att_labels_pred_mapped, padded_value=eos_index)
-        per_each = compute_edit_distance(session,
+        per_list = compute_edit_distance(session,
                                          labels_true_st,
                                          labels_pred_st)
-        per_mean += per_each * batch_size_each
+        per_mean += np.sum(per_list)
 
         if next_epoch_flag:
             break

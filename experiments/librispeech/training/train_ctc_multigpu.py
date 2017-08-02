@@ -29,7 +29,7 @@ from models.ctc.load_model import load
 
 
 def do_train(network, params, gpu_indices):
-    """Run training
+    """Run CTC training.
     Args:
         network: network to train
         params: A dictionary of parameters
@@ -60,10 +60,9 @@ def do_train(network, params, gpu_indices):
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         # Set optimizer
-        network.learning_rate_pl = tf.placeholder(
-            tf.float32, name='learning_rate')
+        learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
         optimizer = network.set_optimizer(
-            params['optimizer'], network.learning_rate_pl)
+            params['optimizer'], learning_rate_pl)
 
         # Calculate the gradients for each model tower
         total_grads_and_vars, total_losses = [], []
@@ -203,7 +202,7 @@ def do_train(network, params, gpu_indices):
                                     ] = network.dropout_ratio_hidden
                     feed_dict_train[network.keep_prob_output_pl_list[i_gpu]
                                     ] = network.dropout_ratio_output
-                feed_dict_train[network.learning_rate_pl] = learning_rate
+                feed_dict_train[learning_rate_pl] = learning_rate
 
                 # Update parameters
                 sess.run(train_op, feed_dict=feed_dict_train)
@@ -350,7 +349,7 @@ def main(config_path, model_save_path, gpu_indices):
         elif params['train_data_size'] == 'train_other500':
             params['num_classes'] = 18669
         elif params['train_data_size'] == 'train_all':
-            raise NotImplementedError
+            params['num_classes'] = 26642
 
     # Model setting
     model = load(model_type=params['model'])

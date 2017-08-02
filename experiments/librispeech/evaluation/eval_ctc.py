@@ -138,7 +138,7 @@ def main(model_path, epoch):
         elif params['train_data_size'] == 'train_other500':
             params['num_classes'] = 18669
         elif params['train_data_size'] == 'train_all':
-            raise NotImplementedError
+            params['num_classes'] = 26642
 
     # Model setting
     model = load(model_type=params['model'])

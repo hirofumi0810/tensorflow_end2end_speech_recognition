@@ -1,0 +1,27 @@
+param:
+  model: blstm_ctc
+  corpus: librispeech
+  label_type: word
+  train_data_size: train_all
+  feature: fbank
+  input_size: 120
+  num_stack: 3
+  num_skip: 3
+  num_unit: 320
+  num_proj: 0
+  num_layer: 5
+  bottleneck_dim: 0
+  batch_size: 32
+  optimizer: adam
+  learning_rate: 1e-3
+  decay_start_epoch: 1
+  decay_rate: 0.75
+  decay_patient_epoch: 1
+  num_epoch: 30
+  weight_init: 0.1
+  clip_grad: 5.0
+  clip_activation: 50
+  dropout_input: 1.0
+  dropout_hidden: 0.8
+  dropout_output: 1.0
+  weight_decay: 0

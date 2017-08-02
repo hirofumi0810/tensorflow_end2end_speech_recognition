@@ -28,7 +28,7 @@ from models.ctc.load_model_multitask import load
 
 
 def do_train(network, params):
-    """Run multi-task training. The target labels in the main task is
+    """Run multi-task CTC training. The target labels in the main task is
     characters and those in the sub task is 61 phones. The model is
     evaluated by CER and PER with 39 phones.
     Args:
@@ -59,6 +59,7 @@ def do_train(network, params):
 
         # Define placeholders
         network.create_placeholders()
+        learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
         # Add to the graph each operation
         loss_op, logits_main, logits_sub = network.compute_loss(
@@ -72,15 +73,15 @@ def do_train(network, params):
         train_op = network.train(
             loss_op,
             optimizer=params['optimizer'],
-            learning_rate=network.learning_rate_pl_list[0])
-        decode_op_main, decode_op_sub = network.decoder(
+            learning_rate=learning_rate_pl)
+        decode_op_character, decode_op_phone = network.decoder(
             logits_main,
             logits_sub,
             network.inputs_seq_len_pl_list[0],
             decode_type='beam_search',
             beam_width=20)
         cer_op, per_op = network.compute_ler(
-            decode_op_main, decode_op_sub,
+            decode_op_character, decode_op_phone,
             network.labels_pl_list[0], network.labels_sub_pl_list[0])
 
         # Define learning rate controller
@@ -143,7 +144,7 @@ def do_train(network, params):
                     network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                     network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
                     network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
-                    network.learning_rate_pl_list[0]: learning_rate
+                    learning_rate_pl: learning_rate
                 }
 
                 # Update parameters
@@ -215,7 +216,7 @@ def do_train(network, params):
                         print('=== Dev Data Evaluation ===')
                         cer_dev_epoch = do_eval_cer(
                             session=sess,
-                            decode_op=decode_op_main,
+                            decode_op=decode_op_character,
                             network=network,
                             dataset=dev_data,
                             label_type=params['label_type_main'],
@@ -224,7 +225,7 @@ def do_train(network, params):
                         print('  CER: %f %%' % (cer_dev_epoch * 100))
                         per_dev_epoch = do_eval_per(
                             session=sess,
-                            decode_op=decode_op_sub,
+                            decode_op=decode_op_phone,
                             per_op=per_op,
                             network=network,
                             dataset=dev_data,
@@ -240,7 +241,7 @@ def do_train(network, params):
                             print('=== Test Data Evaluation ===')
                             cer_test = do_eval_cer(
                                 session=sess,
-                                decode_op=decode_op_main,
+                                decode_op=decode_op_character,
                                 network=network,
                                 dataset=test_data,
                                 label_type=params['label_type_main'],
@@ -249,7 +250,7 @@ def do_train(network, params):
                             print('  CER: %f %%' % (cer_test * 100))
                             per_test = do_eval_per(
                                 session=sess,
-                                decode_op=decode_op_sub,
+                                decode_op=decode_op_phone,
                                 per_op=per_op,
                                 network=network,
                                 dataset=test_data,
