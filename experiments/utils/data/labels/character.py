@@ -14,7 +14,7 @@ def char2num(str_char, map_file_path):
         str_char: string of characters
         map_file_path: path to the mapping file
     Returns:
-        char_list: list of character indices
+        index_list: list of character indices
     """
     char_list = list(str_char)
 
@@ -26,10 +26,9 @@ def char2num(str_char, map_file_path):
             map_dict[line[0]] = int(line[1])
 
     # Convert from character to number
-    for i in range(len(char_list)):
-        char_list[i] = map_dict[char_list[i]]
+    index_list = list(map(lambda x: map_dict[x], char_list))
 
-    return np.array(char_list)
+    return np.array(index_list)
 
 
 def kana2num(str_char, map_file_path):
@@ -38,10 +37,10 @@ def kana2num(str_char, map_file_path):
         str_char: string of kana characters
         map_file_path: path to the mapping file
     Returns:
-        num_list: list of kana character indices
+        index_list: list of kana character indices
     """
     kana_list = list(str_char)
-    num_list = []
+    index_list = []
 
     # Lead the mapping file
     map_dict = {}
@@ -55,28 +54,29 @@ def kana2num(str_char, map_file_path):
         # Check whether next kana character is a double consonant
         if i != len(kana_list) - 1:
             if kana_list[i] + kana_list[i + 1] in map_dict.keys():
-                num_list.append(int(map_dict[kana_list[i] + kana_list[i + 1]]))
+                index_list.append(
+                    int(map_dict[kana_list[i] + kana_list[i + 1]]))
                 i += 1
             elif kana_list[i] in map_dict.keys():
-                num_list.append(int(map_dict[kana_list[i]]))
+                index_list.append(int(map_dict[kana_list[i]]))
             else:
                 raise ValueError(
                     'There are no kana character such as %s' % kana_list[i])
         else:
             if kana_list[i] in map_dict.keys():
-                num_list.append(int(map_dict[kana_list[i]]))
+                index_list.append(int(map_dict[kana_list[i]]))
             else:
                 raise ValueError(
                     'There are no kana character such as %s' % kana_list[i])
         i += 1
 
-    return np.array(num_list)
+    return np.array(index_list)
 
 
-def num2char(num_list, map_file_path, padded_value=-1):
+def num2char(index_list, map_file_path, padded_value=-1):
     """Convert from number to character.
     Args:
-        num_list: np.ndarray, list of character indices. batch_size == 1 is
+        index_list: np.ndarray, list of character indices. batch size 1 is
             expected.
         map_file_path: path to the mapping file
         padded_value: int, the value used for padding
@@ -91,11 +91,11 @@ def num2char(num_list, map_file_path, padded_value=-1):
             map_dict[int(line[1])] = line[0]
 
     # Remove padded values
-    assert type(num_list) == np.ndarray, 'num_list should be np.ndarray.'
-    num_list = np.delete(num_list, np.where(num_list == -1), axis=0)
+    assert type(index_list) == np.ndarray, 'index_list should be np.ndarray.'
+    index_list = np.delete(index_list, np.where(index_list == -1), axis=0)
 
     # Convert from indices to the corresponding characters
-    char_list = list(map(lambda x: map_dict[x], num_list))
+    char_list = list(map(lambda x: map_dict[x], index_list))
 
     str_char = ''.join(char_list)
     return str_char

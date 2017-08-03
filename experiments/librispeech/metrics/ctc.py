@@ -45,6 +45,7 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
         map_file_path = '../metrics/mapping_files/ctc/character2num_capital.txt'
 
     cer_mean = 0
+    skip_data_num = 0
     total_step = int(dataset.data_num / batch_size)
     if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
         total_step += 1
@@ -70,35 +71,38 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
                       ] = 1.0
 
         labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
-
         for i_device, labels_pred_st in enumerate(labels_pred_st_list):
             batch_size_device = len(inputs_seq_len[i_device])
-            labels_pred = sparsetensor2list(labels_pred_st, batch_size_device)
+            try:
+                labels_pred = sparsetensor2list(labels_pred_st,
+                                                batch_size_device)
+                for i_batch in range(batch_size_device):
+                    # Convert from list to string
+                    str_true = num2char(
+                        labels_true[i_device][i_batch], map_file_path)
+                    str_pred = num2char(labels_pred[i_batch], map_file_path)
 
-            for i_batch in range(batch_size_device):
+                    # Remove silence(_) labels
+                    str_true = re.sub(r'[_\']+', "", str_true)
+                    str_pred = re.sub(r'[_\']+', "", str_pred)
 
-                # Convert from list to string
-                str_true = num2char(
-                    labels_true[i_device][i_batch], map_file_path)
-                str_pred = num2char(labels_pred[i_batch], map_file_path)
+                    # Convert to lower case
+                    if label_type == 'character_capital_divide':
+                        str_true = str_true.lower()
+                        str_pred = str_pred.lower()
 
-                # Remove silence(_) labels
-                str_true = re.sub(r'[_\']+', "", str_true)
-                str_pred = re.sub(r'[_\']+', "", str_pred)
+                    # Compute edit distance
+                    cer_mean = Levenshtein.distance(
+                        str_pred, str_true) / len(list(str_true))
 
-                # Convert to lower case
-                if label_type == 'character_capital_divide':
-                    str_true = str_true.lower()
-                    str_pred = str_pred.lower()
-
-                # Compute edit distance
-                cer_mean = Levenshtein.distance(
-                    str_pred, str_true) / len(list(str_true))
+            except IndexError:
+                skip_data_num += batch_size_device
+                # TODO: Conduct decoding again with batch size 1
 
         if next_epoch_flag:
             break
 
-    cer_mean /= dataset.data_num
+    cer_mean /= (dataset.data_num - batch_size_device)
 
     return cer_mean
 
@@ -127,9 +131,11 @@ def do_eval_wer(session, decode_ops, network, dataset, train_data_size, is_test,
 
     batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
 
-    # map_file_path = '../metrics/mapping_files/ctc/word2num_' + train_data_size + '.txt'
+    # map_file_path = '../metrics/mapping_files/ctc/word2num_' +
+    # train_data_size + '.txt'
 
     wer_mean = 0
+    skip_data_num = 0
     total_step = int(dataset.data_num / batch_size)
     if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
         total_step += 1
@@ -155,22 +161,28 @@ def do_eval_wer(session, decode_ops, network, dataset, train_data_size, is_test,
                       ] = 1.0
 
         labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
-
         for i_device, labels_pred_st in enumerate(labels_pred_st_list):
             batch_size_device = len(inputs_seq_len[i_device])
-            labels_pred = sparsetensor2list(labels_pred_st, batch_size_device)
+            try:
+                labels_pred = sparsetensor2list(labels_pred_st,
+                                                batch_size_device)
 
-            # Compute edit distance
-            labels_true_st = list2sparsetensor(labels_true, padded_value=-1)
-            labels_pred_st = list2sparsetensor(labels_pred, padded_value=-1)
-            wer_mean += compute_edit_distance(session,
-                                              labels_true_st,
-                                              labels_pred_st)
+                # Compute edit distance
+                labels_true_st = list2sparsetensor(labels_true,
+                                                   padded_value=-1)
+                labels_pred_st = list2sparsetensor(labels_pred,
+                                                   padded_value=-1)
+                wer_mean += compute_edit_distance(session,
+                                                  labels_true_st,
+                                                  labels_pred_st)
+            except IndexError:
+                skip_data_num += batch_size_device
+                # TODO: Conduct decoding again with batch size 1
 
         if next_epoch_flag:
             break
 
-    wer_mean /= dataset.data_num
+    wer_mean /= (dataset.data_num - skip_data_num)
     # TODO: This is just edit distance.
 
     return wer_mean

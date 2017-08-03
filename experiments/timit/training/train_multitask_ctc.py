@@ -347,7 +347,7 @@ def main(config_path, model_save_path):
         network.model_name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:
         network.model_name += '_weightdecay' + str(params['weight_decay'])
-    network.model_name += '_taskweight' + str(params['main_task_weight'])
+    network.model_name += '_main' + str(params['main_task_weight'])
 
     # Set save path
     network.model_dir = mkdir(model_save_path)

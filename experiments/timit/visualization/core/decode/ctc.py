@@ -47,21 +47,25 @@ def decode_test(session, decode_op, network, dataset, label_type,
 
         # Visualize
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
+        try:
+            labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
+        except IndexError:
+            # no output
+            labels_pred = ['']
+        finally:
+            if label_type in ['character', 'character_capital_divide']:
+                print('----- wav: %s -----' % input_names[0])
+                print('True: %s' % num2char(
+                    labels_true[0], map_file_path))
+                print('Pred: %s' % num2char(
+                    labels_pred[0], map_file_path))
 
-        if label_type in ['character', 'character_capital_divide']:
-            print('----- wav: %s -----' % input_names[0])
-            print('True: %s' % num2char(
-                labels_true[0], map_file_path))
-            print('Pred: %s' % num2char(
-                labels_pred[0], map_file_path))
-
-        else:
-            print('----- wav: %s -----' % input_names[0])
-            print('True: %s' % num2phone(
-                labels_true[0], map_file_path))
-            print('Pred: %s' % num2phone(
-                labels_pred[0], map_file_path))
+            else:
+                print('----- wav: %s -----' % input_names[0])
+                print('True: %s' % num2phone(
+                    labels_true[0], map_file_path))
+                print('Pred: %s' % num2phone(
+                    labels_pred[0], map_file_path))
 
         if next_epoch_flag:
             break
@@ -132,13 +136,17 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, network,
 
         # Visualize
         labels_pred_st = session.run(decode_op_sub, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
-
-        print('----- wav: %s -----' % input_names[0])
-        print('True: %s' % num2phone(
-            labels_true[0], map_file_path))
-        print('Pred: %s' % num2phone(
-            labels_pred[0], map_file_path))
+        try:
+            labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
+        except IndexError:
+            # no output
+            labels_pred = ['']
+        finally:
+            print('----- wav: %s -----' % input_names[0])
+            print('True: %s' % num2phone(
+                labels_true[0], map_file_path))
+            print('Pred: %s' % num2phone(
+                labels_pred[0], map_file_path))
 
         if next_epoch_flag:
             break
