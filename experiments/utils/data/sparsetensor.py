@@ -16,7 +16,7 @@ def list2sparsetensor(labels, padded_value):
         padded_value: int, the value used for padding
     Returns:
         labels_st: A SparseTensor of labels,
-            list of indices, values, dense_shape
+            list of (indices, values, dense_shape)
     """
     indices, values = [], []
     for i_utt, each_label in enumerate(labels):
@@ -42,8 +42,8 @@ def sparsetensor2list(labels_st, batch_size):
         labels_st: A SparseTensor of labels
         batch_size: int the size of mini-batch
     Returns:
-        labels: list of np.ndarray, size of `[B]`. Each element is a
-            sequence of target labels of an input.
+        labels: list of np.ndarray, size of `[B]`. Each element is a sequence
+            of target labels of an input.
     """
     if isinstance(labels_st, tf.SparseTensorValue):
         # Output of TensorFlow

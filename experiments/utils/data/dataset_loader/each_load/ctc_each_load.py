@@ -13,7 +13,7 @@ from os.path import basename
 import random
 import numpy as np
 
-from experiments.utils.data.frame_stacking import stack_frame
+from experiments.utils.data.inputs.frame_stacking import stack_frame
 
 
 class DatasetBase(object):
@@ -29,7 +29,7 @@ class DatasetBase(object):
         overall data during training.
         """
         self.rest = set(range(0, self.data_num, 1))
-        
+
     def __next_mini_batch(self, batch_size=None):
         """Generate each mini-batch.
         Args:
