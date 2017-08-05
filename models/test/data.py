@@ -5,74 +5,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as np
-import scipy.io.wavfile
-from python_speech_features import mfcc, fbank, logfbank, hz2mel
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.data.labels.phone import num2phone, phone2num
+from experiments.utils.data.inputs.splicing import do_image_splice
+from input_pipeline.feature_extraction import wav2feature
 
 
-def read_wav(wav_path, feature_type='logmelfbank', batch_size=1):
-    """Read wav file & convert to MFCC or log mel filterbank features.
-    Args:
-        wav_path: path to a wav file
-        feature: logmelfbank or mfcc
-    Returns:
-        inputs: `[batch_size, max_time, feature_dim]`
-        inputs_seq_len: `[batch_size, frame_num]`
-    """
-    # Load wav file
-    fs, audio = scipy.io.wavfile.read(wav_path)
-
-    if feature_type == 'mfcc':
-        features = mfcc(audio, samplerate=fs)  # `[291, 13]`
-    elif feature_type == 'logmelfbank':
-        fbank_features, energy = fbank(audio, nfilt=40)
-        logfbank = np.log(fbank_features)
-        logenergy = np.log(energy)
-        logmelfbank = hz2mel(logfbank)
-        features = np.c_[logmelfbank, logenergy]  # `[291, 41]`
-
-    delta1 = delta(features, N=2)
-    delta2 = delta(delta1, N=2)
-    input_data = np.c_[features, delta1, delta2]  # `[291, 123]`
-
-    # Transform to 3D array
-    # `[1, 291, 39]` or `[1, 291, 123]`
-    inputs = np.zeros((batch_size, input_data.shape[0], input_data.shape[1]))
-    for i in range(batch_size):
-        inputs[i] = input_data
-    inputs_seq_len = [inputs.shape[1]] * batch_size  # `[291]`
-
-    # Normalization
-    inputs = (inputs - np.mean(inputs)) / np.std(inputs)
-
-    return inputs, inputs_seq_len
-
-
-def delta(feat, N):
-    """Compute delta features from a feature vector sequence.
-    Args:
-        feat: A numpy array of size (NUMFRAMES by number of features)
-            containing features. Each row holds 1 feature vector.
-        N: For each frame, calculate delta features based on preceding and
-            following N frames.
-    Rreturns:
-        dfeat: A numpy array of size (NUMFRAMES by number of features)
-            containing delta features. Each row holds 1 delta feature vector.
-    """
-    NUMFRAMES = len(feat)
-    feat = np.concatenate(([feat[0] for i in range(N)],
-                           feat, [feat[-1] for i in range(N)]))
-    denom = sum([2 * i * i for i in range(1, N + 1)])
-    dfeat = []
-    for j in range(NUMFRAMES):
-        dfeat.append(np.sum([n * feat[N + j + n]
-                             for n in range(-1 * N, N + 1)], axis=0) / denom)
-    return dfeat
-
-
-def read_text(text_path):
+def _read_text(text_path):
     """Read char-level transcripts.
     Args:
         text_path: path to a transcript text file
@@ -86,7 +25,7 @@ def read_text(text_path):
     return transcript
 
 
-def read_phone(text_path):
+def _read_phone(text_path):
     """Read phone-level transcripts.
     Args:
         text_path: path to a transcript text file
@@ -109,25 +48,23 @@ def generate_data(label_type, model, batch_size=1):
         label_type: character or phone or multitask
         model: ctc or attention
     Returns:
-        inputs: `[batch_size, max_time, feature_dim]`
-        labels: `[batch_size]`
-        inputs_seq_len: `[batch_size, frame_num]`
-        labels_seq_len: `[batch_size]` (if model is attention)
+        inputs: `[B, T, input_size]`
+        labels: `[B]`
+        inputs_seq_len: `[B, frame_num]`
+        labels_seq_len: `[B]` (if model is attention)
     """
     # Make input data
-    inputs, inputs_seq_len = read_wav('./sample/LDC93S1.wav',
-                                      feature_type='logmelfbank',
-                                      batch_size=batch_size)
-    # inputs, inputs_seq_len = read_wav('../sample/LDC93S1.wav',
-    #                            feature_type='mfcc',
-    #                            batch_size=batch_size)
+    inputs, inputs_seq_len = wav2feature(
+        ['./sample/LDC93S1.wav'] * batch_size,
+        feature_type='logfbank', feature_dim=40,
+        energy=True, delta1=True, delta2=True)
 
     ctc_phone_map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
     att_phone_map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone61_to_num.txt'
 
     if model == 'ctc':
         if label_type == 'character':
-            transcript = read_text('./sample/LDC93S1.txt')
+            transcript = _read_text('./sample/LDC93S1.txt')
             transcript = ' ' + transcript.replace('.', '') + ' '
             labels = [alpha2num(transcript)] * batch_size
 
@@ -136,7 +73,7 @@ def generate_data(label_type, model, batch_size=1):
             return inputs, labels, inputs_seq_len
 
         elif label_type == 'phone':
-            transcript = read_phone('./sample/LDC93S1.phn')
+            transcript = _read_phone('./sample/LDC93S1.phn')
             labels = [
                 phone2num(transcript.split(' '), ctc_phone_map_file_path)] * batch_size
 
@@ -145,8 +82,8 @@ def generate_data(label_type, model, batch_size=1):
             return inputs, labels, inputs_seq_len
 
         elif label_type == 'multitask':
-            transcript_char = read_text('./sample/LDC93S1.txt')
-            transcript_phone = read_phone('./sample/LDC93S1.phn')
+            transcript_char = _read_text('./sample/LDC93S1.txt')
+            transcript_phone = _read_phone('./sample/LDC93S1.phn')
             transcript_char = ' ' + transcript_char.replace('.', '') + ' '
             labels_char = [alpha2num(transcript_char)] * batch_size
             labels_phone = [
@@ -159,14 +96,14 @@ def generate_data(label_type, model, batch_size=1):
 
     elif model == 'attention':
         if label_type == 'character':
-            transcript = read_text('./sample/LDC93S1.txt')
+            transcript = _read_text('./sample/LDC93S1.txt')
             transcript = '<' + transcript.replace('.', '') + '>'
             labels = [alpha2num(transcript)] * batch_size
             labels_seq_len = [len(labels[0])] * batch_size
             return inputs, labels, inputs_seq_len, labels_seq_len
 
         elif label_type == 'phone':
-            transcript = read_phone('./sample/LDC93S1.phn')
+            transcript = _read_phone('./sample/LDC93S1.phn')
             transcript = '< ' + transcript + ' >'
             labels = [phone2num(transcript.split(
                 ' '), att_phone_map_file_path)] * batch_size
@@ -174,8 +111,8 @@ def generate_data(label_type, model, batch_size=1):
             return inputs, labels, inputs_seq_len, labels_seq_len
 
         elif label_type == 'multitask':
-            transcript_char = read_text('./sample/LDC93S1.txt')
-            transcript_phone = read_phone('./sample/LDC93S1.phn')
+            transcript_char = _read_text('./sample/LDC93S1.txt')
+            transcript_phone = _read_phone('./sample/LDC93S1.phn')
             transcript_char = '<' + transcript_char.replace('.', '') + '>'
             transcript_phone = '< ' + transcript_phone + ' >'
             labels_char = [alpha2num(transcript_char)] * batch_size
@@ -188,7 +125,7 @@ def generate_data(label_type, model, batch_size=1):
 
     elif model == 'joint_ctc_attention':
         if label_type == 'character':
-            transcript = read_text('./sample/LDC93S1.txt')
+            transcript = _read_text('./sample/LDC93S1.txt')
             att_transcript = '<' + transcript.replace('.', '') + '>'
             ctc_transcript = ' ' + transcript.replace('.', '') + ' '
             att_labels = [alpha2num(att_transcript)] * batch_size
@@ -200,7 +137,7 @@ def generate_data(label_type, model, batch_size=1):
             return inputs, att_labels, inputs_seq_len, labels_seq_len, ctc_labels
 
         elif label_type == 'phone':
-            transcript = read_phone('./sample/LDC93S1.phn')
+            transcript = _read_phone('./sample/LDC93S1.phn')
             att_transcript = '< ' + transcript + ' >'
             att_labels = [
                 phone2num(att_transcript.split(' '), att_phone_map_file_path)] * batch_size

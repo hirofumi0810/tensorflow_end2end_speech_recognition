@@ -23,6 +23,9 @@ class TestCTC(tf.test.TestCase):
 
     def test_ctc(self):
         print("CTC Working check.")
+        self.check_training(model_type='vgg_blstm_ctc', label_type='phone')
+        self.check_training(model_type='vgg_blstm_ctc', label_type='character')
+
         self.check_training(model_type='blstm_ctc', label_type='phone')
         self.check_training(model_type='blstm_ctc', label_type='character')
 

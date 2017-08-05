@@ -146,7 +146,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
     """
     # Reset data counter
     dataset.reset()
-    
+
     batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
 
     map_file_path = '../metrics/mapping_files/ctc/' + label_type + '_to_num.txt'
@@ -175,7 +175,6 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
 
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
-
         for i_batch in range(batch_size_each):
 
             # Convert from list to string
@@ -192,7 +191,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
                 str_pred = str_pred.lower()
 
             # Compute edit distance
-            cer_mean = Levenshtein.distance(
+            cer_mean += Levenshtein.distance(
                 str_pred, str_true) / len(list(str_true))
 
         if next_epoch_flag:
