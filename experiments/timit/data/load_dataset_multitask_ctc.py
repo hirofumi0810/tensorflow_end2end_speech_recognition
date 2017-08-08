@@ -22,14 +22,15 @@ from experiments.utils.data.inputs.frame_stacking import stack_frame
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, label_type_main, label_type_sub, batch_size,
-                 num_stack=None, num_skip=None,
-                 sort_utt=True, sort_stop_epoch=None, progressbar=False):
+                 splice=1, num_stack=1, num_skip=1,
+                 sort_utt=False, sort_stop_epoch=None, progressbar=False):
         """A class for loading dataset.
         Args:
             data_type: string, train or dev or test
             label_type_main: string, character or character_capital_divide
             label_type_sub: string, phone39 or phone48 or phone61
             batch_size: int, the size of mini-batch
+            splice: int, frames to splice. Default is 1 frame.
             num_stack: int, the number of frames to stack
             num_skip: int, the number of frames to skip
             sort_utt: if True, sort all utterances by the number of frames and
@@ -46,6 +47,7 @@ class Dataset(DatasetBase):
         self.label_type_main = label_type_main
         self.label_type_sub = label_type_sub
         self.batch_size = batch_size
+        self.splice = splice
         self.num_stack = num_stack
         self.num_skip = num_skip
         self.sort_utt = sort_utt
@@ -94,17 +96,15 @@ class Dataset(DatasetBase):
         self.input_list = np.array(input_list)
         self.label_main_list = np.array(label_main_list)
         self.label_sub_list = np.array(label_sub_list)
-        self.input_size = self.input_list[0].shape[1]
+        self.input_size = self.input_list[0].shape[1] * num_stack
 
         # Frame stacking
-        if (num_stack is not None) and (num_skip is not None):
-            print('=> Stacking frames...')
-            self.input_list = stack_frame(self.input_list,
-                                          self.input_paths,
-                                          self.frame_num_dict,
-                                          num_stack,
-                                          num_skip,
-                                          progressbar)
-            self.input_size *= num_stack
+        print('=> Stacking frames...')
+        self.input_list = stack_frame(self.input_list,
+                                      self.input_paths,
+                                      self.frame_num_dict,
+                                      num_stack,
+                                      num_skip,
+                                      progressbar)
 
         self.rest = set(range(0, self.data_num, 1))

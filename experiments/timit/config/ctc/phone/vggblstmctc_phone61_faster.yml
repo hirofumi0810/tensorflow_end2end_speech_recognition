@@ -1,19 +1,17 @@
 param:
-  model: multitask_blstm_ctc
+  model: vgg_blstm_ctc
   corpus: timit
-  label_type_main: character
-  label_type_sub: phone61
+  label_type: phone61
   feature: fbank
   input_size: 120
-  num_stack: 3
-  num_skip: 3
+  splice: 11
+  num_stack: 1
+  num_skip: 1
   num_unit: 256
   num_proj: 0
-  num_layer_main: 5
-  num_layer_sub: 5
+  num_layer: 5
   bottleneck_dim: 0
-  main_task_weight: 0.8
-  batch_size: 32
+  batch_size: 16
   optimizer: adam
   learning_rate: 1e-3
   decay_start_epoch: 20

@@ -19,7 +19,8 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
            arXiv preprint arXiv:1507.06947 (2015).
     Args:
         input_list: list of input data
-        input_paths: list of paths to input data
+        input_paths: list of paths to input data. This is used to get the
+            number of frames from frame_num_dict.
         frame_num_dict:
             key => utterance index
             value => the number of frames
@@ -29,6 +30,9 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
     Returns:
         stacked_input_list: list of frame-stacked inputs
     """
+    if num_stack == 1 and num_stack == 1:
+        return input_list
+
     if num_stack < num_skip:
         raise ValueError('num_skip must be less than num_stack.')
 

@@ -15,7 +15,7 @@ import yaml
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
 from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
-from models.ctc.load_model_multitask import load
+from models.ctc.load_model import load
 
 
 def do_eval(network, params, epoch=None):
@@ -28,7 +28,7 @@ def do_eval(network, params, epoch=None):
     # Load dataset
     test_data = Dataset(
         data_type='test', label_type_main=params['label_type_main'],
-        label_type_sub='phone39', batch_size=1,
+        label_type_sub='phone39', batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False, progressbar=True)
 

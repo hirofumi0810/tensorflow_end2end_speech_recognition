@@ -8,7 +8,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models.ctc.core.ctc_base import ctcBase
+from models.ctc.ctc_base import ctcBase
 
 
 class Multitask_BLSTM_CTC(ctcBase):

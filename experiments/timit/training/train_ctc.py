@@ -37,22 +37,24 @@ def do_train(network, params):
     # Load dataset
     train_data = Dataset(
         data_type='train', label_type=params['label_type'],
-        batch_size=params['batch_size'],
+        batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=True)
     dev_data = Dataset(
         data_type='dev', label_type=params['label_type'],
-        batch_size=params['batch_size'],
+        batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
     if params['label_type'] in ['character', 'character_capital_divide']:
         test_data = Dataset(
-            data_type='test', label_type=params['label_type'], batch_size=1,
+            data_type='test', label_type=params['label_type'],
+            batch_size=1, splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             sort_utt=False)
     else:
         test_data = Dataset(
-            data_type='test', label_type='phone39', batch_size=1,
+            data_type='test', label_type='phone39',
+            batch_size=1, splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             sort_utt=False)
 
@@ -306,6 +308,7 @@ def main(config_path, model_save_path):
     # Model setting
     model = load(model_type=params['model'])
     network = model(input_size=params['input_size'] * params['num_stack'],
+                    splice=params['splice'],
                     num_unit=params['num_unit'],
                     num_layer=params['num_layer'],
                     num_classes=params['num_classes'],

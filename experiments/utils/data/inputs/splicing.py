@@ -6,121 +6,66 @@
 import numpy as np
 
 
-def do_splice(input_data, splice=0):
+def do_splice(inputs, splice=1, batch_size=1):
     """Splice input data. This is expected to be used for DNNs or RNNs.
     Args:
-        input_data: list of size `[max_time, input_size]' in each timestep
-        splice: int, the frame number to splice
-            ex.) splice==2
-                [t-2, t-1, t, t+1, t+2]
+        inputs: list of size `[B, T, input_size]'
+        splice: int, frames to splice. Default is 1 frame.
+            ex.) splice == 11
+                [t-5, ..., t-1, t, t+1, ..., t+5] (total 11 frames)
+        batch_size: int,
     Returns:
         data_spliced: np.ndarray of size
-            `[max_time, input_size * (2 * splice + 1)]`
+            `[B, T, input_size * splice]`
     """
-    assert isinstance(
-        input_data, np.ndarray), 'input_data should be np.ndarray.'
+    assert isinstance(inputs, np.ndarray), 'inputs should be np.ndarray.'
+    # assert len(inputs.shape) == 3, 'inputs must be 3 demension.'
 
-    if splice == 0:
-        return input_data
+    if splice == 1:
+        return inputs
 
-    max_time = input_data.shape[0]
-    input_size = input_data.shape[1]
-    input_data_spliced = np.zeros((max_time, input_size * (2 * splice + 1)))
+    batch_size, max_time, input_size = inputs.shape
+    input_data_spliced = np.zeros((batch_size, max_time, input_size * splice))
 
-    for t in range(max_time):
-        for i in range(0, 2 * splice + 1, 1):
-            #########################
-            # padding left frames
-            #########################
-            if t <= splice - 1 and i < splice - t:
-                # copy input_data[0] to left side
-                copy_frame = input_data[0]
+    for i_batch in range(batch_size):
+        for i_time in range(max_time):
+            for i_splice in range(0, splice, 1):
+                #########################
+                # padding left frames
+                #########################
+                if i_time <= splice - 1 and i_splice < splice - i_time:
+                    # copy the first frame to left side
+                    copy_frame = inputs[i_batch][0]
 
-            #########################
-            # padding right frames
-            #########################
-            elif max_time - splice <= t and t + (i - splice) > max_time - 1:
-                # copy input_data[-1] to right side
-                copy_frame = input_data[-1]
+                #########################
+                # padding right frames
+                #########################
+                elif max_time - splice <= i_time and i_time + (i_splice - splice) > max_time - 1:
+                    # copy the last frame to right side
+                    copy_frame = inputs[i_batch][-1]
 
-            #########################
-            # middle of frames
-            #########################
-            else:
-                copy_frame = input_data[t + (i - splice)]
+                #########################
+                # middle of frames
+                #########################
+                else:
+                    copy_frame = inputs[i_batch][i_time + (i_splice - splice)]
 
-            input_data_spliced[t][input_size *
-                                  i: input_size * (i + 1)] = copy_frame
+                input_data_spliced[i_batch][i_time][input_size *
+                                                    i_splice: input_size * (i_splice + 1)] = copy_frame
 
     return input_data_spliced
 
 
-def do_image_splice(input_data, splice=0):
-    """Splice input data and return images. This is expected to be used for CNNs.
-    Args:
-        input_data: list of size `[max_time, input_size]' in each timestep
-        splice: int, the frame number to splice
-            ex.) splice==2
-                [t-2, t-1, t, t+1, t+2]
-    Returns:
-        data_spliced: np.ndarray of size
-            `[max_time, input_size, 2 * splice + 1]`
-    """
-    assert isinstance(
-        input_data, np.ndarray), 'input_data should be np.ndarray.'
-
-    max_time = input_data.shape[0]
-    input_size = input_data.shape[1]
-
-    if splice == 0:
-        # Reshape to images
-        return input_data.reshape((max_time, input_size, 1))
-
-    input_data_spliced = np.zeros((max_time, 2 * splice + 1, input_size))
-
-    for t in range(max_time):
-        for i in range(0, 2 * splice + 1, 1):
-            #########################
-            # padding left frames
-            #########################
-            if t <= splice - 1 and i < splice - t:
-                # copy input_data[0] to left side
-                copy_frame = input_data[0]
-
-            #########################
-            # padding right frames
-            #########################
-            elif max_time - splice <= t and t + (i - splice) > max_time - 1:
-                # copy input_data[-1] to right side
-                copy_frame = input_data[-1]
-
-            #########################
-            # middle of frames
-            #########################
-            else:
-                copy_frame = input_data[t + (i - splice)]
-
-            input_data_spliced[t][i] = copy_frame
-
-    return input_data_spliced.transpose(0, 2, 1)
-
-
 def test():
+    sequence = np.zeros((3, 100, 5))
+    for i_batch in range(sequence.shape[0]):
+        for i_frame in range(sequence.shape[1]):
+            sequence[i_batch][i_frame][0] = i_frame
+    sequence_spliced = do_splice(sequence, splice=11)
+    assert sequence_spliced.shape == (3, 100, 5 * 11)
 
-    sequence = np.zeros((100, 5))
-    for i in range(sequence.shape[0]):
-        sequence[i][0] = i
-    sequence_spliced = do_splice(sequence, splice=5)
-    assert sequence_spliced.shape == (100, 5 * (2 * 5 + 1)), "Error"
-
-    # for i in range(sequence_spliced.shape[0]):
-    #     print(sequence_spliced[i])
-
-    sequence_spliced = do_image_splice(sequence, splice=5)
-    assert sequence_spliced.shape == (100, 5, 2 * 5 + 1), "Error"
-
-    # for i in range(sequence_spliced.shape[0]):
-    #     print(sequence_spliced[i].shape)
+    # for i in range(sequence_spliced.shape[1]):
+    #     print(sequence_spliced[0][i])
 
 
 if __name__ == '__main__':

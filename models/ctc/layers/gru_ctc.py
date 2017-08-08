@@ -1,18 +1,14 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Bidirectional GRU-CTC model."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+"""GRU-CTC model."""
 
 import tensorflow as tf
-from models.ctc.core.ctc_base import ctcBase
+from models.ctc.ctc_base import ctcBase
 
 
-class BGRU_CTC(ctcBase):
-    """Bidirectional GRU-CTC model.
+class GRU_CTC(ctcBase):
+    """GRU-CTC model.
     Args:
         input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
@@ -23,7 +19,7 @@ class BGRU_CTC(ctcBase):
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
-        clip_activation: not used
+        clip_activation: A float value. Range of activation clipping (> 0)
         dropout_ratio_input: A float value. Dropout ratio in the input-hidden
             layer
         dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
@@ -43,14 +39,14 @@ class BGRU_CTC(ctcBase):
                  splice=1,
                  parameter_init=0.1,
                  clip_grad=None,
-                 clip_activation=None,  # not used
+                 clip_activation=None,
                  dropout_ratio_input=1.0,
                  dropout_ratio_hidden=1.0,
                  dropout_ratio_output=1.0,
                  num_proj=None,  # not used
                  weight_decay=0.0,
                  bottleneck_dim=None,
-                 name='bgru_ctc'):
+                 name='gru_ctc'):
 
         ctcBase.__init__(self, input_size, num_unit, num_layer, num_classes,
                          splice, parameter_init, clip_grad, clip_activation,
@@ -64,8 +60,8 @@ class BGRU_CTC(ctcBase):
                keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of size`[B, T, input_size]`
-            inputs_seq_len:  A tensor of size` [B]`
+            inputs: A tensor of size `[B, T, input_size]`
+            inputs_seq_len:  A tensor of size `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
                 the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
@@ -76,54 +72,44 @@ class BGRU_CTC(ctcBase):
             logits: A tensor of size `[T, B, num_classes]`
         """
         # Dropout for the input-hidden connection
-        outputs = tf.nn.dropout(inputs,
-                                keep_prob_input,
-                                name='dropout_input')
+        inputs = tf.nn.dropout(inputs,
+                               keep_prob_input,
+                               name='dropout_input')
 
         # Hidden layers
+        gru_list = []
         for i_layer in range(self.num_layer):
-            with tf.name_scope('bgru_hidden' + str(i_layer + 1)):
+            with tf.name_scope('gru_hidden' + str(i_layer + 1)):
 
                 initializer = tf.random_uniform_initializer(
                     minval=-self.parameter_init,
                     maxval=self.parameter_init)
 
                 with tf.variable_scope('gru', initializer=initializer):
-                    gru_fw = tf.contrib.rnn.GRUCell(self.num_unit)
-                    gru_bw = tf.contrib.rnn.GRUCell(self.num_unit)
+                    gru = tf.contrib.rnn.GRUCell(self.num_unit)
 
                 # Dropout for the hidden-hidden connections
-                gru_fw = tf.contrib.rnn.DropoutWrapper(
-                    gru_fw,
-                    output_keep_prob=keep_prob_hidden)
-                gru_bw = tf.contrib.rnn.DropoutWrapper(
-                    gru_bw,
-                    output_keep_prob=keep_prob_hidden)
+                gru = tf.contrib.rnn.DropoutWrapper(
+                    gru, output_keep_prob=keep_prob_hidden)
 
-                # _init_state_fw = gru_fw.zero_state(self.batch_size,
-                #                                    tf.float32)
-                # _init_state_bw = gru_bw.zero_state(self.batch_size,
-                #                                    tf.float32)
-                # initial_state_fw = _init_state_fw,
-                # initial_state_bw = _init_state_bw,
+                gru_list.append(gru)
 
-                # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(
-                    cell_fw=gru_fw,
-                    cell_bw=gru_bw,
-                    inputs=outputs,
-                    sequence_length=inputs_seq_len,
-                    dtype=tf.float32,
-                    scope='bgru_dynamic' + str(i_layer + 1))
+        # Stack multiple cells
+        stacked_gru = tf.contrib.rnn.MultiRNNCell(
+            gru_list, state_is_tuple=True)
 
-                outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
-
-        # Reshape to apply the same weights over the timesteps
-        output_node = self.num_unit * 2
-        outputs = tf.reshape(outputs, shape=[-1, output_node])
+        # Ignore 2nd return (the last state)
+        outputs, _ = tf.nn.dynamic_rnn(cell=stacked_gru,
+                                       inputs=inputs,
+                                       sequence_length=inputs_seq_len,
+                                       dtype=tf.float32)
 
         # inputs: `[batch_size, max_time, input_size]`
         batch_size = tf.shape(inputs)[0]
+
+        # Reshape to apply the same weights over the timesteps
+        output_node = self.num_unit
+        outputs = tf.reshape(outputs, shape=[-1, output_node])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.name_scope('bottleneck'):

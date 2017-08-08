@@ -7,7 +7,7 @@ from __future__ import print_function
 
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.data.labels.phone import num2phone, phone2num
-from experiments.utils.data.inputs.splicing import do_image_splice
+from experiments.utils.data.inputs.splicing import do_splice
 from input_pipeline.feature_extraction import wav2feature
 
 
@@ -42,11 +42,13 @@ def _read_phone(text_path):
     return transcript
 
 
-def generate_data(label_type, model, batch_size=1):
+def generate_data(label_type, model, batch_size=1, splice=1):
     """
     Args:
         label_type: character or phone or multitask
         model: ctc or attention
+        batch_size: int,
+        splice: int, frames to splice. Default is 1 frame.
     Returns:
         inputs: `[B, T, input_size]`
         labels: `[B]`
@@ -59,9 +61,13 @@ def generate_data(label_type, model, batch_size=1):
         feature_type='logfbank', feature_dim=40,
         energy=True, delta1=True, delta2=True)
 
+    # Splice
+    inputs = do_splice(inputs, splice=splice)
+
     ctc_phone_map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
     att_phone_map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone61_to_num.txt'
 
+    # Make transcripts
     if model == 'ctc':
         if label_type == 'character':
             transcript = _read_text('./sample/LDC93S1.txt')

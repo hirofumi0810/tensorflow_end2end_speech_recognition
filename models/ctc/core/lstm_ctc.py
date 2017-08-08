@@ -19,6 +19,7 @@ class LSTM_CTC(ctcBase):
         num_layer: int, the number of layers
         num_classes: int, the number of classes of target labels
             (except for a blank label)
+        splice: int, frames to splice. Default is 1 frame.
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
@@ -39,6 +40,7 @@ class LSTM_CTC(ctcBase):
                  num_unit,
                  num_layer,
                  num_classes,
+                 splice=1,
                  parameter_init=0.1,
                  clip_grad=None,
                  clip_activation=None,
@@ -51,7 +53,7 @@ class LSTM_CTC(ctcBase):
                  name='lstm_ctc'):
 
         ctcBase.__init__(self, input_size, num_unit, num_layer, num_classes,
-                         parameter_init, clip_grad, clip_activation,
+                         splice, parameter_init, clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          dropout_ratio_output, weight_decay, name)
 

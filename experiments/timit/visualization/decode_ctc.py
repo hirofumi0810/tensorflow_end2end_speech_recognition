@@ -27,7 +27,8 @@ def do_decode(network, params, epoch=None):
     """
     # Load dataset
     test_data = Dataset(
-        data_type='test', label_type=params['label_type'], batch_size=1,
+        data_type='test', label_type=params['label_type'],
+        batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False, progressbar=True)
 

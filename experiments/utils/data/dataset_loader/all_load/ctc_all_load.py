@@ -14,6 +14,8 @@ from os.path import basename
 import random
 import numpy as np
 
+from experiments.utils.data.inputs.splicing import do_splice
+
 
 class DatasetBase(object):
 
@@ -95,7 +97,7 @@ class DatasetBase(object):
 
             # Initialization
             inputs = np.zeros(
-                (len(data_indices), max_frame_num, self.input_size),
+                (len(data_indices), max_frame_num, self.input_size * self.splice),
                 dtype=np.float32)
             labels = np.array([[padded_value] * max_seq_len]
                               * len(data_indices), dtype=np.int32)
@@ -107,7 +109,14 @@ class DatasetBase(object):
             # Set values of each data in mini-batch
             for i_batch, x in enumerate(data_indices):
                 data_i = self.input_list[x]
-                frame_num = data_i.shape[0]
+                frame_num, input_size = data_i.shape
+
+                # Splicing
+                data_i = data_i.reshape(1, frame_num, input_size)
+                data_i = do_splice(data_i,
+                                   splice=self.splice,
+                                   batch_size=1).reshape(frame_num, -1)
+
                 inputs[i_batch, :frame_num, :] = data_i
                 labels[i_batch, :len(self.label_list[x])
                        ] = self.label_list[x]

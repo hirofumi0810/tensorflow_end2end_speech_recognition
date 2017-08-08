@@ -21,24 +21,32 @@ class TestLoadDatasetCTC(unittest.TestCase):
     def test(self):
 
         # label_type
-        self.check_loading(label_type='character', sort_utt=False)
-        self.check_loading(label_type='character_capital_divide',
-                           sort_utt=False)
-        self.check_loading(label_type='phone61', sort_utt=False)
+        self.check_loading(label_type='character')
+        self.check_loading(label_type='character_capital_divide')
+        self.check_loading(label_type='phone61')
 
         # sort
         self.check_loading(label_type='phone61', sort_utt=True)
         self.check_loading(label_type='phone61', sort_utt=True,
                            sort_stop_epoch=2)
 
-    @measure_time
-    def check_loading(self, label_type, sort_utt, sort_stop_epoch=None):
-        print('----- label_type: %s, sort_utt: %s, sort_stop_epoch: %s -----' %
-              (label_type, str(sort_utt), str(sort_stop_epoch)))
+        # frame stacking
+        self.check_loading(label_type='phone61', frame_stacking=True)
 
+        # splicing
+        self.check_loading(label_type='phone61', splice=11)
+
+    @measure_time
+    def check_loading(self, label_type, sort_utt=False,
+                      sort_stop_epoch=None, frame_stacking=False, splice=1):
+        print('----- label_type: %s, sort_utt: %s, sort_stop_epoch: %s, frame_stacking: %s, splice: %d -----' %
+              (label_type, str(sort_utt), str(sort_stop_epoch), str(frame_stacking), splice))
+
+        num_stack = 3 if frame_stacking else 1
+        num_skip = 3 if frame_stacking else 1
         dataset = Dataset(
             data_type='dev', label_type=label_type,
-            batch_size=64, num_stack=3, num_skip=3,
+            batch_size=64, splice=splice, num_stack=num_stack, num_skip=num_skip,
             sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
             progressbar=True)
 

@@ -110,14 +110,12 @@ class DatasetBase(object):
                     self.input_size *= self.num_stack
 
             # Frame stacking
-            if self.num_stack is not None and self.num_skip is not None:
-                input_list = stack_frame(
-                    input_list,
-                    self.input_paths[data_indices],
-                    self.frame_num_dict,
-                    self.num_stack,
-                    self.num_skip,
-                    progressbar=False)
+            input_list = stack_frame(input_list,
+                                     self.input_paths[data_indices],
+                                     self.frame_num_dict,
+                                     self.num_stack,
+                                     self.num_skip,
+                                     progressbar=False)
 
             # Compute max frame num in mini-batch
             max_frame_num = max(map(lambda x: x.shape[0], input_list))
@@ -138,8 +136,11 @@ class DatasetBase(object):
                     [[padded_value] * max_seq_len_sub]
                     * len(data_indices), dtype=np.int32)
             else:
-                labels_main = [None] * len(data_indices)
-                labels_sub = [None] * len(data_indices)
+                # Directry feed string (word or character)
+                labels_main = np.array(
+                    [[None] * max_seq_len_main] * len(data_indices))
+                labels_sub = np.array(
+                    [[None] * max_seq_len_sub] * len(data_indices))
             inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
 
             # Set values of each data in mini-batch
@@ -147,14 +148,10 @@ class DatasetBase(object):
                 data_i = input_list[i_batch]
                 frame_num = data_i.shape[0]
                 inputs[i_batch, :frame_num, :] = data_i
-                if not self.is_test:
-                    labels_main[i_batch, :len(
-                        label_main_list[i_batch])] = label_main_list[i_batch]
-                    labels_sub[i_batch, :len(
-                        label_sub_list[i_batch])] = label_sub_list[i_batch]
-                else:
-                    labels_main[i_batch] = label_main_list[i_batch]
-                    labels_sub[i_batch] = label_sub_list[i_batch]
+                labels_main[i_batch, :len(
+                    label_main_list[i_batch])] = label_main_list[i_batch]
+                labels_sub[i_batch, :len(
+                    label_sub_list[i_batch])] = label_sub_list[i_batch]
                 inputs_seq_len[i_batch] = frame_num
 
             ###############

@@ -28,6 +28,7 @@ class CNN_CTC(ctcBase):
         num_layer: int, the number of layers
         num_classes: int, the number of classes of target labels
             (except for a blank label)
+        splice: int, frames to splice. Default is 1 frame.
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
@@ -48,6 +49,7 @@ class CNN_CTC(ctcBase):
                  num_unit,  # TODO: not used
                  num_layer,
                  num_classes,
+                 splice=1,
                  parameter_init=0.1,
                  clip_grad=None,
                  clip_activation=None,
@@ -60,12 +62,11 @@ class CNN_CTC(ctcBase):
                  name='cnn_ctc'):
 
         ctcBase.__init__(self, input_size, num_unit, num_layer, num_classes,
-                         parameter_init, clip_grad, clip_activation,
+                         splice, parameter_init, clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
                          dropout_ratio_output, weight_decay, name)
 
         self.num_proj = None
-        self.splice = 0
 
     def _build(self, inputs, inputs_seq_len, keep_prob_input,
                keep_prob_hidden, keep_prob_output):
@@ -83,10 +84,6 @@ class CNN_CTC(ctcBase):
             logits: A tensor of size `[T, B, num_classes]`
         """
         # Dropout for inputs
-        keep_prob_input = tf.placeholder(tf.float32,
-                                         name='keep_prob_input')
-        keep_prob_hidden = tf.placeholder(tf.float32,
-                                          name='keep_prob_hidden')
         outputs = tf.nn.dropout(inputs,
                                 keep_prob_input,
                                 name='dropout_input')

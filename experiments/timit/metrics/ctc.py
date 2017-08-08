@@ -51,7 +51,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     per_mean = 0
     total_step = int(dataset.data_num / batch_size)
-    if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
+    if (dataset.data_num / batch_size) != dataset.data_num // batch_size:
         total_step += 1
     for data, next_epoch_flag in wrap_generator(dataset(batch_size),
                                                 progressbar,
@@ -152,7 +152,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
     map_file_path = '../metrics/mapping_files/ctc/' + label_type + '_to_num.txt'
     cer_mean = 0
     total_step = int(dataset.data_num / batch_size)
-    if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
+    if (dataset.data_num / batch_size) != dataset.data_num // batch_size:
         total_step += 1
     for data, next_epoch_flag in wrap_generator(dataset(batch_size),
                                                 progressbar,

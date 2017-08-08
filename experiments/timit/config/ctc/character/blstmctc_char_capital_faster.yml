@@ -4,6 +4,7 @@ param:
   label_type: character_capital_divide
   feature: fbank
   input_size: 120
+  splice: 1
   num_stack: 3
   num_skip: 3
   num_unit: 256

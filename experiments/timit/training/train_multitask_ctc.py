@@ -24,7 +24,7 @@ from experiments.utils.training.learning_rate_controller import Controller
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.csv import save_loss, save_ler
-from models.ctc.load_model_multitask import load
+from models.ctc.load_model import load
 
 
 def do_train(network, params):
@@ -39,18 +39,18 @@ def do_train(network, params):
     train_data = Dataset(
         data_type='train', label_type_main=params['label_type_main'],
         label_type_sub=params['label_type_sub'],
-        batch_size=params['batch_size'],
+        batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=True)
     dev_data = Dataset(
         data_type='dev', label_type_main=params['label_type_main'],
         label_type_sub=params['label_type_sub'],
-        batch_size=params['batch_size'],
+        batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
     test_data = Dataset(
         data_type='test', label_type_main=params['label_type_main'],
-        label_type_sub='phone39', batch_size=1,
+        label_type_sub='phone39', batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
 
@@ -314,6 +314,7 @@ def main(config_path, model_save_path):
     # Model setting
     model = load(model_type=params['model'])
     network = model(input_size=params['input_size'] * params['num_stack'],
+                    splice=params['splice'],
                     num_unit=params['num_unit'],
                     num_layer_main=params['num_layer_main'],
                     num_layer_sub=params['num_layer_sub'],

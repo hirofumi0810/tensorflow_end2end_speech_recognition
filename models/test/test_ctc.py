@@ -38,8 +38,8 @@ class TestCTC(tf.test.TestCase):
         self.check_training(model_type='gru_ctc', label_type='phone')
         self.check_training(model_type='gru_ctc', label_type='character')
 
-        # self.check_training(model_type='cnn_ctc', label_type='phone')
-        # self.check_training(model_type='cnn_ctc', label_type='character')
+        self.check_training(model_type='cnn_ctc', label_type='phone')
+        self.check_training(model_type='cnn_ctc', label_type='character')
 
     @measure_time
     def check_training(self, model_type, label_type):
@@ -50,15 +50,19 @@ class TestCTC(tf.test.TestCase):
         with tf.Graph().as_default():
             # Load batch data
             batch_size = 1
+            splice = 1 if model_type not in [
+                'vgg_blstm_ctc', 'cnn_ctc'] else 11
             inputs, labels_true_st, inputs_seq_len = generate_data(
                 label_type=label_type,
                 model='ctc',
-                batch_size=batch_size)
+                batch_size=batch_size,
+                splice=splice)
 
             # Define model graph
             num_classes = 26 if label_type == 'character' else 61
             model = load(model_type=model_type)
-            network = model(input_size=inputs[0].shape[-1],
+            network = model(input_size=inputs[0].shape[-1] // splice,
+                            splice=splice,
                             num_unit=256,
                             num_layer=2,
                             bottleneck_dim=0,
