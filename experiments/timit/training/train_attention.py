@@ -20,6 +20,7 @@ from experiments.timit.data.load_dataset_attention import Dataset
 from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.training.learning_rate_controller import Controller
+from experiments.utils.training.plot import plot_loss, plot_ler
 
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
@@ -226,6 +227,13 @@ def do_train(network, params):
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
 
+                    # Save fugure of loss & ler
+                    plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
+                              save_path=network.model_dir)
+                    plot_ler(csv_ler_train, csv_ler_dev, csv_steps,
+                             label_type=params['label_type'],
+                             save_path=network.model_dir)
+
                     if epoch >= 20:
                         start_time_eval = time.time()
                         if params['label_type'] in ['character', 'character_capital_divide']:
@@ -300,12 +308,6 @@ def do_train(network, params):
 
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
-
-            # Save train & dev loss, ler
-            save_loss(csv_steps, csv_loss_train, csv_loss_dev,
-                      save_path=network.model_dir)
-            save_ler(csv_steps, csv_ler_train, csv_loss_dev,
-                     save_path=network.model_dir)
 
             # Training was finished correctly
             with open(join(network.model_dir, 'complete.txt'), 'w') as f:

@@ -20,6 +20,7 @@ from experiments.librispeech.data.load_dataset_ctc import Dataset
 from experiments.librispeech.metrics.ctc import do_eval_cer, do_eval_wer
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.training.learning_rate_controller import Controller
+from experiments.utils.training.plot import plot_loss, plot_ler
 from experiments.utils.training.multi_gpu import average_gradients
 
 from experiments.utils.directory import mkdir, mkdir_join
@@ -207,7 +208,7 @@ def do_train(network, params, gpu_indices):
                 # Update parameters
                 sess.run(train_op, feed_dict=feed_dict_train)
 
-                if (step + 1) % 50 == 0:
+                if (step + 1) % 100 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels, inputs_seq_len, _), _ = dev_data().__next__()
@@ -266,7 +267,14 @@ def do_train(network, params, gpu_indices):
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
 
-                    if epoch >= 10:
+                    # Save fugure of loss & ler
+                    plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
+                              save_path=network.model_dir)
+                    plot_ler(csv_ler_train, csv_ler_dev, csv_steps,
+                             label_type=params['label_type'],
+                             save_path=network.model_dir)
+
+                    if epoch >= 5:
                         start_time_eval = time.time()
                         if params['label_type'] != 'word':
                             print('=== Dev Data Evaluation ===')
