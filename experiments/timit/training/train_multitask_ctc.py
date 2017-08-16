@@ -21,7 +21,6 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.training.learning_rate_controller import Controller
 from experiments.utils.training.plot import plot_loss, plot_ler
-
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from models.ctc.load_model import load
@@ -41,7 +40,7 @@ def do_train(network, params):
         label_type_sub=params['label_type_sub'],
         batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True)
+        sort_utt=True, sort_stop_epoch=None)
     dev_data = Dataset(
         data_type='dev', label_type_main=params['label_type_main'],
         label_type_sub=params['label_type_sub'],
@@ -138,8 +137,12 @@ def do_train(network, params):
                 inputs, labels_char, labels_phone, inputs_seq_len, _ = data
                 feed_dict_train = {
                     network.inputs_pl_list[0]: inputs,
-                    network.labels_pl_list[0]: list2sparsetensor(labels_char, padded_value=-1),
-                    network.labels_sub_pl_list[0]: list2sparsetensor(labels_phone, padded_value=-1),
+                    network.labels_pl_list[0]: list2sparsetensor(
+                        labels_char,
+                        padded_value=train_data.padded_value),
+                    network.labels_sub_pl_list[0]: list2sparsetensor(
+                        labels_phone,
+                        padded_value=train_data.padded_value),
                     network.inputs_seq_len_pl_list[0]: inputs_seq_len,
                     network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                     network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,

@@ -22,10 +22,8 @@ from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.training.learning_rate_controller import Controller
 from experiments.utils.training.plot import plot_loss, plot_ler
 from experiments.utils.training.multi_gpu import average_gradients
-
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
-from experiments.utils.csv import save_loss, save_ler
 from models.ctc.load_model import load
 
 
@@ -46,7 +44,7 @@ def do_train(network, params, gpu_indices):
         train_data_size=params['train_data_size'],
         label_type=params['label_type'], batch_size=params['batch_size'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True, sort_stop_epoch=5,
+        sort_utt=True, sort_stop_epoch=None,
         num_gpu=len(gpu_indices), is_gpu=True)
     dev_data = Dataset(
         data_type=dev, train_data_size=params['train_data_size'],
@@ -194,7 +192,7 @@ def do_train(network, params, gpu_indices):
                     feed_dict_train[network.inputs_pl_list[i_gpu]
                                     ] = inputs[i_gpu]
                     feed_dict_train[network.labels_pl_list[i_gpu]] = list2sparsetensor(
-                        labels[i_gpu], padded_value=-1)
+                        labels[i_gpu], padded_value=train_data.padded_value)
                     feed_dict_train[network.inputs_seq_len_pl_list[i_gpu]
                                     ] = inputs_seq_len[i_gpu]
                     feed_dict_train[network.keep_prob_input_pl_list[i_gpu]
@@ -208,7 +206,7 @@ def do_train(network, params, gpu_indices):
                 # Update parameters
                 sess.run(train_op, feed_dict=feed_dict_train)
 
-                if (step + 1) % 100 == 0:
+                if (step + 1) % 200 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels, inputs_seq_len, _), _ = dev_data().__next__()
@@ -217,7 +215,7 @@ def do_train(network, params, gpu_indices):
                         feed_dict_dev[network.inputs_pl_list[i_gpu]
                                       ] = inputs[i_gpu]
                         feed_dict_dev[network.labels_pl_list[i_gpu]] = list2sparsetensor(
-                            labels[i_gpu], padded_value=-1)
+                            labels[i_gpu], padded_value=dev_data.padded_value)
                         feed_dict_dev[network.inputs_seq_len_pl_list[i_gpu]
                                       ] = inputs_seq_len[i_gpu]
                         feed_dict_dev[network.keep_prob_input_pl_list[i_gpu]] = 1.0
@@ -274,7 +272,7 @@ def do_train(network, params, gpu_indices):
                              label_type=params['label_type'],
                              save_path=network.model_dir)
 
-                    if epoch >= 5:
+                    if epoch >= 1:
                         start_time_eval = time.time()
                         if params['label_type'] != 'word':
                             print('=== Dev Data Evaluation ===')
@@ -325,12 +323,6 @@ def do_train(network, params, gpu_indices):
 
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
-
-            # Save train & dev loss, ler
-            save_loss(csv_steps, csv_loss_train, csv_loss_dev,
-                      save_path=network.model_dir)
-            save_ler(csv_steps, csv_ler_train, csv_ler_dev,
-                     save_path=network.model_dir)
 
             # Training was finished correctly
             with open(join(network.model_dir, 'complete.txt'), 'w') as f:

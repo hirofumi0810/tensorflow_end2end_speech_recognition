@@ -27,7 +27,7 @@ class DatasetBase(object):
         overall data during training.
         """
         self.rest = set(range(0, self.data_num, 1))
-        
+
     def __next_mini_batch(self, batch_size=None):
         """Generate each mini-batch.
         Args:
@@ -45,6 +45,11 @@ class DatasetBase(object):
             batch_size = self.batch_size
 
         next_epoch_flag = False
+
+        if not self.is_test:
+            self.padded_value = self.eos_index
+        else:
+            self.padded_value = None
 
         while True:
             if next_epoch_flag:
@@ -111,12 +116,8 @@ class DatasetBase(object):
             inputs = np.zeros(
                 (len(data_indices), max_frame_num, self.input_size),
                 dtype=np.float32)
-            # Padding with <EOS>
-            if not self.is_test:
-                labels = np.array([[self.eos_index] * max_seq_len]
-                                  * len(data_indices), dtype=np.int32)
-            else:
-                labels = [None] * len(data_indices)
+            labels = np.array(
+                [[self.padded_value] * max_seq_len] * len(data_indices))
             inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
             labels_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
 
@@ -125,11 +126,8 @@ class DatasetBase(object):
                 data_i = input_list[i_batch]
                 frame_num = data_i.shape[0]
                 inputs[i_batch, : frame_num, :] = data_i
-                if not self.is_test:
-                    labels[i_batch, :len(label_list[i_batch])
-                           ] = label_list[i_batch]
-                else:
-                    labels[i_batch] = label_list[i_batch]
+                labels[i_batch, :len(label_list[i_batch])
+                       ] = label_list[i_batch]
                 inputs_seq_len[i_batch] = frame_num
                 labels_seq_len[i_batch] = len(label_list[i_batch])
 

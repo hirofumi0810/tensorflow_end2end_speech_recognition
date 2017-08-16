@@ -21,7 +21,6 @@ from experiments.timit.metrics.joint_ctc_attention import do_eval_per, do_eval_c
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.training.learning_rate_controller import Controller
 from experiments.utils.training.plot import plot_loss, plot_ler
-
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
 from models.attention.joint_ctc_attention import JointCTCAttention
@@ -137,7 +136,9 @@ def do_train(network, params):
                     network.att_labels_pl_list[0]: att_labels_train,
                     network.inputs_seq_len_pl_list[0]: inputs_seq_len,
                     network.att_labels_seq_len_pl_list[0]: att_labels_seq_len,
-                    network.ctc_labels_pl_list[0]: list2sparsetensor(ctc_labels, padded_value=-1),
+                    network.ctc_labels_pl_list[0]: list2sparsetensor(
+                        ctc_labels,
+                        padded_value=train_data.ctc_padded_value),
                     network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
                     network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
                     network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
@@ -157,7 +158,9 @@ def do_train(network, params):
                         network.att_labels_pl_list[0]: att_labels_dev,
                         network.inputs_seq_len_pl_list[0]: inputs_seq_len,
                         network.att_labels_seq_len_pl_list[0]: att_labels_seq_len,
-                        network.ctc_labels_pl_list[0]: list2sparsetensor(ctc_labels, padded_value=-1),
+                        network.ctc_labels_pl_list[0]: list2sparsetensor(
+                            ctc_labels,
+                            padded_value=dev_data.ctc_padded_value),
                         network.keep_prob_input_pl_list[0]: 1.0,
                         network.keep_prob_hidden_pl_list[0]: 1.0,
                         network.keep_prob_output_pl_list[0]: 1.0

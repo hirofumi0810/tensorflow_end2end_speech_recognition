@@ -92,23 +92,25 @@ def do_eval_cer(session, decode_ops, network, dataset, label_type,
                         str_pred = str_pred.lower()
 
                     # Compute edit distance
-                    cer_mean = Levenshtein.distance(
+                    cer_mean += Levenshtein.distance(
                         str_pred, str_true) / len(list(str_true))
 
             except IndexError:
+                print('skipped')
                 skip_data_num += batch_size_device
                 # TODO: Conduct decoding again with batch size 1
 
         if next_epoch_flag:
             break
 
-    cer_mean /= (dataset.data_num - batch_size_device)
+    cer_mean /= (dataset.data_num - skip_data_num)
 
     return cer_mean
 
 
-def do_eval_wer(session, decode_ops, network, dataset, train_data_size, is_test,
-                eval_batch_size=None, progressbar=False, is_multitask=False):
+def do_eval_wer(session, decode_ops, network, dataset, train_data_size,
+                is_test=False, eval_batch_size=None, progressbar=False,
+                is_multitask=False):
     """Evaluate trained model by Word Error Rate.
     Args:
         session: session of training model
@@ -137,7 +139,7 @@ def do_eval_wer(session, decode_ops, network, dataset, train_data_size, is_test,
     wer_mean = 0
     skip_data_num = 0
     total_step = int(dataset.data_num / batch_size)
-    if (dataset.data_num / batch_size) != int(dataset.data_num / batch_size):
+    if (dataset.data_num / batch_size) != dataset.data_num // batch_size:
         total_step += 1
     for data, next_epoch_flag in wrap_generator(dataset(batch_size),
                                                 progressbar,
@@ -168,10 +170,12 @@ def do_eval_wer(session, decode_ops, network, dataset, train_data_size, is_test,
                                                 batch_size_device)
 
                 # Compute edit distance
-                labels_true_st = list2sparsetensor(labels_true,
-                                                   padded_value=-1)
-                labels_pred_st = list2sparsetensor(labels_pred,
-                                                   padded_value=-1)
+                labels_true_st = list2sparsetensor(
+                    labels_true[i_device],
+                    padded_value=dataset.padded_value)
+                labels_pred_st = list2sparsetensor(
+                    labels_pred,
+                    padded_value=dataset.padded_value)
                 wer_mean += compute_edit_distance(session,
                                                   labels_true_st,
                                                   labels_pred_st)

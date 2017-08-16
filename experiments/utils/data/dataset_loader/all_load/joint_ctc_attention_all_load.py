@@ -47,7 +47,8 @@ class DatasetBase(object):
             _batch_size = self.batch_size
 
         next_epoch_flag = False
-        ctc_padded_value = -1
+        self.ctc_padded_value = -1
+        self.att_padded_value = self.eos_index
 
         while True:
             if next_epoch_flag:
@@ -102,10 +103,9 @@ class DatasetBase(object):
             inputs = np.zeros(
                 (len(data_indices), max_frame_num, self.input_size),
                 dtype=np.int32)
-            # Padding with <EOS>
-            att_labels = np.array([[self.eos_index] * att_max_seq_len]
+            att_labels = np.array([[self.att_padded_value] * att_max_seq_len]
                                   * len(data_indices), dtype=np.int32)
-            ctc_labels = np.array([[ctc_padded_value] * ctc_max_seq_len]
+            ctc_labels = np.array([[self.ctc_padded_value] * ctc_max_seq_len]
                                   * len(data_indices), dtype=np.int32)
             inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
             att_labels_seq_len = np.zeros(

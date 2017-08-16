@@ -47,7 +47,11 @@ class DatasetBase(object):
             batch_size = self.batch_size
 
         next_epoch_flag = False
-        padded_value = -1
+
+        if not self.is_test:
+            self.padded_value = -1
+        else:
+            self.padded_value = None
 
         while True:
             if next_epoch_flag:
@@ -128,19 +132,10 @@ class DatasetBase(object):
             inputs = np.zeros(
                 (len(data_indices), max_frame_num, self.input_size),
                 dtype=np.float32)
-            if not self.is_test:
-                labels_main = np.array(
-                    [[padded_value] * max_seq_len_main]
-                    * len(data_indices), dtype=np.int32)
-                labels_sub = np.array(
-                    [[padded_value] * max_seq_len_sub]
-                    * len(data_indices), dtype=np.int32)
-            else:
-                # Directry feed string (word or character)
-                labels_main = np.array(
-                    [[None] * max_seq_len_main] * len(data_indices))
-                labels_sub = np.array(
-                    [[None] * max_seq_len_sub] * len(data_indices))
+            labels_main = np.array(
+                [[self.padded_value] * max_seq_len_main] * len(data_indices))
+            labels_sub = np.array(
+                [[self.padded_value] * max_seq_len_sub] * len(data_indices))
             inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
 
             # Set values of each data in mini-batch

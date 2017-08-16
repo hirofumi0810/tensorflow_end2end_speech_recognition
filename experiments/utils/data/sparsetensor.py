@@ -12,7 +12,7 @@ import tensorflow as tf
 def list2sparsetensor(labels, padded_value):
     """Convert labels from list to sparse tensor.
     Args:
-        labels: list of labels
+        labels: list of labels, size of `[B, max_label_len]`
         padded_value: int, the value used for padding
     Returns:
         labels_st: A SparseTensor of labels,
@@ -21,16 +21,15 @@ def list2sparsetensor(labels, padded_value):
     indices, values = [], []
     for i_utt, each_label in enumerate(labels):
         for i_l, l in enumerate(each_label):
-            # -1 means empty
-            # Plaese see details in
-            # some_timit/data/read_dataset_ctc.py
+            # -1 or None means empty
             if l == padded_value:
                 break
             indices.append([i_utt, i_l])
             values.append(l)
     dense_shape = [len(labels), np.asarray(indices).max(0)[1] + 1]
     labels_st = [np.array(indices, dtype=np.int64),
-                 np.array(values, dtype=np.int32),
+                 #  np.array(values, dtype=np.int32),
+                 np.array(values),
                  np.array(dense_shape, dtype=np.int64)]
 
     return labels_st

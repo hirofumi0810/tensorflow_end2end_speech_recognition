@@ -48,7 +48,7 @@ class DatasetBase(object):
             _batch_size = self.batch_size
 
         next_epoch_flag = False
-        padded_value = -1
+        self.padded_value = -1
 
         while True:
             if next_epoch_flag:
@@ -103,9 +103,9 @@ class DatasetBase(object):
             inputs = np.zeros(
                 (len(data_indices), max_frame_num, self.input_size * self.splice),
                 dtype=np.int32)
-            labels_main = np.array([[padded_value] * max_seq_len_main]
+            labels_main = np.array([[self.padded_value] * max_seq_len_main]
                                    * len(data_indices), dtype=np.int32)
-            labels_sub = np.array([[padded_value] * max_seq_len_sub]
+            labels_sub = np.array([[self.padded_value] * max_seq_len_sub]
                                   * len(data_indices), dtype=np.int32)
             inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
             input_names = np.array(list(

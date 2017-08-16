@@ -117,9 +117,9 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
 
         # Compute edit distance
         labels_true_st = list2sparsetensor(labels_true_mapped,
-                                           padded_value=eos_index)
+                                           padded_value=dataset.padded_value)
         labels_pred_st = list2sparsetensor(labels_pred_mapped,
-                                           padded_value=eos_index)
+                                           padded_value=dataset.padded_value)
         per_list = compute_edit_distance(session,
                                          labels_true_st,
                                          labels_pred_st)

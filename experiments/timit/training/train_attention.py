@@ -21,10 +21,8 @@ from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.training.learning_rate_controller import Controller
 from experiments.utils.training.plot import plot_loss, plot_ler
-
 from experiments.utils.directory import mkdir, mkdir_join
 from experiments.utils.parameter import count_total_parameters
-from experiments.utils.csv import save_loss, save_ler
 from models.attention import blstm_attention_seq2seq
 
 
@@ -186,18 +184,18 @@ def do_train(network, params):
                     feed_dict_ler_train = {
                         network.labels_st_true_pl: list2sparsetensor(
                             labels_train,
-                            padded_value=params['eos_index']),
+                            padded_value=train_data.padded_value),
                         network.labels_st_pred_pl: list2sparsetensor(
                             predicted_ids_train,
-                            padded_value=params['eos_index'])
+                            padded_value=train_data.padded_value)
                     }
                     feed_dict_ler_dev = {
                         network.labels_st_true_pl: list2sparsetensor(
                             labels_dev,
-                            padded_value=params['eos_index']),
+                            padded_value=dev_data.padded_value),
                         network.labels_st_pred_pl: list2sparsetensor(
                             predicted_ids_dev,
-                            padded_value=params['eos_index'])
+                            padded_value=dev_data.padded_value)
                     }
 
                     # Compute accuracy

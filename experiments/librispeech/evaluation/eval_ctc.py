@@ -27,14 +27,12 @@ def do_eval(network, params, epoch=None):
     """
     # Load dataset
     test_clean_data = Dataset(
-        data_type='test_clean',
-        train_data_size=params['train_data_size'],
+        data_type='test_clean', train_data_size=params['train_data_size'],
         label_type=params['label_type'], batch_size=params['batch_size'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
     test_other_data = Dataset(
-        data_type='test_other',
-        train_data_size=params['train_data_size'],
+        data_type='test_other', train_data_size=params['train_data_size'],
         label_type=params['label_type'], batch_size=params['batch_size'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
