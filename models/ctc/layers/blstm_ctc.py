@@ -19,6 +19,10 @@ class BLSTM_CTC(ctcBase):
         num_layer: int, the number of layers
         num_classes: int, the number of classes of target labels
             (except for a blank label)
+        lstm_impl: string, BasicLSTMCell or LSTMCell or or LSTMBlockCell or
+            LSTMBlockFusedCell.
+            Choose the background implementation of tensorflow.
+            Default is LSTMBlockCell (the fastest implementation).
         splice: int, frames to splice. Default is 1 frame.
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
@@ -40,6 +44,7 @@ class BLSTM_CTC(ctcBase):
                  num_unit,
                  num_layer,
                  num_classes,
+                 lstm_impl='LSTMBlockCell',
                  splice=1,
                  parameter_init=0.1,
                  clip_grad=None,
@@ -57,7 +62,13 @@ class BLSTM_CTC(ctcBase):
                          dropout_ratio_input, dropout_ratio_hidden,
                          dropout_ratio_output, weight_decay, name)
 
-        self.num_proj = int(num_proj) if num_proj not in [None, 0] else None
+        self.lstm_impl = lstm_impl
+        if lstm_impl != 'LSTMCell':
+            self.num_proj = None
+        elif num_proj not in [None, 0]:
+            self.num_proj = int(num_proj)
+        else:
+            self.num_proj = None
         self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
             None, 0] else None
 
@@ -77,42 +88,83 @@ class BLSTM_CTC(ctcBase):
             logits: A tensor of size `[T, B, num_classes]`
         """
         # Dropout for the input-hidden connection
-        outputs = tf.nn.dropout(inputs,
-                                keep_prob_input,
-                                name='dropout_input')
+        outputs = tf.nn.dropout(
+            inputs, keep_prob_input, name='dropout_input')
+
+        initializer = tf.random_uniform_initializer(
+            minval=-self.parameter_init, maxval=self.parameter_init)
 
         # Hidden layers
         for i_layer in range(self.num_layer):
-            with tf.name_scope('blstm_hidden' + str(i_layer + 1)):
+            with tf.variable_scope('blstm_hidden' + str(i_layer + 1),
+                                   initializer=initializer) as scope:
+                if self.lstm_impl == 'BasicLSTMCell':
+                    lstm_fw = tf.contrib.rnn.BasicLSTMCell(
+                        self.num_unit,
+                        forget_bias=1.0,
+                        state_is_tuple=True,
+                        activation=tf.tanh)
+                    lstm_bw = tf.contrib.rnn.BasicLSTMCell(
+                        self.num_unit,
+                        forget_bias=1.0,
+                        state_is_tuple=True,
+                        activation=tf.tanh)
+                    # TODO: cell clipping (update for rc1.3)
 
-                initializer = tf.random_uniform_initializer(
-                    minval=-self.parameter_init,
-                    maxval=self.parameter_init)
+                elif self.lstm_impl == 'LSTMCell':
+                    lstm_fw = tf.contrib.rnn.LSTMCell(
+                        self.num_unit,
+                        use_peepholes=True,
+                        cell_clip=self.clip_activation,
+                        # initializer=initializer,
+                        num_proj=self.num_proj,
+                        forget_bias=1.0,
+                        state_is_tuple=True)
+                    lstm_bw = tf.contrib.rnn.LSTMCell(
+                        self.num_unit,
+                        use_peepholes=True,
+                        cell_clip=self.clip_activation,
+                        # initializer=initializer,
+                        num_proj=self.num_proj,
+                        forget_bias=1.0,
+                        state_is_tuple=True)
 
-                lstm_fw = tf.contrib.rnn.LSTMCell(
-                    self.num_unit,
-                    use_peepholes=True,
-                    cell_clip=self.clip_activation,
-                    initializer=initializer,
-                    num_proj=self.num_proj,
-                    forget_bias=1.0,
-                    state_is_tuple=True)
-                lstm_bw = tf.contrib.rnn.LSTMCell(
-                    self.num_unit,
-                    use_peepholes=True,
-                    cell_clip=self.clip_activation,
-                    initializer=initializer,
-                    num_proj=self.num_proj,
-                    forget_bias=1.0,
-                    state_is_tuple=True)
+                elif self.lstm_impl == 'LSTMBlockCell':
+                    # NOTE: This should be faster than tf.contrib.rnn.LSTMCell
+                    lstm_fw = tf.contrib.rnn.LSTMBlockCell(
+                        self.num_unit,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=True)
+                    lstm_bw = tf.contrib.rnn.LSTMBlockCell(
+                        self.num_unit,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=True)
+                    # TODO: cell clipping (update for rc1.3)
 
-                # Dropout for the hidden-hidden connections
+                elif self.lstm_impl == 'LSTMBlockFusedCell':
+                    raise NotImplementedError
+
+                    # NOTE: This should be faster than
+                    # tf.contrib.rnn.LSTMBlockFusedCell
+                    # lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
+                    #     self.num_unit,
+                    #     forget_bias=1.0,
+                    #     # clip_cell=True,
+                    #     use_peephole=True)
+                    # lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
+                    #     self.num_unit,
+                    #     forget_bias=1.0,
+                    #     # clip_cell=True,
+                    #     use_peephole=True)
+                    # TODO: cell clipping (update for rc1.3)
+
+                    # Dropout for the hidden-hidden connections
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_fw,
-                    output_keep_prob=keep_prob_hidden)
+                    lstm_fw, output_keep_prob=keep_prob_hidden)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_bw,
-                    output_keep_prob=keep_prob_hidden)
+                    lstm_bw, output_keep_prob=keep_prob_hidden)
 
                 # _init_state_fw = lstm_fw.zero_state(self.batch_size,
                 #                                     tf.float32)
@@ -128,15 +180,12 @@ class BLSTM_CTC(ctcBase):
                     inputs=outputs,
                     sequence_length=inputs_seq_len,
                     dtype=tf.float32,
-                    scope='blstm_dynamic' + str(i_layer + 1))
+                    scope=scope)
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
         # Reshape to apply the same weights over the timesteps
-        if self.num_proj is None:
-            output_node = self.num_unit * 2
-        else:
-            output_node = self.num_proj * 2
+        output_node = self.num_unit * 2 if self.num_proj is None else self.num_proj * 2
         outputs = tf.reshape(outputs, shape=[-1, output_node])
 
         # inputs: `[batch_size, max_time, input_size]`

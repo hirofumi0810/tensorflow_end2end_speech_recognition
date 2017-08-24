@@ -23,12 +23,19 @@ class TestCTC(tf.test.TestCase):
 
     def test_ctc(self):
         print("CTC Working check.")
-        self.check_training(model_type='vgg_blstm_ctc', label_type='phone')
-        self.check_training(model_type='vgg_blstm_ctc', label_type='character')
 
-        self.check_training(model_type='blstm_ctc', label_type='phone')
+        # LSTM implementation checking
+        # self.check_training(model_type='blstm_ctc', label_type='phone',
+        #                     lstm_impl='BasicLSTMCell')
+        # self.check_training(model_type='blstm_ctc', label_type='phone',
+        #                     lstm_impl='LSTMCell')
+        self.check_training(model_type='blstm_ctc', label_type='phone',
+                            lstm_impl='LSTMBlockCell')
+        self.check_training(model_type='blstm_ctc', label_type='phone',
+                            lstm_impl='LSTMBlockFusedCell')
         self.check_training(model_type='blstm_ctc', label_type='character')
 
+        # Model checking
         self.check_training(model_type='lstm_ctc', label_type='phone')
         self.check_training(model_type='lstm_ctc', label_type='character')
 
@@ -41,14 +48,17 @@ class TestCTC(tf.test.TestCase):
         self.check_training(model_type='cnn_ctc', label_type='phone')
         self.check_training(model_type='cnn_ctc', label_type='character')
 
+        self.check_training(model_type='vgg_blstm_ctc', label_type='phone')
+        self.check_training(model_type='vgg_blstm_ctc', label_type='character')
+
     @measure_time
-    def check_training(self, model_type, label_type):
-        print('----- model_type: %s, label_type: %s -----' %
-              (model_type, label_type))
+    def check_training(self, model_type, label_type, lstm_impl):
+        print('----- model_type: %s, label_type: %s, lstm_impl: %s -----' %
+              (model_type, label_type, lstm_impl))
 
         tf.reset_default_graph()
         with tf.Graph().as_default():
-            # Load batch data
+                # Load batch data
             batch_size = 1
             splice = 1 if model_type not in [
                 'vgg_blstm_ctc', 'cnn_ctc'] else 11
@@ -67,13 +77,14 @@ class TestCTC(tf.test.TestCase):
                             num_layer=2,
                             bottleneck_dim=0,
                             num_classes=num_classes,
+                            lstm_impl=lstm_impl,
                             parameter_init=0.1,
                             clip_grad=5.0,
                             clip_activation=50,
                             dropout_ratio_input=0.9,
                             dropout_ratio_hidden=0.9,
                             dropout_ratio_output=0.9,
-                            num_proj=256,
+                            num_proj=64,
                             weight_decay=1e-8)
 
             # Define placeholders
@@ -173,24 +184,35 @@ class TestCTC(tf.test.TestCase):
                         # Visualize
                         labels_pred_st = sess.run(
                             decode_op, feed_dict=feed_dict)
-                        labels_true = sparsetensor2list(labels_true_st,
-                                                        batch_size=batch_size)
-                        labels_pred = sparsetensor2list(labels_pred_st,
-                                                        batch_size=batch_size)
-                        if label_type == 'character':
-                            print('True: %s' % num2alpha(labels_true[0]))
-                            print('Pred: %s' % num2alpha(labels_pred[0]))
-                        else:
-                            print('True: %s' % num2phone(
-                                labels_true[0], map_file_path))
-                            print('Pred: %s' % num2phone(
-                                labels_pred[0], map_file_path))
+                        labels_true = sparsetensor2list(
+                            labels_true_st, batch_size=batch_size)
+
+                        try:
+                            labels_pred = sparsetensor2list(
+                                labels_pred_st, batch_size=batch_size)
+                            if label_type == 'character':
+                                print('True: %s' % num2alpha(labels_true[0]))
+                                print('Pred: %s' % num2alpha(labels_pred[0]))
+                            else:
+                                print('True: %s' % num2phone(
+                                    labels_true[0], map_file_path))
+                                print('Pred: %s' % num2phone(
+                                    labels_pred[0], map_file_path))
+                        except IndexError:
+                            if label_type == 'character':
+                                print('True: %s' % num2alpha(labels_true[0]))
+                                print('Pred: %s' % '')
+                            else:
+                                print('True: %s' % num2phone(
+                                    labels_true[0], map_file_path))
+                                print('Pred: %s' % '')
+                            # NOTE: This is for no prediction
 
                         if ler_train >= ler_train_pre:
                             not_improved_count += 1
                         else:
                             not_improved_count = 0
-                        if not_improved_count >= 5:
+                        if not_improved_count >= 5 or ler_train == 0:
                             print('Modle is Converged.')
                             break
                         ler_train_pre = ler_train
