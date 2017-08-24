@@ -15,17 +15,18 @@ class GRU_CTC(ctcBase):
         num_layer: int, the number of layers
         num_classes: int, the number of classes of target labels
             (except for a blank label)
+        lstm_impl: not used
         splice: int, frames to splice. Default is 1 frame.
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
         dropout_ratio_input: A float value. Dropout ratio in the input-hidden
-            layer
+            connection
         dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
-            layers
+            connection
         dropout_ratio_output: A float value. Dropout ratio in the hidden-output
-            layer
+            connection
         num_proj: not used
         weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: int, the dimensions of the bottleneck layer
@@ -36,6 +37,7 @@ class GRU_CTC(ctcBase):
                  num_unit,
                  num_layer,
                  num_classes,
+                 lstm_impl=None,
                  splice=1,
                  parameter_init=0.1,
                  clip_grad=None,
@@ -63,30 +65,27 @@ class GRU_CTC(ctcBase):
             inputs: A tensor of size `[B, T, input_size]`
             inputs_seq_len:  A tensor of size `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden layer
+                the input-hidden connection
             keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden layers
+                the hidden-hidden connection
             keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output layer
+                the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
         """
         # Dropout for the input-hidden connection
-        inputs = tf.nn.dropout(inputs,
-                               keep_prob_input,
-                               name='dropout_input')
+        inputs = tf.nn.dropout(
+            inputs, keep_prob_input, name='dropout_input')
+
+        initializer = tf.random_uniform_initializer(
+            minval=-self.parameter_init,
+            maxval=self.parameter_init)
 
         # Hidden layers
         gru_list = []
         for i_layer in range(self.num_layer):
-            with tf.name_scope('gru_hidden' + str(i_layer + 1)):
-
-                initializer = tf.random_uniform_initializer(
-                    minval=-self.parameter_init,
-                    maxval=self.parameter_init)
-
-                with tf.variable_scope('gru', initializer=initializer):
-                    gru = tf.contrib.rnn.GRUCell(self.num_unit)
+            with tf.variable_scope('gru_hidden' + str(i_layer + 1), initializer=initializer):
+                gru = tf.contrib.rnn.GRUCell(self.num_unit)
 
                 # Dropout for the hidden-hidden connections
                 gru = tf.contrib.rnn.DropoutWrapper(
@@ -99,10 +98,11 @@ class GRU_CTC(ctcBase):
             gru_list, state_is_tuple=True)
 
         # Ignore 2nd return (the last state)
-        outputs, _ = tf.nn.dynamic_rnn(cell=stacked_gru,
-                                       inputs=inputs,
-                                       sequence_length=inputs_seq_len,
-                                       dtype=tf.float32)
+        outputs, final_state = tf.nn.dynamic_rnn(
+            cell=stacked_gru,
+            inputs=inputs,
+            sequence_length=inputs_seq_len,
+            dtype=tf.float32)
 
         # inputs: `[batch_size, max_time, input_size]`
         batch_size = tf.shape(inputs)[0]
@@ -123,9 +123,8 @@ class GRU_CTC(ctcBase):
                 output_node = self.bottleneck_dim
 
                 # Dropout for the hidden-output connections
-                outputs = tf.nn.dropout(outputs,
-                                        keep_prob_output,
-                                        name='dropout_output_bottle')
+                outputs = tf.nn.dropout(
+                    outputs, keep_prob_output, name='dropout_output_bottle')
 
         with tf.name_scope('output'):
             # Affine
@@ -144,8 +143,8 @@ class GRU_CTC(ctcBase):
             logits = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections
-            logits = tf.nn.dropout(logits,
-                                   keep_prob_output,
-                                   name='dropout_output')
+            logits = tf.nn.dropout(
+                logits, keep_prob_output, name='dropout_output')
+            # NOTE: This may lead to bad results
 
             return logits

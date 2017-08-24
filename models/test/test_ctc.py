@@ -24,35 +24,58 @@ class TestCTC(tf.test.TestCase):
     def test_ctc(self):
         print("CTC Working check.")
 
-        # LSTM implementation checking
-        # self.check_training(model_type='blstm_ctc', label_type='phone',
-        #                     lstm_impl='BasicLSTMCell')
-        # self.check_training(model_type='blstm_ctc', label_type='phone',
-        #                     lstm_impl='LSTMCell')
+        ##############################
+        # BLSTM-CTC
+        ##############################
+        self.check_training(model_type='blstm_ctc', label_type='phone',
+                            lstm_impl='BasicLSTMCell')
+        self.check_training(model_type='blstm_ctc', label_type='phone',
+                            lstm_impl='LSTMCell')
         self.check_training(model_type='blstm_ctc', label_type='phone',
                             lstm_impl='LSTMBlockCell')
-        self.check_training(model_type='blstm_ctc', label_type='phone',
-                            lstm_impl='LSTMBlockFusedCell')
+        # self.check_training(model_type='blstm_ctc', label_type='phone',
+        #                     lstm_impl='LSTMBlockFusedCell')
         self.check_training(model_type='blstm_ctc', label_type='character')
 
-        # Model checking
-        self.check_training(model_type='lstm_ctc', label_type='phone')
+        ##############################
+        # LSTM-CTC
+        ##############################
+        self.check_training(model_type='lstm_ctc', label_type='phone',
+                            lstm_impl='BasicLSTMCell')
+        self.check_training(model_type='lstm_ctc', label_type='phone',
+                            lstm_impl='LSTMCell')
+        self.check_training(model_type='lstm_ctc', label_type='phone',
+                            lstm_impl='LSTMBlockCell')
+        # self.check_training(model_type='lstm_ctc', label_type='phone',
+        #                     lstm_impl='LSTMBlockFusedCell')
         self.check_training(model_type='lstm_ctc', label_type='character')
 
+        ##############################
+        # BGRU-CTC
+        ##############################
         self.check_training(model_type='bgru_ctc', label_type='phone')
         self.check_training(model_type='bgru_ctc', label_type='character')
 
+        ##############################
+        # GRU-CTC
+        ##############################
         self.check_training(model_type='gru_ctc', label_type='phone')
         self.check_training(model_type='gru_ctc', label_type='character')
 
-        self.check_training(model_type='cnn_ctc', label_type='phone')
-        self.check_training(model_type='cnn_ctc', label_type='character')
+        ##############################
+        # CNN-CTC
+        ##############################
+        # self.check_training(model_type='cnn_ctc', label_type='phone')
+        # self.check_training(model_type='cnn_ctc', label_type='character')
 
-        self.check_training(model_type='vgg_blstm_ctc', label_type='phone')
-        self.check_training(model_type='vgg_blstm_ctc', label_type='character')
+        ##############################
+        # VGG-BLSTM-CTC
+        ##############################
+        # self.check_training(model_type='vgg_blstm_ctc', label_type='phone')
+        # self.check_training(model_type='vgg_blstm_ctc', label_type='character')
 
     @measure_time
-    def check_training(self, model_type, label_type, lstm_impl):
+    def check_training(self, model_type, label_type, lstm_impl='LSTMBlockCell'):
         print('----- model_type: %s, label_type: %s, lstm_impl: %s -----' %
               (model_type, label_type, lstm_impl))
 
@@ -84,7 +107,7 @@ class TestCTC(tf.test.TestCase):
                             dropout_ratio_input=0.9,
                             dropout_ratio_hidden=0.9,
                             dropout_ratio_output=0.9,
-                            num_proj=64,
+                            num_proj=None,
                             weight_decay=1e-8)
 
             # Define placeholders

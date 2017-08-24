@@ -23,17 +23,18 @@ class BLSTM_CTC(ctcBase):
             LSTMBlockFusedCell.
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
+        use_peephole: bool, if True, use peephole
         splice: int, frames to splice. Default is 1 frame.
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
         dropout_ratio_input: A float value. Dropout ratio in the input-hidden
-            layer
+            connection
         dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
-            layers
+            connection
         dropout_ratio_output: A float value. Dropout ratio in the hidden-output
-            layer
+            connection
         num_proj: int, the number of nodes in recurrent projection layer
         weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: int, the dimensions of the bottleneck layer
@@ -45,6 +46,7 @@ class BLSTM_CTC(ctcBase):
                  num_layer,
                  num_classes,
                  lstm_impl='LSTMBlockCell',
+                 use_peephole=True,
                  splice=1,
                  parameter_init=0.1,
                  clip_grad=None,
@@ -63,6 +65,7 @@ class BLSTM_CTC(ctcBase):
                          dropout_ratio_output, weight_decay, name)
 
         self.lstm_impl = lstm_impl
+        self.use_peephole = use_peephole
         if lstm_impl != 'LSTMCell':
             self.num_proj = None
         elif num_proj not in [None, 0]:
@@ -79,11 +82,11 @@ class BLSTM_CTC(ctcBase):
             inputs: A tensor of size `[B, T, input_size]`
             inputs_seq_len: A tensor of size `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden layer
+                the input-hidden connection
             keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden layers
+                the hidden-hidden connection
             keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output layer
+                the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
         """
@@ -109,22 +112,19 @@ class BLSTM_CTC(ctcBase):
                         forget_bias=1.0,
                         state_is_tuple=True,
                         activation=tf.tanh)
-                    # TODO: cell clipping (update for rc1.3)
 
                 elif self.lstm_impl == 'LSTMCell':
                     lstm_fw = tf.contrib.rnn.LSTMCell(
                         self.num_unit,
-                        use_peepholes=True,
+                        use_peepholes=self.use_peephole,
                         cell_clip=self.clip_activation,
-                        # initializer=initializer,
                         num_proj=self.num_proj,
                         forget_bias=1.0,
                         state_is_tuple=True)
                     lstm_bw = tf.contrib.rnn.LSTMCell(
                         self.num_unit,
-                        use_peepholes=True,
+                        use_peepholes=self.use_peephole,
                         cell_clip=self.clip_activation,
-                        # initializer=initializer,
                         num_proj=self.num_proj,
                         forget_bias=1.0,
                         state_is_tuple=True)
@@ -135,32 +135,36 @@ class BLSTM_CTC(ctcBase):
                         self.num_unit,
                         forget_bias=1.0,
                         # clip_cell=True,
-                        use_peephole=True)
+                        use_peephole=self.use_peephole)
                     lstm_bw = tf.contrib.rnn.LSTMBlockCell(
                         self.num_unit,
                         forget_bias=1.0,
                         # clip_cell=True,
-                        use_peephole=True)
+                        use_peephole=self.use_peephole)
                     # TODO: cell clipping (update for rc1.3)
 
                 elif self.lstm_impl == 'LSTMBlockFusedCell':
                     raise NotImplementedError
 
                     # NOTE: This should be faster than
-                    # tf.contrib.rnn.LSTMBlockFusedCell
-                    # lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
-                    #     self.num_unit,
-                    #     forget_bias=1.0,
-                    #     # clip_cell=True,
-                    #     use_peephole=True)
-                    # lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
-                    #     self.num_unit,
-                    #     forget_bias=1.0,
-                    #     # clip_cell=True,
-                    #     use_peephole=True)
+                    tf.contrib.rnn.LSTMBlockFusedCell
+                    lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
+                        self.num_unit,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=self.use_peephole)
+                    lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
+                        self.num_unit,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=self.use_peephole)
                     # TODO: cell clipping (update for rc1.3)
 
-                    # Dropout for the hidden-hidden connections
+                else:
+                    raise IndexError(
+                        'lstm_impl is "BasicLSTMCell" or "LSTMCell" or "LSTMBlockCell" or "LSTMBlockFusedCell".')
+
+                # Dropout for the hidden-hidden connections
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
                     lstm_fw, output_keep_prob=keep_prob_hidden)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(
@@ -174,7 +178,7 @@ class BLSTM_CTC(ctcBase):
                 # initial_state_bw=_init_state_bw,
 
                 # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(
+                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
                     inputs=outputs,
@@ -203,9 +207,8 @@ class BLSTM_CTC(ctcBase):
                 output_node = self.bottleneck_dim
 
                 # Dropout for the hidden-output connections
-                outputs = tf.nn.dropout(outputs,
-                                        keep_prob_output,
-                                        name='dropout_output_bottle')
+                outputs = tf.nn.dropout(
+                    outputs, keep_prob_output, name='dropout_output_bottle')
 
         with tf.name_scope('output'):
             # Affine
@@ -224,8 +227,8 @@ class BLSTM_CTC(ctcBase):
             logits = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections
-            logits = tf.nn.dropout(logits,
-                                   keep_prob_output,
-                                   name='dropout_output')
+            logits = tf.nn.dropout(
+                logits, keep_prob_output, name='dropout_output')
+            # NOTE: This may lead to bad results
 
             return logits
