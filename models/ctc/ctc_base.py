@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Base class of CTC model."""
+"""Base class of the CTC model."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -24,59 +24,26 @@ class ctcBase(object):
     """Connectionist Temporal Classification (CTC) network.
     Args:
         input_size: int, the dimensions of input vectors
-        num_unit: int, the number of units in each layer
-        num_layer: int, the number of layers
         num_classes: int, the number of classes of target labels
             (except for a blank label)
         splice: int, frames to splice. Default is 1 frame.
-        parameter_init: A float value. Range of uniform distribution to
-            initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
-        clip_activation: A float value. Range of activation clipping (> 0)
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden
-            layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
-            layers
-        dropout_ratio_output: A float value. Dropout ratio in hidden-output
-            layers
         weight_decay: A float value. Regularization parameter for weight decay
-        name: string, model name
     """
 
-    def __init__(self,
-                 input_size,
-                 num_unit,
-                 num_layer,
-                 num_classes,
-                 splice,
-                 parameter_init,
-                 clip_grad,
-                 clip_activation,
-                 dropout_ratio_input,
-                 dropout_ratio_hidden,
-                 dropout_ratio_output,
-                 weight_decay,
-                 name):
-
-        # Network size
+    def __init__(self, input_size, splice, num_classes, clip_grad, weight_decay):
         assert input_size % 3 == 0, 'input_size must be divisible by 3.'
         # NOTE: input features are expected to including Δ and ΔΔ features
-        self.input_size = int(input_size)
         assert splice % 2 == 1, 'splice must be the odd number'
+
+        # Network size
+        self.input_size = int(input_size)
         self.splice = int(splice)
-        self.num_classes = int(num_classes)
-        self.num_unit = int(num_unit)
-        self.num_layer = int(num_layer)
+        # self.input_size *= self.splice
         self.num_classes = int(num_classes) + 1  # plus blank label
-        self.name = name
 
         # Regularization
-        self.parameter_init = float(parameter_init)
         self.clip_grad = float(clip_grad)
-        self.clip_activation = float(clip_activation)
-        self.dropout_ratio_input = float(dropout_ratio_input)
-        self.dropout_ratio_hidden = float(dropout_ratio_hidden)
-        self.dropout_ratio_output = float(dropout_ratio_output)
         self.weight_decay = float(weight_decay)
 
         # Summaries for TensorBoard
@@ -90,6 +57,9 @@ class ctcBase(object):
         self.keep_prob_input_pl_list = []
         self.keep_prob_hidden_pl_list = []
         self.keep_prob_output_pl_list = []
+
+    def __call__(self):
+        raise NotImplementedError
 
     def create_placeholders(self):
         """Create placeholders and append them to list."""
@@ -156,9 +126,8 @@ class ctcBase(object):
             logits: A tensor of size `[T, B, input_size]`
         """
         # Build model graph
-        logits = self._build(
-            inputs, inputs_seq_len,
-            keep_prob_input, keep_prob_hidden, keep_prob_output)
+        logits = self(inputs, inputs_seq_len,
+                      keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         # Weight decay
         if self.weight_decay > 0:

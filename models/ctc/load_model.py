@@ -7,13 +7,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from models.ctc.layers.lstm_ctc import LSTM_CTC
-from models.ctc.layers.blstm_ctc import BLSTM_CTC
-from models.ctc.layers.gru_ctc import GRU_CTC
-from models.ctc.layers.bgru_ctc import BGRU_CTC
-from models.ctc.layers.cnn_ctc import CNN_CTC
-from models.ctc.layers.vgg_blstm_ctc import VGG_BLSTM_CTC
-from models.ctc.layers.multitask_blstm_ctc import Multitask_BLSTM_CTC
+from models.ctc.lstm_ctc import LSTM_CTC
+from models.ctc.blstm_ctc import BLSTM_CTC
+from models.ctc.gru_ctc import GRU_CTC
+from models.ctc.bgru_ctc import BGRU_CTC
+from models.ctc.cnn_ctc import CNN_CTC
+from models.ctc.vgg_blstm_ctc import VGG_BLSTM_CTC
+from models.ctc.multitask_blstm_ctc import Multitask_BLSTM_CTC
 
 
 CTC = {
