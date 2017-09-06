@@ -1,19 +1,19 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""(Bidirectional) LSTM-CTC model."""
+"""VGG + (bidirectional) LSTM-CTC model."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 from models.ctc.ctc_base import CTCBase
-from models.encoders.blstm_encoder import BLSTM_Encoder
-from models.encoders.lstm_encoder import LSTM_Encoder
+from models.encoders.vgg_blstm_encoder import VGG_BLSTM_Encoder
+# from models.encoders.vgg_lstm_encoder import VGG_LSTM_Encoder
 
 
-class LSTM_CTC(CTCBase):
-    """(Bidirectional) LSTM-CTC model.
+class VGG_LSTM_CTC(CTCBase):
+    """VGG + (bidirectional) LSTM-CTC model.
     Args:
         input_size (int): the dimensions of input vectors
         num_units (int): the number of units in each layer
@@ -44,7 +44,7 @@ class LSTM_CTC(CTCBase):
                  bidirectional,
                  lstm_impl='LSTMBlockCell',
                  use_peephole=True,
-                 splice=1,
+                 splice=11,
                  parameter_init=0.1,
                  clip_grad=None,
                  clip_activation=None,
@@ -52,28 +52,34 @@ class LSTM_CTC(CTCBase):
                  weight_decay=0.0,
                  bottleneck_dim=None):
 
-        super(LSTM_CTC, self).__init__(
+        super(VGG_LSTM_CTC, self).__init__(
             input_size, splice, num_classes, clip_grad, weight_decay)
 
         if bidirectional:
-            self.name = 'blstm_ctc'
-            self.encoder = BLSTM_Encoder(num_units,
-                                         num_layers,
-                                         num_classes + 1,
-                                         lstm_impl,
-                                         use_peephole,
-                                         parameter_init,
-                                         clip_activation,
-                                         num_proj,
-                                         bottleneck_dim)
+            self.name = 'vgg_blstm_ctc'
+            self.encoder = VGG_BLSTM_Encoder(input_size,
+                                             num_units,
+                                             num_layers,
+                                             num_classes + 1,
+                                             lstm_impl,
+                                             use_peephole,
+                                             splice,
+                                             parameter_init,
+                                             clip_activation,
+                                             num_proj,
+                                             bottleneck_dim)
+
         else:
-            self.name = 'lstm_ctc'
-            self.encoder = LSTM_Encoder(num_units,
-                                        num_layers,
-                                        num_classes + 1,
-                                        lstm_impl,
-                                        use_peephole,
-                                        parameter_init,
-                                        clip_activation,
-                                        num_proj,
-                                        bottleneck_dim)
+            self.name = 'vgg_lstm_ctc'
+            raise NotImplementedError
+            # self.encoder = VGG_LSTM_Encoder(input_size,
+            #                                 num_units,
+            #                                 num_layers,
+            #                                 num_classes + 1,
+            #                                 lstm_impl,
+            #                                 use_peephole,
+            #                                 splice,
+            #                                 parameter_init,
+            #                                 clip_activation,
+            #                                 num_proj,
+            #                                 bottleneck_dim)

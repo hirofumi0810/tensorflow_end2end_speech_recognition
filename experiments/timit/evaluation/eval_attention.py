@@ -34,6 +34,7 @@ def do_eval(network, params, epoch=None):
         test_data = Dataset(
             data_type='test', label_type=params['label_type'], batch_size=1,
             eos_index=params['eos_index'], sort_utt=False, progressbar=True)
+    # TODO: add frame_stacking
 
     # Define placeholders
     network.create_placeholders()
@@ -138,9 +139,6 @@ def main(model_path, epoch):
         clip_grad=params['clip_grad'],
         clip_activation_encoder=params['clip_activation_encoder'],
         clip_activation_decoder=params['clip_activation_decoder'],
-        dropout_ratio_input=params['dropout_input'],
-        dropout_ratio_hidden=params['dropout_hidden'],
-        dropout_ratio_output=params['dropout_output'],
         weight_decay=params['weight_decay'],
         beam_width=20)
 

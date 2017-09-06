@@ -1,5 +1,6 @@
 param:
   model: lstm_ctc
+  bidirectional: False
   corpus: timit
   label_type: phone61
   feature: fbank
@@ -7,9 +8,9 @@ param:
   splice: 1
   num_stack: 3
   num_skip: 3
-  num_unit: 256
+  num_units: 256
   num_proj: 0
-  num_layer: 5
+  num_layers: 5
   bottleneck_dim: 0
   batch_size: 64
   optimizer: adam

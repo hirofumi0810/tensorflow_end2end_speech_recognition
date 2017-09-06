@@ -118,9 +118,6 @@ def main(model_path, epoch):
         clip_grad=params['clip_grad'],
         clip_activation_encoder=params['clip_activation_encoder'],
         clip_activation_decoder=params['clip_activation_decoder'],
-        dropout_ratio_input=params['dropout_input'],
-        dropout_ratio_hidden=params['dropout_hidden'],
-        dropout_ratio_output=params['dropout_output'],
         weight_decay=params['weight_decay'])
 
     network.model_dir = model_path

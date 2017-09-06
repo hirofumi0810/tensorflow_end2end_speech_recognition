@@ -18,6 +18,11 @@ def list2sparsetensor(labels, padded_value):
         labels_st: A SparseTensor of labels,
             list of (indices, values, dense_shape)
     """
+    if padded_value is None:
+        dtype_values = np.uint8
+    else:
+        dtype_values = np.int32
+
     indices, values = [], []
     for i_utt, each_label in enumerate(labels):
         for i_l, l in enumerate(each_label):
@@ -28,8 +33,7 @@ def list2sparsetensor(labels, padded_value):
             values.append(l)
     dense_shape = [len(labels), np.asarray(indices).max(0)[1] + 1]
     labels_st = [np.array(indices, dtype=np.int64),
-                 #  np.array(values, dtype=np.int32),
-                 np.array(values),
+                 np.array(values, dtype=dtype_values),
                  np.array(dense_shape, dtype=np.int64)]
 
     return labels_st

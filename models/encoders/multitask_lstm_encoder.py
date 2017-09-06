@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Unidirectional LSTM encoder."""
+"""Multi-task unidirectional LSTM encoder."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -10,13 +10,16 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-class LSTM_Encoder(object):
-    """Unidirectional LSTM encoder.
+class Multitask_LSTM_Encoder(object):
+    """Multi-task unidirectional LSTM encoder.
     Args:
         num_units (int): the number of units in each layer
-        num_layers (int): the number of layers
-        num_classes (int): the number of classes of target labels
-            (except for a blank label)
+        num_layers_main (int): the number of layers of the main task
+        num_layers_sub (int): the number of layers of the sub task
+        num_classes_main (int): the number of classes of target labels in the
+            main task (except for a blank label)
+        num_classes_sub (int): the number of classes of target labels in the
+            sub task (except for a blank label)
         lstm_impl (string): BasicLSTMCell or LSTMCell or LSTMBlockCell or
             LSTMBlockFusedCell.
             Choose the background implementation of tensorflow.
@@ -32,19 +35,23 @@ class LSTM_Encoder(object):
 
     def __init__(self,
                  num_units,
-                 num_layers,
-                 num_classes,
+                 num_layers_main,
+                 num_layers_sub,
+                 num_classes_main,
+                 num_classes_sub,
                  lstm_impl,
                  use_peephole,
                  parameter_init,
                  clip_activation,
                  num_proj,
                  bottleneck_dim,
-                 name='lstm_encoder'):
+                 name='multitask_lstm_encoder'):
 
         self.num_units = num_units
-        self.num_layers = num_layers
-        self.num_classes = num_classes
+        self.num_layers_main = num_layers_main
+        self.num_layers_sub = num_layers_sub
+        self.num_classes_main = num_classes_main
+        self.num_classes_sub = num_classes_sub
         self.lstm_impl = lstm_impl
         self.use_peephole = use_peephole
         self.parameter_init = parameter_init
@@ -59,33 +66,44 @@ class LSTM_Encoder(object):
             None, 0] else None
         self.name = name
 
+        if self.num_layers_sub < 1 or self.num_layers_main < self.num_layers_sub:
+            raise ValueError(
+                'Set num_layers_sub between 1 to num_layers_main.')
+
     def __call__(self, inputs, inputs_seq_len, keep_prob_input,
                  keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
-            inputs_seq_len:  A tensor of size `[B]`
+            inputs_seq_len: A tensor of size `[B]`
             keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden connection
+                the input-hidden layer
             keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden connection
+                the hidden-hidden layers
             keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output connection
+                the hidden-output layer
         Returns:
-            logits: A tensor of size `[T, B, num_classes]`
-            final_state: A final hidden state of the encoder
+            logits_main: A tensor of size `[T, B, input_size]`
+                in the main task
+            logits_sub: A tensor of size `[T, B, input_size]`
+                in the sub task
+            final_state: A final hidden state of the encoder in the main task
+            final_state_sub: A final hidden state of the encoder in the sub task
         """
         # Dropout for the input-hidden connection
-        inputs = tf.nn.dropout(
+        outputs = tf.nn.dropout(
             inputs, keep_prob_input, name='dropout_input')
+
+        # inputs: `[batch_size, max_time, input_size]`
+        batch_size = tf.shape(inputs)[0]
 
         initializer = tf.random_uniform_initializer(
             minval=-self.parameter_init, maxval=self.parameter_init)
 
         # Hidden layers
         lstm_list = []
-        for i_layer in range(1, self.num_layers + 1, 1):
-            with tf.variable_scope('lstm_hidden' + str(i_layer), initializer=initializer):
+        for i_layer in range(1, self.num_layers_main + 1, 1):
+            with tf.variable_scope('lstm_hidden' + str(i_layer), initializer=initializer) as scope:
 
                 if self.lstm_impl == 'BasicLSTMCell':
                     lstm = tf.contrib.rnn.BasicLSTMCell(
@@ -134,25 +152,57 @@ class LSTM_Encoder(object):
 
                 lstm_list.append(lstm)
 
-        # Stack multiple cells
-        stacked_lstm = tf.contrib.rnn.MultiRNNCell(
-            lstm_list, state_is_tuple=True)
+            # Stack multiple cells
+            stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+                lstm_list, state_is_tuple=True)
 
-        # Ignore 2nd return (the last state)
-        outputs, final_state = tf.nn.dynamic_rnn(
-            cell=stacked_lstm,
-            inputs=inputs,
-            sequence_length=inputs_seq_len,
-            dtype=tf.float32)
+            # Ignore 2nd return (the last state)
+            outputs, final_state = tf.nn.dynamic_rnn(
+                cell=stacked_lstm,
+                inputs=inputs,
+                sequence_length=inputs_seq_len,
+                dtype=tf.float32)
+
+            if i_layer == self.num_layers_sub:
+                # Reshape to apply the same weights over the timesteps
+                if self.num_proj is None:
+                    outputs_sub = tf.reshape(outputs,
+                                             shape=[-1, self.num_units])
+                else:
+                    outputs_sub = tf.reshape(outputs,
+                                             shape=[-1, self.num_proj])
+
+                with tf.name_scope('output_sub'):
+                    logits_sub_2d = tf.contrib.layers.fully_connected(
+                        outputs_sub, self.num_classes_sub,
+                        activation_fn=None,
+                        weights_initializer=tf.truncated_normal_initializer(
+                            stddev=0.1),
+                        biases_initializer=tf.zeros_initializer(),
+                        scope='output_sub')
+
+                    # Reshape back to the original shape
+                    logits_sub = tf.reshape(
+                        logits_sub_2d,
+                        shape=[batch_size, -1, self.num_classes_sub])
+
+                    # Convert to time-major: `[max_time, batch_size,
+                    # num_classes]'
+                    logits_sub = tf.transpose(logits_sub, (1, 0, 2))
+
+                    # Dropout for the hidden-output connections
+                    logits_sub = tf.nn.dropout(
+                        logits_sub, keep_prob_output,
+                        name='dropout_output_sub')
+                    # NOTE: This may lead to bad results
+
+                    final_state_sub = final_state
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
             outputs = tf.reshape(outputs, shape=[-1, self.num_units])
         else:
             outputs = tf.reshape(outputs, shape=[-1, self.num_proj])
-
-        # inputs: `[batch_size, max_time, input_size]`
-        batch_size = tf.shape(inputs)[0]
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.name_scope('bottleneck'):
@@ -166,27 +216,28 @@ class LSTM_Encoder(object):
 
                 # Dropout for the hidden-output connections
                 outputs = tf.nn.dropout(
-                    outputs, keep_prob_output, name='dropout_output_bottle')
+                    outputs, keep_prob_output,
+                    name='dropout_output_main_bottle')
 
-        with tf.name_scope('output'):
-            logits_2d = tf.contrib.layers.fully_connected(
-                outputs, self.num_classes,
+        with tf.name_scope('output_main'):
+            logits_main_2d = tf.contrib.layers.fully_connected(
+                outputs, self.num_classes_main,
                 activation_fn=None,
                 weights_initializer=tf.truncated_normal_initializer(
                     stddev=0.1),
                 biases_initializer=tf.zeros_initializer(),
-                scope='output')
+                scope='output_main')
 
             # Reshape back to the original shape
             logits = tf.reshape(
-                logits_2d, shape=[batch_size, -1, self.num_classes])
+                logits_main_2d, shape=[batch_size, -1, self.num_classes_main])
 
             # Convert to time-major: `[max_time, batch_size, num_classes]'
-            logits = tf.transpose(logits, (1, 0, 2))
+            logits_main = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections
-            logits = tf.nn.dropout(
-                logits, keep_prob_output, name='dropout_output')
+            logits_main = tf.nn.dropout(
+                logits_main, keep_prob_output, name='dropout_output_main')
             # NOTE: This may lead to bad results
 
-            return logits, final_state
+            return logits_main, logits_sub, final_state, final_state_sub

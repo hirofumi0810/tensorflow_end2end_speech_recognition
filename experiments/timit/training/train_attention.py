@@ -50,6 +50,7 @@ def do_train(network, params):
         test_data = Dataset(
             data_type='test', label_type='phone39', batch_size=1,
             eos_index=params['eos_index'], sort_utt=False)
+    # TODO: add frame_stacking
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -124,18 +125,16 @@ def do_train(network, params):
             ler_dev_best = 1
             learning_rate = float(params['learning_rate'])
             epoch = 1
-            for step, (data, next_epoch_flag) in enumerate(train_data()):
-
+            for step, ((inputs, labels_train, inputs_seq_len, labels_seq_len, _), next_epoch_flag) in enumerate(train_data.next()):
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels_train, inputs_seq_len, labels_seq_len, _ = data
                 feed_dict_train = {
                     network.inputs_pl_list[0]: inputs,
                     network.labels_pl_list[0]: labels_train,
                     network.inputs_seq_len_pl_list[0]: inputs_seq_len,
                     network.labels_seq_len_pl_list[0]: labels_seq_len,
-                    network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
-                    network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
-                    network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                    network.keep_prob_input_pl_list[0]: params['dropout_input'],
+                    network.keep_prob_hidden_pl_list[0]: params['dropout_hidden'],
+                    network.keep_prob_output_pl_list[0]: params['dropout_output'],
                     learning_rate_pl: learning_rate
                 }
 
@@ -146,7 +145,7 @@ def do_train(network, params):
 
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels_dev, inputs_seq_len,
-                     labels_seq_len, _), _ = dev_data().__next__()
+                     labels_seq_len, _), _ = dev_data().next()
                     feed_dict_dev = {
                         network.inputs_pl_list[0]: inputs,
                         network.labels_pl_list[0]: labels_dev,
@@ -312,7 +311,7 @@ def do_train(network, params):
                 f.write('')
 
 
-def main(config_path, model_save_path):
+def main(config_path, model_save_path, stdout):
 
     # Load a config file (.yml)
     with open(config_path, "r") as f:
@@ -354,9 +353,6 @@ def main(config_path, model_save_path):
         clip_grad=params['clip_grad'],
         clip_activation_encoder=params['clip_activation_encoder'],
         clip_activation_decoder=params['clip_activation_decoder'],
-        dropout_ratio_input=params['dropout_input'],
-        dropout_ratio_hidden=params['dropout_hidden'],
-        dropout_ratio_output=params['dropout_output'],
         weight_decay=params['weight_decay'],
         beam_width=1)
 
@@ -396,13 +392,14 @@ def main(config_path, model_save_path):
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
-    sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
+    if not bool(stdout):
+        sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     do_train(network=network, params=params)
 
 
 if __name__ == '__main__':
 
     args = sys.argv
-    if len(args) != 3:
-        raise ValueError
-    main(config_path=args[1], model_save_path=args[2])
+    if len(args) != 4:
+        raise ValueError('Length of args should be 4.')
+    main(config_path=args[1], model_save_path=args[2], stdout=args[3])

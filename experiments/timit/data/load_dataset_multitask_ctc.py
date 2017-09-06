@@ -26,18 +26,18 @@ class Dataset(DatasetBase):
                  sort_utt=False, sort_stop_epoch=None, progressbar=False):
         """A class for loading dataset.
         Args:
-            data_type: string, train or dev or test
-            label_type_main: string, character or character_capital_divide
-            label_type_sub: string, phone39 or phone48 or phone61
-            batch_size: int, the size of mini-batch
-            splice: int, frames to splice. Default is 1 frame.
-            num_stack: int, the number of frames to stack
-            num_skip: int, the number of frames to skip
-            sort_utt: if True, sort all utterances by the number of frames and
-                utteraces in each mini-batch are shuffled
-            sort_stop_epoch: After sort_stop_epoch, training will revert back
+            data_type (string): train or dev or test
+            label_type_main (string): character or character_capital_divide
+            label_type_sub (stirng): phone39 or phone48 or phone61
+            batch_size (int): the size of mini-batch
+            splice (int, optional): frames to splice. Default is 1 frame.
+            num_stack (int, optional): the number of frames to stack
+            num_skip (int, optional): the number of frames to skip
+            sort_utt (bool, optional): if True, sort all utterances by the number
+                of frames and utteraces in each mini-batch are shuffled
+            sort_stop_epoch (int, optional): After sort_stop_epoch, training will revert back
                 to a random order
-            progressbar: if True, visualize progressbar
+            progressbar (bool, optional): if True, visualize progressbar
         """
         if data_type not in ['train', 'dev', 'test']:
             raise ValueError('data_type is "train" or "dev" or "test".')

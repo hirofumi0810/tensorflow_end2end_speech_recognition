@@ -24,18 +24,23 @@ class TestCTC(tf.test.TestCase):
     def test_ctc(self):
         print("CTC Working check.")
 
+        # self.check_training(model_type='cnn_ctc', label_type='phone')
+        # self.check_training(model_type='cnn_ctc', label_type='character')
+        # raise ValueError
+
         ##############################
         # BLSTM-CTC
         ##############################
-        self.check_training(model_type='blstm_ctc', label_type='phone',
-                            lstm_impl='BasicLSTMCell')
-        self.check_training(model_type='blstm_ctc', label_type='phone',
-                            lstm_impl='LSTMCell')
-        self.check_training(model_type='blstm_ctc', label_type='phone',
-                            lstm_impl='LSTMBlockCell')
-        # self.check_training(model_type='blstm_ctc', label_type='phone',
-        #                     lstm_impl='LSTMBlockFusedCell')
-        self.check_training(model_type='blstm_ctc', label_type='character')
+        self.check_training(model_type='lstm_ctc', bidirectional=True,
+                            label_type='phone', lstm_impl='BasicLSTMCell')
+        self.check_training(model_type='lstm_ctc', bidirectional=True,
+                            label_type='phone', lstm_impl='LSTMCell')
+        self.check_training(model_type='lstm_ctc', bidirectional=True,
+                            label_type='phone', lstm_impl='LSTMBlockCell')
+        # self.check_training(model_type='lstm_ctc', bidirectional=True,
+        # label_type='phone', lstm_impl='LSTMBlockFusedCell')
+        self.check_training(model_type='lstm_ctc', bidirectional=True,
+                            label_type='character')
 
         ##############################
         # LSTM-CTC
@@ -53,8 +58,9 @@ class TestCTC(tf.test.TestCase):
         ##############################
         # BGRU-CTC
         ##############################
-        self.check_training(model_type='bgru_ctc', label_type='phone')
-        self.check_training(model_type='bgru_ctc', label_type='character')
+        self.check_training(model_type='gru_ctc', bidirectional=True,
+                            label_type='phone')
+        self.check_training(model_type='gru_ctc', label_type='character')
 
         ##############################
         # GRU-CTC
@@ -71,20 +77,34 @@ class TestCTC(tf.test.TestCase):
         ##############################
         # VGG-BLSTM-CTC
         ##############################
-        # self.check_training(model_type='vgg_blstm_ctc', label_type='phone')
-        # self.check_training(model_type='vgg_blstm_ctc', label_type='character')
+        self.check_training(model_type='vgg_lstm_ctc', bidirectional=True,
+                            label_type='phone')
+        self.check_training(model_type='vgg_lstm_ctc', bidirectional=True,
+                            label_type='character')
+
+        ##############################
+        # VGG-LSTM-CTC
+        ##############################
+        # self.check_training(model_type='vgg_lstm_ctc', label_type='phone')
+        # self.check_training(model_type='vgg_lstm_ctc',
+        # label_type='character')
 
     @measure_time
-    def check_training(self, model_type, label_type, lstm_impl='LSTMBlockCell'):
-        print('----- model_type: %s, label_type: %s, lstm_impl: %s -----' %
-              (model_type, label_type, lstm_impl))
+    def check_training(self, model_type, label_type, bidirectional=False,
+                       lstm_impl='LSTMBlockCell'):
+
+        print('==================================================')
+        print('  model_type: %s' % model_type)
+        print('  bidirectional: %s' % str(bidirectional))
+        print('  label_type: %s' % label_type)
+        print('  lstm_impl: %s' % lstm_impl)
+        print('==================================================')
 
         tf.reset_default_graph()
         with tf.Graph().as_default():
-                # Load batch data
-            batch_size = 1
-            splice = 1 if model_type not in [
-                'vgg_blstm_ctc', 'cnn_ctc'] else 11
+            # Load batch data
+            batch_size = 2
+            splice = 1 if model_type not in ['vgg_lstm_ctc', 'cnn_ctc'] else 11
             inputs, labels_true_st, inputs_seq_len = generate_data(
                 label_type=label_type,
                 model='ctc',
@@ -96,18 +116,17 @@ class TestCTC(tf.test.TestCase):
             model = load(model_type=model_type)
             network = model(input_size=inputs[0].shape[-1] // splice,
                             splice=splice,
-                            num_unit=256,
-                            num_layer=2,
-                            bottleneck_dim=0,
+                            num_units=256,
+                            num_layers=2,
                             num_classes=num_classes,
+                            bidirectional=bidirectional,
                             lstm_impl=lstm_impl,
                             parameter_init=0.1,
                             clip_grad=5.0,
                             clip_activation=50,
-                            dropout_ratio_input=0.9,
-                            dropout_ratio_hidden=0.9,
-                            dropout_ratio_output=0.9,
-                            num_proj=None,
+                            num_proj=256,
+                            # bottleneck_dim=50,
+                            bottleneck_dim=None,
                             weight_decay=1e-8)
 
             # Define placeholders
@@ -132,7 +151,7 @@ class TestCTC(tf.test.TestCase):
             ler_op = network.compute_ler(decode_op, network.labels_pl_list[0])
 
             # Define learning rate controller
-            learning_rate = 1e-3
+            learning_rate = 1e-4
             lr_controller = Controller(learning_rate_init=learning_rate,
                                        decay_start_epoch=10,
                                        decay_rate=0.98,
@@ -157,9 +176,9 @@ class TestCTC(tf.test.TestCase):
                 network.inputs_pl_list[0]: inputs,
                 network.labels_pl_list[0]: labels_true_st,
                 network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
-                network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
-                network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                network.keep_prob_input_pl_list[0]: 0.9,
+                network.keep_prob_hidden_pl_list[0]: 0.9,
+                network.keep_prob_output_pl_list[0]: 0.9,
                 learning_rate_pl: learning_rate
             }
 
@@ -173,7 +192,7 @@ class TestCTC(tf.test.TestCase):
                 # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 
                 # Train model
-                max_steps = 400
+                max_steps = 1000
                 start_time_global = time.time()
                 start_time_step = time.time()
                 ler_train_pre = 1
@@ -221,6 +240,7 @@ class TestCTC(tf.test.TestCase):
                                     labels_true[0], map_file_path))
                                 print('Pred: %s' % num2phone(
                                     labels_pred[0], map_file_path))
+
                         except IndexError:
                             if label_type == 'character':
                                 print('True: %s' % num2alpha(labels_true[0]))
@@ -235,7 +255,7 @@ class TestCTC(tf.test.TestCase):
                             not_improved_count += 1
                         else:
                             not_improved_count = 0
-                        if not_improved_count >= 5 or ler_train == 0:
+                        if ler_train < 0.05:
                             print('Modle is Converged.')
                             break
                         ler_train_pre = ler_train

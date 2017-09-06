@@ -98,15 +98,13 @@ def main(model_path, epoch):
     model = load(model_type=params['model'])
     network = model(
         input_size=params['input_size'] * params['num_stack'],
-        num_unit=params['num_unit'],
-        num_layer=params['num_layer'],
+        num_units=params['num_units'],
+        num_layers=params['num_layers'],
         num_classes=params['num_classes'],
+        bidirectional=params['bidirectional'],
         parameter_init=params['weight_init'],
         clip_grad=params['clip_grad'],
         clip_activation=params['clip_activation'],
-        dropout_ratio_input=params['dropout_input'],
-        dropout_ratio_hidden=params['dropout_hidden'],
-        dropout_ratio_output=params['dropout_output'],
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 

@@ -30,14 +30,14 @@ class Dataset(DatasetBase):
             label_type (string): stirng, phone39 or phone48 or phone61 or
                 character or character_capital_divide
             batch_size (int): the size of mini-batch
-            splice (int, option): frames to splice. Default is 1 frame.
-            num_stack (int, option): the number of frames to stack
-            num_skip (int, option): the number of frames to skip
-            sort_utt (bool, option): if True, sort all utterances by the number
+            splice (int, optional): frames to splice. Default is 1 frame.
+            num_stack (int, optional): the number of frames to stack
+            num_skip (int, optional): the number of frames to skip
+            sort_utt (bool, optional): if True, sort all utterances by the number
                 of frames and utteraces in each mini-batch are shuffled
-            sort_stop_epoch (int, option): After sort_stop_epoch, training will revert back
+            sort_stop_epoch (int, optional): After sort_stop_epoch, training will revert back
                 to a random order
-            progressbar (bool, option): if True, visualize progressbar
+            progressbar (bool, optional): if True, visualize progressbar
         """
         if data_type not in ['train', 'dev', 'test']:
             raise ValueError('data_type is "train" or "dev" or "test".')

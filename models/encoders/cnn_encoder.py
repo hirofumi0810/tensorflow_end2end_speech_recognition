@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""CNN-CTC model."""
+"""CNN encoder."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -10,11 +10,9 @@ from __future__ import print_function
 import math
 import tensorflow as tf
 
-from models.ctc.ctc_base import ctcBase
 
-
-class CNN_CTC(ctcBase):
-    """CNN-CTC model.
+class CNN_Encoder(object):
+    """CNN encoder.
        This implementaion is based on
            https://arxiv.org/abs/1701.02720.
                Zhang, Ying, et al.
@@ -22,51 +20,29 @@ class CNN_CTC(ctcBase):
                 neural networks."
                arXiv preprint arXiv:1701.02720 (2017).
     Args:
-        input_size: int, the dimensions of input vectors
-        num_unit: int, the number of units in each layer
-        num_layer: int, the number of layers
-        num_classes: int, the number of classes of target labels
+        input_size:
+        splice (int): frames to splice. Default is 1 frame.
+        num_classes (int): the number of classes of target labels
             (except for a blank label)
-        splice: int, frames to splice. Default is 1 frame.
-        parameter_init: A float value. Range of uniform distribution to
+        parameter_init (float): Range of uniform distribution to
             initialize weight parameters
-        clip_grad: A float value. Range of gradient clipping (> 0)
-        clip_activation: A float value. Range of activation clipping (> 0)
-        dropout_ratio_input: A float value. Dropout ratio in the input-hidden
-            layer
-        dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
-            layers
-        dropout_ratio_output: A float value. Dropout ratio in the hidden-output
-            layer
-        num_proj: not used
-        weight_decay: A float value. Regularization parameter for weight decay
-        bottleneck_dim: not used
+        name (string, optional): the name of encoder
     """
 
     def __init__(self,
                  input_size,
+                 splice,
                  num_classes,
-                 num_unit=0,  # not used
-                 num_layer=0,  # not used
-                 splice=1,
-                 parameter_init=0.1,
-                 clip_grad=None,
-                 clip_activation=None,
-                 dropout_ratio_input=1.0,
-                 dropout_ratio_hidden=1.0,
-                 dropout_ratio_output=1.0,
-                 num_proj=None,  # not used
-                 weight_decay=0.0,
-                 bottleneck_dim=None,  # not used
-                 name='cnn_ctc'):
+                 parameter_init,
+                 name='cnn_encoder'):
+        self.input_size = input_size
+        self.splice = splice
+        self.num_classes = num_classes
+        self.parameter_init = parameter_init
+        self.name = name
 
-        ctcBase.__init__(self, input_size, num_unit, num_layer, num_classes,
-                         splice, parameter_init, clip_grad, clip_activation,
-                         dropout_ratio_input, dropout_ratio_hidden,
-                         dropout_ratio_output, weight_decay, name)
-
-    def _build(self, inputs, inputs_seq_len, keep_prob_hidden,
-               keep_prob_input=None, keep_prob_output=None):
+    def __call__(self, inputs, inputs_seq_len, keep_prob_hidden,
+                 keep_prob_input=None, keep_prob_output=None):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
@@ -79,6 +55,7 @@ class CNN_CTC(ctcBase):
                 the hidden-output layer
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
+            final_state: A final hidden state of the encoder
         """
         # NOTE: input dropout is not performed
 
@@ -86,17 +63,18 @@ class CNN_CTC(ctcBase):
         batch_size = tf.shape(inputs)[0]
         max_time = tf.shape(inputs)[1]
 
-        # Reshape to 4D `[batch_size, max_time, input_size, splice]`
+        # Reshape to 4D tensor `[batch_size, max_time, input_size, splice]`
         inputs = tf.reshape(
             inputs, shape=[batch_size, max_time, self.input_size, self.splice])
 
-        # Reshape to 5D `[batch_size, max_time, input_size / 3, splice, 3 (+Δ,
-        # ΔΔ)]`
+        # Reshape to 5D tensor
+        # `[batch_size, max_time, input_size / 3, 3 (+Δ,ΔΔ), splice]`
         inputs = tf.reshape(
             inputs, shape=[batch_size, max_time, int(self.input_size / 3), 3, self.splice])
-        inputs = tf.transpose(inputs, (0, 1, 2, 4, 3))
 
-        # Reshape to 4D `[batch_size * max_time, input_size / 3, splice, 3]`
+        # Reshape to 4D tensor
+        # `[batch_size * max_time, input_size / 3, splice, 3]`
+        inputs = tf.transpose(inputs, (0, 1, 2, 4, 3))
         inputs = tf.reshape(
             inputs, shape=[batch_size * max_time, int(self.input_size / 3), self.splice, 3])
 
@@ -145,19 +123,21 @@ class CNN_CTC(ctcBase):
                 # TODO: try Weight decay
                 # TODO: try batch normalization
 
-        # Reshape to 5D `[batch_size, max_time, 14, splice, 256]`
+        # Reshape to 5D tensor `[batch_size, max_time, new_h, new_w, 256]`
+        new_h = math.ceil(self.input_size / 3 / 3)  # expected to be 14
+        new_w = self.splice  # expected to be 11
         outputs = tf.reshape(
-            outputs, shape=[batch_size, max_time, math.ceil(self.input_size / 3 / 3), self.splice, 256])
+            outputs, shape=[batch_size, max_time, new_h, new_w, 256])
 
-        # Reshape to 3D `[batch_size, max_time, 14 * splice * 256]`
+        # Reshape to 3D tensor `[batch_size, max_time, new_h * new_w * 256]`
         outputs = tf.reshape(
-            outputs, shape=[batch_size, max_time, math.ceil(self.input_size / 3 / 3) * self.splice * 256])
+            outputs, shape=[batch_size, max_time, new_h * new_w * 256])
 
-        # Reshape to 2D `[batch_size * max_time, 14 * splice * 256]`
+        # Reshape to 2D tensor `[batch_size * max_time, new_h * new_w * 256]`
         outputs = tf.reshape(
-            outputs, shape=[batch_size * max_time, math.ceil(self.input_size / 3 / 3) * self.splice * 256])
+            outputs, shape=[batch_size * max_time, new_h * new_w * 256])
 
-        # 11~13th fc
+        # 11-13th fc
         with tf.name_scope('fc'):
             for i_layer in range(11, 14, 1):
                 num_outputs = 1024 if i_layer != 13 else self.num_classes
@@ -173,14 +153,14 @@ class CNN_CTC(ctcBase):
                 # TODO: try Weight decay
                 # TODO: try batch normalization
 
-        # Reshape back to 3D `[batch_size, max_time, num_classes]`
+        # Reshape back to 3D tensor `[batch_size, max_time, num_classes]`
         logits = tf.reshape(
             outputs, shape=[batch_size, max_time, self.num_classes])
 
         # Convert to time-major: `[max_time, batch_size, num_classes]'
         logits = tf.transpose(logits, (1, 0, 2))
 
-        return logits
+        return logits, None
 
     def _max_pool(self, bottom, name):
         """A max pooling layer.

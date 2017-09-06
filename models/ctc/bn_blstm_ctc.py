@@ -8,40 +8,36 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models.ctc.ctc_base import ctcBase
-
+from models.ctc.ctc_base import CTCBase
 from recurrent.layers.bn_lstm import BatchNormLSTMCell
 from recurrent.initializer import orthogonal_initializer
 
 
-class BN_BLSTM_CTC(ctcBase):
+class BN_BLSTM_CTC(CTCBase):
     """Batch Normalized Bidirectional LSTM-CTC model.
     Args:
         batch_size: int, batch size of mini batch
         input_size: int, the dimensions of input vectors
-        num_unit: int, the number of units in each layer
-        num_layer: int, the number of layers
+        num_units: int, the number of units in each layer
+        num_layers: int, the number of layers
         num_classes: int, the number of classes of target labels
             (except for a blank label)
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
         clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden
-            layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
-            layers
         num_proj: int, the number of nodes in recurrent projection layer
         weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: int, the dimensions of the bottleneck layer
         is_training: bool, set True when training
+        name: string, the name of the CTC model
     """
 
     def __init__(self,
                  batch_size,
                  input_size,
-                 num_unit,
-                 num_layer,
+                 num_units,
+                 num_layers,
                  num_classes,
                  parameter_init=0.1,
                  clip_grad=None,
@@ -54,7 +50,7 @@ class BN_BLSTM_CTC(ctcBase):
                  is_training=True,
                  name='bn_blstm_ctc'):
 
-        ctcBase.__init__(self, batch_size, input_size, num_unit, num_layer,
+        CTCBase.__init__(self, batch_size, input_size, num_units, num_layers,
                          num_classes, parameter_init,
                          clip_grad, clip_activation,
                          dropout_ratio_input, dropout_ratio_hidden,
@@ -83,7 +79,7 @@ class BN_BLSTM_CTC(ctcBase):
         self.is_training = tf.placeholder(tf.bool)
 
         # Hidden layers
-        for i_layer in range(self.num_layer):
+        for i_layer in range(self.num_layers):
             with tf.name_scope('blstm_hidden' + str(i_layer + 1)):
 
                 # initializer = tf.random_uniform_initializer(
@@ -91,7 +87,7 @@ class BN_BLSTM_CTC(ctcBase):
                 #     maxval=self.parameter_init)
                 initializer = orthogonal_initializer()
 
-                lstm_fw = BatchNormLSTMCell(self.num_unit,
+                lstm_fw = BatchNormLSTMCell(self.num_units,
                                             use_peepholes=True,
                                             cell_clip=self.clip_activation,
                                             initializer=initializer,
@@ -100,7 +96,7 @@ class BN_BLSTM_CTC(ctcBase):
                                             state_is_tuple=True,
                                             is_training=self.is_training)
 
-                lstm_bw = BatchNormLSTMCell(self.num_unit,
+                lstm_bw = BatchNormLSTMCell(self.num_units,
                                             use_peepholes=True,
                                             cell_clip=self.clip_activation,
                                             initializer=initializer,
@@ -108,7 +104,7 @@ class BN_BLSTM_CTC(ctcBase):
                                             forget_bias=1.0,
                                             state_is_tuple=True,
                                             is_training=self.is_training)
-                # num_proj=int(self.num_unit / 2),
+                # num_proj=int(self.num_units / 2),
 
                 # Dropout for outputs of each layer
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
@@ -138,7 +134,7 @@ class BN_BLSTM_CTC(ctcBase):
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
-            output_node = self.num_unit * 2
+            output_node = self.num_units * 2
         else:
             output_node = self.num_proj * 2
         outputs = tf.reshape(outputs, shape=[-1, output_node])

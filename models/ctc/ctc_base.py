@@ -20,13 +20,13 @@ OPTIMIZER_CLS_NAMES = {
 }
 
 
-class ctcBase(object):
+class CTCBase(object):
     """Connectionist Temporal Classification (CTC) network.
     Args:
         input_size: int, the dimensions of input vectors
+        splice: int, frames to splice. Default is 1 frame.
         num_classes: int, the number of classes of target labels
             (except for a blank label)
-        splice: int, frames to splice. Default is 1 frame.
         clip_grad: A float value. Range of gradient clipping (> 0)
         weight_decay: A float value. Regularization parameter for weight decay
     """
@@ -39,7 +39,6 @@ class ctcBase(object):
         # Network size
         self.input_size = int(input_size)
         self.splice = int(splice)
-        # self.input_size *= self.splice
         self.num_classes = int(num_classes) + 1  # plus blank label
 
         # Regularization
@@ -58,8 +57,26 @@ class ctcBase(object):
         self.keep_prob_hidden_pl_list = []
         self.keep_prob_output_pl_list = []
 
-    def __call__(self):
-        raise NotImplementedError
+    def __call__(self, inputs, inputs_seq_len, keep_prob_input,
+                 keep_prob_hidden, keep_prob_output):
+        """Construct model graph.
+        Args:
+            inputs: A tensor of size `[B, T, input_size]`
+            inputs_seq_len: A tensor of size `[B]`
+            keep_prob_input: A float value. A probability to keep nodes in
+                the input-hidden connection
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                the hidden-hidden connection
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output connection
+        Returns:
+            logits: A tensor of size `[T, B, num_classes]`
+        """
+        logits, final_state = self.encoder(
+            inputs, inputs_seq_len, keep_prob_input,
+            keep_prob_hidden, keep_prob_output)
+
+        return logits
 
     def create_placeholders(self):
         """Create placeholders and append them to list."""
@@ -338,20 +355,17 @@ class ctcBase(object):
                     tf.summary.histogram(var.name, var))
         with tf.name_scope("dev"):
             for var in trainable_vars:
-                self.summaries_dev.append(
-                    tf.summary.histogram(var.name, var))
+                self.summaries_dev.append(tf.summary.histogram(var.name, var))
 
         # Mean
         with tf.name_scope("mean_train"):
             for var in trainable_vars:
                 self.summaries_train.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_mean(var)))
+                    tf.summary.scalar(var.name, tf.reduce_mean(var)))
         with tf.name_scope("mean_dev"):
             for var in trainable_vars:
                 self.summaries_dev.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_mean(var)))
+                    tf.summary.scalar(var.name, tf.reduce_mean(var)))
 
         # Standard deviation
         with tf.name_scope("stddev_train"):
@@ -369,8 +383,7 @@ class ctcBase(object):
         with tf.name_scope("max_train"):
             for var in trainable_vars:
                 self.summaries_train.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_max(var)))
+                    tf.summary.scalar(var.name, tf.reduce_max(var)))
         with tf.name_scope("max_dev"):
             for var in trainable_vars:
                 self.summaries_dev.append(
@@ -380,10 +393,8 @@ class ctcBase(object):
         with tf.name_scope("min_train"):
             for var in trainable_vars:
                 self.summaries_train.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_min(var)))
+                    tf.summary.scalar(var.name, tf.reduce_min(var)))
         with tf.name_scope("min_dev"):
             for var in trainable_vars:
                 self.summaries_dev.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_min(var)))
+                    tf.summary.scalar(var.name, tf.reduce_min(var)))

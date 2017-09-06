@@ -1,114 +1,77 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Multi-task Bidirectional LSTM-CTC model."""
+"""Multi-task bidirectional LSTM encoder."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models.ctc.ctc_base import ctcBase
 
 
-class Multitask_BLSTM_CTC(ctcBase):
-    """Multi-task Bidirectional LSTM-CTC model.
+class Multitask_BLSTM_Encoder(object):
+    """Multi-task bidirectional LSTM encoder.
     Args:
-        input_size: int, the dimensions of input vectors
-        num_unit: int, the number of units in each layer
-        num_layer_main: int, the number of layers of the main task
-        num_layer_sub: int, the number of layers of the sub task. Set
-            between 1 to num_layer_main
-        num_classes_main: int, the number of classes of target labels in the
+        num_units (int): the number of units in each layer
+        num_layers_main (int): the number of layers of the main task
+        num_layers_sub (int): the number of layers of the sub task
+        num_classes_main (int): the number of classes of target labels in the
             main task (except for a blank label)
-        num_classes_sub: int, the number of classes of target labels in the
+        num_classes_sub (int): the number of classes of target labels in the
             sub task (except for a blank label)
-        main_task_weight: A float value. The weight of loss of the main task.
-            Set between 0 to 1
-        splice: int, frames to splice. Default is 1 frame.
-        parameter_init: A float value. Range of uniform distribution to
-            initialize weight parameters
-        clip_grad: A float value. Range of gradient clipping (> 0)
-        clip_activation: A float value. Range of activation clipping (> 0)
-        dropout_ratio_input: A float value. Dropout ratio in the input-hidden
-            layer
-        dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
-            layers
-        dropout_ratio_output: A float value. Dropout ratio in the hidden-output
-            layer
-        num_proj: int, the number of nodes in recurrent projection layer
-        weight_decay: A float value. Regularization parameter for weight decay
-        bottleneck_dim: int, the dimensions of the bottleneck layer
+        lstm_impl (string): BasicLSTMCell or LSTMCell or LSTMBlockCell or
+            LSTMBlockFusedCell.
+            Choose the background implementation of tensorflow.
+            Default is LSTMBlockCell (the fastest implementation).
+        use_peephole (bool): if True, use peephole
+        parameter_init (float): Range of uniform distribution to initialize
+            weight parameters
+        clip_activation (float): Range of activation clipping (> 0)
+        num_proj (int): the number of nodes in recurrent projection layer
+        bottleneck_dim (int): the dimensions of the bottleneck layer
+        name (string, optional): the name of encoder
     """
 
     def __init__(self,
-                 input_size,
-                 num_unit,
-                 num_layer_main,
-                 num_layer_sub,
+                 num_units,
+                 num_layers_main,
+                 num_layers_sub,
                  num_classes_main,
                  num_classes_sub,
-                 main_task_weight,
-                 splice=1,
-                 parameter_init=0.1,
-                 clip_grad=None,
-                 clip_activation=None,
-                 dropout_ratio_input=1.0,
-                 dropout_ratio_hidden=1.0,
-                 dropout_ratio_output=1.0,
-                 num_proj=None,
-                 weight_decay=0.0,
-                 bottleneck_dim=None,
-                 name='multitask_blstm_ctc'):
+                 lstm_impl,
+                 use_peephole,
+                 parameter_init,
+                 clip_activation,
+                 num_proj,
+                 bottleneck_dim,
+                 name='multitask_blstm_encoder'):
 
-        ctcBase.__init__(self, input_size, num_unit, num_layer_main,
-                         num_classes_main, splice, parameter_init,
-                         clip_grad, clip_activation,
-                         dropout_ratio_input, dropout_ratio_hidden,
-                         dropout_ratio_output, weight_decay, name)
-
-        self.num_proj = int(num_proj) if num_proj not in [None, 0] else None
+        self.num_units = num_units
+        self.num_layers_main = num_layers_main
+        self.num_layers_sub = num_layers_sub
+        self.num_classes_main = num_classes_main
+        self.num_classes_sub = num_classes_sub
+        self.lstm_impl = lstm_impl
+        self.use_peephole = use_peephole
+        self.parameter_init = parameter_init
+        self.clip_activation = clip_activation
+        if lstm_impl != 'LSTMCell':
+            self.num_proj = None
+        elif num_proj not in [None, 0]:
+            self.num_proj = int(num_proj)
+        else:
+            self.num_proj = None
         self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
             None, 0] else None
+        self.name = name
 
-        if int(num_layer_sub) < 1 or int(num_layer_main) < int(num_layer_sub):
+        if self.num_layers_sub < 1 or self.num_layers_main < self.num_layers_sub:
             raise ValueError(
-                'Set num_layer_sub between 1 to num_layer_main.')
-        self.num_layer_sub = int(num_layer_sub)
-        self.num_classes_sub = int(num_classes_sub) + 1  # plus blank label
+                'Set num_layers_sub between 1 to num_layers_main.')
 
-        if float(main_task_weight) < 0 or float(main_task_weight) > 1:
-            raise ValueError('Set main_task_weight between 0 to 1.')
-        self.main_task_weight = float(main_task_weight)
-        self.sub_task_weight = 1 - self.main_task_weight
-
-        # Placeholder for multi-task
-        self.labels_sub_pl_list = []
-
-    def create_placeholders(self):
-        """Create placeholders and append them to list."""
-        self.inputs_pl_list.append(
-            tf.placeholder(tf.float32, shape=[None, None, self.input_size],
-                           name='input'))
-        self.labels_pl_list.append(
-            tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
-                            tf.placeholder(tf.int32, name='values'),
-                            tf.placeholder(tf.int64, name='shape')))
-        self.labels_sub_pl_list.append(
-            tf.SparseTensor(tf.placeholder(tf.int64, name='indices_sub'),
-                            tf.placeholder(tf.int32, name='values_sub'),
-                            tf.placeholder(tf.int64, name='shape_sub')))
-        self.inputs_seq_len_pl_list.append(
-            tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
-        self.keep_prob_input_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_input'))
-        self.keep_prob_hidden_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_hidden'))
-        self.keep_prob_output_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_output'))
-
-    def _build(self, inputs, inputs_seq_len, keep_prob_input,
-               keep_prob_hidden, keep_prob_output):
+    def __call__(self, inputs, inputs_seq_len, keep_prob_input,
+                 keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
@@ -124,47 +87,91 @@ class Multitask_BLSTM_CTC(ctcBase):
                 in the main task
             logits_sub: A tensor of size `[T, B, input_size]`
                 in the sub task
+            final_state: A final hidden state of the encoder in the main task
+            final_state_sub: A final hidden state of the encoder in the sub task
         """
         # Dropout for the input-hidden connection
-        outputs = tf.nn.dropout(inputs,
-                                keep_prob_input,
-                                name='dropout_input')
+        outputs = tf.nn.dropout(
+            inputs, keep_prob_input, name='dropout_input')
 
         # inputs: `[batch_size, max_time, input_size]`
         batch_size = tf.shape(inputs)[0]
 
+        initializer = tf.random_uniform_initializer(
+            minval=-self.parameter_init, maxval=self.parameter_init)
+
         # Hidden layers
-        for i_layer in range(self.num_layer):
-            with tf.name_scope('blstm_hidden' + str(i_layer + 1)):
+        for i_layer in range(1, self.num_layers_main + 1, 1):
+            with tf.variable_scope('blstm_hidden' + str(i_layer), initializer=initializer) as scope:
 
-                initializer = tf.random_uniform_initializer(
-                    minval=-self.parameter_init,
-                    maxval=self.parameter_init)
+                if self.lstm_impl == 'BasicLSTMCell':
+                    lstm_fw = tf.contrib.rnn.BasicLSTMCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        state_is_tuple=True,
+                        activation=tf.tanh)
+                    lstm_bw = tf.contrib.rnn.BasicLSTMCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        state_is_tuple=True,
+                        activation=tf.tanh)
 
-                lstm_fw = tf.contrib.rnn.LSTMCell(
-                    self.num_unit,
-                    use_peepholes=True,
-                    cell_clip=self.clip_activation,
-                    initializer=initializer,
-                    num_proj=self.num_proj,
-                    forget_bias=1.0,
-                    state_is_tuple=True)
-                lstm_bw = tf.contrib.rnn.LSTMCell(
-                    self.num_unit,
-                    use_peepholes=True,
-                    cell_clip=self.clip_activation,
-                    initializer=initializer,
-                    num_proj=self.num_proj,
-                    forget_bias=1.0,
-                    state_is_tuple=True)
+                elif self.lstm_impl == 'LSTMCell':
+                    lstm_fw = tf.contrib.rnn.LSTMCell(
+                        self.num_units,
+                        use_peepholes=self.use_peephole,
+                        cell_clip=self.clip_activation,
+                        num_proj=self.num_proj,
+                        forget_bias=1.0,
+                        state_is_tuple=True)
+                    lstm_bw = tf.contrib.rnn.LSTMCell(
+                        self.num_units,
+                        use_peepholes=self.use_peephole,
+                        cell_clip=self.clip_activation,
+                        num_proj=self.num_proj,
+                        forget_bias=1.0,
+                        state_is_tuple=True)
+
+                elif self.lstm_impl == 'LSTMBlockCell':
+                    # NOTE: This should be faster than tf.contrib.rnn.LSTMCell
+                    lstm_fw = tf.contrib.rnn.LSTMBlockCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=self.use_peephole)
+                    lstm_bw = tf.contrib.rnn.LSTMBlockCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=self.use_peephole)
+                    # TODO: cell clipping (update for rc1.3)
+
+                elif self.lstm_impl == 'LSTMBlockFusedCell':
+                    raise NotImplementedError
+
+                    # NOTE: This should be faster than
+                    tf.contrib.rnn.LSTMBlockFusedCell
+                    lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=self.use_peephole)
+                    lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=self.use_peephole)
+                    # TODO: cell clipping (update for rc1.3)
+
+                else:
+                    raise IndexError(
+                        'lstm_impl is "BasicLSTMCell" or "LSTMCell" or "LSTMBlockCell" or "LSTMBlockFusedCell".')
 
                 # Dropout for the hidden-hidden connections
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_fw,
-                    output_keep_prob=keep_prob_hidden)
+                    lstm_fw, output_keep_prob=keep_prob_hidden)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_bw,
-                    output_keep_prob=keep_prob_hidden)
+                    lstm_bw, output_keep_prob=keep_prob_hidden)
 
                 # _init_state_fw = lstm_fw.zero_state(self.batch_size,
                 #                                     tf.float32)
@@ -174,35 +181,32 @@ class Multitask_BLSTM_CTC(ctcBase):
                 # initial_state_bw=_init_state_bw,
 
                 # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), _ = tf.nn.bidirectional_dynamic_rnn(
+                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
                     cell_fw=lstm_fw,
                     cell_bw=lstm_bw,
                     inputs=outputs,
                     sequence_length=inputs_seq_len,
                     dtype=tf.float32,
-                    scope='blstm_dynamic' + str(i_layer + 1))
+                    scope=scope)
 
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
-                if i_layer == self.num_layer_sub - 1:
+                if i_layer == self.num_layers_sub:
                     # Reshape to apply the same weights over the timesteps
                     if self.num_proj is None:
-                        output_node = self.num_unit * 2
+                        output_node = self.num_units * 2
                     else:
                         output_node = self.num_proj * 2
-                    outputs_hidden = tf.reshape(
-                        outputs, shape=[-1, output_node])
+                    outputs_sub = tf.reshape(outputs, shape=[-1, output_node])
 
                     with tf.name_scope('output_sub'):
-                        # Affine
-                        W_output_sub = tf.Variable(tf.truncated_normal(
-                            shape=[output_node, self.num_classes_sub],
-                            stddev=0.1, name='W_output_sub'))
-                        b_output_sub = tf.Variable(tf.zeros(
-                            shape=[self.num_classes_sub],
-                            name='b_output_sub'))
-                        logits_sub_2d = tf.matmul(
-                            outputs_hidden, W_output_sub) + b_output_sub
+                        logits_sub_2d = tf.contrib.layers.fully_connected(
+                            outputs_sub, self.num_classes_sub,
+                            activation_fn=None,
+                            weights_initializer=tf.truncated_normal_initializer(
+                                stddev=0.1),
+                            biases_initializer=tf.zeros_initializer(),
+                            scope='output_sub')
 
                         # Reshape back to the original shape
                         logits_sub = tf.reshape(
@@ -214,241 +218,53 @@ class Multitask_BLSTM_CTC(ctcBase):
                         logits_sub = tf.transpose(logits_sub, (1, 0, 2))
 
                         # Dropout for the hidden-output connections
-                        logits_sub = tf.nn.dropout(logits_sub,
-                                                   keep_prob_output,
-                                                   name='dropout_output_sub')
+                        logits_sub = tf.nn.dropout(
+                            logits_sub, keep_prob_output,
+                            name='dropout_output_sub')
+                        # NOTE: This may lead to bad results
+
+                        final_state_sub = final_state
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
-            output_node = self.num_unit * 2
+            outputs = tf.reshape(outputs, shape=[-1, self.num_units * 2])
         else:
-            output_node = self.num_proj * 2
-        outputs = tf.reshape(outputs, shape=[-1, output_node])
+            outputs = tf.reshape(outputs, shape=[-1, self.num_proj * 2])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.name_scope('bottleneck'):
-                # Affine
-                W_bottleneck = tf.Variable(tf.truncated_normal(
-                    shape=[output_node, self.bottleneck_dim],
-                    stddev=0.1, name='W_bottleneck'))
-                b_bottleneck = tf.Variable(tf.zeros(
-                    shape=[self.bottleneck_dim], name='b_bottleneck'))
-                outputs = tf.matmul(outputs, W_bottleneck) + b_bottleneck
-                output_node = self.bottleneck_dim
+                outputs = tf.contrib.layers.fully_connected(
+                    outputs, self.bottleneck_dim,
+                    activation_fn=tf.nn.relu,
+                    weights_initializer=tf.truncated_normal_initializer(
+                        stddev=0.1),
+                    biases_initializer=tf.zeros_initializer(),
+                    scope='bottleneck')
 
                 # Dropout for the hidden-output connections
-                outputs = tf.nn.dropout(outputs,
-                                        keep_prob_output,
-                                        name='dropout_output_main_bottle')
+                outputs = tf.nn.dropout(
+                    outputs, keep_prob_output,
+                    name='dropout_output_main_bottle')
 
         with tf.name_scope('output_main'):
-            # Affine
-            W_output_main = tf.Variable(tf.truncated_normal(
-                shape=[output_node, self.num_classes],
-                stddev=0.1, name='W_output_main'))
-            b_output_main = tf.Variable(tf.zeros(
-                shape=[self.num_classes], name='b_output_main'))
-            logits_main_2d = tf.matmul(outputs, W_output_main) + b_output_main
+            logits_main_2d = tf.contrib.layers.fully_connected(
+                outputs, self.num_classes_main,
+                activation_fn=None,
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=0.1),
+                biases_initializer=tf.zeros_initializer(),
+                scope='output_main')
 
             # Reshape back to the original shape
             logits = tf.reshape(
-                logits_main_2d, shape=[batch_size, -1, self.num_classes])
+                logits_main_2d, shape=[batch_size, -1, self.num_classes_main])
 
             # Convert to time-major: `[max_time, batch_size, num_classes]'
             logits_main = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections
-            logits_main = tf.nn.dropout(logits_main,
-                                        keep_prob_output,
-                                        name='dropout_output_main')
+            logits_main = tf.nn.dropout(
+                logits_main, keep_prob_output, name='dropout_output_main')
+            # NOTE: This may lead to bad results
 
-            return logits_main, logits_sub
-
-    def compute_loss(self, inputs, labels_main, labels_sub, inputs_seq_len,
-                     keep_prob_input, keep_prob_hidden, keep_prob_output,
-                     scope=None):
-        """Operation for computing ctc loss.
-        Args:
-            inputs: A tensor of size `[B, T, input_size]`
-            labels_main: A SparseTensor of target labels in the main task
-            labels_sub: A SparseTensor of target labels in the sub task
-            inputs_seq_len: A tensor of size `[B]`
-            keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden layer
-            keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden layers
-            keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output layer
-            scope: A scope in the model tower
-        Returns:
-            total_loss: operation for computing total ctc loss
-            logits_main: A tensor of size `[T, B, input_size]`
-            logits_sub: A tensor of size `[T, B, input_size]`
-        """
-        # Build model graph
-        logits_main, logits_sub = self._build(
-            inputs, inputs_seq_len,
-            keep_prob_input, keep_prob_hidden, keep_prob_output)
-
-        # Weight decay
-        if self.weight_decay > 0:
-            with tf.name_scope("weight_decay_loss"):
-                weight_sum = 0
-                for var in tf.trainable_variables():
-                    if 'bias' not in var.name.lower():
-                        weight_sum += tf.nn.l2_loss(var)
-                tf.add_to_collection('losses', weight_sum * self.weight_decay)
-
-        with tf.name_scope("ctc_loss_main"):
-            ctc_losses = tf.nn.ctc_loss(
-                labels_main,
-                logits_main,
-                tf.cast(inputs_seq_len, tf.int32),
-                preprocess_collapse_repeated=False,
-                ctc_merge_repeated=True,
-                ignore_longer_outputs_than_inputs=False,
-                time_major=True)
-            ctc_loss_main = tf.reduce_mean(
-                ctc_losses, name='ctc_loss_mean_main')
-            tf.add_to_collection(
-                'losses', ctc_loss_main * self.main_task_weight)
-
-        with tf.name_scope("ctc_loss_sub"):
-            ctc_losses = tf.nn.ctc_loss(
-                labels_sub,
-                logits_sub,
-                tf.cast(inputs_seq_len, tf.int32),
-                preprocess_collapse_repeated=False,
-                ctc_merge_repeated=True,
-                ignore_longer_outputs_than_inputs=False,
-                time_major=True)
-            ctc_loss_sub = tf.reduce_mean(
-                ctc_losses, name='ctc_loss_mean_sub')
-            tf.add_to_collection(
-                'losses', ctc_loss_sub * self.sub_task_weight)
-
-        # Compute total loss
-        total_loss = tf.add_n(tf.get_collection('losses', scope),
-                              name='total_loss')
-
-        # Add a scalar summary for the snapshot of loss
-        if self.weight_decay > 0:
-            self.summaries_train.append(
-                tf.summary.scalar('weight_loss_train',
-                                  weight_sum * self.weight_decay))
-            self.summaries_dev.append(
-                tf.summary.scalar('weight_loss_dev',
-                                  weight_sum * self.weight_decay))
-            self.summaries_train.append(
-                tf.summary.scalar('total_loss_train', total_loss))
-            self.summaries_dev.append(
-                tf.summary.scalar('total_loss_dev', total_loss))
-
-        self.summaries_train.append(
-            tf.summary.scalar('ctc_loss_main_train',
-                              ctc_loss_main * self.main_task_weight))
-        self.summaries_dev.append(
-            tf.summary.scalar('ctc_loss_main_dev',
-                              ctc_loss_main * self.main_task_weight))
-
-        self.summaries_train.append(
-            tf.summary.scalar('ctc_loss_sub_train',
-                              ctc_loss_sub * self.sub_task_weight))
-        self.summaries_dev.append(
-            tf.summary.scalar('ctc_loss_sub_dev',
-                              ctc_loss_sub * self.sub_task_weight))
-
-        return total_loss, logits_main, logits_sub
-
-    def decoder(self, logits_main, logits_sub, inputs_seq_len, decode_type,
-                beam_width=None):
-        """Operation for decoding.
-        Args:
-            logits_main: A tensor of size `[T, B, input_size]`
-            logits_sub: A tensor of size `[T, B, input_size]`
-            inputs_seq_len: A tensor of size `[B]`
-            decode_type: greedy or beam_search
-            beam_width: beam width for beam search
-        Return:
-            decode_op_main: operation for decoding of the main task
-            decode_op_sub: operation for decoding of the sub task
-        """
-        if decode_type not in ['greedy', 'beam_search']:
-            raise ValueError('decode_type is "greedy" or "beam_search".')
-
-        if decode_type == 'greedy':
-            decoded_main, _ = tf.nn.ctc_greedy_decoder(
-                logits_main, tf.cast(inputs_seq_len, tf.int32))
-            decoded_sub, _ = tf.nn.ctc_greedy_decoder(
-                logits_sub, tf.cast(inputs_seq_len, tf.int32))
-
-        elif decode_type == 'beam_search':
-            if beam_width is None:
-                raise ValueError('Set beam_width.')
-
-            decoded_main, _ = tf.nn.ctc_beam_search_decoder(
-                logits_main, tf.cast(inputs_seq_len, tf.int32),
-                beam_width=beam_width)
-            decoded_sub, _ = tf.nn.ctc_beam_search_decoder(
-                logits_sub, tf.cast(inputs_seq_len, tf.int32),
-                beam_width=beam_width)
-
-        decode_op_main = tf.to_int32(decoded_main[0])
-        decode_op_sub = tf.to_int32(decoded_sub[0])
-
-        return decode_op_main, decode_op_sub
-
-    def posteriors(self, logits_main, logits_sub):
-        """Operation for computing posteriors of each time steps.
-        Args:
-            logits_main: A tensor of size `[T, B, input_size]`
-            logits_sub: A tensor of size `[T, B, input_size]`
-        Return:
-            posteriors_op_main: operation for computing posteriors for each
-                class in the main task
-            posteriors_op_sub: operation for computing posteriors for each
-                class in the sub task
-        """
-        # Convert to batch-major: `[batch_size, max_time, num_classes]'
-        logits_main = tf.transpose(logits_main, (1, 0, 2))
-        logits_sub = tf.transpose(logits_sub, (1, 0, 2))
-
-        logits_2d_main = tf.reshape(logits_main,
-                                    shape=[-1, self.num_classes])
-        posteriors_op_main = tf.nn.softmax(logits_2d_main)
-
-        logits_2d_sub = tf.reshape(logits_sub,
-                                   shape=[-1, self.num_classes_sub])
-        posteriors_op_sub = tf.nn.softmax(logits_2d_sub)
-
-        return posteriors_op_main, posteriors_op_sub
-
-    def compute_ler(self, decode_op_main, decode_op_sub,
-                    labels_main, labels_sub):
-        """Operation for computing LER (Label Error Rate).
-        Args:
-            decode_op_main: operation for decoding of the main task
-            decode_op_sub: operation for decoding of the sub task
-            labels_main: A SparseTensor of target labels in the main task
-            labels_sub: A SparseTensor of target labels in the sub task
-        Return:
-            ler_op_main: operation for computing LER of the main task
-            ler_op_sub: operation for computing LER of the sub task
-        """
-        # Compute LER (normalize by label length)
-        ler_op_main = tf.reduce_mean(tf.edit_distance(
-            decode_op_main, labels_main, normalize=True))
-        ler_op_sub = tf.reduce_mean(tf.edit_distance(
-            decode_op_sub, labels_sub, normalize=True))
-
-        # Add a scalar summary for the snapshot of LER
-        self.summaries_train.append(tf.summary.scalar(
-            'ler_main_train', ler_op_main))
-        self.summaries_train.append(tf.summary.scalar(
-            'ler_sub_train', ler_op_sub))
-        self.summaries_dev.append(tf.summary.scalar(
-            'ler_main_dev', ler_op_main))
-        self.summaries_dev.append(tf.summary.scalar(
-            'ler_sub_dev', ler_op_sub))
-
-        return ler_op_main, ler_op_sub
+            return logits_main, logits_sub, final_state, final_state_sub

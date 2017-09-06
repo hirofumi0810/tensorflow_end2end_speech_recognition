@@ -127,21 +127,22 @@ def do_train(network, params):
             ler_dev_best = 1
             learning_rate = float(params['learning_rate'])
             epoch = 1
-            for step, (data, next_epoch_flag) in enumerate(train_data()):
+            for step, ((inputs, labels, inputs_seq_len, _), next_epoch_flag) in enumerate(train_data.next()):
+
+            inputs, labels_train, inputs_seq_len, labels_seq_len, _
+            for step, (inputs, att_labels_train, ctc_labels, inputs_seq_len, att_labels_seq_len, _, next_epoch_flag) in enumerate(train_data.next():
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, att_labels_train, ctc_labels, inputs_seq_len, att_labels_seq_len, _ = data
-                feed_dict_train = {
+                feed_dict_train={
                     network.inputs_pl_list[0]: inputs,
                     network.att_labels_pl_list[0]: att_labels_train,
                     network.inputs_seq_len_pl_list[0]: inputs_seq_len,
                     network.att_labels_seq_len_pl_list[0]: att_labels_seq_len,
                     network.ctc_labels_pl_list[0]: list2sparsetensor(
-                        ctc_labels,
-                        padded_value=train_data.ctc_padded_value),
-                    network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
-                    network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
-                    network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                        ctc_labels, padded_value=train_data.ctc_padded_value),
+                    network.keep_prob_input_pl_list[0]: params['dropout_input'],
+                    network.keep_prob_hidden_pl_list[0]: params['dropout_hidden'],
+                    network.keep_prob_output_pl_list[0]: params['dropout_output'],
                     learning_rate_pl: learning_rate
                 }
 
@@ -152,37 +153,36 @@ def do_train(network, params):
 
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, att_labels_dev, ctc_labels, inputs_seq_len,
-                     att_labels_seq_len, _), _ = dev_data().__next__()
-                    feed_dict_dev = {
+                     att_labels_seq_len, _), _=dev_data().next()
+                    feed_dict_dev={
                         network.inputs_pl_list[0]: inputs,
                         network.att_labels_pl_list[0]: att_labels_dev,
                         network.inputs_seq_len_pl_list[0]: inputs_seq_len,
                         network.att_labels_seq_len_pl_list[0]: att_labels_seq_len,
                         network.ctc_labels_pl_list[0]: list2sparsetensor(
-                            ctc_labels,
-                            padded_value=dev_data.ctc_padded_value),
+                            ctc_labels, padded_value=dev_data.ctc_padded_value),
                         network.keep_prob_input_pl_list[0]: 1.0,
                         network.keep_prob_hidden_pl_list[0]: 1.0,
                         network.keep_prob_output_pl_list[0]: 1.0
                     }
 
                     # Compute loss
-                    loss_train = sess.run(loss_op, feed_dict=feed_dict_train)
-                    loss_dev = sess.run(loss_op, feed_dict=feed_dict_dev)
+                    loss_train=sess.run(loss_op, feed_dict=feed_dict_train)
+                    loss_dev=sess.run(loss_op, feed_dict=feed_dict_dev)
                     csv_steps.append(step)
                     csv_loss_train.append(loss_train)
                     csv_loss_dev.append(loss_dev)
 
                     # Change to evaluation mode
-                    feed_dict_train[network.keep_prob_input_pl_list[0]] = 1.0
-                    feed_dict_train[network.keep_prob_hidden_pl_list[0]] = 1.0
-                    feed_dict_train[network.keep_prob_output_pl_list[0]] = 1.0
+                    feed_dict_train[network.keep_prob_input_pl_list[0]]=1.0
+                    feed_dict_train[network.keep_prob_hidden_pl_list[0]]=1.0
+                    feed_dict_train[network.keep_prob_output_pl_list[0]]=1.0
 
                     # Predict class ids & update event files
-                    predicted_ids_train, summary_str_train = sess.run(
+                    predicted_ids_train, summary_str_train=sess.run(
                         [decode_op_infer, summary_train],
                         feed_dict=feed_dict_train)
-                    predicted_ids_dev, summary_str_dev = sess.run(
+                    predicted_ids_dev, summary_str_dev=sess.run(
                         [decode_op_infer, summary_dev],
                         feed_dict=feed_dict_dev)
                     summary_writer.add_summary(summary_str_train, step + 1)
@@ -190,7 +190,7 @@ def do_train(network, params):
                     summary_writer.flush()
 
                     # Convert to sparsetensor to compute LER
-                    feed_dict_ler_train = {
+                    feed_dict_ler_train={
                         network.att_labels_true_st: list2sparsetensor(
                             att_labels_train,
                             padded_value=params['eos_index']),
@@ -198,7 +198,7 @@ def do_train(network, params):
                             predicted_ids_train,
                             padded_value=params['eos_index'])
                     }
-                    feed_dict_ler_dev = {
+                    feed_dict_ler_dev={
                         network.att_labels_true_st: list2sparsetensor(
                             att_labels_dev,
                             padded_value=params['eos_index']),
@@ -208,29 +208,29 @@ def do_train(network, params):
                     }
 
                     # Compute accuracy
-                    ler_train = sess.run(
+                    ler_train=sess.run(
                         ler_op, feed_dict=feed_dict_ler_train)
-                    ler_dev = sess.run(
+                    ler_dev=sess.run(
                         ler_op, feed_dict=feed_dict_ler_dev)
                     csv_ler_train.append(ler_train)
                     csv_ler_dev.append(ler_dev)
 
-                    duration_step = time.time() - start_time_step
+                    duration_step=time.time() - start_time_step
                     print("Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) / lr = %.5f (%.3f min)" %
                           (step + 1, loss_train, loss_dev, ler_train, ler_dev,
                            learning_rate, duration_step / 60))
                     sys.stdout.flush()
-                    start_time_step = time.time()
+                    start_time_step=time.time()
 
                 # Save checkpoint and evaluate model per epoch
                 if next_epoch_flag:
-                    duration_epoch = time.time() - start_time_epoch
+                    duration_epoch=time.time() - start_time_epoch
                     print('-----EPOCH:%d (%.3f min)-----' %
                           (epoch, duration_epoch / 60))
 
                     # Save model (check point)
-                    checkpoint_file = join(network.model_dir, 'model.ckpt')
-                    save_path = saver.save(
+                    checkpoint_file=join(network.model_dir, 'model.ckpt')
+                    save_path=saver.save(
                         sess, checkpoint_file, global_step=epoch)
                     print("Model saved in file: %s" % save_path)
 
@@ -242,10 +242,10 @@ def do_train(network, params):
                              save_path=network.model_dir)
 
                     if epoch >= 20:
-                        start_time_eval = time.time()
+                        start_time_eval=time.time()
                         if params['label_type'] in ['character', 'character_capital_divide']:
                             print('=== Dev Data Evaluation ===')
-                            ler_dev_epoch = do_eval_cer(
+                            ler_dev_epoch=do_eval_cer(
                                 session=sess,
                                 decode_op=decode_op_infer,
                                 network=network,
@@ -254,11 +254,11 @@ def do_train(network, params):
                             print('  CER: %f %%' % (ler_dev_epoch * 100))
 
                             if ler_dev_epoch < ler_dev_best:
-                                ler_dev_best = ler_dev_epoch
+                                ler_dev_best=ler_dev_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
                                 print('=== Test Data Evaluation ===')
-                                ler_test = do_eval_cer(
+                                ler_test=do_eval_cer(
                                     session=sess,
                                     decode_op=decode_op_infer,
                                     network=network,
@@ -269,7 +269,7 @@ def do_train(network, params):
 
                         else:
                             print('=== Dev Data Evaluation ===')
-                            ler_dev_epoch = do_eval_per(
+                            ler_dev_epoch=do_eval_per(
                                 session=sess,
                                 decode_op=decode_op_infer,
                                 per_op=ler_op,
@@ -281,11 +281,11 @@ def do_train(network, params):
                             print('  PER: %f %%' % (ler_dev_epoch * 100))
 
                             if ler_dev_epoch < ler_dev_best:
-                                ler_dev_best = ler_dev_epoch
+                                ler_dev_best=ler_dev_epoch
                                 print('■■■ ↑Best Score (PER)↑ ■■■')
 
                                 print('=== Test Data Evaluation ===')
-                                ler_test = do_eval_per(
+                                ler_test=do_eval_per(
                                     session=sess,
                                     decode_op=decode_op_infer,
                                     per_op=ler_op,
@@ -297,12 +297,12 @@ def do_train(network, params):
                                 print('  PER: %f %%' %
                                       (ler_test * 100))
 
-                        duration_eval = time.time() - start_time_eval
+                        duration_eval=time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
                               (duration_eval / 60))
 
                         # Update learning rate
-                        learning_rate = lr_controller.decay_lr(
+                        learning_rate=lr_controller.decay_lr(
                             learning_rate=learning_rate,
                             epoch=epoch,
                             value=ler_dev_epoch)
@@ -311,9 +311,9 @@ def do_train(network, params):
                             break
 
                     epoch += 1
-                    start_time_epoch = time.time()
+                    start_time_epoch=time.time()
 
-            duration_train = time.time() - start_time_train
+            duration_train=time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
 
             # Training was finished correctly
@@ -321,31 +321,31 @@ def do_train(network, params):
                 f.write('')
 
 
-def main(config_path, model_save_path):
+def main(config_path, model_save_path, stdout):
 
     # Load a config file (.yml)
     with open(config_path, "r") as f:
-        config = yaml.load(f)
-        params = config['param']
+        config=yaml.load(f)
+        params=config['param']
 
-    params['sos_index'] = 0
-    params['eos_index'] = 1
+    params['sos_index']=0
+    params['eos_index']=1
     if params['label_type'] == 'phone61':
-        params['att_num_classes'] = 63
-        params['ctc_num_classes'] = 61
+        params['att_num_classes']=63
+        params['ctc_num_classes']=61
     elif params['label_type'] == 'phone48':
-        params['att_num_classes'] = 50
-        params['ctc_num_classes'] = 48
+        params['att_num_classes']=50
+        params['ctc_num_classes']=48
     elif params['label_type'] == 'phone39':
-        params['att_num_classes'] = 41
-        params['ctc_num_classes'] = 39
+        params['att_num_classes']=41
+        params['ctc_num_classes']=39
     elif params['label_type'] == 'character':
-        params['att_num_classes'] = 30
-        params['ctc_num_classes'] = 28
+        params['att_num_classes']=30
+        params['ctc_num_classes']=28
 
     # Model setting
     # AttentionModel = load(model_type=config['model_name'])
-    network = JointCTCAttention(
+    network=JointCTCAttention(
         input_size=params['input_size'],
         encoder_num_unit=params['encoder_num_unit'],
         encoder_num_layer=params['encoder_num_layer'],
@@ -367,12 +367,9 @@ def main(config_path, model_save_path):
         clip_grad=params['clip_grad'],
         clip_activation_encoder=params['clip_activation_encoder'],
         clip_activation_decoder=params['clip_activation_decoder'],
-        dropout_ratio_input=params['dropout_input'],
-        dropout_ratio_hidden=params['dropout_hidden'],
-        dropout_ratio_output=params['dropout_output'],
         weight_decay=params['weight_decay'])
 
-    network.model_name = params['model']
+    network.model_name=params['model']
     network.model_name += '_encoder' + str(params['encoder_num_unit'])
     network.model_name += '_' + str(params['encoder_num_layer'])
     network.model_name += '_attdim' + str(params['attention_dim'])
@@ -390,10 +387,10 @@ def main(config_path, model_save_path):
         network.model_name += '_weightdecay' + str(params['weight_decay'])
 
     # Set save path
-    network.model_dir = mkdir(model_save_path)
-    network.model_dir = mkdir_join(network.model_dir, 'attention')
-    network.model_dir = mkdir_join(network.model_dir, params['label_type'])
-    network.model_dir = mkdir_join(network.model_dir, network.model_name)
+    network.model_dir=mkdir(model_save_path)
+    network.model_dir=mkdir_join(network.model_dir, 'attention')
+    network.model_dir=mkdir_join(network.model_dir, params['label_type'])
+    network.model_dir=mkdir_join(network.model_dir, network.model_name)
 
     # Reset model directory
     if not isfile(join(network.model_dir, 'complete.txt')):
@@ -408,13 +405,14 @@ def main(config_path, model_save_path):
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
-    sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
+    if not bool(stdout):
+        sys.stdout=open(join(network.model_dir, 'train.log'), 'w')
     do_train(network=network, params=params)
 
 
 if __name__ == '__main__':
 
-    args = sys.argv
-    if len(args) != 3:
-        raise ValueError
-    main(config_path=args[1], model_save_path=args[2])
+    args=sys.argv
+    if len(args) != 4:
+        raise ValueError('Length of args should be 4.')
+    main(config_path=args[1], model_save_path=args[2], stdout=args[3])
