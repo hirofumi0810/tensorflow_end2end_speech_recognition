@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """Load dataset for the Joint CTC-Attention model (TIMIT corpus).
+   In addition, frame stacking and skipping are used.
    You can use only the single GPU version.
 """
 
@@ -15,23 +16,29 @@ import numpy as np
 
 from experiments.utils.progressbar import wrap_iterator
 from experiments.utils.data.dataset_loader.all_load.joint_ctc_attention_all_load import DatasetBase
+from experiments.utils.data.inputs.frame_stacking import stack_frame
 
 
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, label_type, batch_size, eos_index,
+                 splice=1, num_stack=1, num_skip=1,
                  sort_utt=True, sort_stop_epoch=None, progressbar=False):
         """A class for loading dataset.
         Args:
-            data_type: string, train or dev or test
-            label_type: string, phone39 or phone48 or phone61 or character
-                or character_capital_divide
-            eos_index: int , the index of <EOS> class
-            sort_utt: if True, sort all utterances by the number of frames and
-                utteraces in each mini-batch are shuffled
-        sort_stop_epoch: Aftersort_stop_epoch, training will revert back
+            data_type (string): train or dev or test
+            label_type (string): stirng, phone39 or phone48 or phone61 or
+                character or character_capital_divide
+            batch_size (int): the size of mini-batch
+            eos_index (int): the index of <EOS> class
+            splice (int, option): frames to splice. Default is 1 frame.
+            num_stack (int, option): the number of frames to stack
+            num_skip (int, option): the number of frames to skip
+            sort_utt (bool, option): if True, sort all utterances by the number
+                of frames and utteraces in each mini-batch are shuffled
+            sort_stop_epoch (int, option): After sort_stop_epoch, training will revert back
                 to a random order
-            progressbar: if True, visualize progressbar
+            progressbar (bool, option): if True, visualize progressbar
         """
         if data_type not in ['train', 'dev', 'test']:
             raise ValueError('data_type is "train" or "dev" or "test".')
@@ -41,6 +48,9 @@ class Dataset(DatasetBase):
         self.label_type = label_type
         self.batch_size = batch_size
         self.eos_index = eos_index
+        self.splice = splice
+        self.num_stack = num_stack
+        self.num_skip = num_skip
         self.sort_utt = sort_utt
         self.sort_stop_epoch = sort_stop_epoch
         self.epoch = 0
@@ -70,18 +80,26 @@ class Dataset(DatasetBase):
         self.input_paths = np.array(input_paths)
         self.att_label_paths = np.array(att_label_paths)
         self.ctc_label_paths = np.array(ctc_label_paths)
-        self.data_num = len(self.input_paths)
+        data_num = len(self.input_paths)
 
         # Load all dataset in advance
         print('=> Loading dataset (%s, %s)...' % (data_type, label_type))
         input_list, att_label_list, ctc_label_list = [], [], []
-        for i in wrap_iterator(range(self.data_num), self.progressbar):
+        for i in wrap_iterator(range(data_num), self.progressbar):
             input_list.append(np.load(self.input_paths[i]))
             att_label_list.append(np.load(self.att_label_paths[i]))
             ctc_label_list.append(np.load(self.ctc_label_paths[i]))
         self.input_list = np.array(input_list)
         self.att_label_list = np.array(att_label_list)
         self.ctc_label_list = np.array(ctc_label_list)
-        self.input_size = self.input_list[0].shape[1]
 
-        self.rest = set(range(0, self.data_num, 1))
+        # Frame stacking
+        print('=> Stacking frames...')
+        self.input_list = stack_frame(self.input_list,
+                                      self.input_paths,
+                                      self.frame_num_dict,
+                                      num_stack,
+                                      num_skip,
+                                      progressbar)
+
+        self.rest = set(range(0, data_num, 1))

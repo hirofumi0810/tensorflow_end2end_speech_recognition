@@ -26,6 +26,7 @@ class BLSTM_Encoder(object):
             initialize weight parameters
         clip_activation: A float value. Range of activation clipping (> 0)
         num_proj: int, the number of nodes in recurrent projection layer
+        weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: int, the dimensions of the bottleneck layer
         name: string, the name of encoder
     """
@@ -55,6 +56,7 @@ class BLSTM_Encoder(object):
             self.num_proj = int(num_proj)
         else:
             self.num_proj = None
+        self.num_proj = num_proj
         self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
             None, 0] else None
         self.name = name
@@ -73,7 +75,6 @@ class BLSTM_Encoder(object):
                 the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
-            final_state: A final hidden state of the encoder
         """
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(
@@ -83,8 +84,8 @@ class BLSTM_Encoder(object):
             minval=-self.parameter_init, maxval=self.parameter_init)
 
         # Hidden layers
-        for i_layer in range(1, self.num_layer + 1, 1):
-            with tf.variable_scope('blstm_hidden' + str(i_layer),
+        for i_layer in range(self.num_layer):
+            with tf.variable_scope('blstm_hidden' + str(i_layer + 1),
                                    initializer=initializer) as scope:
                 if self.lstm_impl == 'BasicLSTMCell':
                     lstm_fw = tf.contrib.rnn.BasicLSTMCell(
@@ -216,4 +217,4 @@ class BLSTM_Encoder(object):
                 logits, keep_prob_output, name='dropout_output')
             # NOTE: This may lead to bad results
 
-            return logits, final_state
+            return logits

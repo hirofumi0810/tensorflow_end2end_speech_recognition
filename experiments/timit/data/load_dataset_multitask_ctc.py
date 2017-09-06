@@ -83,20 +83,19 @@ class Dataset(DatasetBase):
         self.input_paths = np.array(input_paths)
         self.label_main_paths = np.array(label_main_paths)
         self.label_sub_paths = np.array(label_sub_paths)
-        self.data_num = len(self.input_paths)
+        data_num = len(self.input_paths)
 
         # Load all dataset in advance
         print('=> Loading dataset (%s, %s, %s)...' %
               (data_type, label_type_main, label_type_sub))
         input_list, label_main_list, label_sub_list = [], [], []
-        for i in wrap_iterator(range(self.data_num), self.progressbar):
+        for i in wrap_iterator(range(data_num), self.progressbar):
             input_list.append(np.load(self.input_paths[i]))
             label_main_list.append(np.load(self.label_main_paths[i]))
             label_sub_list.append(np.load(self.label_sub_paths[i]))
         self.input_list = np.array(input_list)
         self.label_main_list = np.array(label_main_list)
         self.label_sub_list = np.array(label_sub_list)
-        self.input_size = self.input_list[0].shape[1] * num_stack
 
         # Frame stacking
         print('=> Stacking frames...')
@@ -107,4 +106,4 @@ class Dataset(DatasetBase):
                                       num_skip,
                                       progressbar)
 
-        self.rest = set(range(0, self.data_num, 1))
+        self.rest = set(range(0, data_num, 1))

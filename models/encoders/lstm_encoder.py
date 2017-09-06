@@ -1,18 +1,20 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Unidirectional LSTM encoder."""
+"""LSTM-CTC model."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from models.ctc.ctc_base import ctcBase
 
 
-class LSTM_Encoder(object):
-    """Unidirectional LSTM encoder.
+class LSTM_CTC(ctcBase):
+    """LSTM-CTC model.
     Args:
+        input_size: int, the dimensions of input vectors
         num_unit: int, the number of units in each layer
         num_layer: int, the number of layers
         num_classes: int, the number of classes of target labels
@@ -22,33 +24,48 @@ class LSTM_Encoder(object):
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
         use_peephole: bool, if True, use peephole
+        splice: int, frames to splice. Default is 1 frame.
         parameter_init: A float value. Range of uniform distribution to
             initialize weight parameters
+        clip_grad: A float value. Range of gradient clipping (> 0)
         clip_activation: A float value. Range of activation clipping (> 0)
+        dropout_ratio_input: A float value. Dropout ratio in the input-hidden
+            connection
+        dropout_ratio_hidden: A float value. Dropout ratio in the hidden-hidden
+            connection
+        dropout_ratio_output: A float value. Dropout ratio in the hidden-output
+            connection
         num_proj: int, the number of nodes in recurrent projection layer
+        weight_decay: A float value. Regularization parameter for weight decay
         bottleneck_dim: int, the dimensions of the bottleneck layer
-        name: string, the name of encoder
     """
 
     def __init__(self,
+                 input_size,
                  num_unit,
                  num_layer,
                  num_classes,
                  lstm_impl='LSTMBlockCell',
                  use_peephole=True,
+                 splice=1,
                  parameter_init=0.1,
+                 clip_grad=None,
                  clip_activation=None,
+                 dropout_ratio_input=1.0,
+                 dropout_ratio_hidden=1.0,
+                 dropout_ratio_output=1.0,
                  num_proj=None,
+                 weight_decay=0.0,
                  bottleneck_dim=None,
-                 name='lstm_encoder'):
+                 name='lstm_ctc'):
 
-        self.num_unit = num_unit
-        self.num_layer = num_layer
-        self.num_classes = num_classes
+        ctcBase.__init__(self, input_size, num_unit, num_layer, num_classes,
+                         splice, parameter_init, clip_grad, clip_activation,
+                         dropout_ratio_input, dropout_ratio_hidden,
+                         dropout_ratio_output, weight_decay, name)
+
         self.lstm_impl = lstm_impl
         self.use_peephole = use_peephole
-        self.parameter_init = parameter_init
-        self.clip_activation = clip_activation
         if lstm_impl != 'LSTMCell':
             self.num_proj = None
         elif num_proj not in [None, 0]:
@@ -57,10 +74,9 @@ class LSTM_Encoder(object):
             self.num_proj = None
         self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
             None, 0] else None
-        self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob_input,
-                 keep_prob_hidden, keep_prob_output):
+    def _build(self, inputs, inputs_seq_len, keep_prob_input,
+               keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
@@ -73,19 +89,19 @@ class LSTM_Encoder(object):
                 the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
-            final_state: A final hidden state of the encoder
         """
         # Dropout for the input-hidden connection
         inputs = tf.nn.dropout(
             inputs, keep_prob_input, name='dropout_input')
 
         initializer = tf.random_uniform_initializer(
-            minval=-self.parameter_init, maxval=self.parameter_init)
+            minval=-self.parameter_init,
+            maxval=self.parameter_init)
 
         # Hidden layers
         lstm_list = []
-        for i_layer in range(1, self.num_layer + 1, 1):
-            with tf.variable_scope('lstm_hidden' + str(i_layer), initializer=initializer):
+        for i_layer in range(self.num_layer):
+            with tf.variable_scope('lstm_hidden' + str(i_layer + 1), initializer=initializer):
                 if self.lstm_impl == 'BasicLSTMCell':
                     lstm = tf.contrib.rnn.BasicLSTMCell(
                         self.num_unit,
@@ -188,4 +204,4 @@ class LSTM_Encoder(object):
                 logits, keep_prob_output, name='dropout_output')
             # NOTE: This may lead to bad results
 
-            return logits, final_state
+            return logits
