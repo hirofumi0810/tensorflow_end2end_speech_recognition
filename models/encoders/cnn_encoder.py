@@ -47,12 +47,12 @@ class CNN_Encoder(object):
         Args:
             inputs: A tensor of size `[B, T, input_size]`
             inputs_seq_len:  A tensor of size `[B]`
-            keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden layer
-            keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden layers
-            keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output layer
+            keep_prob_input (float): A probability to keep nodes in the
+                input-hidden connection
+            keep_prob_hidden (float): A probability to keep nodes in the
+                hidden-hidden connection
+            keep_prob_output (float): A probability to keep nodes in the
+                hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder

@@ -71,12 +71,12 @@ class VGG_BLSTM_Encoder(object):
         Args:
             inputs: A tensor of size `[B, T, input_size]`
             inputs_seq_len: A tensor of size `[B]`
-            keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden layer
-            keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden layers
-            keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output layer
+            keep_prob_input (float): A probability to keep nodes in the
+                input-hidden connection
+            keep_prob_hidden (float): A probability to keep nodes in the
+                hidden-hidden connection
+            keep_prob_output (float): A probability to keep nodes in the
+                hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder
@@ -288,7 +288,7 @@ class VGG_BLSTM_Encoder(object):
         """A max pooling layer.
         Args:
             bottom: A tensor of size `[B * T, H, W, C]`
-            name: A layer name
+            name (string): A layer name
         Returns:
             A tensor of size `[B * T, H / 2, W / 2, C]`
         """
@@ -305,7 +305,7 @@ class VGG_BLSTM_Encoder(object):
             bottom: A tensor of size `[B * T, H, W, C]`
             filter_shape: A list of
                 `[height, width, input_channel, output_channel]`
-            name: A layer name
+            name (string): A layer name
         Returns:
             outputs: A tensor of size `[B * T, H, W, output_channel]`
         """

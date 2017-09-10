@@ -152,24 +152,24 @@ class Multitask_LSTM_Encoder(object):
 
                 lstm_list.append(lstm)
 
-            # Stack multiple cells
-            stacked_lstm = tf.contrib.rnn.MultiRNNCell(
-                lstm_list, state_is_tuple=True)
-
-            # Ignore 2nd return (the last state)
-            outputs, final_state = tf.nn.dynamic_rnn(
-                cell=stacked_lstm,
-                inputs=inputs,
-                sequence_length=inputs_seq_len,
-                dtype=tf.float32)
-
             if i_layer == self.num_layers_sub:
+                # Stack multiple cells
+                stacked_lstm_sub = tf.contrib.rnn.MultiRNNCell(
+                    lstm_list, state_is_tuple=True)
+
+                # Ignore 2nd return (the last state)
+                outputs_sub, final_state_sub = tf.nn.dynamic_rnn(
+                    cell=stacked_lstm_sub,
+                    inputs=inputs,
+                    sequence_length=inputs_seq_len,
+                    dtype=tf.float32)
+
                 # Reshape to apply the same weights over the timesteps
                 if self.num_proj is None:
-                    outputs_sub = tf.reshape(outputs,
+                    outputs_sub = tf.reshape(outputs_sub,
                                              shape=[-1, self.num_units])
                 else:
-                    outputs_sub = tf.reshape(outputs,
+                    outputs_sub = tf.reshape(outputs_sub,
                                              shape=[-1, self.num_proj])
 
                 with tf.name_scope('output_sub'):
@@ -196,7 +196,16 @@ class Multitask_LSTM_Encoder(object):
                         name='dropout_output_sub')
                     # NOTE: This may lead to bad results
 
-                    final_state_sub = final_state
+        # Stack multiple cells
+        stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+            lstm_list, state_is_tuple=True)
+
+        # Ignore 2nd return (the last state)
+        outputs, final_state = tf.nn.dynamic_rnn(
+            cell=stacked_lstm,
+            inputs=inputs,
+            sequence_length=inputs_seq_len,
+            dtype=tf.float32)
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
