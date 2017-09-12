@@ -28,13 +28,15 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         per_op: operation for computing phone error rate
         network: network to evaluate
         dataset: An instance of a `Dataset' class
-        label_type: string, phone39 or phone48 or phone61
-        eos_index: int, the index of <EOS> class
-        eval_batch_size: int, the batch size when evaluating the model
-        progressbar: if True, visualize the progressbar
+        label_type (string): phone39 or phone48 or phone61
+        eos_index (int): the index of <EOS> class
+        eval_batch_size (int, optional): the batch size when evaluating the model
+        progressbar (bool, optional): if True, visualize the progressbar
     Returns:
         per_mean: An average of PER
     """
+    # TODO: remove eos_index
+
     # Reset data counter
     dataset.reset()
 
@@ -49,13 +51,12 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     phone2num_39_map_file_path = '../metrics/mapping_files/attention/phone39_to_num.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     per_mean = 0
-    total_step = int(dataset.data_num / batch_size)
-    if (dataset.data_num / batch_size) != dataset.data_num // batch_size:
+    total_step = int(len(dataset) / batch_size)
+    if (len(dataset) / batch_size) != len(dataset) // batch_size:
         total_step += 1
-    for data, next_epoch_flag in wrap_generator(dataset(batch_size),
-                                                progressbar,
-                                                total=total_step):
-        # Create feed dictionary for next mini-batch
+    for _ in wrap_generator(range(len(dataset)), progressbar, total=total_step):
+        # Create feed dictionary for next mini batch
+        data, next_epoch_flag = dataset.next()
         inputs, att_labels_true, _, inputs_seq_len, _, _ = data
 
         feed_dict = {
@@ -123,12 +124,12 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         if next_epoch_flag:
             break
 
-    per_mean /= dataset.data_num
+    per_mean /= len(dataset)
 
     return per_mean
 
 
-def do_eval_cer(session, decode_op, network, dataset, label_type,
+def do_eval_cer(session, decode_op, network, dataset, label_type, eos_index,
                 eval_batch_size=None, progressbar=False):
     """Evaluate trained model by Character Error Rate.
     Args:
@@ -136,23 +137,25 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type: string, character or character_capital_divide
-        eval_batch_size: int, batch size when evaluating the model
-        progressbar: if True, visualize the progressbar
+        label_type (string): character or character_capital_divide
+        eos_index (int): the index of <EOS> class
+        eval_batch_size (int, optional): batch size when evaluating the model
+        progressbar (bool, optional): if True, visualize the progressbar
     Return:
         cer_mean: An average of CER
     """
+    # TODO: remove eos_index
+
     batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
 
     map_file_path = '../metrics/mapping_files/attention/' + label_type + '_to_num.txt'
     cer_mean = 0
-    total_step = int(dataset.data_num / batch_size)
-    if (dataset.data_num / batch_size) != dataset.data_num // batch_size:
+    total_step = int(len(dataset) / batch_size)
+    if (len(dataset) / batch_size) != len(dataset) // batch_size:
         total_step += 1
-    for data, next_epoch_flag in wrap_generator(dataset(batch_size),
-                                                progressbar,
-                                                total=total_step):
-        # Create feed dictionary for next mini-batch
+    for _ in wrap_generator(range(len(dataset)), progressbar, total=total_step):
+        # Create feed dictionary for next mini batch
+        data, next_epoch_flag = dataset.next()
         inputs, att_labels_true, _, inputs_seq_len, _, _ = data
 
         feed_dict = {
@@ -186,6 +189,6 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
         if next_epoch_flag:
             break
 
-    cer_mean /= dataset.data_num
+    cer_mean /= len(dataset)
 
     return cer_mean

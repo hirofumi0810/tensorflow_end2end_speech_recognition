@@ -26,18 +26,18 @@ class Dataset(DatasetBase):
                  sort_utt=False, sort_stop_epoch=None, progressbar=False):
         """A class for loading dataset.
         Args:
-            data_type: string, train or dev or test
-            label_type: stirng, phone39 or phone48 or phone61 or character
-                or character_capital_divide
-            batch_size: int, the size of mini-batch
-            splice: int, frames to splice. Default is 1 frame.
-            num_stack: int, the number of frames to stack
-            num_skip: int, the number of frames to skip
-            sort_utt: if True, sort all utterances by the number of frames and
-                utteraces in each mini-batch are shuffled
-            sort_stop_epoch: After sort_stop_epoch, training will revert back
+            data_type (string): train or dev or test
+            label_type (string): stirng, phone39 or phone48 or phone61 or
+                character or character_capital_divide
+            batch_size (int): the size of mini-batch
+            splice (int, optional): frames to splice. Default is 1 frame.
+            num_stack (int, optional): the number of frames to stack
+            num_skip (int, optional): the number of frames to skip
+            sort_utt (bool, optional): if True, sort all utterances by the number
+                of frames and utteraces in each mini-batch are shuffled
+            sort_stop_epoch (int, optional): After sort_stop_epoch, training will revert back
                 to a random order
-            progressbar: if True, visualize progressbar
+            progressbar (bool, optional): if True, visualize progressbar
         """
         if data_type not in ['train', 'dev', 'test']:
             raise ValueError('data_type is "train" or "dev" or "test".')
@@ -73,17 +73,16 @@ class Dataset(DatasetBase):
             label_paths.append(join(label_path, input_name + '.npy'))
         self.input_paths = np.array(input_paths)
         self.label_paths = np.array(label_paths)
-        self.data_num = len(self.input_paths)
+        data_num = len(self.input_paths)
 
         # Load all dataset in advance
         print('=> Loading dataset (%s, %s)...' % (data_type, label_type))
         input_list, label_list = [], []
-        for i in wrap_iterator(range(self.data_num), self.progressbar):
+        for i in wrap_iterator(range(data_num), self.progressbar):
             input_list.append(np.load(self.input_paths[i]))
             label_list.append(np.load(self.label_paths[i]))
         self.input_list = np.array(input_list)
         self.label_list = np.array(label_list)
-        self.input_size = self.input_list[0].shape[1] * num_stack
 
         # Frame stacking
         print('=> Stacking frames...')
@@ -94,4 +93,4 @@ class Dataset(DatasetBase):
                                       num_skip,
                                       progressbar)
 
-        self.rest = set(range(0, self.data_num, 1))
+        self.rest = set(range(0, data_num, 1))

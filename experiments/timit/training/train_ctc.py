@@ -7,6 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 from os.path import join, isfile
 import sys
 import time
@@ -128,20 +129,20 @@ def do_train(network, params):
             start_time_step = time.time()
             ler_dev_best = 1
             learning_rate = float(params['learning_rate'])
-            epoch = 1
-            for step, (data, next_epoch_flag) in enumerate(train_data()):
+            epoch, step = 1, 0
+            while True:
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, labels, inputs_seq_len, _ = data
+                (inputs, labels, inputs_seq_len,
+                 _), next_epoch_flag = train_data.next()
                 feed_dict_train = {
                     network.inputs_pl_list[0]: inputs,
                     network.labels_pl_list[0]: list2sparsetensor(
-                        labels,
-                        padded_value=train_data.padded_value),
+                        labels, padded_value=train_data.padded_value),
                     network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                    network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
-                    network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
-                    network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                    network.keep_prob_input_pl_list[0]: params['dropout_input'],
+                    network.keep_prob_hidden_pl_list[0]: params['dropout_hidden'],
+                    network.keep_prob_output_pl_list[0]: params['dropout_output'],
                     learning_rate_pl: learning_rate
                 }
 
@@ -151,12 +152,11 @@ def do_train(network, params):
                 if (step + 1) % 10 == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    (inputs, labels, inputs_seq_len, _), _ = dev_data().__next__()
+                    (inputs, labels, inputs_seq_len, _), _ = dev_data.next()
                     feed_dict_dev = {
                         network.inputs_pl_list[0]: inputs,
                         network.labels_pl_list[0]: list2sparsetensor(
-                            labels,
-                            padded_value=dev_data.padded_value),
+                            labels, padded_value=dev_data.padded_value),
                         network.inputs_seq_len_pl_list[0]: inputs_seq_len,
                         network.keep_prob_input_pl_list[0]: 1.0,
                         network.keep_prob_hidden_pl_list[0]: 1.0,
@@ -190,7 +190,8 @@ def do_train(network, params):
                     print("Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) / lr = %.5f (%.3f min)" %
                           (step + 1, loss_train, loss_dev, ler_train, ler_dev,
                            learning_rate, duration_step / 60))
-                    sys.stdout.flush()
+                    # sys.stdout.flush()
+                    step += 1
                     start_time_step = time.time()
 
                 # Save checkpoint and evaluate model per epoch
@@ -238,6 +239,9 @@ def do_train(network, params):
                                     label_type=params['label_type'],
                                     eval_batch_size=1)
                                 print('  CER: %f %%' % (ler_test * 100))
+                            else:
+                                # Remove the saved model
+                                os.remove(save_path)
 
                         else:
                             print('=== Dev Data Evaluation ===')
@@ -265,6 +269,9 @@ def do_train(network, params):
                                     label_type=params['label_type'],
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (ler_test * 100))
+                            else:
+                                # Remove the saved model
+                                os.remove(save_path)
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -290,7 +297,7 @@ def do_train(network, params):
                 f.write('')
 
 
-def main(config_path, model_save_path):
+def main(config_path, model_save_path, stdout):
 
     # Load a config file (.yml)
     with open(config_path, "r") as f:
@@ -313,21 +320,22 @@ def main(config_path, model_save_path):
     model = load(model_type=params['model'])
     network = model(input_size=params['input_size'] * params['num_stack'],
                     splice=params['splice'],
-                    num_unit=params['num_unit'],
-                    num_layer=params['num_layer'],
+                    num_units=params['num_units'],
+                    num_layers=params['num_layers'],
                     num_classes=params['num_classes'],
+                    bidirectional=params['bidirectional'],
                     parameter_init=params['weight_init'],
                     clip_grad=params['clip_grad'],
                     clip_activation=params['clip_activation'],
-                    dropout_ratio_input=params['dropout_input'],
-                    dropout_ratio_output=params['dropout_output'],
-                    dropout_ratio_hidden=params['dropout_hidden'],
                     num_proj=params['num_proj'],
                     weight_decay=params['weight_decay'])
 
-    network.model_name = params['model']
-    network.model_name += '_' + str(params['num_unit'])
-    network.model_name += '_' + str(params['num_layer'])
+    if params['bidirectional']:
+        network.model_name = 'b' + params['model']
+    else:
+        network.model_name = params['model']
+    network.model_name += '_' + str(params['num_units'])
+    network.model_name += '_' + str(params['num_layers'])
     network.model_name += '_' + params['optimizer']
     network.model_name += '_lr' + str(params['learning_rate'])
     if params['num_proj'] != 0:
@@ -362,13 +370,14 @@ def main(config_path, model_save_path):
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
-    sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
+    if not bool(stdout):
+        sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
     do_train(network=network, params=params)
 
 
 if __name__ == '__main__':
 
     args = sys.argv
-    if len(args) != 3:
-        raise ValueError
-    main(config_path=args[1], model_save_path=args[2])
+    if len(args) != 4:
+        raise ValueError('Length of args should be 4.')
+    main(config_path=args[1], model_save_path=args[2], stdout=args[3])

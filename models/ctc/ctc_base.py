@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Base class of CTC model."""
+"""Base class of the CTC model."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -14,69 +14,35 @@ OPTIMIZER_CLS_NAMES = {
     "adagrad": tf.train.AdagradOptimizer,
     "adadelta": tf.train.AdadeltaOptimizer,
     "adam": tf.train.AdamOptimizer,
-    "momentum": tf.train.MomentumOptimizer,
     "rmsprop": tf.train.RMSPropOptimizer,
     "sgd": tf.train.GradientDescentOptimizer,
 }
 
 
-class ctcBase(object):
+class CTCBase(object):
     """Connectionist Temporal Classification (CTC) network.
     Args:
-        input_size: int, the dimensions of input vectors
-        num_unit: int, the number of units in each layer
-        num_layer: int, the number of layers
-        num_classes: int, the number of classes of target labels
+        input_size (int): the dimensions of input vectors
+        splice (int): frames to splice. Default is 1 frame.
+        num_classes (int): the number of classes of target labels
             (except for a blank label)
-        splice: int, frames to splice. Default is 1 frame.
-        parameter_init: A float value. Range of uniform distribution to
-            initialize weight parameters
-        clip_grad: A float value. Range of gradient clipping (> 0)
-        clip_activation: A float value. Range of activation clipping (> 0)
-        dropout_ratio_input: A float value. Dropout ratio in input-hidden
-            layers
-        dropout_ratio_hidden: A float value. Dropout ratio in hidden-hidden
-            layers
-        dropout_ratio_output: A float value. Dropout ratio in hidden-output
-            layers
-        weight_decay: A float value. Regularization parameter for weight decay
-        name: string, model name
+        clip_grad (float): Range of gradient clipping (> 0)
+        weight_decay (float): Regularization parameter for weight decay
     """
 
-    def __init__(self,
-                 input_size,
-                 num_unit,
-                 num_layer,
-                 num_classes,
-                 splice,
-                 parameter_init,
-                 clip_grad,
-                 clip_activation,
-                 dropout_ratio_input,
-                 dropout_ratio_hidden,
-                 dropout_ratio_output,
-                 weight_decay,
-                 name):
-
-        # Network size
+    def __init__(self, input_size, splice, num_classes, clip_grad,
+                 weight_decay):
         assert input_size % 3 == 0, 'input_size must be divisible by 3.'
         # NOTE: input features are expected to including Δ and ΔΔ features
-        self.input_size = int(input_size)
         assert splice % 2 == 1, 'splice must be the odd number'
+
+        # Network size
+        self.input_size = int(input_size)
         self.splice = int(splice)
-        self.num_classes = int(num_classes)
-        self.num_unit = int(num_unit)
-        self.num_layer = int(num_layer)
         self.num_classes = int(num_classes) + 1  # plus blank label
-        self.name = name
 
         # Regularization
-        self.parameter_init = float(parameter_init)
         self.clip_grad = float(clip_grad)
-        self.clip_activation = float(clip_activation)
-        self.dropout_ratio_input = float(dropout_ratio_input)
-        self.dropout_ratio_hidden = float(dropout_ratio_hidden)
-        self.dropout_ratio_output = float(dropout_ratio_output)
         self.weight_decay = float(weight_decay)
 
         # Summaries for TensorBoard
@@ -90,6 +56,27 @@ class ctcBase(object):
         self.keep_prob_input_pl_list = []
         self.keep_prob_hidden_pl_list = []
         self.keep_prob_output_pl_list = []
+
+    def __call__(self, inputs, inputs_seq_len, keep_prob_input,
+                 keep_prob_hidden, keep_prob_output):
+        """Construct model graph.
+        Args:
+            inputs: A tensor of size `[B, T, input_size]`
+            inputs_seq_len: A tensor of size `[B]`
+            keep_prob_input: A float value. A probability to keep nodes in
+                the input-hidden connection
+            keep_prob_hidden: A float value. A probability to keep nodes in
+                the hidden-hidden connection
+            keep_prob_output: A float value. A probability to keep nodes in
+                the hidden-output connection
+        Returns:
+            logits: A tensor of size `[T, B, num_classes]`
+        """
+        logits, final_state = self.encoder(
+            inputs, inputs_seq_len, keep_prob_input,
+            keep_prob_hidden, keep_prob_output)
+
+        return logits
 
     def create_placeholders(self):
         """Create placeholders and append them to list."""
@@ -114,7 +101,8 @@ class ctcBase(object):
         """Add gaussian noise to the inputs.
         Args:
             inputs: the noise free input-features.
-            stddev: The standart deviation of the noise.
+            stddev (float, optional): The standart deviation of the noise.
+                Default is 0.075.
         Returns:
             inputs: Input features plus noise.
         """
@@ -132,7 +120,7 @@ class ctcBase(object):
         Args:
             grads_and_vars:
             gradient_noise_scale:
-            stddev:
+            stddev (float):
         Returns:
         """
         raise NotImplementedError
@@ -144,21 +132,20 @@ class ctcBase(object):
             inputs: A tensor of size `[B, T, input_size]`
             labels: A SparseTensor of target labels
             inputs_seq_len: A tensor of size `[B]`
-            keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden layer
-            keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden layers
-            keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output layer
-            scope: A scope in the model tower
+            keep_prob_input (float): A probability to keep nodes in the
+                input-hidden layer
+            keep_prob_hidden (float): A probability to keep nodes in the
+                hidden-hidden layers
+            keep_prob_output (float): A probability to keep nodes in the
+                hidden-output layer
+            scope (optional): A scope in the model tower
         Returns:
             total_loss: operation for computing total ctc loss
             logits: A tensor of size `[T, B, input_size]`
         """
         # Build model graph
-        logits = self._build(
-            inputs, inputs_seq_len,
-            keep_prob_input, keep_prob_hidden, keep_prob_output)
+        logits = self(inputs, inputs_seq_len,
+                      keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         # Weight decay
         if self.weight_decay > 0:
@@ -208,8 +195,9 @@ class ctcBase(object):
     def set_optimizer(self, optimizer_name, learning_rate):
         """Set optimizer.
         Args:
-            optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
-            learning_rate: A float value, a learning rate
+            optimizer_name (string): the name of the optimizer in
+                OPTIMIZER_CLS_NAMES
+            learning_rate (float): A learning rate
         Returns:
             optimizer:
         """
@@ -220,21 +208,23 @@ class ctcBase(object):
                 (", ".join(OPTIMIZER_CLS_NAMES), optimizer_name))
 
         # Select optimizer
-        if optimizer_name == 'momentum':
+        if optimizer_name == 'sgd':
             return OPTIMIZER_CLS_NAMES[optimizer_name](
                 learning_rate=learning_rate,
                 momentum=0.9)
+            # NOTE: Default momentum of SGD is 0.9
         else:
             return OPTIMIZER_CLS_NAMES[optimizer_name](
                 learning_rate=learning_rate)
 
-    def train(self, loss, optimizer, learning_rate=None, clip_norm=False):
+    def train(self, loss, optimizer_name, learning_rate, clip_norm=False):
         """Operation for training. Only the sigle GPU training is supported.
         Args:
             loss: An operation for computing loss
-            optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
-            learning_rate: A float value, a learning rate
-            clip_norm: if True, clip gradients norm by self.clip_grad
+            optimizer_name (string): name of the optimizer in OPTIMIZER_CLS_NAMES
+            learning_rate (float): A learning rate
+            clip_norm (bool, optional): if True, clip gradients norm by
+                self.clip_grad
         Returns:
             train_op: operation for training
         """
@@ -242,7 +232,7 @@ class ctcBase(object):
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         # Set optimizer
-        self.optimizer = self.set_optimizer(optimizer, learning_rate)
+        self.optimizer = self.set_optimizer(optimizer_name, learning_rate)
 
         if self.clip_grad is not None:
             # Compute gradients
@@ -297,25 +287,26 @@ class ctcBase(object):
 
         return clipped_grads_and_vars
 
-    def decoder(self, logits, inputs_seq_len, decode_type, beam_width=None):
+    def decoder(self, logits, inputs_seq_len, decode_type='greedy',
+                beam_width=1):
         """Operation for decoding.
         Args:
             logits: A tensor of size `[T, B, input_size]`
             inputs_seq_len: A tensor of size `[B]`
-            decode_type: greedy or beam_search
-            beam_width: beam width for beam search
+            decode_type (string): greedy or beam_search. Defalult is greedy.
+            beam_width (int, optional): beam width for beam search.
+                Default is 1 (best path decoding).
         Return:
             decode_op: A SparseTensor
         """
         if decode_type not in ['greedy', 'beam_search']:
             raise ValueError('decode_type is "greedy" or "beam_search".')
+        assert isinstance(beam_width, int), "beam_width should be integer."
 
-        if decode_type == 'greedy':
+        if decode_type == 'greedy' or beam_width == 1:
             decoded, _ = tf.nn.ctc_greedy_decoder(
                 logits, tf.cast(inputs_seq_len, tf.int32))
         elif decode_type == 'beam_search':
-            if beam_width is None:
-                raise ValueError('Set beam_width.')
             decoded, _ = tf.nn.ctc_beam_search_decoder(
                 logits, tf.cast(inputs_seq_len, tf.int32),
                 beam_width=beam_width)
@@ -357,32 +348,23 @@ class ctcBase(object):
 
         return ler_op
 
-    def _tensorboard(self, trainable_vars):
+    def _tensorboard(self, trainable_vars, dev=True):
         """Compute statistics for TensorBoard plot.
         Args:
             trainable_vars:
+            dev (bool, optional): if True, show values in the dev set
         """
         # Histogram
         with tf.name_scope("train"):
             for var in trainable_vars:
                 self.summaries_train.append(
                     tf.summary.histogram(var.name, var))
-        with tf.name_scope("dev"):
-            for var in trainable_vars:
-                self.summaries_dev.append(
-                    tf.summary.histogram(var.name, var))
 
         # Mean
         with tf.name_scope("mean_train"):
             for var in trainable_vars:
                 self.summaries_train.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_mean(var)))
-        with tf.name_scope("mean_dev"):
-            for var in trainable_vars:
-                self.summaries_dev.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_mean(var)))
+                    tf.summary.scalar(var.name, tf.reduce_mean(var)))
 
         # Standard deviation
         with tf.name_scope("stddev_train"):
@@ -390,31 +372,46 @@ class ctcBase(object):
                 self.summaries_train.append(
                     tf.summary.scalar(var.name, tf.sqrt(
                         tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
-        with tf.name_scope("stddev_dev"):
-            for var in trainable_vars:
-                self.summaries_dev.append(
-                    tf.summary.scalar(var.name, tf.sqrt(
-                        tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
 
         # Max
         with tf.name_scope("max_train"):
             for var in trainable_vars:
                 self.summaries_train.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_max(var)))
-        with tf.name_scope("max_dev"):
-            for var in trainable_vars:
-                self.summaries_dev.append(
                     tf.summary.scalar(var.name, tf.reduce_max(var)))
 
         # Min
         with tf.name_scope("min_train"):
             for var in trainable_vars:
                 self.summaries_train.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_min(var)))
-        with tf.name_scope("min_dev"):
-            for var in trainable_vars:
-                self.summaries_dev.append(
-                    tf.summary.scalar(var.name,
-                                      tf.reduce_min(var)))
+                    tf.summary.scalar(var.name, tf.reduce_min(var)))
+
+        if dev:
+            # Histogram
+            with tf.name_scope("dev"):
+                for var in trainable_vars:
+                    self.summaries_dev.append(tf.summary.histogram(var.name, var))
+
+            # Mean
+            with tf.name_scope("mean_dev"):
+                for var in trainable_vars:
+                    self.summaries_dev.append(
+                        tf.summary.scalar(var.name, tf.reduce_mean(var)))
+
+            # Standard deviation
+            with tf.name_scope("stddev_dev"):
+                for var in trainable_vars:
+                    self.summaries_dev.append(
+                        tf.summary.scalar(var.name, tf.sqrt(
+                            tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
+
+            # Max
+            with tf.name_scope("max_dev"):
+                for var in trainable_vars:
+                    self.summaries_dev.append(
+                        tf.summary.scalar(var.name, tf.reduce_max(var)))
+
+            # Min
+            with tf.name_scope("min_dev"):
+                for var in trainable_vars:
+                    self.summaries_dev.append(
+                        tf.summary.scalar(var.name, tf.reduce_min(var)))

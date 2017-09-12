@@ -1,5 +1,6 @@
 param:
-  model: multitask_blstm_ctc
+  model: multitask_lstm_ctc
+  bidirectional: True
   corpus: timit
   label_type_main: character
   label_type_sub: phone61
@@ -8,10 +9,10 @@ param:
   splice: 1
   num_stack: 3
   num_skip: 3
-  num_unit: 256
+  num_units: 256
   num_proj: 0
-  num_layer_main: 5
-  num_layer_sub: 3
+  num_layers_main: 5
+  num_layers_sub: 3
   bottleneck_dim: 0
   main_task_weight: 0.5
   batch_size: 64

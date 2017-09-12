@@ -1,6 +1,7 @@
 #!/bin/zsh
 
 MODEL_SAVE_PATH="/n/sd8/inaguma/result/timit/"
+STANDARD_OUTPUT=true
 
 # Select GPU
 if [ $# -ne 2 ]; then
@@ -20,8 +21,12 @@ config_path=$1
 gpu_index=$2
 filename=$(basename $config_path | awk -F. '{print $1}')
 
-# Background job version
-CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_attention.py $config_path $MODEL_SAVE_PATH > log/$filename".log" &
-
-# Standard output version
-# CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_attention.py $config_path $MODEL_SAVE_PATH
+if $STANDARD_OUTPUT ; then
+    # Standard output version
+    CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_attention.py \
+        $config_path $MODEL_SAVE_PATH $STANDARD_OUTPUT
+else
+    # Background job version
+    CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_attention.py \
+        $config_path $MODEL_SAVE_PATH $STANDARD_OUTPUT > log/$filename".log" &
+fi

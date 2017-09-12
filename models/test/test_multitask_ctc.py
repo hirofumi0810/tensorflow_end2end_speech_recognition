@@ -11,7 +11,7 @@ import tensorflow as tf
 # from tensorflow.python import debug as tf_debug
 
 sys.path.append('../../')
-from models.ctc.load_model_multitask import load
+from models.ctc.load_model import load
 from models.test.util import measure_time
 from models.test.data import generate_data, num2alpha, num2phone
 from experiments.utils.data.sparsetensor import sparsetensor2list
@@ -19,15 +19,19 @@ from experiments.utils.parameter import count_total_parameters
 from experiments.utils.training.learning_rate_controller import Controller
 
 
-class TestCTC(tf.test.TestCase):
+class TestMultitaskCTC(tf.test.TestCase):
 
     def test_multiask_ctc(self):
         print("Multitask CTC Working check.")
-        self.check_training(model_type='multitask_blstm_ctc')
+        self.check_training(bidirectional=True)
+        self.check_training(bidirectional=False)
 
     @measure_time
-    def check_training(self, model_type):
-        print('----- model_type: %s -----' % model_type)
+    def check_training(self, bidirectional):
+
+        print('==================================================')
+        print('  bidirectional: %s' % str(bidirectional))
+        print('==================================================')
 
         tf.reset_default_graph()
         with tf.Graph().as_default():
@@ -41,21 +45,20 @@ class TestCTC(tf.test.TestCase):
             # Define model graph
             num_classes_main = 26
             num_classes_sub = 61
-            model = load(model_type=model_type)
+            model = load(model_type='multitask_lstm_ctc')
             network = model(input_size=inputs[0].shape[1],
-                            num_unit=256,
-                            num_layer_main=2,
-                            num_layer_sub=1,
+                            num_units=256,
+                            num_layers_main=2,
+                            num_layers_sub=1,
                             num_classes_main=num_classes_main,
                             num_classes_sub=num_classes_sub,
                             main_task_weight=0.8,
+                            bidirectional=bidirectional,
                             parameter_init=0.1,
                             clip_grad=5.0,
                             clip_activation=50,
-                            dropout_ratio_input=0.9,
-                            dropout_ratio_hidden=0.9,
-                            dropout_ratio_output=0.9,
-                            num_proj=None,
+                            num_proj=256,
+                            bottleneck_dim=50,
                             weight_decay=1e-8)
 
             # Define placeholders
@@ -112,9 +115,9 @@ class TestCTC(tf.test.TestCase):
                 network.labels_pl_list[0]: labels_true_char_st,
                 network.labels_sub_pl_list[0]: labels_true_phone_st,
                 network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                network.keep_prob_input_pl_list[0]: network.dropout_ratio_input,
-                network.keep_prob_hidden_pl_list[0]: network.dropout_ratio_hidden,
-                network.keep_prob_output_pl_list[0]: network.dropout_ratio_output,
+                network.keep_prob_input_pl_list[0]: 0.9,
+                network.keep_prob_hidden_pl_list[0]: 0.9,
+                network.keep_prob_output_pl_list[0]: 0.9,
                 learning_rate_pl: learning_rate
             }
 
@@ -128,7 +131,7 @@ class TestCTC(tf.test.TestCase):
                 # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 
                 # Train model
-                max_steps = 400
+                max_steps = 500
                 start_time_global = time.time()
                 start_time_step = time.time()
                 ler_train_char_pre = 1
@@ -173,15 +176,32 @@ class TestCTC(tf.test.TestCase):
                             labels_pred_char_st, batch_size=batch_size)
                         labels_pred_phone = sparsetensor2list(
                             labels_pred_phone_st, batch_size=batch_size)
+
                         print('Character')
-                        print('  True: %s' % num2alpha(labels_true_char[0]))
-                        print('  Pred: %s' % num2alpha(labels_pred_char[0]))
+                        try:
+                            print('  True: %s' %
+                                  num2alpha(labels_true_char[0]))
+                            print('  Pred: %s' %
+                                  num2alpha(labels_pred_char[0]))
+                        except IndexError:
+                            print('Character')
+                            print('  True: %s' %
+                                  num2alpha(labels_true_char[0]))
+                            print('  Pred: %s' % '')
+
                         print('Phone')
-                        print('  True: %s' % num2phone(labels_true_phone[0],
-                                                       map_file_path))
-                        print('  Pred: %s' % num2phone(labels_pred_phone[0],
-                                                       map_file_path))
-                        print('----------------------------------------')
+                        try:
+                            print('  True: %s' % num2phone(labels_true_phone[0],
+                                                           map_file_path))
+                            print('  Pred: %s' % num2phone(labels_pred_phone[0],
+                                                           map_file_path))
+                        except IndexError:
+                            print('  True: %s' % num2phone(labels_true_phone[0],
+                                                           map_file_path))
+                            print('  Pred: %s' % '')
+                            # NOTE: This is for no prediction
+                        print('---------------------------------------------' +
+                              '---------------------------------------------')
 
                         if ler_train_char >= ler_train_char_pre:
                             not_improved_count += 1

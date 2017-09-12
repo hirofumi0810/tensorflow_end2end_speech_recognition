@@ -29,10 +29,10 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         per_op: operation for computing phone error rate
         network: network to evaluate
         dataset: An instance of a `Dataset' class
-        label_type: string, phone39 or phone48 or phone61
-        eval_batch_size: int, the batch size when evaluating the model
-        progressbar: if True, visualize the progressbar
-        is_multitask: if True, evaluate the multitask model
+        label_type (string): phone39 or phone48 or phone61
+        eval_batch_size (int): the batch size when evaluating the model
+        progressbar (bool, optional): if True, visualize the progressbar
+        is_multitask (bool, optional): if True, evaluate the multitask model
     Returns:
         per_mean: An average of PER
     """
@@ -50,13 +50,12 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     phone2num_39_map_file_path = '../metrics/mapping_files/ctc/phone39_to_num.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     per_mean = 0
-    total_step = int(dataset.data_num / batch_size)
-    if (dataset.data_num / batch_size) != dataset.data_num // batch_size:
+    total_step = int(len(dataset) / batch_size)
+    if (len(dataset) / batch_size) != len(dataset) // batch_size:
         total_step += 1
-    for data, next_epoch_flag in wrap_generator(dataset(batch_size),
-                                                progressbar,
-                                                total=total_step):
+    for _ in wrap_generator(range(len(dataset)), progressbar, total=total_step):
         # Create feed dictionary for next mini batch
+        data, next_epoch_flag = dataset.next()
         if is_multitask:
             inputs, _, labels_true, inputs_seq_len, _ = data
         else:
@@ -126,7 +125,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
         if next_epoch_flag:
             break
 
-    per_mean /= dataset.data_num
+    per_mean /= len(dataset)
 
     return per_mean
 
@@ -139,10 +138,10 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
         decode_op: operation for decoding
         network: network to evaluate
         dataset: An instance of a `Dataset` class
-        label_type: string, character or character_capital_divide
-        eval_batch_size: int, the batch size when evaluating the model
-        progressbar: if True, visualize the progressbar
-        is_multitask: if True, evaluate the multitask model
+        label_type (string): character or character_capital_divide
+        eval_batch_size (int, optional): the batch size when evaluating the model
+        progressbar (bool, optional): if True, visualize the progressbar
+        is_multitask (bool, optional): if True, evaluate the multitask model
     Return:
         cer_mean: An average of CER
     """
@@ -153,13 +152,12 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
 
     map_file_path = '../metrics/mapping_files/ctc/' + label_type + '_to_num.txt'
     cer_mean = 0
-    total_step = int(dataset.data_num / batch_size)
-    if (dataset.data_num / batch_size) != dataset.data_num // batch_size:
+    total_step = int(len(dataset) / batch_size)
+    if (len(dataset) / batch_size) != len(dataset) // batch_size:
         total_step += 1
-    for data, next_epoch_flag in wrap_generator(dataset(batch_size),
-                                                progressbar,
-                                                total=total_step):
+    for _ in wrap_generator(range(len(dataset)), progressbar, total=total_step):
         # Create feed dictionary for next mini batch
+        data, next_epoch_flag = dataset.next()
         if is_multitask:
             inputs, labels_true, _, inputs_seq_len, _ = data
         else:
@@ -199,6 +197,6 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
         if next_epoch_flag:
             break
 
-    cer_mean /= dataset.data_num
+    cer_mean /= len(dataset)
 
     return cer_mean
