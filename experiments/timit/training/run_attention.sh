@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-MODEL_SAVE_PATH="/n/sd8/inaguma/result/timit/"
+MODEL_SAVE_PATH="/home/huanglu/asr/end2end/tf_end2end/experiments/timit/exp/ctc"
 STANDARD_OUTPUT=true
 
 # Select GPU
@@ -15,7 +15,7 @@ export PATH=$PATH:/usr/local/cuda-8.0/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-8.0/lib64:/usr/local/cuda-8.0/extras/CUPTI/lib64
 
 # Set path to python
-PYTHON=/home/lab5/inaguma/.pyenv/versions/anaconda3-4.1.1/bin/python
+PYTHON=/home/huanglu/usr/anaconda2/bin/python
 
 config_path=$1
 gpu_index=$2
