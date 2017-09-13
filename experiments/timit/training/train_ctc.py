@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+# ! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """Train the CTC model (TIMIT corpus)."""
@@ -7,7 +7,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 from os.path import join, isfile
 import sys
 import time
@@ -32,7 +31,7 @@ def do_train(network, params):
     with 39 phones.
     Args:
         network: network to train
-        params: A dictionary of parameters
+        params (dict): A dictionary of parameters
     """
     # Load dataset
     train_data = Dataset(
@@ -131,6 +130,7 @@ def do_train(network, params):
             learning_rate = float(params['learning_rate'])
             epoch, step = 1, 0
             while True:
+                # TODO: change this loop
 
                 # Create feed dictionary for next mini batch (train)
                 (inputs, labels, inputs_seq_len,
@@ -149,7 +149,7 @@ def do_train(network, params):
                 # Update parameters
                 sess.run(train_op, feed_dict=feed_dict_train)
 
-                if (step + 1) % 10 == 0:
+                if (step + 1) % params['print_step'] == 0:
 
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels, inputs_seq_len, _), _ = dev_data.next()
@@ -190,7 +190,7 @@ def do_train(network, params):
                     print("Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) / lr = %.5f (%.3f min)" %
                           (step + 1, loss_train, loss_dev, ler_train, ler_dev,
                            learning_rate, duration_step / 60))
-                    # sys.stdout.flush()
+                    sys.stdout.flush()
                     step += 1
                     start_time_step = time.time()
 
@@ -200,12 +200,6 @@ def do_train(network, params):
                     print('-----EPOCH:%d (%.3f min)-----' %
                           (epoch, duration_epoch / 60))
 
-                    # Save model (check point)
-                    checkpoint_file = join(network.model_dir, 'model.ckpt')
-                    save_path = saver.save(
-                        sess, checkpoint_file, global_step=epoch)
-                    print("Model saved in file: %s" % save_path)
-
                     # Save fugure of loss & ler
                     plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
                               save_path=network.model_dir)
@@ -213,7 +207,7 @@ def do_train(network, params):
                              label_type=params['label_type'],
                              save_path=network.model_dir)
 
-                    if epoch >= 20:
+                    if epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
                         if params['label_type'] in ['character', 'character_capital_divide']:
                             print('=== Dev Data Evaluation ===')
@@ -230,6 +224,12 @@ def do_train(network, params):
                                 ler_dev_best = ler_dev_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
+                                # Save model (check point)
+                                checkpoint_file = join(network.model_dir, 'model.ckpt')
+                                save_path = saver.save(
+                                    sess, checkpoint_file, global_step=epoch)
+                                print("Model saved in file: %s" % save_path)
+
                                 print('=== Test Data Evaluation ===')
                                 ler_test = do_eval_cer(
                                     session=sess,
@@ -239,9 +239,6 @@ def do_train(network, params):
                                     label_type=params['label_type'],
                                     eval_batch_size=1)
                                 print('  CER: %f %%' % (ler_test * 100))
-                            else:
-                                # Remove the saved model
-                                os.remove(save_path)
 
                         else:
                             print('=== Dev Data Evaluation ===')
@@ -269,9 +266,12 @@ def do_train(network, params):
                                     label_type=params['label_type'],
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (ler_test * 100))
-                            else:
-                                # Remove the saved model
-                                os.remove(save_path)
+
+                                # Save model (check point)
+                                checkpoint_file = join(network.model_dir, 'model.ckpt')
+                                save_path = saver.save(
+                                    sess, checkpoint_file, global_step=epoch)
+                                print("Model saved in file: %s" % save_path)
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -297,7 +297,7 @@ def do_train(network, params):
                 f.write('')
 
 
-def main(config_path, model_save_path, stdout):
+def main(config_path, model_save_path):
 
     # Load a config file (.yml)
     with open(config_path, "r") as f:
@@ -330,32 +330,28 @@ def main(config_path, model_save_path, stdout):
                     num_proj=params['num_proj'],
                     weight_decay=params['weight_decay'])
 
-    if params['bidirectional']:
-        network.model_name = 'b' + params['model']
-    else:
-        network.model_name = params['model']
-    network.model_name += '_' + str(params['num_units'])
-    network.model_name += '_' + str(params['num_layers'])
-    network.model_name += '_' + params['optimizer']
-    network.model_name += '_lr' + str(params['learning_rate'])
+    network.name += '_' + str(params['num_units'])
+    network.name += '_' + str(params['num_layers'])
+    network.name += '_' + params['optimizer']
+    network.name += '_lr' + str(params['learning_rate'])
     if params['num_proj'] != 0:
-        network.model_name += '_proj' + str(params['num_proj'])
+        network.name += '_proj' + str(params['num_proj'])
     if params['dropout_input'] != 1:
-        network.model_name += '_dropi' + str(params['dropout_input'])
+        network.name += '_dropi' + str(params['dropout_input'])
     if params['dropout_hidden'] != 1:
-        network.model_name += '_droph' + str(params['dropout_hidden'])
+        network.name += '_droph' + str(params['dropout_hidden'])
     if params['dropout_output'] != 1:
-        network.model_name += '_dropo' + str(params['dropout_output'])
+        network.name += '_dropo' + str(params['dropout_output'])
     if params['num_stack'] != 1:
-        network.model_name += '_stack' + str(params['num_stack'])
+        network.name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:
-        network.model_name += '_weightdecay' + str(params['weight_decay'])
+        network.name += '_weightdecay' + str(params['weight_decay'])
 
     # Set save path
     network.model_dir = mkdir(model_save_path)
     network.model_dir = mkdir_join(network.model_dir, 'ctc')
     network.model_dir = mkdir_join(network.model_dir, params['label_type'])
-    network.model_dir = mkdir_join(network.model_dir, network.model_name)
+    network.model_dir = mkdir_join(network.model_dir, network.name)
 
     # Reset model directory
     if not isfile(join(network.model_dir, 'complete.txt')):
@@ -370,14 +366,14 @@ def main(config_path, model_save_path, stdout):
     # Save config file
     shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
 
-    if not bool(stdout):
-        sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
+    sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
+    # TODO: change to logger
     do_train(network=network, params=params)
 
 
 if __name__ == '__main__':
 
     args = sys.argv
-    if len(args) != 4:
-        raise ValueError('Length of args should be 4.')
-    main(config_path=args[1], model_save_path=args[2], stdout=args[3])
+    if len(args) != 3:
+        raise ValueError('Length of args should be 3.')
+    main(config_path=args[1], model_save_path=args[2])

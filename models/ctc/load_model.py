@@ -26,7 +26,7 @@ CTC = {
 def load(model_type):
     """Select & load model.
     Args:
-        model_type: string, name of the ctc model in the key of CTC
+        model_type (string): name of the ctc model in the key of CTC
     Returns:
         model: class object
     """
@@ -34,5 +34,4 @@ def load(model_type):
         raise ValueError(
             "model_type should be one of [%s], you provided %s." %
             (", ".join(CTC), model_type))
-
     return CTC[model_type]

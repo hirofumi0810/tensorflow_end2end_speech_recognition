@@ -1,8 +1,8 @@
 param:
-  model: lstm_ctc
+  model: gru_ctc
   bidirectional: True
   corpus: timit
-  label_type: character_capital_divide
+  label_type: phone61
   feature: fbank
   input_size: 120
   splice: 1
@@ -26,3 +26,5 @@ param:
   dropout_hidden: 0.5
   dropout_output: 1.0
   weight_decay: 0
+  eval_start_epoch: 20
+  print_step: 10

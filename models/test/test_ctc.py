@@ -24,9 +24,19 @@ class TestCTC(tf.test.TestCase):
     def test_ctc(self):
         print("CTC Working check.")
 
-        # self.check_training(model_type='cnn_ctc', label_type='phone')
-        # self.check_training(model_type='cnn_ctc', label_type='character')
-        # raise ValueError
+        ##############################
+        # VGG-BLSTM-CTC
+        ##############################
+        self.check_training(model_type='vgg_lstm_ctc', bidirectional=True,
+                            label_type='phone')
+        self.check_training(model_type='vgg_lstm_ctc', bidirectional=True,
+                            label_type='character')
+
+        ##############################
+        # VGG-LSTM-CTC
+        ##############################
+        self.check_training(model_type='vgg_lstm_ctc', label_type='phone')
+        self.check_training(model_type='vgg_lstm_ctc', label_type='character')
 
         ##############################
         # BLSTM-CTC
@@ -73,21 +83,6 @@ class TestCTC(tf.test.TestCase):
         ##############################
         # self.check_training(model_type='cnn_ctc', label_type='phone')
         # self.check_training(model_type='cnn_ctc', label_type='character')
-
-        ##############################
-        # VGG-BLSTM-CTC
-        ##############################
-        self.check_training(model_type='vgg_lstm_ctc', bidirectional=True,
-                            label_type='phone')
-        self.check_training(model_type='vgg_lstm_ctc', bidirectional=True,
-                            label_type='character')
-
-        ##############################
-        # VGG-LSTM-CTC
-        ##############################
-        # self.check_training(model_type='vgg_lstm_ctc', label_type='phone')
-        # self.check_training(model_type='vgg_lstm_ctc',
-        # label_type='character')
 
     @measure_time
     def check_training(self, model_type, label_type, bidirectional=False,

@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from models.ctc.multitask_ctc_base import multitaskCTCBase
+from models.ctc.base_multitask import multitaskCTCBase
 from models.encoders.multitask_blstm_encoder import Multitask_BLSTM_Encoder
 from models.encoders.multitask_lstm_encoder import Multitask_LSTM_Encoder
 
@@ -15,6 +15,7 @@ from models.encoders.multitask_lstm_encoder import Multitask_LSTM_Encoder
 class Multitask_LSTM_CTC(multitaskCTCBase):
     """Multi-task (bidirectional) LSTM-CTC model.
     Args:
+
         input_size (int): the dimensions of input vectors
         num_units (int): the number of units in each layer
         num_layers_main (int): the number of layers of the main task
@@ -33,11 +34,11 @@ class Multitask_LSTM_CTC(multitaskCTCBase):
         use_peephole (bool, optional): if True, use peephole
         splice (int, optional): frames to splice. Default is 1 frame.
         parameter_init (float, optional): Range of uniform distribution to
-            initialize weight parameters
-        clip_grad (float, optional): Range of gradient clipping (> 0)
+            initialize weight parameters (>= 0)
+        clip_grad (float): the range of gradient clipping (> 0)
         clip_activation (float, optional): Range of activation clipping (> 0)
         num_proj (int, optional): the number of nodes in recurrent projection layer
-        weight_decay (float, optional): Regularization parameter for weight decay
+        weight_decay (float, optional): a parameter for weight decay
         bottleneck_dim (int, optional): the dimensions of the bottleneck layer
     """
 

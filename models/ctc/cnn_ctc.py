@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from models.ctc.ctc_base import CTCBase
+from models.ctc.base import CTCBase
 from models.encoders.cnn_encoder import CNN_Encoder
 
 
@@ -28,14 +28,15 @@ class CNN_CTC(CTCBase):
         bidirectional: <not used>
         lstm_impl: <not used>
         use_peephole: <not used>
-        splice (int, optional): frames to splice. Default is 1 frame.
-        parameter_init (float, optional): Range of uniform distribution to
-            initialize weight parameters
-        clip_grad (float, optional): Range of gradient clipping (> 0)
-        clip_activation (float, optional): Range of activation clipping (> 0)
+        splice (int, optional): the number of frames to splice.
+            Default is 11 frame (left: 5 frames, right: 5 frames).
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        clip_grad (float): the range of gradient clipping (> 0)
+        clip_activation <not used>
         num_proj: <not used>
-        weight_decay (float, optional): Regularization parameter for weight decay
-        bottleneck_dim: <not used>
+        weight_decay (float, optional): a parameter for weight decay
+        bottleneck_dim (int, optional): the dimensions of the bottleneck layer
     """
 
     def __init__(self,
@@ -49,7 +50,7 @@ class CNN_CTC(CTCBase):
                  splice=11,
                  parameter_init=0.1,
                  clip_grad=None,
-                 clip_activation=None,
+                 clip_activation=None,  # <not used>
                  num_proj=None,  # <not used>
                  weight_decay=0.0,
                  bottleneck_dim=None):  # <not used>
