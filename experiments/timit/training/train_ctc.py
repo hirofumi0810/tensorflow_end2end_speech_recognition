@@ -241,7 +241,8 @@ def do_train(network, params):
                                 print('  CER: %f %%' % (ler_test * 100))
                             else:
                                 # Remove the saved model
-                                os.remove(save_path)
+                                # os.remove(save_path)
+                                os.system('rm {0}*'.format(save_path))
 
                         else:
                             print('=== Dev Data Evaluation ===')
@@ -271,7 +272,8 @@ def do_train(network, params):
                                 print('  PER: %f %%' % (ler_test * 100))
                             else:
                                 # Remove the saved model
-                                os.remove(save_path)
+                                # os.remove(save_path)
+                                os.system('rm {0}*'.format(save_path))
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
