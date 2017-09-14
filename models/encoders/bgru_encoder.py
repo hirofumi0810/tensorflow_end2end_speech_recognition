@@ -17,8 +17,8 @@ class BGRU_Encoder(object):
         num_layers (int): the number of layers
         num_classes (int): the number of classes of target labels
             (except for a blank label)
-        parameter_init (float): Range of uniform distribution to initialize
-            weight parameters
+        parameter_init (float): the range of uniform distribution to initialize
+            weight parameters (>= 0)
         bottleneck_dim (int): the dimensions of the bottleneck layer
         name (string, optional): the name of encoder
     """
@@ -39,18 +39,18 @@ class BGRU_Encoder(object):
             None, 0] else None
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob_input,
-                 keep_prob_hidden, keep_prob_output):
+    def __call__(self, inputs, inputs_seq_len,
+                 keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of size`[B, T, input_size]`
-            inputs_seq_len:  A tensor of size` [B]`
-            keep_prob_input (float): A probability to keep nodes in the
-                input-hidden connection
-            keep_prob_hidden (float): A probability to keep nodes in the
-                hidden-hidden connection
-            keep_prob_output (float): A probability to keep nodes in the
-                hidden-output connection
+            inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
+            keep_prob_input (placeholder, float): A probability to keep nodes
+                in the input-hidden connection
+            keep_prob_hidden (placeholder, float): A probability to keep nodes
+                in the hidden-hidden connection
+            keep_prob_output (placeholder, float): A probability to keep nodes
+                in the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder
@@ -100,27 +100,27 @@ class BGRU_Encoder(object):
         batch_size = tf.shape(inputs)[0]
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
-            with tf.name_scope('bottleneck'):
+            with tf.variable_scope('bottleneck') as scope:
                 outputs = tf.contrib.layers.fully_connected(
                     outputs, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
                     weights_initializer=tf.truncated_normal_initializer(
                         stddev=0.1),
                     biases_initializer=tf.zeros_initializer(),
-                    scope='bottleneck')
+                    scope=scope)
 
                 # Dropout for the hidden-output connections
                 outputs = tf.nn.dropout(
                     outputs, keep_prob_output, name='dropout_output_bottle')
 
-        with tf.name_scope('output'):
+        with tf.variable_scope('output') as scope:
             logits_2d = tf.contrib.layers.fully_connected(
                 outputs, self.num_classes,
                 activation_fn=None,
                 weights_initializer=tf.truncated_normal_initializer(
                     stddev=0.1),
                 biases_initializer=tf.zeros_initializer(),
-                scope='output')
+                scope=scope)
 
             # Reshape back to the original shape
             logits = tf.reshape(

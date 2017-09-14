@@ -14,7 +14,7 @@ import tensorflow as tf
 class VGG_BLSTM_Encoder(object):
     """VGG + bidirectional LSTM encoder.
     Args:
-        input_size (int):
+        input_size (int): the dimensions of input vectors
         num_units (int): the number of units in each layer
         num_layers (int): the number of layers
         num_classes (int): the number of classes of target labels
@@ -24,10 +24,10 @@ class VGG_BLSTM_Encoder(object):
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
         use_peephole (bool): if True, use peephole
-        parameter_init (float): Range of uniform distribution to initialize
-            weight parameters
-        clip_activation (float): Range of activation clipping (> 0)
-        num_proj (int): the number of nodes in recurrent projection layer
+        parameter_init (float): the range of uniform distribution to initialize
+            weight parameters (>= 0)
+        clip_activation (float): the range of activation clipping (> 0)
+        num_proj (int): the number of nodes in the projection layer
         bottleneck_dim (int): the dimensions of the bottleneck layer
         name (string, optional): the name of encoder
     """
@@ -65,61 +65,70 @@ class VGG_BLSTM_Encoder(object):
             None, 0] else None
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob_input,
-                 keep_prob_hidden, keep_prob_output):
+    def __call__(self, inputs, inputs_seq_len,
+                 keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of size `[B, T, input_size]`
-            inputs_seq_len: A tensor of size `[B]`
-            keep_prob_input (float): A probability to keep nodes in the
-                input-hidden connection
-            keep_prob_hidden (float): A probability to keep nodes in the
-                hidden-hidden connection
-            keep_prob_output (float): A probability to keep nodes in the
-                hidden-output connection
+            inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
+            keep_prob_input (placeholder, float): A probability to keep nodes
+                in the input-hidden connection
+            keep_prob_hidden (placeholder, float): A probability to keep nodes
+                in the hidden-hidden connection
+            keep_prob_output (placeholder, float): A probability to keep nodes
+                in the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder
         """
-        # TODO: add lstm_impl
-
         # inputs: 3D tensor `[batch_size, max_time, input_size * splice]`
         batch_size = tf.shape(inputs)[0]
         max_time = tf.shape(inputs)[1]
 
         # Reshape to 4D tensor `[batch_size, max_time, input_size, splice]`
         inputs = tf.reshape(
-            inputs, shape=[batch_size, max_time, self.input_size, self.splice])
+            inputs, shape=[batch_size,
+                           max_time,
+                           self.input_size,
+                           self.splice])
 
         # Reshape to 5D tensor
         # `[batch_size, max_time, input_size / 3, 3 (+Δ, ΔΔ), splice]`
         inputs = tf.reshape(
-            inputs, shape=[batch_size, max_time, int(self.input_size / 3), 3, self.splice])
+            inputs, shape=[batch_size,
+                           max_time,
+                           int(self.input_size / 3), 3, self.splice])
 
         # Reshape to 4D tensor
         # `[batch_size * max_time, input_size / 3, splice, 3]`
         inputs = tf.transpose(inputs, (0, 1, 2, 4, 3))
         inputs = tf.reshape(
-            inputs, shape=[batch_size * max_time, int(self.input_size / 3), self.splice, 3])
+            inputs, shape=[batch_size * max_time,
+                           int(self.input_size / 3),
+                           self.splice, 3])
 
-        with tf.name_scope('VGG1'):
-            inputs = self._conv_layer(inputs,
-                                      filter_shape=[3, 3, 3, 64],
-                                      name='conv1')
-            inputs = self._conv_layer(inputs,
-                                      filter_shape=[3, 3, 64, 64],
-                                      name='conv2')
-            inputs = self._max_pool(inputs, name='pool')
+        with tf.variable_scope('VGG1'):
+            inputs = _conv_layer(inputs,
+                                 filter_shape=[3, 3, 3, 64],
+                                 parameter_init=self.parameter_init,
+                                 name='conv1')
+            inputs = _conv_layer(inputs,
+                                 filter_shape=[3, 3, 64, 64],
+                                 parameter_init=self.parameter_init,
+                                 name='conv2')
+            inputs = _max_pool(inputs, name='pool')
             # TODO: try batch normalization
 
-        with tf.name_scope('VGG2'):
-            inputs = self._conv_layer(inputs,
-                                      filter_shape=[3, 3, 64, 128],
-                                      name='conv1')
-            inputs = self._conv_layer(inputs,
-                                      filter_shape=[3, 3, 128, 128],
-                                      name='conv2')
-            inputs = self._max_pool(inputs, name='pool')
+        with tf.variable_scope('VGG2'):
+            inputs = _conv_layer(inputs,
+                                 filter_shape=[3, 3, 64, 128],
+                                 parameter_init=self.parameter_init,
+                                 name='conv1')
+            inputs = _conv_layer(inputs,
+                                 filter_shape=[3, 3, 128, 128],
+                                 parameter_init=self.parameter_init,
+                                 name='conv2')
+            inputs = _max_pool(inputs, name='pool')
             # TODO: try batch normalization
 
         # Reshape to 5D tensor `[batch_size, max_time, new_h, new_w, 128]`
@@ -134,12 +143,12 @@ class VGG_BLSTM_Encoder(object):
 
         # Insert linear layer to recude CNN's output demention
         # from new_h * new_w * 128 to 256
-        with tf.name_scope('linear'):
+        with tf.variable_scope('linear') as scope:
             inputs = tf.contrib.layers.fully_connected(
                 inputs=inputs,
                 num_outputs=256,
                 activation_fn=None,
-                scope='linear')
+                scope=scope)
 
         # Dropout for the VGG-output-hidden connection
         outputs = tf.nn.dropout(inputs,
@@ -216,7 +225,8 @@ class VGG_BLSTM_Encoder(object):
 
                 else:
                     raise IndexError(
-                        'lstm_impl is "BasicLSTMCell" or "LSTMCell" or "LSTMBlockCell" or "LSTMBlockFusedCell".')
+                        'lstm_impl is "BasicLSTMCell" or "LSTMCell" or ' +
+                        '"LSTMBlockCell" or "LSTMBlockFusedCell".')
 
                 # Dropout for the hidden-hidden connections
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
@@ -249,27 +259,25 @@ class VGG_BLSTM_Encoder(object):
             outputs = tf.reshape(outputs, shape=[-1, self.num_proj * 2])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
-            with tf.name_scope('bottleneck'):
+            with tf.variable_scope('bottleneck') as scope:
                 outputs = tf.contrib.layers.fully_connected(
                     outputs, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
-                    weights_initializer=tf.truncated_normal_initializer(
-                        stddev=0.1),
+                    weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
                     biases_initializer=tf.zeros_initializer(),
-                    scope='bottleneck')
+                    scope=scope)
 
                 # Dropout for the hidden-output connections
                 outputs = tf.nn.dropout(
                     outputs, keep_prob_output, name='dropout_output_bottle')
 
-        with tf.name_scope('output'):
+        with tf.variable_scope('output') as scope:
             logits_2d = tf.contrib.layers.fully_connected(
                 outputs, self.num_classes,
                 activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(
-                    stddev=0.1),
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
                 biases_initializer=tf.zeros_initializer(),
-                scope='output')
+                scope=scope)
 
             # Reshape back to the original shape
             logits = tf.reshape(
@@ -284,39 +292,40 @@ class VGG_BLSTM_Encoder(object):
 
             return logits, final_state
 
-    def _max_pool(self, bottom, name):
-        """A max pooling layer.
-        Args:
-            bottom: A tensor of size `[B * T, H, W, C]`
-            name (string): A layer name
-        Returns:
-            A tensor of size `[B * T, H / 2, W / 2, C]`
-        """
-        return tf.nn.max_pool(
-            bottom,
-            ksize=[1, 2, 2, 1],  # original
-            # ksize=[1, 3, 3, 1],
-            strides=[1, 2, 2, 1],
-            padding='SAME', name=name)
 
-    def _conv_layer(self, bottom, filter_shape, name):
-        """A convolutional layer
-        Args:
-            bottom: A tensor of size `[B * T, H, W, C]`
-            filter_shape: A list of
-                `[height, width, input_channel, output_channel]`
-            name (string): A layer name
-        Returns:
-            outputs: A tensor of size `[B * T, H, W, output_channel]`
-        """
-        with tf.variable_scope(name):
-            W = tf.Variable(tf.truncated_normal(shape=filter_shape,
-                                                stddev=self.parameter_init),
-                            name='weight')
-            b = tf.Variable(tf.zeros(shape=filter_shape[-1]),
-                            name='bias')
-            conv_bottom = tf.nn.conv2d(bottom, W,
-                                       strides=[1, 1, 1, 1],
-                                       padding='SAME')
-            outputs = tf.nn.bias_add(conv_bottom, b)
-            return tf.nn.relu(outputs)
+def _max_pool(bottom, name):
+    """A max pooling layer.
+    Args:
+        bottom: A tensor of size `[B * T, H, W, C]`
+        name (string): A layer name
+    Returns:
+        A tensor of size `[B * T, H / 2, W / 2, C]`
+    """
+    return tf.nn.max_pool(
+        bottom,
+        ksize=[1, 2, 2, 1],  # original
+        # ksize=[1, 3, 3, 1],
+        strides=[1, 2, 2, 1],
+        padding='SAME', name=name)
+
+
+def _conv_layer(bottom, filter_shape, parameter_init, name):
+    """A convolutional layer
+    Args:
+        bottom: A tensor of size `[B * T, H, W, C]`
+        filter_shape (list): A list of
+            `[height, width, input_channel, output_channel]`
+        name (string): A layer name
+    Returns:
+        outputs: A tensor of size `[B * T, H, W, output_channel]`
+    """
+    with tf.variable_scope(name):
+        W = tf.Variable(tf.truncated_normal(shape=filter_shape,
+                                            stddev=parameter_init),
+                        name='weight')
+        b = tf.Variable(tf.zeros(shape=filter_shape[-1]), name='bias')
+        conv_bottom = tf.nn.conv2d(bottom, W,
+                                   strides=[1, 1, 1, 1],
+                                   padding='SAME')
+        outputs = tf.nn.bias_add(conv_bottom, b)
+        return tf.nn.relu(outputs)

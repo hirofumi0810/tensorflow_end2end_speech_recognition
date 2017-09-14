@@ -1,8 +1,8 @@
 param:
-  model: gru_ctc
+  model: lstm_ctc
   bidirectional: False
   corpus: timit
-  label_type: phone61
+  label_type: character_capital_divide
   feature: fbank
   input_size: 120
   splice: 1
@@ -14,7 +14,7 @@ param:
   bottleneck_dim: 0
   batch_size: 64
   optimizer: adam
-  learning_rate: 5e-3
+  learning_rate: 1e-3
   decay_start_epoch: 20
   decay_rate: 0.5
   decay_patient_epoch: 3
@@ -26,3 +26,5 @@ param:
   dropout_hidden: 0.5
   dropout_output: 1.0
   weight_decay: 0
+  eval_start_epoch: 20
+  print_step: 10

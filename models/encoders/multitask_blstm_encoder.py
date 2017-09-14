@@ -25,9 +25,9 @@ class Multitask_BLSTM_Encoder(object):
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
         use_peephole (bool): if True, use peephole
-        parameter_init (float): Range of uniform distribution to initialize
-            weight parameters
-        clip_activation (float): Range of activation clipping (> 0)
+        parameter_init (float): the range of uniform distribution to initialize
+            weight parameters (>= 0)
+        clip_activation (float): the range of activation clipping (> 0)
         num_proj (int): the number of nodes in recurrent projection layer
         bottleneck_dim (int): the dimensions of the bottleneck layer
         name (string, optional): the name of encoder
@@ -70,24 +70,21 @@ class Multitask_BLSTM_Encoder(object):
             raise ValueError(
                 'Set num_layers_sub between 1 to num_layers_main.')
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob_input,
-                 keep_prob_hidden, keep_prob_output):
+    def __call__(self, inputs, inputs_seq_len,
+                 keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of size `[B, T, input_size]`
-            inputs_seq_len: A tensor of size `[B]`
-            keep_prob_input (float): A probability to keep nodes in the
-                input-hidden connection
-            keep_prob_hidden (float): A probability to keep nodes in the
-                hidden-hidden connection
-            keep_prob_output (float): A probability to keep nodes in the
-                hidden-output connection. A probability to keep nodes in
-                the hidden-output layer
+            inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
+            keep_prob_input (placeholder, float): A probability to keep nodes
+                in the input-hidden connection
+            keep_prob_hidden (placeholder, float): A probability to keep nodes
+                in the hidden-hidden connection
+            keep_prob_output (placeholder, float): A probability to keep nodes
+                in the hidden-output connection
         Returns:
-            logits_main: A tensor of size `[T, B, input_size]`
-                in the main task
-            logits_sub: A tensor of size `[T, B, input_size]`
-                in the sub task
+            logits: A tensor of size `[T, B, input_size]` in the main task
+            logits_sub: A tensor of size `[T, B, input_size]` in the sub task
             final_state: A final hidden state of the encoder in the main task
             final_state_sub: A final hidden state of the encoder in the sub task
         """
@@ -166,7 +163,8 @@ class Multitask_BLSTM_Encoder(object):
 
                 else:
                     raise IndexError(
-                        'lstm_impl is "BasicLSTMCell" or "LSTMCell" or "LSTMBlockCell" or "LSTMBlockFusedCell".')
+                        'lstm_impl is "BasicLSTMCell" or "LSTMCell" or ' +
+                        '"LSTMBlockCell" or "LSTMBlockFusedCell".')
 
                 # Dropout for the hidden-hidden connections
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
@@ -200,14 +198,14 @@ class Multitask_BLSTM_Encoder(object):
                         output_node = self.num_proj * 2
                     outputs_sub = tf.reshape(outputs, shape=[-1, output_node])
 
-                    with tf.name_scope('output_sub'):
+                    with tf.variable_scope('output_sub') as scope:
                         logits_sub_2d = tf.contrib.layers.fully_connected(
                             outputs_sub, self.num_classes_sub,
                             activation_fn=None,
                             weights_initializer=tf.truncated_normal_initializer(
                                 stddev=0.1),
                             biases_initializer=tf.zeros_initializer(),
-                            scope='output_sub')
+                            scope=scope)
 
                         # Reshape back to the original shape
                         logits_sub = tf.reshape(
@@ -233,39 +231,39 @@ class Multitask_BLSTM_Encoder(object):
             outputs = tf.reshape(outputs, shape=[-1, self.num_proj * 2])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
-            with tf.name_scope('bottleneck'):
+            with tf.variable_scope('bottleneck') as scope:
                 outputs = tf.contrib.layers.fully_connected(
                     outputs, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
                     weights_initializer=tf.truncated_normal_initializer(
                         stddev=0.1),
                     biases_initializer=tf.zeros_initializer(),
-                    scope='bottleneck')
+                    scope=scope)
 
                 # Dropout for the hidden-output connections
                 outputs = tf.nn.dropout(
                     outputs, keep_prob_output,
                     name='dropout_output_main_bottle')
 
-        with tf.name_scope('output_main'):
-            logits_main_2d = tf.contrib.layers.fully_connected(
+        with tf.variable_scope('output_main') as scope:
+            logits_2d = tf.contrib.layers.fully_connected(
                 outputs, self.num_classes_main,
                 activation_fn=None,
                 weights_initializer=tf.truncated_normal_initializer(
                     stddev=0.1),
                 biases_initializer=tf.zeros_initializer(),
-                scope='output_main')
+                scope=scope)
 
             # Reshape back to the original shape
             logits = tf.reshape(
-                logits_main_2d, shape=[batch_size, -1, self.num_classes_main])
+                logits_2d, shape=[batch_size, -1, self.num_classes_main])
 
             # Convert to time-major: `[max_time, batch_size, num_classes]'
-            logits_main = tf.transpose(logits, (1, 0, 2))
+            logits = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections
-            logits_main = tf.nn.dropout(
-                logits_main, keep_prob_output, name='dropout_output_main')
+            logits = tf.nn.dropout(
+                logits, keep_prob_output, name='dropout_output_main')
             # NOTE: This may lead to bad results
 
-            return logits_main, logits_sub, final_state, final_state_sub
+            return logits, logits_sub, final_state, final_state_sub

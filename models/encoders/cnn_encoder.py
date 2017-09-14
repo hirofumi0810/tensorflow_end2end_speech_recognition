@@ -20,7 +20,7 @@ class CNN_Encoder(object):
                 neural networks."
                arXiv preprint arXiv:1701.02720 (2017).
     Args:
-        input_size:
+        input_size (int): the dimensions of input vectors
         splice (int): frames to splice. Default is 1 frame.
         num_classes (int): the number of classes of target labels
             (except for a blank label)
@@ -41,23 +41,23 @@ class CNN_Encoder(object):
         self.parameter_init = parameter_init
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob_hidden,
-                 keep_prob_input=None, keep_prob_output=None):
+    def __call__(self, inputs, inputs_seq_len,
+                 keep_prob_hidden, keep_prob_input, keep_prob_output):
         """Construct model graph.
         Args:
-            inputs: A tensor of size `[B, T, input_size]`
-            inputs_seq_len:  A tensor of size `[B]`
-            keep_prob_input (float): A probability to keep nodes in the
-                input-hidden connection
-            keep_prob_hidden (float): A probability to keep nodes in the
-                hidden-hidden connection
-            keep_prob_output (float): A probability to keep nodes in the
-                hidden-output connection
+            inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
+            keep_prob_input (placeholder, float): A probability to keep nodes
+                in the input-hidden connection
+            keep_prob_hidden (placeholder, float): A probability to keep nodes
+                in the hidden-hidden connection
+            keep_prob_output (placeholder, float): A probability to keep nodes
+                in the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder
         """
-        # NOTE: input dropout is not performed
+        # TODO: input dropout is not performed
 
         # inputs: 3D `[batch_size, max_time, input_size * splice]`
         batch_size = tf.shape(inputs)[0]
@@ -65,26 +65,37 @@ class CNN_Encoder(object):
 
         # Reshape to 4D tensor `[batch_size, max_time, input_size, splice]`
         inputs = tf.reshape(
-            inputs, shape=[batch_size, max_time, self.input_size, self.splice])
+            inputs, shape=[batch_size,
+                           max_time,
+                           self.input_size,
+                           self.splice])
 
         # Reshape to 5D tensor
         # `[batch_size, max_time, input_size / 3, 3 (+Δ,ΔΔ), splice]`
         inputs = tf.reshape(
-            inputs, shape=[batch_size, max_time, int(self.input_size / 3), 3, self.splice])
+            inputs, shape=[batch_size,
+                           max_time,
+                           int(self.input_size / 3),
+                           3,
+                           self.splice])
 
         # Reshape to 4D tensor
         # `[batch_size * max_time, input_size / 3, splice, 3]`
         inputs = tf.transpose(inputs, (0, 1, 2, 4, 3))
         inputs = tf.reshape(
-            inputs, shape=[batch_size * max_time, int(self.input_size / 3), self.splice, 3])
+            inputs, shape=[batch_size * max_time,
+                           int(self.input_size / 3),
+                           self.splice,
+                           3])
 
         # Choose the activation function
         activation = 'relu'
         # activation = 'prelu'
         # activation = 'maxout'
+        # TODO: add prelu and maxout layers
 
         # 1-4 layers
-        with tf.name_scope('conv128'):
+        with tf.variable_scope('conv128'):
             for i_layer in range(1, 5, 1):
                 if i_layer == 1:
                     outputs = self._conv_layer(inputs,
@@ -105,7 +116,7 @@ class CNN_Encoder(object):
                 # TODO: try batch normalization
 
         # 5-10 layers
-        with tf.name_scope('conv256'):
+        with tf.variable_scope('conv256'):
             for i_layer in range(5, 11, 1):
                 if i_layer == 5:
                     outputs = self._conv_layer(outputs,
@@ -138,7 +149,7 @@ class CNN_Encoder(object):
             outputs, shape=[batch_size * max_time, new_h * new_w * 256])
 
         # 11-13th fc
-        with tf.name_scope('fc'):
+        with tf.variable_scope('fc'):
             for i_layer in range(11, 14, 1):
                 num_outputs = 1024 if i_layer != 13 else self.num_classes
                 outputs = tf.contrib.layers.fully_connected(

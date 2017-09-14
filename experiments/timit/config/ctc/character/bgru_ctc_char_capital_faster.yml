@@ -26,3 +26,5 @@ param:
   dropout_hidden: 0.5
   dropout_output: 1.0
   weight_decay: 0
+  eval_start_epoch: 20
+  print_step: 10

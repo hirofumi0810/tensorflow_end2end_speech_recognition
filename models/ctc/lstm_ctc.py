@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from models.ctc.ctc_base import CTCBase
+from models.ctc.base import CTCBase
 from models.encoders.blstm_encoder import BLSTM_Encoder
 from models.encoders.lstm_encoder import LSTM_Encoder
 
@@ -25,14 +25,15 @@ class LSTM_CTC(CTCBase):
             LSTMBlockCell or LSTMBlockFusedCell.
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
-        use_peephole (bool, optional): if True, use peephole
-        splice (int, optional): frames to splice. Default is 1 frame.
-        parameter_init (float, optional): Range of uniform distribution to
-            initialize weight parameters
-        clip_grad (float, optional): Range of gradient clipping (> 0)
-        clip_activation (float, optional): Range of activation clipping (> 0)
-        num_proj (int, optional): the number of nodes in recurrent projection layer
-        weight_decay (float, optional): Regularization parameter for weight decay
+        use_peephole (bool, optional): if True, use peephole connection
+        splice (int, optional): the number of frames to splice.
+            Default is 1 frame.
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        clip_grad (float): the range of gradient clipping (> 0)
+        clip_activation (float, optional): the range of activation clipping (> 0)
+        num_proj (int, optional): the number of nodes in the projection layer
+        weight_decay (float, optional): a parameter for weight decay
         bottleneck_dim (int, optional): the dimensions of the bottleneck layer
     """
 

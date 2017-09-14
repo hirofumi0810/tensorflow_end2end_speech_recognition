@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from models.ctc.ctc_base import CTCBase
+from models.ctc.base import CTCBase
 from models.encoders.bgru_encoder import BGRU_Encoder
 from models.encoders.gru_encoder import GRU_Encoder
 
@@ -23,13 +23,14 @@ class GRU_CTC(CTCBase):
         bidirectional (bool): if True, create a bidirectional model
         lstm_impl: <not used>
         use_peephole: <not used>
-        splice (int, optional): frames to splice. Default is 1 frame.
-        parameter_init (float, optional): Range of uniform distribution to
-            initialize weight parameters
-        clip_grad (float, optional): Range of gradient clipping (> 0)
+        splice (int, optional): the number of frames to splice.
+            Default is 1 frame.
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        clip_grad (float): the range of gradient clipping (> 0)
         clip_activation: <not used>
         num_proj: <not used>
-        weight_decay (float, optional): Regularization parameter for weight decay
+        weight_decay (float, optional): a parameter for weight decay
         bottleneck_dim (int, optional): the dimensions of the bottleneck layer
     """
 

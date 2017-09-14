@@ -24,7 +24,7 @@ class TestMultitaskCTC(tf.test.TestCase):
     def test_multiask_ctc(self):
         print("Multitask CTC Working check.")
         self.check_training(bidirectional=True)
-        self.check_training(bidirectional=False)
+        # self.check_training(bidirectional=False)
 
     @measure_time
     def check_training(self, bidirectional):
