@@ -1,18 +1,21 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Bidirectional LSTM encoder."""
+"""VGG + unidirectional LSTM encoder."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import math
 import tensorflow as tf
+from models.encoders.vgg_blstm_encoder import _conv_layer, _max_pool
 
 
-class BLSTM_Encoder(object):
-    """Bidirectional LSTM encoder.
+class VGG_LSTM_Encoder(object):
+    """VGG + unidirectional LSTM encoder.
     Args:
+        input_size (int): the dimensions of input vectors
         num_units (int): the number of units in each layer
         num_layers (int): the number of layers
         num_classes (int): the number of classes of target labels
@@ -31,22 +34,26 @@ class BLSTM_Encoder(object):
     """
 
     def __init__(self,
+                 input_size,
                  num_units,
                  num_layers,
                  num_classes,
                  lstm_impl,
                  use_peephole,
+                 splice,
                  parameter_init,
                  clip_activation,
                  num_proj,
                  bottleneck_dim,
-                 name='blstm_encoder'):
+                 name='vgg_lstm_encoder'):
 
+        self.input_size = input_size
         self.num_units = num_units
         self.num_layers = num_layers
         self.num_classes = num_classes
         self.lstm_impl = lstm_impl
         self.use_peephole = use_peephole
+        self.splice = splice
         self.parameter_init = parameter_init
         self.clip_activation = clip_activation
         if lstm_impl != 'LSTMCell':
@@ -75,39 +82,98 @@ class BLSTM_Encoder(object):
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder
         """
-        # Dropout for the input-hidden connection
-        outputs = tf.nn.dropout(
-            inputs, keep_prob_input, name='dropout_input')
+        # inputs: 3D tensor `[batch_size, max_time, input_size * splice]`
+        batch_size = tf.shape(inputs)[0]
+        max_time = tf.shape(inputs)[1]
+
+        # Reshape to 4D tensor `[batch_size, max_time, input_size, splice]`
+        inputs = tf.reshape(
+            inputs, shape=[batch_size,
+                           max_time,
+                           self.input_size,
+                           self.splice])
+
+        # Reshape to 5D tensor
+        # `[batch_size, max_time, input_size / 3, 3 (+Δ, ΔΔ), splice]`
+        inputs = tf.reshape(
+            inputs, shape=[batch_size,
+                           max_time,
+                           int(self.input_size / 3), 3, self.splice])
+
+        # Reshape to 4D tensor
+        # `[batch_size * max_time, input_size / 3, splice, 3]`
+        inputs = tf.transpose(inputs, (0, 1, 2, 4, 3))
+        inputs = tf.reshape(
+            inputs, shape=[batch_size * max_time,
+                           int(self.input_size / 3),
+                           self.splice, 3])
+
+        with tf.variable_scope('VGG1'):
+            inputs = _conv_layer(inputs,
+                                 filter_shape=[3, 3, 3, 64],
+                                 parameter_init=self.parameter_init,
+                                 name='conv1')
+            inputs = _conv_layer(inputs,
+                                 filter_shape=[3, 3, 64, 64],
+                                 parameter_init=self.parameter_init,
+                                 name='conv2')
+            inputs = _max_pool(inputs, name='pool')
+            # TODO: try batch normalization
+
+        with tf.variable_scope('VGG2'):
+            inputs = _conv_layer(inputs,
+                                 filter_shape=[3, 3, 64, 128],
+                                 parameter_init=self.parameter_init,
+                                 name='conv1')
+            inputs = _conv_layer(inputs,
+                                 filter_shape=[3, 3, 128, 128],
+                                 parameter_init=self.parameter_init,
+                                 name='conv2')
+            inputs = _max_pool(inputs, name='pool')
+            # TODO: try batch normalization
+
+        # Reshape to 5D tensor `[batch_size, max_time, new_h, new_w, 128]`
+        new_h = math.ceil(self.input_size / 3 / 4)  # expected to be 11 ro 10
+        new_w = math.ceil(self.splice / 4)  # expected to be 3
+        inputs = tf.reshape(
+            inputs, shape=[batch_size, max_time, new_h, new_w, 128])
+
+        # Reshape to 3D tensor `[batch_size, max_time, new_h * new_w * 128]`
+        inputs = tf.reshape(
+            inputs, shape=[batch_size, max_time, new_h * new_w * 128])
+
+        # Insert linear layer to recude CNN's output demention
+        # from new_h * new_w * 128 to 256
+        with tf.variable_scope('linear') as scope:
+            inputs = tf.contrib.layers.fully_connected(
+                inputs=inputs,
+                num_outputs=256,
+                activation_fn=None,
+                scope=scope)
+
+        # Dropout for the VGG-output-hidden connection
+        outputs = tf.nn.dropout(inputs,
+                                keep_prob_input,
+                                name='dropout_input')
 
         initializer = tf.random_uniform_initializer(
-            minval=-self.parameter_init, maxval=self.parameter_init)
+            minval=-self.parameter_init,
+            maxval=self.parameter_init)
 
         # Hidden layers
+        lstm_list = []
         for i_layer in range(1, self.num_layers + 1, 1):
-            with tf.variable_scope('blstm_hidden' + str(i_layer),
-                                   initializer=initializer) as scope:
+            with tf.variable_scope('lstm_hidden' + str(i_layer), initializer=initializer):
 
                 if self.lstm_impl == 'BasicLSTMCell':
-                    lstm_fw = tf.contrib.rnn.BasicLSTMCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        state_is_tuple=True,
-                        activation=tf.tanh)
-                    lstm_bw = tf.contrib.rnn.BasicLSTMCell(
+                    lstm = tf.contrib.rnn.BasicLSTMCell(
                         self.num_units,
                         forget_bias=1.0,
                         state_is_tuple=True,
                         activation=tf.tanh)
 
                 elif self.lstm_impl == 'LSTMCell':
-                    lstm_fw = tf.contrib.rnn.LSTMCell(
-                        self.num_units,
-                        use_peepholes=self.use_peephole,
-                        cell_clip=self.clip_activation,
-                        num_proj=self.num_proj,
-                        forget_bias=1.0,
-                        state_is_tuple=True)
-                    lstm_bw = tf.contrib.rnn.LSTMCell(
+                    lstm = tf.contrib.rnn.LSTMCell(
                         self.num_units,
                         use_peepholes=self.use_peephole,
                         cell_clip=self.clip_activation,
@@ -117,12 +183,7 @@ class BLSTM_Encoder(object):
 
                 elif self.lstm_impl == 'LSTMBlockCell':
                     # NOTE: This should be faster than tf.contrib.rnn.LSTMCell
-                    lstm_fw = tf.contrib.rnn.LSTMBlockCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        # clip_cell=True,
-                        use_peephole=self.use_peephole)
-                    lstm_bw = tf.contrib.rnn.LSTMBlockCell(
+                    lstm = tf.contrib.rnn.LSTMBlockCell(
                         self.num_units,
                         forget_bias=1.0,
                         # clip_cell=True,
@@ -134,12 +195,7 @@ class BLSTM_Encoder(object):
 
                     # NOTE: This should be faster than
                     tf.contrib.rnn.LSTMBlockFusedCell
-                    lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        # clip_cell=True,
-                        use_peephole=self.use_peephole)
-                    lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
+                    lstm = tf.contrib.rnn.LSTMBlockFusedCell(
                         self.num_units,
                         forget_bias=1.0,
                         # clip_cell=True,
@@ -152,37 +208,27 @@ class BLSTM_Encoder(object):
                         '"LSTMBlockCell" or "LSTMBlockFusedCell".')
 
                 # Dropout for the hidden-hidden connections
-                lstm_fw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_fw, output_keep_prob=keep_prob_hidden)
-                lstm_bw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_bw, output_keep_prob=keep_prob_hidden)
+                lstm = tf.contrib.rnn.DropoutWrapper(
+                    lstm, output_keep_prob=keep_prob_hidden)
 
-                # _init_state_fw = lstm_fw.zero_state(self.batch_size,
-                #                                     tf.float32)
-                # _init_state_bw = lstm_bw.zero_state(self.batch_size,
-                #                                     tf.float32)
-                # initial_state_fw=_init_state_fw,
-                # initial_state_bw=_init_state_bw,
+                lstm_list.append(lstm)
 
-                # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
-                    cell_fw=lstm_fw,
-                    cell_bw=lstm_bw,
-                    inputs=outputs,
-                    sequence_length=inputs_seq_len,
-                    dtype=tf.float32,
-                    scope=scope)
+        # Stack multiple cells
+        stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+            lstm_list, state_is_tuple=True)
 
-                outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
+        # Ignore 2nd return (the last state)
+        outputs, final_state = tf.nn.dynamic_rnn(
+            cell=stacked_lstm,
+            inputs=inputs,
+            sequence_length=inputs_seq_len,
+            dtype=tf.float32)
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
-            outputs = tf.reshape(outputs, shape=[-1, self.num_units * 2])
+            outputs = tf.reshape(outputs, shape=[-1, self.num_units])
         else:
-            outputs = tf.reshape(outputs, shape=[-1, self.num_proj * 2])
-
-        # inputs: `[batch_size, max_time, input_size]`
-        batch_size = tf.shape(inputs)[0]
+            outputs = tf.reshape(outputs, shape=[-1, self.num_proj])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.variable_scope('bottleneck') as scope:
@@ -215,6 +261,5 @@ class BLSTM_Encoder(object):
             # Dropout for the hidden-output connections
             logits = tf.nn.dropout(
                 logits, keep_prob_output, name='dropout_output')
-            # NOTE: This may lead to bad results
 
             return logits, final_state

@@ -7,9 +7,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from models.ctc.ctc_base import CTCBase
+from models.ctc.base import CTCBase
 from models.encoders.vgg_blstm_encoder import VGG_BLSTM_Encoder
-# from models.encoders.vgg_lstm_encoder import VGG_LSTM_Encoder
+from models.encoders.vgg_lstm_encoder import VGG_LSTM_Encoder
 
 
 class VGG_LSTM_CTC(CTCBase):
@@ -25,14 +25,15 @@ class VGG_LSTM_CTC(CTCBase):
             LSTMBlockCell or LSTMBlockFusedCell.
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
-        use_peephole (bool, optional): if True, use peephole
-        splice (int, optional): frames to splice. Default is 1 frame.
-        parameter_init (float, optional): Range of uniform distribution to
-            initialize weight parameters
-        clip_grad (float, optional): Range of gradient clipping (> 0)
-        clip_activation (float, optional): Range of activation clipping (> 0)
-        num_proj (int, optional): the number of nodes in recurrent projection layer
-        weight_decay (float, optional): Regularization parameter for weight decay
+        use_peephole (bool, optional): if True, use peephole connection
+        splice (int, optional): the number of frames to splice.
+            Default is 11 frame (left: 5 frames, right: 5 frames).
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        clip_grad (float): the range of gradient clipping (> 0)
+        clip_activation (float, optional): the range of activation clipping (> 0)
+        num_proj (int, optional): the number of nodes in the projection layer
+        weight_decay (float, optional): a parameter for weight decay
         bottleneck_dim (int, optional): the dimensions of the bottleneck layer
     """
 
@@ -71,15 +72,14 @@ class VGG_LSTM_CTC(CTCBase):
 
         else:
             self.name = 'vgg_lstm_ctc'
-            raise NotImplementedError
-            # self.encoder = VGG_LSTM_Encoder(input_size,
-            #                                 num_units,
-            #                                 num_layers,
-            #                                 num_classes + 1,
-            #                                 lstm_impl,
-            #                                 use_peephole,
-            #                                 splice,
-            #                                 parameter_init,
-            #                                 clip_activation,
-            #                                 num_proj,
-            #                                 bottleneck_dim)
+            self.encoder = VGG_LSTM_Encoder(input_size,
+                                            num_units,
+                                            num_layers,
+                                            num_classes + 1,
+                                            lstm_impl,
+                                            use_peephole,
+                                            splice,
+                                            parameter_init,
+                                            clip_activation,
+                                            num_proj,
+                                            bottleneck_dim)

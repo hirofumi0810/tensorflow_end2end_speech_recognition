@@ -5,12 +5,7 @@
 *.log
 *.npy
 __pycache__
-blstm_ctc_example.py
-lstm_ctc_example.py
 .dropbox.attr
-
-read_dataset_ctc_cluster.py
-read_dataset_multitask_ctc_cluster.py
 
 # csj
 *_ss
@@ -21,3 +16,6 @@ csj/fine_tuning
 
 # librispeech
 word2num*.txt
+
+# temporal
+bn_blstm_ctc.py

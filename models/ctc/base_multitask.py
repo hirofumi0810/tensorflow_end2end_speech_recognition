@@ -8,22 +8,22 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models.ctc.ctc_base import CTCBase
+from models.ctc.base import CTCBase
 
 
 class multitaskCTCBase(CTCBase):
     """Hierarchical Connectionist Temporal Classification (CTC) network.
     Args:
-        input_size: int, the dimensions of input vectors
-        splice: int, frames to splice. Default is 1 frame.
-        num_classes_main: int, the number of classes of target labels in the
+        input_size (int): the dimensions of input vectors
+        splice (int): frames to splice. Default is 1 frame.
+        num_classes_main (int): the number of classes of target labels in the
             main task (except for a blank label)
-        num_classes_sub: int, the number of classes of target labels in the
+        num_classes_sub (int): the number of classes of target labels in the
             sub task (except for a blank label)
-        main_task_weight: A float value. The weight of loss of the main task.
-            Set between 0 to 1
-        clip_grad: A float value. Range of gradient clipping (> 0)
-        weight_decay: A float value. Regularization parameter for weight decay
+        main_task_weight (float): the weight of loss of the main task.
+            Set between 0 to 1.
+        clip_grad (float): range of gradient clipping (> 0)
+        weight_decay (float): a parameter for weight decay
     """
 
     def __init__(self, input_size, splice, num_classes_main, num_classes_sub,
@@ -33,7 +33,6 @@ class multitaskCTCBase(CTCBase):
                          clip_grad, weight_decay)
 
         self.num_classes_sub = int(num_classes_sub) + 1  # plus blank label
-
         if float(main_task_weight) < 0 or float(main_task_weight) > 1:
             raise ValueError('Set main_task_weight between 0 to 1.')
         self.main_task_weight = float(main_task_weight)

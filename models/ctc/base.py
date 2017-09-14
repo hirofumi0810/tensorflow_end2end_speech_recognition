@@ -26,15 +26,17 @@ class CTCBase(object):
         splice (int): frames to splice. Default is 1 frame.
         num_classes (int): the number of classes of target labels
             (except for a blank label)
-        clip_grad (float): Range of gradient clipping (> 0)
-        weight_decay (float): Regularization parameter for weight decay
+        clip_grad (float): the range of gradient clipping (> 0)
+        weight_decay (float): a parameter for weight decay
     """
 
     def __init__(self, input_size, splice, num_classes, clip_grad,
                  weight_decay):
-        assert input_size % 3 == 0, 'input_size must be divisible by 3.'
+        assert input_size % 3 == 0, 'input_size must be divisible by 3 (+ delta, double delta features).'
         # NOTE: input features are expected to including Δ and ΔΔ features
         assert splice % 2 == 1, 'splice must be the odd number'
+        assert clip_grad > 0, 'clip_grad must be larger than 0.'
+        assert weight_decay >= 0, 'weight_decay must not be a negative value.'
 
         # Network size
         self.input_size = int(input_size)
@@ -192,37 +194,37 @@ class CTCBase(object):
 
         return total_loss, logits
 
-    def set_optimizer(self, optimizer_name, learning_rate):
+    def _set_optimizer(self, optimizer, learning_rate):
         """Set optimizer.
         Args:
-            optimizer_name (string): the name of the optimizer in
+            optimizer (string): the name of the optimizer in
                 OPTIMIZER_CLS_NAMES
             learning_rate (float): A learning rate
         Returns:
             optimizer:
         """
-        optimizer_name = optimizer_name.lower()
-        if optimizer_name not in OPTIMIZER_CLS_NAMES:
+        optimizer = optimizer.lower()
+        if optimizer not in OPTIMIZER_CLS_NAMES:
             raise ValueError(
                 "Optimizer name should be one of [%s], you provided %s." %
-                (", ".join(OPTIMIZER_CLS_NAMES), optimizer_name))
+                (", ".join(OPTIMIZER_CLS_NAMES), optimizer))
 
         # Select optimizer
-        if optimizer_name == 'sgd':
-            return OPTIMIZER_CLS_NAMES[optimizer_name](
+        if optimizer == 'sgd':
+            return OPTIMIZER_CLS_NAMES[optimizer](
                 learning_rate=learning_rate,
                 momentum=0.9)
             # NOTE: Default momentum of SGD is 0.9
         else:
-            return OPTIMIZER_CLS_NAMES[optimizer_name](
+            return OPTIMIZER_CLS_NAMES[optimizer](
                 learning_rate=learning_rate)
 
-    def train(self, loss, optimizer_name, learning_rate, clip_norm=False):
+    def train(self, loss, optimizer, learning_rate, clip_norm=False):
         """Operation for training. Only the sigle GPU training is supported.
         Args:
             loss: An operation for computing loss
-            optimizer_name (string): name of the optimizer in OPTIMIZER_CLS_NAMES
-            learning_rate (float): A learning rate
+            optimizer (string): name of the optimizer in OPTIMIZER_CLS_NAMES
+            learning_rate (placeholder): A learning rate
             clip_norm (bool, optional): if True, clip gradients norm by
                 self.clip_grad
         Returns:
@@ -232,7 +234,7 @@ class CTCBase(object):
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         # Set optimizer
-        self.optimizer = self.set_optimizer(optimizer_name, learning_rate)
+        self.optimizer = self._set_optimizer(optimizer, learning_rate)
 
         if self.clip_grad is not None:
             # Compute gradients

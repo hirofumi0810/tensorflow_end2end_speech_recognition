@@ -1,14 +1,14 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Batch Normalized Bidirectional LSTM-CTC model."""
+"""Batch Normalized bidirectional LSTM-CTC model."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models.ctc.ctc_base import CTCBase
+from models.ctc.base import CTCBase
 from recurrent.layers.bn_lstm import BatchNormLSTMCell
 from recurrent.initializer import orthogonal_initializer
 
