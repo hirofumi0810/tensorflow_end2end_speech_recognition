@@ -33,7 +33,8 @@ def decode_test(session, decode_op, network, dataset, label_type,
         sys.stdout = open(join(network.model_dir, 'decode.txt'), 'w')
 
     # Batch size is expected to be 1
-    for data, next_epoch_flag in dataset(batch_size=1):
+    for _ in range(len(dataset)):
+        data, next_epoch_flag = dataset.next()
         # Create feed dictionary for next mini batch
         inputs, labels_true, inputs_seq_len, input_names = data
 
