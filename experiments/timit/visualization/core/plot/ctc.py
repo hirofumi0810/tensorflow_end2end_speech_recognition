@@ -9,8 +9,11 @@ from __future__ import print_function
 
 from os.path import join
 import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
+import sys
 
 from experiments.utils.directory import mkdir_join
 
@@ -38,7 +41,8 @@ def posterior_test(session, posteriors_op, network, dataset, label_type,
     save_path = mkdir_join(save_path, 'ctc_output')
 
     # Batch size is expected to be 1
-    for data, next_epoch_flag in dataset(batch_size=1):
+    for _ in range(len(dataset)):
+        data, next_epoch_flag = dataset.next()
         # Create feed dictionary for next mini batch
         inputs, _, inputs_seq_len, input_names = data
 
