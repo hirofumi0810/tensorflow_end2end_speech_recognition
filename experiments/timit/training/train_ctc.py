@@ -74,7 +74,7 @@ def do_train(network, params):
             network.keep_prob_output_pl_list[0])
         train_op = network.train(
             loss_op,
-            optimizer=params['optimizer'],
+            optimizer_name=params['optimizer'],
             learning_rate=learning_rate_pl)
         decode_op = network.decoder(logits,
                                     network.inputs_seq_len_pl_list[0],
