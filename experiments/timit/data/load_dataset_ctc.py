@@ -55,9 +55,9 @@ class Dataset(DatasetBase):
         self.progressbar = progressbar
 
         input_path = join(
-            '/home/huanglu/asr/end2end/data/timit/dataset/inputs', data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/inputs', data_type)
         label_path = join(
-            '/home/huanglu/asr/end2end/data/timit/dataset/labels/ctc',
+            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc',
             label_type, data_type)
 
         # Load the frame number dictionary
