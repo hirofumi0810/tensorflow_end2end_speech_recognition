@@ -24,7 +24,7 @@ class CNN_Encoder(object):
         splice (int): frames to splice. Default is 1 frame.
         num_classes (int): the number of classes of target labels
             (except for a blank label)
-        parameter_init (float): Range of uniform distribution to
+        parameter_init (float, optional): Range of uniform distribution to
             initialize weight parameters
         name (string, optional): the name of encoder
     """
@@ -33,8 +33,9 @@ class CNN_Encoder(object):
                  input_size,
                  splice,
                  num_classes,
-                 parameter_init,
+                 parameter_init=0.1,
                  name='cnn_encoder'):
+
         self.input_size = input_size
         self.splice = splice
         self.num_classes = num_classes

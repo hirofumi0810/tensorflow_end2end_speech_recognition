@@ -11,9 +11,10 @@ import tensorflow as tf
 # from tensorflow.python import debug as tf_debug
 
 sys.path.append('../../')
-from models.ctc.load_model import load
+from models.ctc.multitask_ctc import Multitask_CTC
 from models.test.util import measure_time
-from models.test.data import generate_data, num2alpha, num2phone
+from models.test.data import generate_data, num2alpha
+from experiments.utils.data.labels.phone import num2phone
 from experiments.utils.data.sparsetensor import sparsetensor2list
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.training.learning_rate_controller import Controller
@@ -23,14 +24,15 @@ class TestMultitaskCTC(tf.test.TestCase):
 
     def test_multiask_ctc(self):
         print("Multitask CTC Working check.")
-        self.check_training(bidirectional=True)
-        # self.check_training(bidirectional=False)
+
+        self.check_training(encoder_type='multitask_blstm')
+        self.check_training(encoder_type='multitask_lstm')
 
     @measure_time
-    def check_training(self, bidirectional):
+    def check_training(self, encoder_type):
 
         print('==================================================')
-        print('  bidirectional: %s' % str(bidirectional))
+        print('  encoder_type: %s' % str(encoder_type))
         print('==================================================')
 
         tf.reset_default_graph()
@@ -45,48 +47,48 @@ class TestMultitaskCTC(tf.test.TestCase):
             # Define model graph
             num_classes_main = 26
             num_classes_sub = 61
-            model = load(model_type='multitask_lstm_ctc')
-            network = model(input_size=inputs[0].shape[1],
-                            num_units=256,
-                            num_layers_main=2,
-                            num_layers_sub=1,
-                            num_classes_main=num_classes_main,
-                            num_classes_sub=num_classes_sub,
-                            main_task_weight=0.8,
-                            bidirectional=bidirectional,
-                            parameter_init=0.1,
-                            clip_grad=5.0,
-                            clip_activation=50,
-                            num_proj=256,
-                            bottleneck_dim=50,
-                            weight_decay=1e-8)
+            model = Multitask_CTC(
+                encoder_type=encoder_type,
+                input_size=inputs[0].shape[1],
+                num_units=256,
+                num_layers_main=2,
+                num_layers_sub=1,
+                num_classes_main=num_classes_main,
+                num_classes_sub=num_classes_sub,
+                main_task_weight=0.8,
+                parameter_init=0.1,
+                clip_grad=5.0,
+                clip_activation=50,
+                num_proj=256,
+                bottleneck_dim=50,
+                weight_decay=1e-8)
 
             # Define placeholders
-            network.create_placeholders()
+            model.create_placeholders()
             learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
             # Add to the graph each operation
-            loss_op, logits_main, logits_sub = network.compute_loss(
-                network.inputs_pl_list[0],
-                network.labels_pl_list[0],
-                network.labels_sub_pl_list[0],
-                network.inputs_seq_len_pl_list[0],
-                network.keep_prob_input_pl_list[0],
-                network.keep_prob_hidden_pl_list[0],
-                network.keep_prob_output_pl_list[0])
-            train_op = network.train(
+            loss_op, logits_main, logits_sub = model.compute_loss(
+                model.inputs_pl_list[0],
+                model.labels_pl_list[0],
+                model.labels_sub_pl_list[0],
+                model.inputs_seq_len_pl_list[0],
+                model.keep_prob_input_pl_list[0],
+                model.keep_prob_hidden_pl_list[0],
+                model.keep_prob_output_pl_list[0])
+            train_op = model.train(
                 loss_op,
                 optimizer='adam',
                 learning_rate=learning_rate_pl)
-            decode_op_main, decode_op_sub = network.decoder(
+            decode_op_main, decode_op_sub = model.decoder(
                 logits_main,
                 logits_sub,
-                network.inputs_seq_len_pl_list[0],
+                model.inputs_seq_len_pl_list[0],
                 decode_type='beam_search',
                 beam_width=20)
-            ler_op_main, ler_op_sub = network.compute_ler(
+            ler_op_main, ler_op_sub = model.compute_ler(
                 decode_op_main, decode_op_sub,
-                network.labels_pl_list[0], network.labels_sub_pl_list[0])
+                model.labels_pl_list[0], model.labels_sub_pl_list[0])
 
             # Define learning rate controller
             learning_rate = 1e-3
@@ -111,13 +113,13 @@ class TestMultitaskCTC(tf.test.TestCase):
 
             # Make feed dict
             feed_dict = {
-                network.inputs_pl_list[0]: inputs,
-                network.labels_pl_list[0]: labels_true_char_st,
-                network.labels_sub_pl_list[0]: labels_true_phone_st,
-                network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                network.keep_prob_input_pl_list[0]: 0.9,
-                network.keep_prob_hidden_pl_list[0]: 0.9,
-                network.keep_prob_output_pl_list[0]: 0.9,
+                model.inputs_pl_list[0]: inputs,
+                model.labels_pl_list[0]: labels_true_char_st,
+                model.labels_sub_pl_list[0]: labels_true_phone_st,
+                model.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                model.keep_prob_input_pl_list[0]: 0.9,
+                model.keep_prob_hidden_pl_list[0]: 0.9,
+                model.keep_prob_output_pl_list[0]: 0.9,
                 learning_rate_pl: learning_rate
             }
 
@@ -131,7 +133,7 @@ class TestMultitaskCTC(tf.test.TestCase):
                 # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 
                 # Train model
-                max_steps = 500
+                max_steps = 1000
                 start_time_global = time.time()
                 start_time_step = time.time()
                 ler_train_char_pre = 1
@@ -143,16 +145,16 @@ class TestMultitaskCTC(tf.test.TestCase):
                         [train_op, loss_op], feed_dict=feed_dict)
 
                     # Gradient check
-                    # grads = sess.run(network.clipped_grads,
+                    # grads = sess.run(model.clipped_grads,
                     #                  feed_dict=feed_dict)
                     # for grad in grads:
                     #     print(np.max(grad))
 
                     if (step + 1) % 10 == 0:
                         # Change to evaluation mode
-                        feed_dict[network.keep_prob_input_pl_list[0]] = 1.0
-                        feed_dict[network.keep_prob_hidden_pl_list[0]] = 1.0
-                        feed_dict[network.keep_prob_output_pl_list[0]] = 1.0
+                        feed_dict[model.keep_prob_input_pl_list[0]] = 1.0
+                        feed_dict[model.keep_prob_hidden_pl_list[0]] = 1.0
+                        feed_dict[model.keep_prob_output_pl_list[0]] = 1.0
 
                         # Compute accuracy
                         ler_train_char, ler_train_phone = sess.run(

@@ -16,17 +16,18 @@ class LSTM_Encoder(object):
         num_units (int): the number of units in each layer
         num_layers (int): the number of layers
         num_classes (int): the number of classes of target labels
-            (except for a blank label)
-        lstm_impl (string): BasicLSTMCell or LSTMCell or LSTMBlockCell or
-            LSTMBlockFusedCell.
+            (except for a blank label). if 0, return hidden states before
+            passing through the softmax layer
+        lstm_impl (string, optional):
+            BasicLSTMCell or LSTMCell or LSTMBlockCell or LSTMBlockFusedCell.
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
-        use_peephole (bool): if True, use peephole
-        parameter_init (float): the range of uniform distribution to initialize
-            weight parameters (>= 0)
-        clip_activation (float): the range of activation clipping (> 0)
-        num_proj (int): the number of nodes in the projection layer
-        bottleneck_dim (int): the dimensions of the bottleneck layer
+        use_peephole (bool, optional): if True, use peephole
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        clip_activation (float, optional): the range of activation clipping (> 0)
+        num_proj (int, optional): the number of nodes in the projection layer
+        bottleneck_dim (int, optional): the dimensions of the bottleneck layer
         name (string, optional): the name of encoder
     """
 
@@ -34,12 +35,12 @@ class LSTM_Encoder(object):
                  num_units,
                  num_layers,
                  num_classes,
-                 lstm_impl,
-                 use_peephole,
-                 parameter_init,
-                 clip_activation,
-                 num_proj,
-                 bottleneck_dim,
+                 lstm_impl='LSTMBlockCell',
+                 use_peephole=True,
+                 parameter_init=0.1,
+                 clip_activation=5.0,
+                 num_proj=None,
+                 bottleneck_dim=None,
                  name='lstm_encoder'):
 
         self.num_units = num_units
@@ -58,6 +59,8 @@ class LSTM_Encoder(object):
         self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
             None, 0] else None
         self.name = name
+
+        self.return_hidden_states = True if num_classes == 0 else False
 
     def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
@@ -84,8 +87,8 @@ class LSTM_Encoder(object):
 
         # Hidden layers
         lstm_list = []
-        for i_layer in range(1, self.num_layers + 1, 1):
-            with tf.variable_scope('lstm_hidden' + str(i_layer), initializer=initializer):
+        with tf.variable_scope('multi_lstm', initializer=initializer) as scope:
+            for i_layer in range(1, self.num_layers + 1, 1):
 
                 if self.lstm_impl == 'BasicLSTMCell':
                     lstm = tf.contrib.rnn.BasicLSTMCell(
@@ -135,16 +138,21 @@ class LSTM_Encoder(object):
 
                 lstm_list.append(lstm)
 
-        # Stack multiple cells
-        stacked_lstm = tf.contrib.rnn.MultiRNNCell(
-            lstm_list, state_is_tuple=True)
+            # Stack multiple cells
+            stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+                lstm_list, state_is_tuple=True)
 
-        # Ignore 2nd return (the last state)
-        outputs, final_state = tf.nn.dynamic_rnn(
-            cell=stacked_lstm,
-            inputs=inputs,
-            sequence_length=inputs_seq_len,
-            dtype=tf.float32)
+            # Ignore 2nd return (the last state)
+            outputs, final_state = tf.nn.dynamic_rnn(
+                cell=stacked_lstm,
+                inputs=inputs,
+                sequence_length=inputs_seq_len,
+                dtype=tf.float32,
+                scope=scope)
+            # NOTE: initial states are zero states by default
+
+        if self.return_hidden_states:
+            return outputs, final_state
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:

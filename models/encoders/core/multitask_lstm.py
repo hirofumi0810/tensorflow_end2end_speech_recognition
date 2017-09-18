@@ -20,16 +20,16 @@ class Multitask_LSTM_Encoder(object):
             main task (except for a blank label)
         num_classes_sub (int): the number of classes of target labels in the
             sub task (except for a blank label)
-        lstm_impl (string): BasicLSTMCell or LSTMCell or LSTMBlockCell or
-            LSTMBlockFusedCell.
+        lstm_impl (string, optional):
+            BasicLSTMCell or LSTMCell or LSTMBlockCell or LSTMBlockFusedCell.
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
-        use_peephole (bool): if True, use peephole
-        parameter_init (float): the range of uniform distribution to initialize
-            weight parameters (>= 0)
-        clip_activation (float): the range of activation clipping (> 0)
-        num_proj (int): the number of nodes in recurrent projection layer
-        bottleneck_dim (int): the dimensions of the bottleneck layer
+        use_peephole (bool, optional): if True, use peephole
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        clip_activation (float, optional): the range of activation clipping (> 0)
+        num_proj (int, optional): the number of nodes in recurrent projection layer
+        bottleneck_dim (int, optional): the dimensions of the bottleneck layer
         name (string, optional): the name of encoder
     """
 
@@ -39,12 +39,12 @@ class Multitask_LSTM_Encoder(object):
                  num_layers_sub,
                  num_classes_main,
                  num_classes_sub,
-                 lstm_impl,
-                 use_peephole,
-                 parameter_init,
-                 clip_activation,
-                 num_proj,
-                 bottleneck_dim,
+                 lstm_impl='LSTMBlockCell',
+                 use_peephole=True,
+                 parameter_init=0.1,
+                 clip_activation=5.0,
+                 num_proj=None,
+                 bottleneck_dim=None,
                  name='multitask_lstm_encoder'):
 
         self.num_units = num_units
@@ -69,6 +69,8 @@ class Multitask_LSTM_Encoder(object):
         if self.num_layers_sub < 1 or self.num_layers_main < self.num_layers_sub:
             raise ValueError(
                 'Set num_layers_sub between 1 to num_layers_main.')
+
+        self.return_hidden_states = True if num_classes_main == 0 or num_classes_sub == 0 else False
 
     def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
@@ -100,8 +102,8 @@ class Multitask_LSTM_Encoder(object):
 
         # Hidden layers
         lstm_list = []
-        for i_layer in range(1, self.num_layers_main + 1, 1):
-            with tf.variable_scope('lstm_hidden' + str(i_layer), initializer=initializer) as scope:
+        with tf.variable_scope('multi_lstm', initializer=initializer) as scope_lstm:
+            for i_layer in range(1, self.num_layers_main + 1, 1):
 
                 if self.lstm_impl == 'BasicLSTMCell':
                     lstm = tf.contrib.rnn.BasicLSTMCell(
@@ -151,88 +153,94 @@ class Multitask_LSTM_Encoder(object):
 
                 lstm_list.append(lstm)
 
-            if i_layer == self.num_layers_sub:
-                # Stack multiple cells
-                stacked_lstm_sub = tf.contrib.rnn.MultiRNNCell(
-                    lstm_list, state_is_tuple=True)
+                if i_layer == self.num_layers_sub:
+                    lstm_list_sub = lstm_list
 
-                # Ignore 2nd return (the last state)
-                outputs_sub, final_state_sub = tf.nn.dynamic_rnn(
-                    cell=stacked_lstm_sub,
-                    inputs=inputs,
-                    sequence_length=inputs_seq_len,
-                    dtype=tf.float32)
+            # Stack multiple cells
+            stacked_lstm = tf.contrib.rnn.MultiRNNCell(
+                lstm_list, state_is_tuple=True)
 
-                # Reshape to apply the same weights over the timesteps
-                if self.num_proj is None:
-                    outputs_sub = tf.reshape(outputs_sub,
-                                             shape=[-1, self.num_units])
-                else:
-                    outputs_sub = tf.reshape(outputs_sub,
-                                             shape=[-1, self.num_proj])
+            # Ignore 2nd return (the last state)
+            outputs, final_state = tf.nn.dynamic_rnn(
+                cell=stacked_lstm,
+                inputs=inputs,
+                sequence_length=inputs_seq_len,
+                dtype=tf.float32,
+                scope=scope_lstm)
+            # NOTE: initial states are zero states by default
 
-                with tf.variable_scope('output_sub') as scope:
-                    logits_sub_2d = tf.contrib.layers.fully_connected(
-                        outputs_sub, self.num_classes_sub,
-                        activation_fn=None,
-                        weights_initializer=tf.truncated_normal_initializer(
-                            stddev=0.1),
-                        biases_initializer=tf.zeros_initializer(),
-                        scope=scope)
+        with tf.variable_scope('multi_lstm', initializer=initializer, reuse=True) as scope_lstm:
+            # Stack multiple cells
+            stacked_lstm_sub = tf.contrib.rnn.MultiRNNCell(
+                lstm_list, state_is_tuple=True)
 
-                    # Reshape back to the original shape
-                    logits_sub = tf.reshape(
-                        logits_sub_2d,
-                        shape=[batch_size, -1, self.num_classes_sub])
+            # Ignore 2nd return (the last state)
+            outputs_sub, final_state_sub = tf.nn.dynamic_rnn(
+                cell=stacked_lstm_sub,
+                inputs=inputs,
+                sequence_length=inputs_seq_len,
+                dtype=tf.float32,
+                scope=scope_lstm)
 
-                    # Convert to time-major: `[max_time, batch_size,
-                    # num_classes]'
-                    logits_sub = tf.transpose(logits_sub, (1, 0, 2))
+            # Reshape to apply the same weights over the timesteps
+            if self.num_proj is None:
+                outputs_sub_2d = tf.reshape(outputs_sub,
+                                            shape=[-1, self.num_units])
+            else:
+                outputs_sub_2d = tf.reshape(outputs_sub,
+                                            shape=[-1, self.num_proj])
 
-                    # Dropout for the hidden-output connections
-                    logits_sub = tf.nn.dropout(
-                        logits_sub, keep_prob_output,
-                        name='dropout_output_sub')
-                    # NOTE: This may lead to bad results
+        with tf.variable_scope('output_sub') as scope_output:
+            logits_sub_2d = tf.contrib.layers.fully_connected(
+                outputs_sub_2d, self.num_classes_sub,
+                activation_fn=None,
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                biases_initializer=tf.zeros_initializer(),
+                scope=scope_output)
 
-        # Stack multiple cells
-        stacked_lstm = tf.contrib.rnn.MultiRNNCell(
-            lstm_list, state_is_tuple=True)
+            # Reshape back to the original shape
+            logits_sub = tf.reshape(
+                logits_sub_2d,
+                shape=[batch_size, -1, self.num_classes_sub])
 
-        # Ignore 2nd return (the last state)
-        outputs, final_state = tf.nn.dynamic_rnn(
-            cell=stacked_lstm,
-            inputs=inputs,
-            sequence_length=inputs_seq_len,
-            dtype=tf.float32)
+            # Convert to time-major: `[max_time, batch_size,
+            # num_classes]'
+            logits_sub = tf.transpose(logits_sub, (1, 0, 2))
+
+            # Dropout for the hidden-output connections
+            logits_sub = tf.nn.dropout(
+                logits_sub, keep_prob_output,
+                name='dropout_output_sub')
+            # NOTE: This may lead to bad results
+
+        if self.return_hidden_states:
+            return outputs, final_state, outputs_sub, final_state_sub
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
-            outputs = tf.reshape(outputs, shape=[-1, self.num_units])
+            outputs_2d = tf.reshape(outputs, shape=[-1, self.num_units])
         else:
-            outputs = tf.reshape(outputs, shape=[-1, self.num_proj])
+            outputs_2d = tf.reshape(outputs, shape=[-1, self.num_proj])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.variable_scope('bottleneck') as scope:
-                outputs = tf.contrib.layers.fully_connected(
-                    outputs, self.bottleneck_dim,
+                outputs_2d = tf.contrib.layers.fully_connected(
+                    outputs_2d, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
-                    weights_initializer=tf.truncated_normal_initializer(
-                        stddev=0.1),
+                    weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
 
                 # Dropout for the hidden-output connections
-                outputs = tf.nn.dropout(
-                    outputs, keep_prob_output,
+                outputs_2d = tf.nn.dropout(
+                    outputs_2d, keep_prob_output,
                     name='dropout_output_main_bottle')
 
         with tf.variable_scope('output_main') as scope:
             logits_2d = tf.contrib.layers.fully_connected(
-                outputs, self.num_classes_main,
+                outputs_2d, self.num_classes_main,
                 activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(
-                    stddev=0.1),
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 

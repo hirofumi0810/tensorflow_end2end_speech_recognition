@@ -11,9 +11,10 @@ import tensorflow as tf
 # from tensorflow.python import debug as tf_debug
 
 sys.path.append('../../')
-from models.ctc.load_model import load
+from models.ctc.vanilla_ctc import CTC
 from models.test.util import measure_time
-from models.test.data import generate_data, num2alpha, num2phone
+from models.test.data import generate_data, num2alpha
+from experiments.utils.data.labels.phone import num2phone
 from experiments.utils.data.sparsetensor import sparsetensor2list
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.training.learning_rate_controller import Controller
@@ -25,72 +26,67 @@ class TestCTC(tf.test.TestCase):
         print("CTC Working check.")
 
         ##############################
-        # VGG-BLSTM-CTC
-        ##############################
-        self.check_training(model_type='vgg_lstm_ctc', bidirectional=True,
-                            label_type='phone')
-        self.check_training(model_type='vgg_lstm_ctc', bidirectional=True,
-                            label_type='character')
-
-        ##############################
-        # VGG-LSTM-CTC
-        ##############################
-        self.check_training(model_type='vgg_lstm_ctc', label_type='phone')
-        self.check_training(model_type='vgg_lstm_ctc', label_type='character')
-
-        ##############################
         # BLSTM-CTC
         ##############################
-        self.check_training(model_type='lstm_ctc', bidirectional=True,
-                            label_type='phone', lstm_impl='BasicLSTMCell')
-        self.check_training(model_type='lstm_ctc', bidirectional=True,
-                            label_type='phone', lstm_impl='LSTMCell')
-        self.check_training(model_type='lstm_ctc', bidirectional=True,
-                            label_type='phone', lstm_impl='LSTMBlockCell')
-        # self.check_training(model_type='lstm_ctc', bidirectional=True,
-        # label_type='phone', lstm_impl='LSTMBlockFusedCell')
-        self.check_training(model_type='lstm_ctc', bidirectional=True,
-                            label_type='character')
+        self.check_training(encoder_type='blstm', label_type='phone',
+                            lstm_impl='BasicLSTMCell')
+        self.check_training(encoder_type='blstm', label_type='phone',
+                            lstm_impl='LSTMCell')
+        self.check_training(encoder_type='blstm', label_type='phone',
+                            lstm_impl='LSTMBlockCell')
+        self.check_training(encoder_type='blstm', label_type='phone',
+                            lstm_impl='LSTMBlockFusedCell')
+        self.check_training(encoder_type='blstm', label_type='character')
 
         ##############################
         # LSTM-CTC
         ##############################
-        self.check_training(model_type='lstm_ctc', label_type='phone',
+        self.check_training(encoder_type='lstm', label_type='phone',
                             lstm_impl='BasicLSTMCell')
-        self.check_training(model_type='lstm_ctc', label_type='phone',
+        self.check_training(encoder_type='lstm', label_type='phone',
                             lstm_impl='LSTMCell')
-        self.check_training(model_type='lstm_ctc', label_type='phone',
+        self.check_training(encoder_type='lstm', label_type='phone',
                             lstm_impl='LSTMBlockCell')
-        # self.check_training(model_type='lstm_ctc', label_type='phone',
-        #                     lstm_impl='LSTMBlockFusedCell')
-        self.check_training(model_type='lstm_ctc', label_type='character')
+        self.check_training(encoder_type='lstm', label_type='phone',
+                            lstm_impl='LSTMBlockFusedCell')
+        self.check_training(encoder_type='lstm', label_type='character')
+
+        ##############################
+        # VGG-BLSTM-CTC
+        ##############################
+        self.check_training(encoder_type='vgg_blstm', label_type='phone')
+        self.check_training(encoder_type='vgg_blstm', label_type='character')
+
+        ##############################
+        # VGG-LSTM-CTC
+        ##############################
+        self.check_training(encoder_type='vgg_lstm', label_type='phone')
+        self.check_training(encoder_type='vgg_lstm', label_type='character')
 
         ##############################
         # BGRU-CTC
         ##############################
-        self.check_training(model_type='gru_ctc', bidirectional=True,
-                            label_type='phone')
-        self.check_training(model_type='gru_ctc', label_type='character')
+        self.check_training(encoder_type='bgru', label_type='phone')
+        self.check_training(encoder_type='bgru', label_type='character')
 
         ##############################
         # GRU-CTC
         ##############################
-        self.check_training(model_type='gru_ctc', label_type='phone')
-        self.check_training(model_type='gru_ctc', label_type='character')
+        self.check_training(encoder_type='gru', label_type='phone')
+        self.check_training(encoder_type='gru', label_type='character')
 
         ##############################
         # CNN-CTC
         ##############################
-        # self.check_training(model_type='cnn_ctc', label_type='phone')
-        # self.check_training(model_type='cnn_ctc', label_type='character')
+        # self.check_training(encoder_type='cnn', label_type='phone')
+        # self.check_training(encoder_type='cnn', label_type='character')
 
     @measure_time
-    def check_training(self, model_type, label_type, bidirectional=False,
+    def check_training(self, encoder_type, label_type, bidirectional=False,
                        lstm_impl='LSTMBlockCell'):
 
         print('==================================================')
-        print('  model_type: %s' % model_type)
-        print('  bidirectional: %s' % str(bidirectional))
+        print('  encoder_type: %s' % encoder_type)
         print('  label_type: %s' % label_type)
         print('  lstm_impl: %s' % lstm_impl)
         print('==================================================')
@@ -99,7 +95,7 @@ class TestCTC(tf.test.TestCase):
         with tf.Graph().as_default():
             # Load batch data
             batch_size = 2
-            splice = 1 if model_type not in ['vgg_lstm_ctc', 'cnn_ctc'] else 11
+            splice = 1 if encoder_type not in ['vgg_blstm', 'vgg_lstm', 'cnn'] else 11
             inputs, labels_true_st, inputs_seq_len = generate_data(
                 label_type=label_type,
                 model='ctc',
@@ -108,42 +104,41 @@ class TestCTC(tf.test.TestCase):
 
             # Define model graph
             num_classes = 26 if label_type == 'character' else 61
-            model = load(model_type=model_type)
-            network = model(input_size=inputs[0].shape[-1] // splice,
-                            splice=splice,
-                            num_units=256,
-                            num_layers=2,
-                            num_classes=num_classes,
-                            bidirectional=bidirectional,
-                            lstm_impl=lstm_impl,
-                            parameter_init=0.1,
-                            clip_grad=5.0,
-                            clip_activation=50,
-                            num_proj=256,
-                            # bottleneck_dim=50,
-                            bottleneck_dim=None,
-                            weight_decay=1e-8)
+            model = CTC(encoder_type=encoder_type,
+                        input_size=inputs[0].shape[-1] // splice,
+                        splice=splice,
+                        num_units=256,
+                        num_layers=2,
+                        num_classes=num_classes,
+                        lstm_impl=lstm_impl,
+                        parameter_init=0.1,
+                        clip_grad=5.0,
+                        clip_activation=50,
+                        num_proj=256,
+                        # bottleneck_dim=50,
+                        bottleneck_dim=None,
+                        weight_decay=1e-8)
 
             # Define placeholders
-            network.create_placeholders()
+            model.create_placeholders()
             learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
             # Add to the graph each operation
-            loss_op, logits = network.compute_loss(
-                network.inputs_pl_list[0],
-                network.labels_pl_list[0],
-                network.inputs_seq_len_pl_list[0],
-                network.keep_prob_input_pl_list[0],
-                network.keep_prob_hidden_pl_list[0],
-                network.keep_prob_output_pl_list[0])
-            train_op = network.train(loss_op,
-                                     optimizer='adam',
-                                     learning_rate=learning_rate_pl)
-            decode_op = network.decoder(logits,
-                                        network.inputs_seq_len_pl_list[0],
-                                        decode_type='beam_search',
-                                        beam_width=20)
-            ler_op = network.compute_ler(decode_op, network.labels_pl_list[0])
+            loss_op, logits = model.compute_loss(
+                model.inputs_pl_list[0],
+                model.labels_pl_list[0],
+                model.inputs_seq_len_pl_list[0],
+                model.keep_prob_input_pl_list[0],
+                model.keep_prob_hidden_pl_list[0],
+                model.keep_prob_output_pl_list[0])
+            train_op = model.train(loss_op,
+                                   optimizer='adam',
+                                   learning_rate=learning_rate_pl)
+            decode_op = model.decoder(logits,
+                                      model.inputs_seq_len_pl_list[0],
+                                      decode_type='beam_search',
+                                      beam_width=20)
+            ler_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 
             # Define learning rate controller
             learning_rate = 1e-4
@@ -168,20 +163,25 @@ class TestCTC(tf.test.TestCase):
 
             # Make feed dict
             feed_dict = {
-                network.inputs_pl_list[0]: inputs,
-                network.labels_pl_list[0]: labels_true_st,
-                network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                network.keep_prob_input_pl_list[0]: 0.9,
-                network.keep_prob_hidden_pl_list[0]: 0.9,
-                network.keep_prob_output_pl_list[0]: 0.9,
+                model.inputs_pl_list[0]: inputs,
+                model.labels_pl_list[0]: labels_true_st,
+                model.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                model.keep_prob_input_pl_list[0]: 0.9,
+                model.keep_prob_hidden_pl_list[0]: 0.9,
+                model.keep_prob_output_pl_list[0]: 0.9,
                 learning_rate_pl: learning_rate
             }
 
             map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
 
+            print('aaa')
+            # return 0
+
             with tf.Session() as sess:
                 # Initialize parameters
                 sess.run(init_op)
+
+                return 0
 
                 # Wrapper for tfdbg
                 # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
@@ -199,16 +199,16 @@ class TestCTC(tf.test.TestCase):
                         [train_op, loss_op], feed_dict=feed_dict)
 
                     # Gradient check
-                    # grads = sess.run(network.clipped_grads,
+                    # grads = sess.run(model.clipped_grads,
                     #                  feed_dict=feed_dict)
                     # for grad in grads:
                     #     print(np.max(grad))
 
                     if (step + 1) % 10 == 0:
                         # Change to evaluation mode
-                        feed_dict[network.keep_prob_input_pl_list[0]] = 1.0
-                        feed_dict[network.keep_prob_hidden_pl_list[0]] = 1.0
-                        feed_dict[network.keep_prob_output_pl_list[0]] = 1.0
+                        feed_dict[model.keep_prob_input_pl_list[0]] = 1.0
+                        feed_dict[model.keep_prob_hidden_pl_list[0]] = 1.0
+                        feed_dict[model.keep_prob_output_pl_list[0]] = 1.0
 
                         # Compute accuracy
                         ler_train = sess.run(ler_op, feed_dict=feed_dict)

@@ -1,25 +1,22 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Bidirectional GRU Encoder."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+"""Unidirectional GRU encoder."""
 
 import tensorflow as tf
 
 
-class BGRU_Encoder(object):
-    """Bidirectional GRU-CTC model.
+class GRU_Encoder(object):
+    """Unidirectional GRU encoder.
     Args:
         num_units (int): the number of units in each layer
         num_layers (int): the number of layers
         num_classes (int): the number of classes of target labels
-            (except for a blank label)
-        parameter_init (float): the range of uniform distribution to initialize
-            weight parameters (>= 0)
-        bottleneck_dim (int): the dimensions of the bottleneck layer
+            (except for a blank label). if 0, return hidden states before
+            passing through the softmax layer
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        bottleneck_dim (int, optional): the dimensions of the bottleneck layer
         name (string, optional): the name of encoder
     """
 
@@ -27,9 +24,9 @@ class BGRU_Encoder(object):
                  num_units,
                  num_layers,
                  num_classes,
-                 parameter_init,
-                 bottleneck_dim,
-                 name='bgru_encoder'):
+                 parameter_init=0.1,
+                 bottleneck_dim=None,
+                 name='gru_encoder'):
 
         self.num_units = num_units
         self.num_layers = num_layers
@@ -38,6 +35,8 @@ class BGRU_Encoder(object):
         self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
             None, 0] else None
         self.name = name
+
+        self.return_hidden_states = True if num_classes == 0 else False
 
     def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
@@ -56,56 +55,52 @@ class BGRU_Encoder(object):
             final_state: A final hidden state of the encoder
         """
         # Dropout for the input-hidden connection
-        outputs = tf.nn.dropout(
+        inputs = tf.nn.dropout(
             inputs, keep_prob_input, name='dropout_input')
 
         initializer = tf.random_uniform_initializer(
             minval=-self.parameter_init, maxval=self.parameter_init)
 
         # Hidden layers
+        gru_list = []
         for i_layer in range(1, self.num_layers + 1, 1):
-            with tf.variable_scope('bgru_hidden' + str(i_layer), initializer=initializer) as scope:
+            with tf.variable_scope('gru_hidden' + str(i_layer), initializer=initializer):
 
-                gru_fw = tf.contrib.rnn.GRUCell(self.num_units)
-                gru_bw = tf.contrib.rnn.GRUCell(self.num_units)
+                gru = tf.contrib.rnn.GRUCell(self.num_units)
 
                 # Dropout for the hidden-hidden connections
-                gru_fw = tf.contrib.rnn.DropoutWrapper(
-                    gru_fw, output_keep_prob=keep_prob_hidden)
-                gru_bw = tf.contrib.rnn.DropoutWrapper(
-                    gru_bw, output_keep_prob=keep_prob_hidden)
+                gru = tf.contrib.rnn.DropoutWrapper(
+                    gru, output_keep_prob=keep_prob_hidden)
 
-                # _init_state_fw = gru_fw.zero_state(self.batch_size,
-                #                                    tf.float32)
-                # _init_state_bw = gru_bw.zero_state(self.batch_size,
-                #                                    tf.float32)
-                # initial_state_fw = _init_state_fw,
-                # initial_state_bw = _init_state_bw,
+                gru_list.append(gru)
 
-                # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
-                    cell_fw=gru_fw,
-                    cell_bw=gru_bw,
-                    inputs=outputs,
-                    sequence_length=inputs_seq_len,
-                    dtype=tf.float32,
-                    scope=scope)
+        # Stack multiple cells
+        stacked_gru = tf.contrib.rnn.MultiRNNCell(
+            gru_list, state_is_tuple=True)
 
-                outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
-
-        # Reshape to apply the same weights over the timesteps
-        outputs = tf.reshape(outputs, shape=[-1, self.num_units * 2])
+        # Ignore 2nd return (the last state)
+        outputs, final_state = tf.nn.dynamic_rnn(
+            cell=stacked_gru,
+            inputs=inputs,
+            sequence_length=inputs_seq_len,
+            dtype=tf.float32)
+        # NOTE: initial states are zero states by default
 
         # inputs: `[batch_size, max_time, input_size]`
         batch_size = tf.shape(inputs)[0]
+
+        if self.return_hidden_states:
+            return outputs, final_state
+
+        # Reshape to apply the same weights over the timesteps
+        outputs = tf.reshape(outputs, shape=[-1, self.num_units])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.variable_scope('bottleneck') as scope:
                 outputs = tf.contrib.layers.fully_connected(
                     outputs, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
-                    weights_initializer=tf.truncated_normal_initializer(
-                        stddev=0.1),
+                    weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
 
@@ -117,8 +112,7 @@ class BGRU_Encoder(object):
             logits_2d = tf.contrib.layers.fully_connected(
                 outputs, self.num_classes,
                 activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(
-                    stddev=0.1),
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 

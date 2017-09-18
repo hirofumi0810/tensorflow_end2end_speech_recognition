@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""VGG + unidirectional LSTM encoder."""
+"""VGG + bidirectional LSTM encoder."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -9,51 +9,52 @@ from __future__ import print_function
 
 import math
 import tensorflow as tf
-from models.encoders.vgg_blstm_encoder import _conv_layer, _max_pool
 
 
-class VGG_LSTM_Encoder(object):
-    """VGG + unidirectional LSTM encoder.
+class VGG_BLSTM_Encoder(object):
+    """VGG + bidirectional LSTM encoder.
     Args:
         input_size (int): the dimensions of input vectors
+        splice (int): frames to splice
         num_units (int): the number of units in each layer
         num_layers (int): the number of layers
         num_classes (int): the number of classes of target labels
-            (except for a blank label)
-        lstm_impl (string): BasicLSTMCell or LSTMCell or LSTMBlockCell or
-            LSTMBlockFusedCell.
+            (except for a blank label). if 0, return hidden states before
+            passing through the softmax layer
+        lstm_impl (string, optional):
+            BasicLSTMCell or LSTMCell or LSTMBlockCell or LSTMBlockFusedCell.
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
-        use_peephole (bool): if True, use peephole
-        parameter_init (float): the range of uniform distribution to initialize
-            weight parameters (>= 0)
-        clip_activation (float): the range of activation clipping (> 0)
-        num_proj (int): the number of nodes in the projection layer
-        bottleneck_dim (int): the dimensions of the bottleneck layer
+        use_peephole (bool, optional): if True, use peephole
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        clip_activation (float, optional): the range of activation clipping (> 0)
+        num_proj (int, optional): the number of nodes in the projection layer
+        bottleneck_dim (int, optional): the dimensions of the bottleneck layer
         name (string, optional): the name of encoder
     """
 
     def __init__(self,
                  input_size,
+                 splice,
                  num_units,
                  num_layers,
                  num_classes,
-                 lstm_impl,
-                 use_peephole,
-                 splice,
-                 parameter_init,
-                 clip_activation,
-                 num_proj,
-                 bottleneck_dim,
-                 name='vgg_lstm_encoder'):
+                 lstm_impl='LSTMBlockCell',
+                 use_peephole=True,
+                 parameter_init=0.1,
+                 clip_activation=5.0,
+                 num_proj=None,
+                 bottleneck_dim=None,
+                 name='vgg_blstm_encoder'):
 
         self.input_size = input_size
+        self.splice = splice
         self.num_units = num_units
         self.num_layers = num_layers
         self.num_classes = num_classes
         self.lstm_impl = lstm_impl
         self.use_peephole = use_peephole
-        self.splice = splice
         self.parameter_init = parameter_init
         self.clip_activation = clip_activation
         if lstm_impl != 'LSTMCell':
@@ -65,6 +66,8 @@ class VGG_LSTM_Encoder(object):
         self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
             None, 0] else None
         self.name = name
+
+        self.return_hidden_states = True if num_classes == 0 else False
 
     def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
@@ -161,19 +164,31 @@ class VGG_LSTM_Encoder(object):
             maxval=self.parameter_init)
 
         # Hidden layers
-        lstm_list = []
         for i_layer in range(1, self.num_layers + 1, 1):
-            with tf.variable_scope('lstm_hidden' + str(i_layer), initializer=initializer):
+            with tf.variable_scope('blstm_hidden' + str(i_layer),
+                                   initializer=initializer) as scope:
 
                 if self.lstm_impl == 'BasicLSTMCell':
-                    lstm = tf.contrib.rnn.BasicLSTMCell(
+                    lstm_fw = tf.contrib.rnn.BasicLSTMCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        state_is_tuple=True,
+                        activation=tf.tanh)
+                    lstm_bw = tf.contrib.rnn.BasicLSTMCell(
                         self.num_units,
                         forget_bias=1.0,
                         state_is_tuple=True,
                         activation=tf.tanh)
 
                 elif self.lstm_impl == 'LSTMCell':
-                    lstm = tf.contrib.rnn.LSTMCell(
+                    lstm_fw = tf.contrib.rnn.LSTMCell(
+                        self.num_units,
+                        use_peepholes=self.use_peephole,
+                        cell_clip=self.clip_activation,
+                        num_proj=self.num_proj,
+                        forget_bias=1.0,
+                        state_is_tuple=True)
+                    lstm_bw = tf.contrib.rnn.LSTMCell(
                         self.num_units,
                         use_peepholes=self.use_peephole,
                         cell_clip=self.clip_activation,
@@ -183,7 +198,12 @@ class VGG_LSTM_Encoder(object):
 
                 elif self.lstm_impl == 'LSTMBlockCell':
                     # NOTE: This should be faster than tf.contrib.rnn.LSTMCell
-                    lstm = tf.contrib.rnn.LSTMBlockCell(
+                    lstm_fw = tf.contrib.rnn.LSTMBlockCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=self.use_peephole)
+                    lstm_bw = tf.contrib.rnn.LSTMBlockCell(
                         self.num_units,
                         forget_bias=1.0,
                         # clip_cell=True,
@@ -195,7 +215,12 @@ class VGG_LSTM_Encoder(object):
 
                     # NOTE: This should be faster than
                     tf.contrib.rnn.LSTMBlockFusedCell
-                    lstm = tf.contrib.rnn.LSTMBlockFusedCell(
+                    lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
+                        self.num_units,
+                        forget_bias=1.0,
+                        # clip_cell=True,
+                        use_peephole=self.use_peephole)
+                    lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
                         self.num_units,
                         forget_bias=1.0,
                         # clip_cell=True,
@@ -208,27 +233,31 @@ class VGG_LSTM_Encoder(object):
                         '"LSTMBlockCell" or "LSTMBlockFusedCell".')
 
                 # Dropout for the hidden-hidden connections
-                lstm = tf.contrib.rnn.DropoutWrapper(
-                    lstm, output_keep_prob=keep_prob_hidden)
+                lstm_fw = tf.contrib.rnn.DropoutWrapper(
+                    lstm_fw, output_keep_prob=keep_prob_hidden)
+                lstm_bw = tf.contrib.rnn.DropoutWrapper(
+                    lstm_bw, output_keep_prob=keep_prob_hidden)
 
-                lstm_list.append(lstm)
+                # Ignore 2nd return (the last state)
+                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
+                    cell_fw=lstm_fw,
+                    cell_bw=lstm_bw,
+                    inputs=outputs,
+                    sequence_length=inputs_seq_len,
+                    dtype=tf.float32,
+                    scope=scope)
+                # NOTE: initial states are zero states by default
 
-        # Stack multiple cells
-        stacked_lstm = tf.contrib.rnn.MultiRNNCell(
-            lstm_list, state_is_tuple=True)
+                outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
-        # Ignore 2nd return (the last state)
-        outputs, final_state = tf.nn.dynamic_rnn(
-            cell=stacked_lstm,
-            inputs=inputs,
-            sequence_length=inputs_seq_len,
-            dtype=tf.float32)
+        if self.return_hidden_states:
+            return outputs, final_state
 
         # Reshape to apply the same weights over the timesteps
         if self.num_proj is None:
-            outputs = tf.reshape(outputs, shape=[-1, self.num_units])
+            outputs = tf.reshape(outputs, shape=[-1, self.num_units * 2])
         else:
-            outputs = tf.reshape(outputs, shape=[-1, self.num_proj])
+            outputs = tf.reshape(outputs, shape=[-1, self.num_proj * 2])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.variable_scope('bottleneck') as scope:
@@ -263,3 +292,41 @@ class VGG_LSTM_Encoder(object):
                 logits, keep_prob_output, name='dropout_output')
 
             return logits, final_state
+
+
+def _max_pool(bottom, name):
+    """A max pooling layer.
+    Args:
+        bottom: A tensor of size `[B * T, H, W, C]`
+        name (string): A layer name
+    Returns:
+        A tensor of size `[B * T, H / 2, W / 2, C]`
+    """
+    return tf.nn.max_pool(
+        bottom,
+        ksize=[1, 2, 2, 1],  # original
+        # ksize=[1, 3, 3, 1],
+        strides=[1, 2, 2, 1],
+        padding='SAME', name=name)
+
+
+def _conv_layer(bottom, filter_shape, parameter_init, name):
+    """A convolutional layer
+    Args:
+        bottom: A tensor of size `[B * T, H, W, C]`
+        filter_shape (list): A list of
+            `[height, width, input_channel, output_channel]`
+        name (string): A layer name
+    Returns:
+        outputs: A tensor of size `[B * T, H, W, output_channel]`
+    """
+    with tf.variable_scope(name):
+        W = tf.Variable(tf.truncated_normal(shape=filter_shape,
+                                            stddev=parameter_init),
+                        name='weight')
+        b = tf.Variable(tf.zeros(shape=filter_shape[-1]), name='bias')
+        conv_bottom = tf.nn.conv2d(bottom, W,
+                                   strides=[1, 1, 1, 1],
+                                   padding='SAME')
+        outputs = tf.nn.bias_add(conv_bottom, b)
+        return tf.nn.relu(outputs)

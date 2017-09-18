@@ -6,7 +6,7 @@ from __future__ import division
 from __future__ import print_function
 
 from experiments.utils.data.sparsetensor import list2sparsetensor
-from experiments.utils.data.labels.phone import num2phone, phone2num
+from experiments.utils.data.labels.phone import phone2num
 from experiments.utils.data.inputs.splicing import do_splice
 from input_pipeline.feature_extraction import wav2feature
 
@@ -14,9 +14,9 @@ from input_pipeline.feature_extraction import wav2feature
 def _read_text(text_path):
     """Read char-level transcripts.
     Args:
-        text_path: path to a transcript text file
+        text_path (string): path to a transcript text file
     Returns:
-        transcript: a text of transcript
+        transcript (string): a text of transcript
     """
     # Read ground truth labels
     with open(text_path, 'r') as f:
@@ -28,9 +28,9 @@ def _read_text(text_path):
 def _read_phone(text_path):
     """Read phone-level transcripts.
     Args:
-        text_path: path to a transcript text file
+        text_path (string): path to a transcript text file
     Returns:
-        transcript: a text of transcript
+        transcript (string): a text of transcript
     """
     # Read ground truth labels
     phone_list = []
@@ -45,10 +45,10 @@ def _read_phone(text_path):
 def generate_data(label_type, model, batch_size=1, splice=1):
     """
     Args:
-        label_type: character or phone or multitask
-        model: ctc or attention
-        batch_size: int,
-        splice: int, frames to splice. Default is 1 frame.
+        label_type (string): character or phone or multitask
+        model (string): ctc or attention or joint_ctc_attention
+        batch_size (int, optional): the size of mini-batch
+        splice (int, optional): frames to splice. Default is 1 frame.
     Returns:
         inputs: `[B, T, input_size]`
         labels: `[B]`
@@ -160,9 +160,9 @@ def generate_data(label_type, model, batch_size=1, splice=1):
 def alpha2num(transcript):
     """Convert from alphabet to number.
     Args:
-        transcript: sequence of characters (string)
+        transcript (string): sequence of characters
     Returns:
-        index_list: list of indices of alphabet (int)
+        index_list (list): list of indices of alphabet
     """
     char_list = list(transcript)
 
@@ -185,9 +185,9 @@ def alpha2num(transcript):
 def num2alpha(index_list):
     """Convert from number to alphabet.
     Args:
-        index_list: list of indices of alphabet (int)
+        index_list (list): list of indices of alphabet
     Returns:
-        transcript: sequence of character (string)
+        transcript (string): sequence of character
     """
     # 0 is reserved to space
     first_index = ord('a') - 1

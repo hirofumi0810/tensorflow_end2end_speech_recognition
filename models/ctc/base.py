@@ -59,18 +59,18 @@ class CTCBase(object):
         self.keep_prob_hidden_pl_list = []
         self.keep_prob_output_pl_list = []
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob_input,
-                 keep_prob_hidden, keep_prob_output):
+    def __call__(self, inputs, inputs_seq_len,
+                 keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
             inputs_seq_len: A tensor of size `[B]`
-            keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden connection
-            keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden connection
-            keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output connection
+            keep_prob_input (placeholder, float): A probability to keep nodes
+                in the input-hidden connection
+            keep_prob_hidden (placeholder, float): A probability to keep nodes
+                in the hidden-hidden connection
+            keep_prob_output (placeholder, float): A probability to keep nodes
+                in the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
         """
@@ -134,12 +134,12 @@ class CTCBase(object):
             inputs: A tensor of size `[B, T, input_size]`
             labels: A SparseTensor of target labels
             inputs_seq_len: A tensor of size `[B]`
-            keep_prob_input (float): A probability to keep nodes in the
-                input-hidden layer
-            keep_prob_hidden (float): A probability to keep nodes in the
-                hidden-hidden layers
-            keep_prob_output (float): A probability to keep nodes in the
-                hidden-output layer
+            keep_prob_input (placeholder, float): A probability to keep nodes
+                in the input-hidden connection
+            keep_prob_hidden (placeholder, float): A probability to keep nodes
+                in the hidden-hidden connection
+            keep_prob_output (placeholder, float): A probability to keep nodes
+                in the hidden-output connection
             scope (optional): A scope in the model tower
         Returns:
             total_loss: operation for computing total ctc loss
