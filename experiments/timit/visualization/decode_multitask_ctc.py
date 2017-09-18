@@ -15,15 +15,15 @@ import yaml
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
 from experiments.timit.visualization.core.decode.ctc import decode_test_multitask
-from models.ctc.load_model import load
+from models.ctc.multitask_ctc import Multitask_CTC
 
 
-def do_decode(network, params, epoch=None):
+def do_decode(model, params, epoch=None):
     """Decode the Multi-task CTC outputs.
     Args:
-        network: model to restore
-        params: A dictionary of parameters
-        epoch: int, the epoch to restore
+        model: the model to restore
+        params (dict): A dictionary of parameters
+        epoch (int): the epoch to restore
     """
     # Load dataset
     test_data = Dataset(
@@ -34,21 +34,21 @@ def do_decode(network, params, epoch=None):
         sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.create_placeholders()
+    model.create_placeholders()
 
     # Add to the graph each operation (including model definition)
-    _, logits_main, logits_sub = network.compute_loss(
-        network.inputs_pl_list[0],
-        network.labels_pl_list[0],
-        network.labels_sub_pl_list[0],
-        network.inputs_seq_len_pl_list[0],
-        network.keep_prob_input_pl_list[0],
-        network.keep_prob_hidden_pl_list[0],
-        network.keep_prob_output_pl_list[0])
-    decode_op_main, decode_op_sub = network.decoder(
+    _, logits_main, logits_sub = model.compute_loss(
+        model.inputs_pl_list[0],
+        model.labels_pl_list[0],
+        model.labels_sub_pl_list[0],
+        model.inputs_seq_len_pl_list[0],
+        model.keep_prob_input_pl_list[0],
+        model.keep_prob_hidden_pl_list[0],
+        model.keep_prob_output_pl_list[0])
+    decode_op_main, decode_op_sub = model.decoder(
         logits_main,
         logits_sub,
-        network.inputs_seq_len_pl_list[0],
+        model.inputs_seq_len_pl_list[0],
         decode_type='beam_search',
         beam_width=20)
 
@@ -56,7 +56,7 @@ def do_decode(network, params, epoch=None):
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(network.model_dir)
+        ckpt = tf.train.get_checkpoint_state(model.model_path)
 
         # If check point exists
         if ckpt:
@@ -74,12 +74,12 @@ def do_decode(network, params, epoch=None):
         decode_test_multitask(session=sess,
                               decode_op_main=decode_op_main,
                               decode_op_sub=decode_op_sub,
-                              network=network,
+                              model=model,
                               dataset=test_data,
                               label_type_main=params['label_type_main'],
                               label_type_sub=params['label_type_sub'],
                               save_path=None)
-        #   save_path=network.model_dir)
+        #   save_path=model.model_path)
 
 
 def main(model_path, epoch):
@@ -103,8 +103,8 @@ def main(model_path, epoch):
         params['num_classes_sub'] = 39
 
     # Model setting
-    model = load(model_type=params['model'])
-    network = model(
+    model = Multitask_CTC(
+        encoder_type=params['encoder_type'],
         input_size=params['input_size'] * params['num_stack'],
         num_units=params['num_units'],
         num_layers_main=params['num_layers_main'],
@@ -117,8 +117,8 @@ def main(model_path, epoch):
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 
-    network.model_dir = model_path
-    do_decode(network=network, params=params, epoch=epoch)
+    model.model_path = model_path
+    do_decode(model=model, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

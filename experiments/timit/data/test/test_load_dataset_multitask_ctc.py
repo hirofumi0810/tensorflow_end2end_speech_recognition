@@ -32,7 +32,7 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
         # sort
         self.check_loading(label_type_main='character', sort_utt=True)
         self.check_loading(label_type_main='character', sort_utt=True,
-                           sort_stop_epoch=2)
+                           sort_stop_epoch=1)
 
         # frame stacking
         self.check_loading(label_type_main='character', frame_stacking=True)
@@ -59,18 +59,16 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
         dataset = Dataset(
             data_type=data_type,
             label_type_main=label_type_main, label_type_sub='phone61',
-            batch_size=64, splice=splice,
+            batch_size=64, max_epoch=2, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
             sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
             progressbar=True)
 
         print('=> Loading mini-batch...')
-        map_file_path_char = '../../metrics/mapping_files/ctc/' + \
-            label_type_main + '_to_num.txt'
-        map_file_path_phone = '../../metrics/mapping_files/ctc/phone61_to_num.txt'
+        map_file_path_char = '../../metrics/mapping_files/ctc/' + label_type_main + '.txt'
+        map_file_path_phone = '../../metrics/mapping_files/ctc/phone61.txt'
 
-        for _ in range(len(dataset)):
-            data, next_epoch_flag = dataset.next()
+        for data, is_new_epoch in dataset:
             inputs, labels_char, labels_phone, inputs_seq_len, input_names = data
 
             str_true_char = num2char(labels_char[0], map_file_path_char)
@@ -80,9 +78,6 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
             print('----- %s -----' % input_names[0])
             print(str_true_char)
             print(str_true_phone)
-
-            if next_epoch_flag:
-                break
 
 
 if __name__ == '__main__':

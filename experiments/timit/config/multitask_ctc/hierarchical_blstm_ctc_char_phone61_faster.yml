@@ -1,7 +1,8 @@
 param:
-  encoder_type: lstm
+  encoder_type: multitask_blstm
   corpus: timit
-  label_type: character
+  label_type_main: character
+  label_type_sub: phone61
   feature: fbank
   input_size: 120
   splice: 1
@@ -9,15 +10,17 @@ param:
   num_skip: 3
   num_units: 256
   num_proj: 0
-  num_layers: 5
+  num_layers_main: 5
+  num_layers_sub: 3
   bottleneck_dim: 0
+  main_task_weight: 0.5
   batch_size: 64
   optimizer: adam
   learning_rate: 1e-3
   decay_start_epoch: 20
   decay_rate: 0.5
   decay_patient_epoch: 3
-  num_epoch: 50
+  num_epoch: 70
   weight_init: 0.1
   clip_grad: 5.0
   clip_activation: 50

@@ -1,6 +1,5 @@
 param:
-  model: lstm_ctc
-  bidirectional: False
+  encoder_type: lstm
   corpus: timit
   label_type: character_capital_divide
   feature: fbank

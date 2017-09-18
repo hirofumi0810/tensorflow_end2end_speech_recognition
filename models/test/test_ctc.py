@@ -174,14 +174,9 @@ class TestCTC(tf.test.TestCase):
 
             map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
 
-            print('aaa')
-            # return 0
-
             with tf.Session() as sess:
                 # Initialize parameters
                 sess.run(init_op)
-
-                return 0
 
                 # Wrapper for tfdbg
                 # sess = tf_debug.LocalCLIDebugWrapperSession(sess)

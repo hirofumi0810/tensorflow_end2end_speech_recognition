@@ -15,15 +15,15 @@ import yaml
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_ctc import Dataset
 from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
-from models.ctc.load_model import load
+from models.ctc.vanilla_ctc import CTC
 
 
-def do_eval(network, params, epoch=None):
+def do_eval(model, params, epoch=None):
     """Evaluate the model.
     Args:
-        network: model to restore
-        params: A dictionary of parameters
-        epoch: int, the epoch to restore
+        model: the model to restore
+        params (dict): A dictionary of parameters
+        epoch (int): the epoch to restore
     """
     # Load dataset
     if 'phone' in params['label_type']:
@@ -40,26 +40,26 @@ def do_eval(network, params, epoch=None):
             sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.create_placeholders()
+    model.create_placeholders()
 
     # Add to the graph each operation (including model definition)
-    _, logits = network.compute_loss(network.inputs_pl_list[0],
-                                     network.labels_pl_list[0],
-                                     network.inputs_seq_len_pl_list[0],
-                                     network.keep_prob_input_pl_list[0],
-                                     network.keep_prob_hidden_pl_list[0],
-                                     network.keep_prob_output_pl_list[0])
-    decode_op = network.decoder(logits,
-                                network.inputs_seq_len_pl_list[0],
-                                decode_type='beam_search',
-                                beam_width=20)
-    per_op = network.compute_ler(decode_op, network.labels_pl_list[0])
+    _, logits = model.compute_loss(model.inputs_pl_list[0],
+                                   model.labels_pl_list[0],
+                                   model.inputs_seq_len_pl_list[0],
+                                   model.keep_prob_input_pl_list[0],
+                                   model.keep_prob_hidden_pl_list[0],
+                                   model.keep_prob_output_pl_list[0])
+    decode_op = model.decoder(logits,
+                              model.inputs_seq_len_pl_list[0],
+                              decode_type='beam_search',
+                              beam_width=20)
+    per_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(network.model_dir)
+        ckpt = tf.train.get_checkpoint_state(model.model_dir)
 
         # If check point exists
         if ckpt:
@@ -78,7 +78,7 @@ def do_eval(network, params, epoch=None):
             cer_test = do_eval_cer(
                 session=sess,
                 decode_op=decode_op,
-                network=network,
+                model=model,
                 dataset=test_data,
                 label_type=params['label_type'],
                 eval_batch_size=1,
@@ -89,7 +89,7 @@ def do_eval(network, params, epoch=None):
                 session=sess,
                 decode_op=decode_op,
                 per_op=per_op,
-                network=network,
+                model=model,
                 dataset=test_data,
                 label_type=params['label_type'],
                 eval_batch_size=1,
@@ -117,21 +117,20 @@ def main(model_path, epoch):
         params['num_classes'] = 72
 
     # Model setting
-    model = load(model_type=params['model'])
-    network = model(
+    model = CTC(
+        encoder_type=params['encoder_type'],
         input_size=params['input_size'] * params['num_stack'],
         num_units=params['num_units'],
         num_layers=params['num_layers'],
         num_classes=params['num_classes'],
-        bidirectional=params['bidirectional'],
         parameter_init=params['weight_init'],
         clip_grad=params['clip_grad'],
         clip_activation=params['clip_activation'],
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 
-    network.model_dir = model_path
-    do_eval(network=network, params=params, epoch=epoch)
+    model.model_dir = model_path
+    do_eval(model=model, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

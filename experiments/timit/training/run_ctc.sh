@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-MODEL_SAVE_PATH="/n/sd8/inaguma/result/timit/"
+MODEL_SAVE_PATH="/n/sd8/inaguma/result/timit"
 
 # Select GPU
 if [ $# -ne 2 ]; then

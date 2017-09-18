@@ -21,22 +21,23 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from experiments.utils.data.sparsetensor import list2sparsetensor
 from experiments.utils.training.learning_rate_controller import Controller
 from experiments.utils.training.plot import plot_loss, plot_ler
-from experiments.utils.directory import mkdir, mkdir_join
+from experiments.utils.directory import mkdir_join
 from experiments.utils.parameter import count_total_parameters
-from models.ctc.load_model import load
+from models.ctc.vanilla_ctc import CTC
 
 
-def do_train(network, params):
+def do_train(model, params):
     """Run training. If target labels are phone, the model is evaluated by PER
     with 39 phones.
     Args:
-        network: network to train
+        model: the model to train
         params (dict): A dictionary of parameters
     """
     # Load dataset
     train_data = Dataset(
         data_type='train', label_type=params['label_type'],
-        batch_size=params['batch_size'], splice=params['splice'],
+        batch_size=params['batch_size'], max_epoch=params['num_epoch'],
+        splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=True, sort_stop_epoch=None)
     dev_data = Dataset(
@@ -61,26 +62,26 @@ def do_train(network, params):
     with tf.Graph().as_default():
 
         # Define placeholders
-        network.create_placeholders()
+        model.create_placeholders()
         learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
         # Add to the graph each operation (including model definition)
-        loss_op, logits = network.compute_loss(
-            network.inputs_pl_list[0],
-            network.labels_pl_list[0],
-            network.inputs_seq_len_pl_list[0],
-            network.keep_prob_input_pl_list[0],
-            network.keep_prob_hidden_pl_list[0],
-            network.keep_prob_output_pl_list[0])
-        train_op = network.train(
+        loss_op, logits = model.compute_loss(
+            model.inputs_pl_list[0],
+            model.labels_pl_list[0],
+            model.inputs_seq_len_pl_list[0],
+            model.keep_prob_input_pl_list[0],
+            model.keep_prob_hidden_pl_list[0],
+            model.keep_prob_output_pl_list[0])
+        train_op = model.train(
             loss_op,
             optimizer=params['optimizer'],
             learning_rate=learning_rate_pl)
-        decode_op = network.decoder(logits,
-                                    network.inputs_seq_len_pl_list[0],
-                                    decode_type='beam_search',
-                                    beam_width=20)
-        ler_op = network.compute_ler(decode_op, network.labels_pl_list[0])
+        decode_op = model.decoder(logits,
+                                  model.inputs_seq_len_pl_list[0],
+                                  decode_type='beam_search',
+                                  beam_width=20)
+        ler_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 
         # Define learning rate controller
         lr_controller = Controller(
@@ -92,8 +93,8 @@ def do_train(network, params):
 
         # Build the summary tensor based on the TensorFlow collection of
         # summaries
-        summary_train = tf.summary.merge(network.summaries_train)
-        summary_dev = tf.summary.merge(network.summaries_dev)
+        summary_train = tf.summary.merge(model.summaries_train)
+        summary_dev = tf.summary.merge(model.summaries_dev)
 
         # Add the variable initializer operation
         init_op = tf.global_variables_initializer()
@@ -117,7 +118,7 @@ def do_train(network, params):
 
             # Instantiate a SummaryWriter to output summaries and the graph
             summary_writer = tf.summary.FileWriter(
-                network.model_dir, sess.graph)
+                model.model_path, sess.graph)
 
             # Initialize parameters
             sess.run(init_op)
@@ -128,21 +129,19 @@ def do_train(network, params):
             start_time_step = time.time()
             ler_dev_best = 1
             learning_rate = float(params['learning_rate'])
-            epoch, step = 1, 0
-            while True:
-                # TODO: change this loop
+            step = 0
+            for data, is_new_epoch in train_data:
 
                 # Create feed dictionary for next mini batch (train)
-                (inputs, labels, inputs_seq_len,
-                 _), next_epoch_flag = train_data.next()
+                inputs, labels, inputs_seq_len, _ = data
                 feed_dict_train = {
-                    network.inputs_pl_list[0]: inputs,
-                    network.labels_pl_list[0]: list2sparsetensor(
+                    model.inputs_pl_list[0]: inputs,
+                    model.labels_pl_list[0]: list2sparsetensor(
                         labels, padded_value=train_data.padded_value),
-                    network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                    network.keep_prob_input_pl_list[0]: params['dropout_input'],
-                    network.keep_prob_hidden_pl_list[0]: params['dropout_hidden'],
-                    network.keep_prob_output_pl_list[0]: params['dropout_output'],
+                    model.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                    model.keep_prob_input_pl_list[0]: params['dropout_input'],
+                    model.keep_prob_hidden_pl_list[0]: params['dropout_hidden'],
+                    model.keep_prob_output_pl_list[0]: params['dropout_output'],
                     learning_rate_pl: learning_rate
                 }
 
@@ -154,13 +153,13 @@ def do_train(network, params):
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels, inputs_seq_len, _), _ = dev_data.next()
                     feed_dict_dev = {
-                        network.inputs_pl_list[0]: inputs,
-                        network.labels_pl_list[0]: list2sparsetensor(
+                        model.inputs_pl_list[0]: inputs,
+                        model.labels_pl_list[0]: list2sparsetensor(
                             labels, padded_value=dev_data.padded_value),
-                        network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                        network.keep_prob_input_pl_list[0]: 1.0,
-                        network.keep_prob_hidden_pl_list[0]: 1.0,
-                        network.keep_prob_output_pl_list[0]: 1.0
+                        model.inputs_seq_len_pl_list[0]: inputs_seq_len,
+                        model.keep_prob_input_pl_list[0]: 1.0,
+                        model.keep_prob_hidden_pl_list[0]: 1.0,
+                        model.keep_prob_output_pl_list[0]: 1.0
                     }
 
                     # Compute loss
@@ -171,9 +170,9 @@ def do_train(network, params):
                     csv_loss_dev.append(loss_dev)
 
                     # Change to evaluation mode
-                    feed_dict_train[network.keep_prob_input_pl_list[0]] = 1.0
-                    feed_dict_train[network.keep_prob_hidden_pl_list[0]] = 1.0
-                    feed_dict_train[network.keep_prob_output_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_input_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_hidden_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_output_pl_list[0]] = 1.0
 
                     # Compute accuracy & update event files
                     ler_train, summary_str_train = sess.run(
@@ -195,26 +194,26 @@ def do_train(network, params):
                     start_time_step = time.time()
 
                 # Save checkpoint and evaluate model per epoch
-                if next_epoch_flag:
+                if is_new_epoch:
                     duration_epoch = time.time() - start_time_epoch
                     print('-----EPOCH:%d (%.3f min)-----' %
-                          (epoch, duration_epoch / 60))
+                          (train_data.epoch, duration_epoch / 60))
 
                     # Save fugure of loss & ler
                     plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
-                              save_path=network.model_dir)
+                              save_path=model.model_path)
                     plot_ler(csv_ler_train, csv_ler_dev, csv_steps,
                              label_type=params['label_type'],
-                             save_path=network.model_dir)
+                             save_path=model.model_path)
 
-                    if epoch >= params['eval_start_epoch']:
+                    if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
                         if params['label_type'] in ['character', 'character_capital_divide']:
                             print('=== Dev Data Evaluation ===')
                             ler_dev_epoch = do_eval_cer(
                                 session=sess,
                                 decode_op=decode_op,
-                                network=network,
+                                model=model,
                                 dataset=dev_data,
                                 label_type=params['label_type'],
                                 eval_batch_size=1)
@@ -224,17 +223,17 @@ def do_train(network, params):
                                 ler_dev_best = ler_dev_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
-                                # Save model (check point)
-                                checkpoint_file = join(network.model_dir, 'model.ckpt')
+                                # Save model only when best accuracy is obtained (check point)
+                                checkpoint_file = join(model.model_path, 'model.ckpt')
                                 save_path = saver.save(
-                                    sess, checkpoint_file, global_step=epoch)
+                                    sess, checkpoint_file, global_step=train_data.epoch)
                                 print("Model saved in file: %s" % save_path)
 
                                 print('=== Test Data Evaluation ===')
                                 ler_test = do_eval_cer(
                                     session=sess,
                                     decode_op=decode_op,
-                                    network=network,
+                                    model=model,
                                     dataset=test_data,
                                     label_type=params['label_type'],
                                     eval_batch_size=1)
@@ -246,7 +245,7 @@ def do_train(network, params):
                                 session=sess,
                                 decode_op=decode_op,
                                 per_op=ler_op,
-                                network=network,
+                                model=model,
                                 dataset=dev_data,
                                 label_type=params['label_type'],
                                 eval_batch_size=1)
@@ -256,44 +255,39 @@ def do_train(network, params):
                                 ler_dev_best = ler_dev_epoch
                                 print('■■■ ↑Best Score (PER)↑ ■■■')
 
+                                # Save model only when best accuracy is obtained (check point)
+                                checkpoint_file = join(model.model_path, 'model.ckpt')
+                                save_path = saver.save(
+                                    sess, checkpoint_file, global_step=train_data.epoch)
+                                print("Model saved in file: %s" % save_path)
+
                                 print('=== Test Data Evaluation ===')
                                 ler_test = do_eval_per(
                                     session=sess,
                                     decode_op=decode_op,
                                     per_op=ler_op,
-                                    network=network,
+                                    model=model,
                                     dataset=test_data,
                                     label_type=params['label_type'],
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (ler_test * 100))
 
-                                # Save model (check point)
-                                checkpoint_file = join(network.model_dir, 'model.ckpt')
-                                save_path = saver.save(
-                                    sess, checkpoint_file, global_step=epoch)
-                                print("Model saved in file: %s" % save_path)
-
                         duration_eval = time.time() - start_time_eval
-                        print('Evaluation time: %.3f min' %
-                              (duration_eval / 60))
+                        print('Evaluation time: %.3f min' % (duration_eval / 60))
 
                         # Update learning rate
                         learning_rate = lr_controller.decay_lr(
                             learning_rate=learning_rate,
-                            epoch=epoch,
+                            epoch=train_data.epoch,
                             value=ler_dev_epoch)
 
-                        if epoch == params['num_epoch']:
-                            break
-
-                    epoch += 1
                     start_time_epoch = time.time()
 
             duration_train = time.time() - start_time_train
             print('Total time: %.3f hour' % (duration_train / 3600))
 
             # Training was finished correctly
-            with open(join(network.model_dir, 'complete.txt'), 'w') as f:
+            with open(join(model.model_path, 'complete.txt'), 'w') as f:
                 f.write('')
 
 
@@ -317,46 +311,43 @@ def main(config_path, model_save_path):
         params['num_classes'] = 72
 
     # Model setting
-    model = load(model_type=params['model'])
-    network = model(input_size=params['input_size'] * params['num_stack'],
-                    splice=params['splice'],
-                    num_units=params['num_units'],
-                    num_layers=params['num_layers'],
-                    num_classes=params['num_classes'],
-                    bidirectional=params['bidirectional'],
-                    parameter_init=params['weight_init'],
-                    clip_grad=params['clip_grad'],
-                    clip_activation=params['clip_activation'],
-                    num_proj=params['num_proj'],
-                    weight_decay=params['weight_decay'])
+    model = CTC(encoder_type=params['encoder_type'],
+                input_size=params['input_size'] * params['num_stack'],
+                splice=params['splice'],
+                num_units=params['num_units'],
+                num_layers=params['num_layers'],
+                num_classes=params['num_classes'],
+                parameter_init=params['weight_init'],
+                clip_grad=params['clip_grad'],
+                clip_activation=params['clip_activation'],
+                num_proj=params['num_proj'],
+                weight_decay=params['weight_decay'])
 
-    network.name += '_' + str(params['num_units'])
-    network.name += '_' + str(params['num_layers'])
-    network.name += '_' + params['optimizer']
-    network.name += '_lr' + str(params['learning_rate'])
+    model.name += '_' + str(params['num_units'])
+    model.name += '_' + str(params['num_layers'])
+    model.name += '_' + params['optimizer']
+    model.name += '_lr' + str(params['learning_rate'])
     if params['num_proj'] != 0:
-        network.name += '_proj' + str(params['num_proj'])
+        model.name += '_proj' + str(params['num_proj'])
     if params['dropout_input'] != 1:
-        network.name += '_dropi' + str(params['dropout_input'])
+        model.name += '_dropi' + str(params['dropout_input'])
     if params['dropout_hidden'] != 1:
-        network.name += '_droph' + str(params['dropout_hidden'])
+        model.name += '_droph' + str(params['dropout_hidden'])
     if params['dropout_output'] != 1:
-        network.name += '_dropo' + str(params['dropout_output'])
+        model.name += '_dropo' + str(params['dropout_output'])
     if params['num_stack'] != 1:
-        network.name += '_stack' + str(params['num_stack'])
+        model.name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:
-        network.name += '_weightdecay' + str(params['weight_decay'])
+        model.name += '_weightdecay' + str(params['weight_decay'])
 
     # Set save path
-    network.model_dir = mkdir(model_save_path)
-    network.model_dir = mkdir_join(network.model_dir, 'ctc')
-    network.model_dir = mkdir_join(network.model_dir, params['label_type'])
-    network.model_dir = mkdir_join(network.model_dir, network.name)
+    model.model_path = mkdir_join(
+        model_save_path, 'ctc', params['label_type'], model.name)
 
     # Reset model directory
-    if not isfile(join(network.model_dir, 'complete.txt')):
-        tf.gfile.DeleteRecursively(network.model_dir)
-        tf.gfile.MakeDirs(network.model_dir)
+    if not isfile(join(model.model_path, 'complete.txt')):
+        tf.gfile.DeleteRecursively(model.model_path)
+        tf.gfile.MakeDirs(model.model_path)
     else:
         raise ValueError('File exists.')
 
@@ -364,11 +355,11 @@ def main(config_path, model_save_path):
     setproctitle('timit_ctc_' + params['label_type'])
 
     # Save config file
-    shutil.copyfile(config_path, join(network.model_dir, 'config.yml'))
+    shutil.copyfile(config_path, join(model.model_path, 'config.yml'))
 
-    sys.stdout = open(join(network.model_dir, 'train.log'), 'w')
-    # TODO: change to logger
-    do_train(network=network, params=params)
+    sys.stdout = open(join(model.model_path, 'train.log'), 'w')
+    # TODO(hirofumi): change to logger
+    do_train(model=model, params=params)
 
 
 if __name__ == '__main__':

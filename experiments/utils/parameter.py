@@ -9,12 +9,12 @@ from __future__ import print_function
 def count_total_parameters(variables):
     """
     Args:
-        variables: tf.trainable_variables()
+        variables (list): tf.trainable_variables()
     Returns:
-        parameters_dict:
+        parameters_dict (dict):
             key => variable name
             value => the number of parameters
-        total_parameters: total parameters of the model
+        total_parameters (float): total parameters of the model
     """
     total_parameters = 0
     parameters_dict = {}

@@ -1,6 +1,5 @@
 param:
-  model: lstm_ctc
-  bidirectional: True
+  encoder_type: blstm
   corpus: timit
   label_type: phone61
   feature: fbank

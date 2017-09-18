@@ -31,3 +31,5 @@ param:
   dropout_output: 1.0
   weight_decay: 0
   beam_width: 20
+  eval_start_epoch: 20
+  print_step: 10

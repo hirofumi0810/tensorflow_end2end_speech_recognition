@@ -15,15 +15,15 @@ import yaml
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_ctc import Dataset
 from experiments.timit.visualization.core.decode.ctc import decode_test
-from models.ctc.load_model import load
+from models.ctc.vanilla_ctc import CTC
 
 
-def do_decode(network, params, epoch=None):
+def do_decode(model, params, epoch=None):
     """Decode the CTC outputs.
     Args:
-        network: model to restore
-        params: A dictionary of parameters
-        epoch: int, the epoch to restore
+        model: the model to restore
+        params (dict): A dictionary of parameters
+        epoch (int): the epoch to restore
     """
     # Load dataset
     test_data = Dataset(
@@ -33,25 +33,25 @@ def do_decode(network, params, epoch=None):
         sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.create_placeholders()
+    model.create_placeholders()
 
     # Add to the graph each operation (including model definition)
-    _, logits = network.compute_loss(network.inputs_pl_list[0],
-                                     network.labels_pl_list[0],
-                                     network.inputs_seq_len_pl_list[0],
-                                     network.keep_prob_input_pl_list[0],
-                                     network.keep_prob_hidden_pl_list[0],
-                                     network.keep_prob_output_pl_list[0])
-    decode_op = network.decoder(logits,
-                                network.inputs_seq_len_pl_list[0],
-                                decode_type='beam_search',
-                                beam_width=20)
+    _, logits = model.compute_loss(model.inputs_pl_list[0],
+                                   model.labels_pl_list[0],
+                                   model.inputs_seq_len_pl_list[0],
+                                   model.keep_prob_input_pl_list[0],
+                                   model.keep_prob_hidden_pl_list[0],
+                                   model.keep_prob_output_pl_list[0])
+    decode_op = model.decoder(logits,
+                              model.inputs_seq_len_pl_list[0],
+                              decode_type='beam_search',
+                              beam_width=20)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(network.model_dir)
+        ckpt = tf.train.get_checkpoint_state(model.model_path)
 
         # If check point exists
         if ckpt:
@@ -68,11 +68,11 @@ def do_decode(network, params, epoch=None):
         # Visualize
         decode_test(session=sess,
                     decode_op=decode_op,
-                    network=network,
+                    model=model,
                     dataset=test_data,
                     label_type=params['label_type'],
                     save_path=None)
-        # save_path=network.model_dir)
+        # save_path=model.model_path)
 
 
 def main(model_path, epoch):
@@ -95,21 +95,20 @@ def main(model_path, epoch):
         params['num_classes'] = 72
 
     # Model setting
-    model = load(model_type=params['model'])
-    network = model(
-        input_size=params['input_size'] * params['num_stack'],
-        num_units=params['num_units'],
-        num_layers=params['num_layers'],
-        num_classes=params['num_classes'],
-        bidirectional=params['bidirectional'],
-        parameter_init=params['weight_init'],
-        clip_grad=params['clip_grad'],
-        clip_activation=params['clip_activation'],
-        num_proj=params['num_proj'],
-        weight_decay=params['weight_decay'])
+    model = CTC(encoder_type=params['encoder_type'],
+                input_size=params['input_size'] * params['num_stack'],
+                splice=params['splice'],
+                num_units=params['num_units'],
+                num_layers=params['num_layers'],
+                num_classes=params['num_classes'],
+                parameter_init=params['weight_init'],
+                clip_grad=params['clip_grad'],
+                clip_activation=params['clip_activation'],
+                num_proj=params['num_proj'],
+                weight_decay=params['weight_decay'])
 
-    network.model_dir = model_path
-    do_decode(network=network, params=params, epoch=epoch)
+    model.model_path = model_path
+    do_decode(model=model, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

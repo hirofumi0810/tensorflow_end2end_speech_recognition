@@ -18,12 +18,12 @@ from experiments.timit.visualization.core.decode.attention import decode_test
 from models.attention import blstm_attention_seq2seq
 
 
-def do_decode(network, params, epoch=None):
+def do_decode(model, params, epoch=None):
     """Decode the Attention outputs.
     Args:
-        network: model to restore
-        params: A dictionary of parameters
-        epoch: int, the epoch to restore
+        model: the model to restore
+        params (dict): A dictionary of parameters
+        epoch (int): the epoch to restore
     """
     # Load dataset
     test_data = Dataset(
@@ -31,18 +31,18 @@ def do_decode(network, params, epoch=None):
         eos_index=params['eos_index'], sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.create_placeholders()
+    model.create_placeholders()
 
     # Add to the graph each operation (including model definition)
-    _, _, decoder_outputs_train, decoder_outputs_infer = network.compute_loss(
-        network.inputs_pl_list[0],
-        network.labels_pl_list[0],
-        network.inputs_seq_len_pl_list[0],
-        network.labels_seq_len_pl_list[0],
-        network.keep_prob_input_pl_list[0],
-        network.keep_prob_hidden_pl_list[0],
-        network.keep_prob_output_pl_list[0])
-    _, decode_op_infer = network.decoder(
+    _, _, decoder_outputs_train, decoder_outputs_infer = model.compute_loss(
+        model.inputs_pl_list[0],
+        model.labels_pl_list[0],
+        model.inputs_seq_len_pl_list[0],
+        model.labels_seq_len_pl_list[0],
+        model.keep_prob_input_pl_list[0],
+        model.keep_prob_hidden_pl_list[0],
+        model.keep_prob_output_pl_list[0])
+    _, decode_op_infer = model.decoder(
         decoder_outputs_train,
         decoder_outputs_infer)
 
@@ -50,7 +50,7 @@ def do_decode(network, params, epoch=None):
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(network.model_dir)
+        ckpt = tf.train.get_checkpoint_state(model.model_path)
 
         # If check point exists
         if ckpt:
@@ -67,11 +67,11 @@ def do_decode(network, params, epoch=None):
         # Visualize
         decode_test(session=sess,
                     decode_op=decode_op_infer,
-                    network=network,
+                    model=model,
                     dataset=test_data,
                     label_type=params['label_type'],
                     save_path=None)
-        # save_path=network.model_dir)
+        # save_path=model.model_path)
 
 
 def main(model_path, epoch):
@@ -97,7 +97,7 @@ def main(model_path, epoch):
 
     # Model setting
     # AttentionModel = load(model_type=params['model'])
-    network = blstm_attention_seq2seq.BLSTMAttetion(
+    model = blstm_attention_seq2seq.BLSTMAttetion(
         input_size=params['input_size'],
         encoder_num_unit=params['encoder_num_unit'],
         encoder_num_layer=params['encoder_num_layer'],
@@ -120,9 +120,9 @@ def main(model_path, epoch):
         weight_decay=params['weight_decay'],
         beam_width=1)
 
-    network.model_dir = model_path
-    print(network.model_dir)
-    do_decode(network=network, params=params, epoch=epoch)
+    model.model_path = model_path
+    print(model.model_path)
+    do_decode(model=model, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

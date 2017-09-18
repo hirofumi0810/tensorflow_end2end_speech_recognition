@@ -1,14 +1,16 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Utilities for plotting of Attetnion-based model (TIMIT corpus)."""
+"""Utilities for plotting of the Attetnion-based model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 from os.path import join
-import numpy as np
+# import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -25,24 +27,23 @@ orange = '#D2691E'
 green = '#006400'
 
 
-def attention_test(session, decode_op, attention_weights_op, network, dataset,
+def attention_test(session, decode_op, attention_weights_op, model, dataset,
                    label_type, save_path=None, show=False):
     """Visualize attention weights of Attetnion-based model.
     Args:
         session: session of training model
         decode_op: operation for decoding
         attention_weights_op: operation for computing attention weights
-        network: network to evaluate
+        model: model to evaluate
         dataset: An instance of a `Dataset` class
-        label_type: string, phone39 or phone48 or phone61 or character or
+        label_type (string, optional): phone39 or phone48 or phone61 or character or
             character_capital_divide
-        save_path: path to save attention weights plotting
-        show: if True, show each figure
+        save_path (string, optional): path to save attention weights plotting
+        show (bool, optional): if True, show each figure
     """
     save_path = mkdir_join(save_path, 'attention_weights')
 
-    map_file_path = '../metrics/mapping_files/attention/' + \
-        label_type + '_to_num.txt'
+    map_file_path = '../metrics/mapping_files/attention/' + label_type + '.txt'
 
     # Load mapping file
     map_dict = {}
@@ -51,17 +52,19 @@ def attention_test(session, decode_op, attention_weights_op, network, dataset,
             line = line.strip().split()
             map_dict[int(line[1])] = line[0]
 
-    # Batch size is expected to be 1
-    for data, next_epoch_flag in dataset(batch_size=1):
+    while True:
+
         # Create feed dictionary for next mini batch
+        data, is_new_epoch = dataset.next(batch_size=1)
         inputs, _, inputs_seq_len, _, input_names = data
+        # NOTE: Batch size is expected to be 1
 
         feed_dict = {
-            network.inputs_pl_list[0]: inputs,
-            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-            network.keep_prob_input_pl_list[0]: 1.0,
-            network.keep_prob_hidden_pl_list[0]: 1.0,
-            network.keep_prob_output_pl_list[0]: 1.0
+            model.inputs_pl_list[0]: inputs,
+            model.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            model.keep_prob_input_pl_list[0]: 1.0,
+            model.keep_prob_hidden_pl_list[0]: 1.0,
+            model.keep_prob_output_pl_list[0]: 1.0
         }
 
         # Visualize
@@ -96,5 +99,5 @@ def attention_test(session, decode_op, attention_weights_op, network, dataset,
             save_path = join(save_path, input_names[0] + '.png')
             plt.savefig(save_path, dvi=500)
 
-        if next_epoch_flag:
+        if is_new_epoch:
             break

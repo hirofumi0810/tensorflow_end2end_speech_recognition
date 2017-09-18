@@ -15,15 +15,15 @@ import yaml
 sys.path.append('../../../')
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
 from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
-from models.ctc.load_model import load
+from models.ctc.multitask_ctc import Multitask_CTC
 
 
-def do_eval(network, params, epoch=None):
+def do_eval(model, params, epoch=None):
     """Evaluate the model.
     Args:
-        network: model to restore
-        params: A dictionary of parameters
-        epoch: int, the epoch to restore
+        model: the model to restore
+        params (dict): A dictionary of parameters
+        epoch (int): the epoch to restore
     """
     # Load dataset
     test_data = Dataset(
@@ -33,32 +33,32 @@ def do_eval(network, params, epoch=None):
         sort_utt=False, progressbar=True)
 
     # Define placeholders
-    network.create_placeholders()
+    model.create_placeholders()
 
     # Add to the graph each operation
-    _, logits_main, logits_sub = network.compute_loss(
-        network.inputs_pl_list[0],
-        network.labels_pl_list[0],
-        network.labels_sub_pl_list[0],
-        network.inputs_seq_len_pl_list[0],
-        network.keep_prob_input_pl_list[0],
-        network.keep_prob_hidden_pl_list[0],
-        network.keep_prob_output_pl_list[0])
-    decode_op_main, decode_op_sub = network.decoder(
+    _, logits_main, logits_sub = model.compute_loss(
+        model.inputs_pl_list[0],
+        model.labels_pl_list[0],
+        model.labels_sub_pl_list[0],
+        model.inputs_seq_len_pl_list[0],
+        model.keep_prob_input_pl_list[0],
+        model.keep_prob_hidden_pl_list[0],
+        model.keep_prob_output_pl_list[0])
+    decode_op_main, decode_op_sub = model.decoder(
         logits_main,
         logits_sub,
-        network.inputs_seq_len_pl_list[0],
+        model.inputs_seq_len_pl_list[0],
         decode_type='beam_search',
         beam_width=20)
-    _, per_op = network.compute_ler(
+    _, per_op = model.compute_ler(
         decode_op_main, decode_op_sub,
-        network.labels_pl_list[0], network.labels_sub_pl_list[0])
+        model.labels_pl_list[0], model.labels_sub_pl_list[0])
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(network.model_dir)
+        ckpt = tf.train.get_checkpoint_state(model.model_path)
 
         # If check point exists
         if ckpt:
@@ -76,7 +76,7 @@ def do_eval(network, params, epoch=None):
         cer_test = do_eval_cer(
             session=sess,
             decode_op=decode_op_main,
-            network=network,
+            model=model,
             dataset=test_data,
             label_type=params['label_type_main'],
             eval_batch_size=1,
@@ -88,7 +88,7 @@ def do_eval(network, params, epoch=None):
             session=sess,
             decode_op=decode_op_sub,
             per_op=per_op,
-            network=network,
+            model=model,
             dataset=test_data,
             label_type=params['label_type_sub'],
             eval_batch_size=1,
@@ -118,8 +118,8 @@ def main(model_path, epoch):
         params['num_classes_sub'] = 39
 
     # Model setting
-    model = load(model_type=params['model'])
-    network = model(
+    model = Multitask_CTC(
+        encoder_type=params['encoder_type'],
         input_size=params['input_size'] * params['num_stack'],
         num_units=params['num_units'],
         num_layers_main=params['num_layers_main'],
@@ -133,8 +133,8 @@ def main(model_path, epoch):
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 
-    network.model_dir = model_path
-    do_eval(network=network, params=params, epoch=epoch)
+    model.model_path = model_path
+    do_eval(model=model, params=params, epoch=epoch)
 
 
 if __name__ == '__main__':

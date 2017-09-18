@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Define evaluation method for CTC network (TIMIT corpus)."""
+"""Define evaluation method for the CTC model (TIMIT corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -19,22 +19,21 @@ from experiments.utils.evaluation.edit_distance import compute_edit_distance
 from experiments.utils.progressbar import wrap_generator
 
 
-def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
-                eval_batch_size=None, progressbar=False,
-                is_multitask=False):
+def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
+                eval_batch_size=None, progressbar=False, is_multitask=False):
     """Evaluate trained model by Phone Error Rate.
     Args:
         session: session of training model
         decode_op: operation for decoding
         per_op: operation for computing phone error rate
-        network: network to evaluate
+        model: the model to evaluate
         dataset: An instance of a `Dataset' class
         label_type (string): phone39 or phone48 or phone61
-        eval_batch_size (int): the batch size when evaluating the model
+        eval_batch_size (int, optional): the batch size when evaluating the model
         progressbar (bool, optional): if True, visualize the progressbar
         is_multitask (bool, optional): if True, evaluate the multitask model
     Returns:
-        per_mean: An average of PER
+        per_mean (float): An average of PER
     """
     # Reset data counter
     dataset.reset()
@@ -43,30 +42,28 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     train_label_type = label_type
     eval_label_type = dataset.label_type_sub if is_multitask else dataset.label_type
 
-    train_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + \
-        train_label_type + '_to_num.txt'
-    eval_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + \
-        eval_label_type + '_to_num.txt'
-    phone2num_39_map_file_path = '../metrics/mapping_files/ctc/phone39_to_num.txt'
+    train_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + train_label_type + '.txt'
+    eval_phone2num_map_file_path = '../metrics/mapping_files/ctc/' + eval_label_type + '.txt'
+    phone2num_39_map_file_path = '../metrics/mapping_files/ctc/phone39.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     per_mean = 0
     total_step = int(len(dataset) / batch_size)
     if (len(dataset) / batch_size) != len(dataset) // batch_size:
         total_step += 1
-    for _ in wrap_generator(range(len(dataset)), progressbar, total=total_step):
+    for data, is_new_epoch in wrap_generator(dataset, progressbar, total=total_step):
+
         # Create feed dictionary for next mini batch
-        data, next_epoch_flag = dataset.next()
         if is_multitask:
             inputs, _, labels_true, inputs_seq_len, _ = data
         else:
             inputs, labels_true, inputs_seq_len, _ = data
 
         feed_dict = {
-            network.inputs_pl_list[0]: inputs,
-            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-            network.keep_prob_input_pl_list[0]: 1.0,
-            network.keep_prob_hidden_pl_list[0]: 1.0,
-            network.keep_prob_output_pl_list[0]: 1.0
+            model.inputs_pl_list[0]: inputs,
+            model.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            model.keep_prob_input_pl_list[0]: 1.0,
+            model.keep_prob_hidden_pl_list[0]: 1.0,
+            model.keep_prob_output_pl_list[0]: 1.0
         }
 
         batch_size_each = len(inputs_seq_len)
@@ -122,7 +119,7 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
                                          labels_pred_st)
         per_mean += np.sum(per_list)
 
-        if next_epoch_flag:
+        if is_new_epoch:
             break
 
     per_mean /= len(dataset)
@@ -130,45 +127,45 @@ def do_eval_per(session, decode_op, per_op, network, dataset, label_type,
     return per_mean
 
 
-def do_eval_cer(session, decode_op, network, dataset, label_type,
+def do_eval_cer(session, decode_op, model, dataset, label_type,
                 eval_batch_size=None, progressbar=False, is_multitask=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
         decode_op: operation for decoding
-        network: network to evaluate
+        model: the model to evaluate
         dataset: An instance of a `Dataset` class
         label_type (string): character or character_capital_divide
         eval_batch_size (int, optional): the batch size when evaluating the model
         progressbar (bool, optional): if True, visualize the progressbar
         is_multitask (bool, optional): if True, evaluate the multitask model
     Return:
-        cer_mean: An average of CER
+        cer_mean (float): An average of CER
     """
     # Reset data counter
     dataset.reset()
 
     batch_size = dataset.batch_size if eval_batch_size is None else eval_batch_size
 
-    map_file_path = '../metrics/mapping_files/ctc/' + label_type + '_to_num.txt'
+    map_file_path = '../metrics/mapping_files/ctc/' + label_type + '.txt'
     cer_mean = 0
     total_step = int(len(dataset) / batch_size)
     if (len(dataset) / batch_size) != len(dataset) // batch_size:
         total_step += 1
-    for _ in wrap_generator(range(len(dataset)), progressbar, total=total_step):
+    for data, is_new_epoch in wrap_generator(dataset, progressbar, total=total_step):
+
         # Create feed dictionary for next mini batch
-        data, next_epoch_flag = dataset.next()
         if is_multitask:
             inputs, labels_true, _, inputs_seq_len, _ = data
         else:
             inputs, labels_true, inputs_seq_len, _ = data
 
         feed_dict = {
-            network.inputs_pl_list[0]: inputs,
-            network.inputs_seq_len_pl_list[0]: inputs_seq_len,
-            network.keep_prob_input_pl_list[0]: 1.0,
-            network.keep_prob_hidden_pl_list[0]: 1.0,
-            network.keep_prob_output_pl_list[0]: 1.0
+            model.inputs_pl_list[0]: inputs,
+            model.inputs_seq_len_pl_list[0]: inputs_seq_len,
+            model.keep_prob_input_pl_list[0]: 1.0,
+            model.keep_prob_hidden_pl_list[0]: 1.0,
+            model.keep_prob_output_pl_list[0]: 1.0
         }
 
         batch_size_each = len(inputs_seq_len)
@@ -194,7 +191,7 @@ def do_eval_cer(session, decode_op, network, dataset, label_type,
             cer_mean += Levenshtein.distance(
                 str_pred, str_true) / len(list(str_true))
 
-        if next_epoch_flag:
+        if is_new_epoch:
             break
 
     cer_mean /= len(dataset)

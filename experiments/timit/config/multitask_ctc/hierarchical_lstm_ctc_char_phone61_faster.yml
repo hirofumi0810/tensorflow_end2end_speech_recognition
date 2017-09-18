@@ -1,6 +1,5 @@
 param:
-  model: multitask_lstm_ctc
-  bidirectional: True
+  encoder_type: multitask_lstm
   corpus: timit
   label_type_main: character
   label_type_sub: phone61
@@ -29,3 +28,5 @@ param:
   dropout_hidden: 0.5
   dropout_output: 1.0
   weight_decay: 0
+  eval_start_epoch: 20
+  print_step: 10

@@ -1,6 +1,5 @@
 param:
-  model: gru_ctc
-  bidirectional: False
+  encoder_type: gru
   corpus: timit
   label_type: phone61
   feature: fbank

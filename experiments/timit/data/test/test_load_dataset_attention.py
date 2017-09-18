@@ -33,7 +33,7 @@ class TestLoadDatasetAttention(unittest.TestCase):
         # sort
         self.check_loading(label_type='phone61', sort_utt=True)
         self.check_loading(label_type='phone61', sort_utt=True,
-                           sort_stop_epoch=2)
+                           sort_stop_epoch=1)
 
         # frame stacking
         self.check_loading(label_type='phone61', frame_stacking=True)
@@ -59,20 +59,19 @@ class TestLoadDatasetAttention(unittest.TestCase):
         num_skip = 3 if frame_stacking else 1
         dataset = Dataset(
             data_type=data_type, label_type=label_type,
-            batch_size=64, eos_index=1, splice=splice,
+            batch_size=64,  eos_index=1, max_epoch=2, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
             sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
             progressbar=True)
 
         print('=> Loading mini-batch...')
-        map_file_path = '../../metrics/mapping_files/attention/' + label_type + '_to_num.txt'
+        map_file_path = '../../metrics/mapping_files/attention/' + label_type + '.txt'
         if label_type in ['character', 'character_capital_divide']:
             map_fn = num2char
         else:
             map_fn = num2phone
 
-        for _ in range(len(dataset)):
-            data, next_epoch_flag = dataset.next()
+        for data, is_new_epoch in dataset:
             inputs, labels, inputs_seq_len, labels_seq_len, input_names = data
 
             str_true = map_fn(
@@ -80,9 +79,6 @@ class TestLoadDatasetAttention(unittest.TestCase):
             str_true = re.sub(r'_', ' ', str_true)
             print('----- %s -----' % input_names[0])
             print(str_true)
-
-            if next_epoch_flag:
-                break
 
 
 if __name__ == '__main__':
