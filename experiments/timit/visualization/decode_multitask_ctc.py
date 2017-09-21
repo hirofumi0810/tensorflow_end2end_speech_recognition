@@ -12,7 +12,7 @@ import sys
 import tensorflow as tf
 import yaml
 
-sys.path.append('../../../')
+sys.path.append(os.path.abspath('../../../'))
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
 from experiments.timit.visualization.core.decode.ctc import decode_test_multitask
 from models.ctc.multitask_ctc import Multitask_CTC
@@ -56,7 +56,7 @@ def do_decode(model, params, epoch=None):
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(model.model_path)
+        ckpt = tf.train.get_checkpoint_state(model.save_path)
 
         # If check point exists
         if ckpt:
@@ -79,7 +79,7 @@ def do_decode(model, params, epoch=None):
                               label_type_main=params['label_type_main'],
                               label_type_sub=params['label_type_sub'],
                               save_path=None)
-        #   save_path=model.model_path)
+        #   save_path=model.save_path)
 
 
 def main(model_path, epoch):
@@ -117,7 +117,7 @@ def main(model_path, epoch):
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 
-    model.model_path = model_path
+    model.save_path = model_path
     do_decode(model=model, params=params, epoch=epoch)
 
 

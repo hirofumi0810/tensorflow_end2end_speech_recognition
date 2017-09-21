@@ -14,16 +14,18 @@ from os.path import join
 import pickle
 import numpy as np
 
-from experiments.utils.progressbar import wrap_iterator
-from experiments.utils.data.dataset_loader.all_load.ctc_all_load import DatasetBase
-from experiments.utils.data.inputs.frame_stacking import stack_frame
+from utils.progressbar import wrap_iterator
+from utils.data.dataset_loader.all_load.ctc_all_load import DatasetBase
+from utils.data.inputs.frame_stacking import stack_frame
 
 
 class Dataset(DatasetBase):
 
-    def __init__(self, data_type, label_type, batch_size, max_epoch=None,
-                 splice=1, num_stack=1, num_skip=1,
-                 sort_utt=False, sort_stop_epoch=None, progressbar=False):
+    def __init__(self, data_type, label_type, batch_size,
+                 max_epoch=None, splice=1,
+                 num_stack=1, num_skip=1,
+                 sort_utt=False, sort_stop_epoch=None,
+                 progressbar=False):
         """A class for loading dataset.
         Args:
             data_type (string): train or dev or test
@@ -42,7 +44,12 @@ class Dataset(DatasetBase):
             progressbar (bool, optional): if True, visualize progressbar
         """
         if data_type not in ['train', 'dev', 'test']:
-            raise ValueError('data_type is "train" or "dev" or "test".')
+            raise TypeError('data_type must be "train" or "dev" or "test".')
+        if label_type not in ['phone39', 'phone48', 'phone61', 'character', 'character_capital_divide']:
+            raise TypeError(
+                'label_type must be "phone39" or "phone48" or "phone61" or "character" or "character_capital_divide".')
+
+        super(Dataset, self).__init__()
 
         self.is_training = True if data_type == 'train' else False
         self.data_type = data_type

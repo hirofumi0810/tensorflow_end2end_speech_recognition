@@ -5,18 +5,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import sys
 import time
 import tensorflow as tf
 # from tensorflow.python import debug as tf_debug
 
-sys.path.append('../../')
+sys.path.append(os.path.abspath('../../'))
 from models.attention.joint_ctc_attention import JointCTCAttention
 from models.test.util import measure_time
-from models.test.data import generate_data, num2alpha, num2phone
-from experiments.utils.data.sparsetensor import list2sparsetensor
-from experiments.utils.parameter import count_total_parameters
-from experiments.utils.training.learning_rate_controller import Controller
+from models.test.data import generate_data, idx2alpha, idx2phone
+from utils.data.sparsetensor import list2sparsetensor
+from utils.parameter import count_total_parameters
+from utils.training.learning_rate_controller import Controller
 
 
 class TestAttention(tf.test.TestCase):
@@ -188,18 +189,18 @@ class TestAttention(tf.test.TestCase):
                         # Visualize
                         if label_type == 'character':
                             print('True            : %s' %
-                                  num2alpha(att_labels[0]))
+                                  idx2alpha(att_labels[0]))
                             print('Pred (Training) : <%s' %
-                                  num2alpha(predicted_ids_train[0]))
+                                  idx2alpha(predicted_ids_train[0]))
                             print('Pred (Inference): <%s' %
-                                  num2alpha(predicted_ids_infer[0]))
+                                  idx2alpha(predicted_ids_infer[0]))
                         else:
                             print('True            : %s' %
-                                  num2phone(att_labels[0], map_file_path))
+                                  idx2phone(att_labels[0], map_file_path))
                             print('Pred (Training) : < %s' %
-                                  num2phone(predicted_ids_train[0], map_file_path))
+                                  idx2phone(predicted_ids_train[0], map_file_path))
                             print('Pred (Inference): < %s' %
-                                  num2phone(predicted_ids_infer[0], map_file_path))
+                                  idx2phone(predicted_ids_infer[0], map_file_path))
 
                         if ler_train >= ler_train_pre:
                             not_improved_count += 1

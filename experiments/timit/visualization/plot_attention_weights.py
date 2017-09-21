@@ -12,7 +12,7 @@ import sys
 import tensorflow as tf
 import yaml
 
-sys.path.append('../../../')
+sys.path.append(os.path.abspath('../../../'))
 from experiments.timit.data.load_dataset_attention import Dataset
 from experiments.timit.visualization.core.plot.attention import attention_test
 from models.attention import blstm_attention_seq2seq
@@ -53,7 +53,7 @@ def do_plot(model, params, epoch=None):
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(model.model_path)
+        ckpt = tf.train.get_checkpoint_state(model.save_path)
 
         # If check point exists
         if ckpt:
@@ -122,8 +122,8 @@ def main(model_path, epoch):
         clip_activation_decoder=params['clip_activation_decoder'],
         weight_decay=params['weight_decay'])
 
-    model.model_path = model_path
-    print(model.model_path)
+    model.save_path = model_path
+    print(model.save_path)
     do_plot(model=model, params=params, epoch=epoch)
 
 

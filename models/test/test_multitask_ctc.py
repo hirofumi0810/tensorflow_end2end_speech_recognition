@@ -5,16 +5,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import sys
 import time
 import tensorflow as tf
 # from tensorflow.python import debug as tf_debug
 
-sys.path.append('../../')
+sys.path.append(os.path.abspath('../../'))
 from models.ctc.multitask_ctc import Multitask_CTC
 from models.test.util import measure_time
-from models.test.data import generate_data, num2alpha
-from experiments.utils.data.labels.phone import num2phone
+from models.test.data import generate_data, idx2alpha
+from experiments.utils.data.labels.phone import idx2phone
 from experiments.utils.data.sparsetensor import sparsetensor2list
 from experiments.utils.parameter import count_total_parameters
 from experiments.utils.training.learning_rate_controller import Controller
@@ -123,7 +124,7 @@ class TestMultitaskCTC(tf.test.TestCase):
                 learning_rate_pl: learning_rate
             }
 
-            map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
+            map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61.txt'
 
             with tf.Session() as sess:
                 # Initialize parameters
@@ -182,23 +183,23 @@ class TestMultitaskCTC(tf.test.TestCase):
                         print('Character')
                         try:
                             print('  True: %s' %
-                                  num2alpha(labels_true_char[0]))
+                                  idx2alpha(labels_true_char[0]))
                             print('  Pred: %s' %
-                                  num2alpha(labels_pred_char[0]))
+                                  idx2alpha(labels_pred_char[0]))
                         except IndexError:
                             print('Character')
                             print('  True: %s' %
-                                  num2alpha(labels_true_char[0]))
+                                  idx2alpha(labels_true_char[0]))
                             print('  Pred: %s' % '')
 
                         print('Phone')
                         try:
-                            print('  True: %s' % num2phone(labels_true_phone[0],
+                            print('  True: %s' % idx2phone(labels_true_phone[0],
                                                            map_file_path))
-                            print('  Pred: %s' % num2phone(labels_pred_phone[0],
+                            print('  Pred: %s' % idx2phone(labels_pred_phone[0],
                                                            map_file_path))
                         except IndexError:
-                            print('  True: %s' % num2phone(labels_true_phone[0],
+                            print('  True: %s' % idx2phone(labels_true_phone[0],
                                                            map_file_path))
                             print('  Pred: %s' % '')
                             # NOTE: This is for no prediction

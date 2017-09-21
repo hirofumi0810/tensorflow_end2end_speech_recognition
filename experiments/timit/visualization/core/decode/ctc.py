@@ -10,9 +10,9 @@ from __future__ import print_function
 from os.path import join
 import sys
 
-from experiments.utils.data.labels.character import num2char
-from experiments.utils.data.labels.phone import num2phone
-from experiments.utils.data.sparsetensor import sparsetensor2list
+from utils.data.labels.character import idx2char
+from utils.data.labels.phone import idx2phone
+from utils.data.sparsetensor import sparsetensor2list
 
 
 def decode_test(session, decode_op, model, dataset, label_type, save_path=None):
@@ -56,13 +56,13 @@ def decode_test(session, decode_op, model, dataset, label_type, save_path=None):
         finally:
             if label_type in ['character', 'character_capital_divide']:
                 print('----- wav: %s -----' % input_names[0])
-                print('True: %s' % num2char(labels_true[0], map_file_path))
-                print('Pred: %s' % num2char(labels_pred[0], map_file_path))
+                print('True: %s' % idx2char(labels_true[0], map_file_path))
+                print('Pred: %s' % idx2char(labels_pred[0], map_file_path))
 
             else:
                 print('----- wav: %s -----' % input_names[0])
-                print('True: %s' % num2phone(labels_true[0], map_file_path))
-                print('Pred: %s' % num2phone(labels_pred[0], map_file_path))
+                print('True: %s' % idx2phone(labels_true[0], map_file_path))
+                print('Pred: %s' % idx2phone(labels_pred[0], map_file_path))
 
         if is_new_epoch:
             break
@@ -108,8 +108,8 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
         labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
 
         print('----- wav: %s -----' % input_names[0])
-        print('True: %s' % num2char(labels_true[0], map_file_path))
-        print('Pred: %s' % num2char(labels_pred[0], map_file_path))
+        print('True: %s' % idx2char(labels_true[0], map_file_path))
+        print('Pred: %s' % idx2char(labels_pred[0], map_file_path))
 
         if is_new_epoch:
             break
@@ -140,8 +140,8 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
             labels_pred = ['']
         finally:
             print('----- wav: %s -----' % input_names[0])
-            print('True: %s' % num2phone(labels_true[0], map_file_path))
-            print('Pred: %s' % num2phone(labels_pred[0], map_file_path))
+            print('True: %s' % idx2phone(labels_true[0], map_file_path))
+            print('Pred: %s' % idx2phone(labels_pred[0], map_file_path))
 
         if is_new_epoch:
             break

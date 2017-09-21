@@ -14,16 +14,18 @@ from os.path import join
 import pickle
 import numpy as np
 
-from experiments.utils.progressbar import wrap_iterator
-from experiments.utils.data.dataset_loader.all_load.multitask_ctc_all_load import DatasetBase
-from experiments.utils.data.inputs.frame_stacking import stack_frame
+from utils.progressbar import wrap_iterator
+from utils.data.dataset_loader.all_load.multitask_ctc_all_load import DatasetBase
+from utils.data.inputs.frame_stacking import stack_frame
 
 
 class Dataset(DatasetBase):
 
-    def __init__(self, data_type, label_type_main, label_type_sub, batch_size,
-                 max_epoch=None, splice=1, num_stack=1, num_skip=1,
-                 sort_utt=False, sort_stop_epoch=None, progressbar=False):
+    def __init__(self, data_type, label_type_main, label_type_sub,
+                 batch_size, max_epoch=None, splice=1,
+                 num_stack=1, num_skip=1,
+                 sort_utt=False, sort_stop_epoch=None,
+                 progressbar=False):
         """A class for loading dataset.
         Args:
             data_type (string): train or dev or test
@@ -42,9 +44,17 @@ class Dataset(DatasetBase):
             progressbar (bool, optional): if True, visualize progressbar
         """
         if data_type not in ['train', 'dev', 'test']:
-            raise ValueError('data_type is "train" or "dev" or "test".')
-        self.is_training = True if data_type == 'train' else False
+            raise TypeError('data_type must be "train" or "dev" or "test".')
+        if label_type_main not in ['character', 'character_capital_divide']:
+            raise TypeError(
+                'label_type_main must be "character" or "character_capital_divide".')
+        if label_type_sub not in ['phone39', 'phone48', 'phone61']:
+            raise TypeError(
+                'label_type_sub must be "phone39" or "phone48" or "phone61".')
 
+        super(Dataset, self).__init__()
+
+        self.is_training = True if data_type == 'train' else False
         self.data_type = data_type
         self.label_type_main = label_type_main
         self.label_type_sub = label_type_sub

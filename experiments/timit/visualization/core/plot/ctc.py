@@ -13,7 +13,8 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
-from experiments.utils.directory import mkdir_join
+
+from utils.directory import mkdir_join
 
 plt.style.use('ggplot')
 sns.set_style("white")

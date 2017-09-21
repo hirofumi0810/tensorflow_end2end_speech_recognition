@@ -12,11 +12,11 @@ import Levenshtein
 import numpy as np
 
 from experiments.timit.metrics.mapping import map_to_39phone
-from experiments.utils.data.labels.character import num2char
-from experiments.utils.data.labels.phone import num2phone, phone2num
-from experiments.utils.data.sparsetensor import list2sparsetensor
-from experiments.utils.evaluation.edit_distance import compute_edit_distance
-from experiments.utils.progressbar import wrap_generator
+from utils.data.labels.character import idx2char
+from utils.data.labels.phone import idx2phone, phone2idx
+from utils.data.sparsetensor import list2sparsetensor
+from utils.evaluation.edit_distance import compute_edit_distance
+from utils.progressbar import wrap_generator
 
 
 def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
@@ -44,9 +44,9 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
     train_label_type = label_type
     eval_label_type = dataset.label_type
 
-    train_phone2num_map_file_path = '../metrics/mapping_files/attention/' + train_label_type + '.txt'
-    eval_phone2num_map_file_path = '../metrics/mapping_files/attention/' + eval_label_type + '.txt'
-    phone2num_39_map_file_path = '../metrics/mapping_files/attention/phone39.txt'
+    train_phone2idx_map_file_path = '../metrics/mapping_files/attention/' + train_label_type + '.txt'
+    eval_phone2idx_map_file_path = '../metrics/mapping_files/attention/' + eval_label_type + '.txt'
+    phone2idx_39_map_file_path = '../metrics/mapping_files/attention/phone39.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     per_mean = 0
     total_step = int(len(dataset) / batch_size)
@@ -77,9 +77,9 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
             # Hypothesis
             ###############
             # Convert from num to phone (-> list of phone strings)
-            phone_pred_list = num2phone(
+            phone_pred_list = idx2phone(
                 att_labels_pred[i_batch],
-                train_phone2num_map_file_path).split(' ')
+                train_phone2idx_map_file_path).split(' ')
 
             # Mapping to 39 phones (-> list of phone strings)
             phone_pred_list = map_to_39phone(phone_pred_list,
@@ -87,17 +87,17 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
                                              phone2phone_map_file_path)
 
             # Convert from phone to num (-> list of phone indices)
-            phone_pred_list = phone2num(phone_pred_list,
-                                        phone2num_39_map_file_path)
+            phone_pred_list = phone2idx(phone_pred_list,
+                                        phone2idx_39_map_file_path)
             att_labels_pred_mapped.append(phone_pred_list)
 
             ###############
             # Reference
             ###############
             # Convert from num to phone (-> list of phone strings)
-            phone_true_list = num2phone(
+            phone_true_list = idx2phone(
                 att_labels_true[i_batch],
-                eval_phone2num_map_file_path).split(' ')
+                eval_phone2idx_map_file_path).split(' ')
 
             # Mapping to 39 phones (-> list of phone strings)
             phone_true_list = map_to_39phone(phone_true_list,
@@ -105,8 +105,8 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
                                              phone2phone_map_file_path)
 
             # Convert from phone to num (-> list of phone indices)
-            phone_true_list = phone2num(phone_true_list,
-                                        phone2num_39_map_file_path)
+            phone_true_list = phone2idx(phone_true_list,
+                                        phone2idx_39_map_file_path)
             att_labels_true_mapped.append(phone_true_list)
 
         # Compute edit distance
@@ -172,8 +172,8 @@ def do_eval_cer(session, decode_op, model, dataset, label_type, eos_index,
         for i_batch in range(batch_size_each):
 
             # Convert from list to string
-            str_true = num2char(att_labels_true[i_batch], map_file_path)
-            str_pred = num2char(att_labels_pred[i_batch], map_file_path)
+            str_true = idx2char(att_labels_true[i_batch], map_file_path)
+            str_pred = idx2char(att_labels_pred[i_batch], map_file_path)
 
             # Remove silence(_) labels
             str_true = re.sub(r'[<>_\'\":;!?,.-]+', "", str_true)

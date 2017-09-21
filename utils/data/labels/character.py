@@ -8,13 +8,13 @@ from __future__ import print_function
 import numpy as np
 
 
-def char2num(str_char, map_file_path):
-    """Convert from character to number.
+def char2idx(str_char, map_file_path):
+    """Convert from character to index.
     Args:
-        str_char: string of characters
-        map_file_path: path to the mapping file
+        str_char (string): a sequence of characters
+        map_file_path (string): path to the mapping file
     Returns:
-        index_list: list of character indices
+        index_list (list): character indices
     """
     char_list = list(str_char)
 
@@ -25,19 +25,19 @@ def char2num(str_char, map_file_path):
             line = line.strip().split()
             map_dict[line[0]] = int(line[1])
 
-    # Convert from character to number
+    # Convert from character to index
     index_list = list(map(lambda x: map_dict[x], char_list))
 
     return np.array(index_list)
 
 
-def kana2num(str_char, map_file_path):
-    """Convert from kana character to number.
+def kana2idx(str_char, map_file_path):
+    """Convert from kana character to index.
     Args:
-        str_char: string of kana characters
-        map_file_path: path to the mapping file
+        str_char (string): a sequence of kana characters
+        map_file_path (string): path to the mapping file
     Returns:
-        index_list: list of kana character indices
+        index_list (list): kana character indices
     """
     kana_list = list(str_char)
     index_list = []
@@ -73,15 +73,15 @@ def kana2num(str_char, map_file_path):
     return np.array(index_list)
 
 
-def num2char(index_list, map_file_path, padded_value=-1):
-    """Convert from number to character.
+def idx2char(index_list, map_file_path, padded_value=-1):
+    """Convert from index to character.
     Args:
-        index_list: np.ndarray, list of character indices. batch size 1 is
+        index_list (np.ndarray): list of character indices. Batch size 1 is
             expected.
-        map_file_path: path to the mapping file
-        padded_value: int, the value used for padding
+        map_file_path (string): path to the mapping file
+        padded_value (int): the value used for padding
     Returns:
-        str_char: string of characters
+        str_char (string): a sequence of characters
     """
     # Read mapping file
     map_dict = {}

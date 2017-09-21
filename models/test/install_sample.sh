@@ -2,7 +2,7 @@
 
 # install TIMIT samples (public available)
 mkdir -p sample
-cs sample
+cd sample
 wget https://catalog.ldc.upenn.edu/desc/addenda/LDC93S1.phn
 wget https://catalog.ldc.upenn.edu/desc/addenda/LDC93S1.txt
 wget https://catalog.ldc.upenn.edu/desc/addenda/LDC93S1.wav

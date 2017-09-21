@@ -5,19 +5,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import sys
 import time
 import tensorflow as tf
 # from tensorflow.python import debug as tf_debug
 
-sys.path.append('../../')
+sys.path.append(os.path.abspath('../../'))
 from models.ctc.vanilla_ctc import CTC
 from models.test.util import measure_time
-from models.test.data import generate_data, num2alpha
-from experiments.utils.data.labels.phone import num2phone
-from experiments.utils.data.sparsetensor import sparsetensor2list
-from experiments.utils.parameter import count_total_parameters
-from experiments.utils.training.learning_rate_controller import Controller
+from models.test.data import generate_data, idx2alpha
+from utils.data.labels.phone import idx2phone
+from utils.data.sparsetensor import sparsetensor2list
+from utils.parameter import count_total_parameters
+from utils.training.learning_rate_controller import Controller
 
 
 class TestCTC(tf.test.TestCase):
@@ -141,7 +142,7 @@ class TestCTC(tf.test.TestCase):
             ler_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 
             # Define learning rate controller
-            learning_rate = 1e-4
+            learning_rate = 1e-3
             lr_controller = Controller(learning_rate_init=learning_rate,
                                        decay_start_epoch=10,
                                        decay_rate=0.98,
@@ -168,11 +169,11 @@ class TestCTC(tf.test.TestCase):
                 model.inputs_seq_len_pl_list[0]: inputs_seq_len,
                 model.keep_prob_input_pl_list[0]: 0.9,
                 model.keep_prob_hidden_pl_list[0]: 0.9,
-                model.keep_prob_output_pl_list[0]: 0.9,
+                model.keep_prob_output_pl_list[0]: 1.0,
                 learning_rate_pl: learning_rate
             }
 
-            map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61_to_num.txt'
+            map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61.txt'
 
             with tf.Session() as sess:
                 # Initialize parameters
@@ -223,20 +224,20 @@ class TestCTC(tf.test.TestCase):
                             labels_pred = sparsetensor2list(
                                 labels_pred_st, batch_size=batch_size)
                             if label_type == 'character':
-                                print('True: %s' % num2alpha(labels_true[0]))
-                                print('Pred: %s' % num2alpha(labels_pred[0]))
+                                print('True: %s' % idx2alpha(labels_true[0]))
+                                print('Pred: %s' % idx2alpha(labels_pred[0]))
                             else:
-                                print('True: %s' % num2phone(
+                                print('True: %s' % idx2phone(
                                     labels_true[0], map_file_path))
-                                print('Pred: %s' % num2phone(
+                                print('Pred: %s' % idx2phone(
                                     labels_pred[0], map_file_path))
 
                         except IndexError:
                             if label_type == 'character':
-                                print('True: %s' % num2alpha(labels_true[0]))
+                                print('True: %s' % idx2alpha(labels_true[0]))
                                 print('Pred: %s' % '')
                             else:
-                                print('True: %s' % num2phone(
+                                print('True: %s' % idx2phone(
                                     labels_true[0], map_file_path))
                                 print('Pred: %s' % '')
                             # NOTE: This is for no prediction

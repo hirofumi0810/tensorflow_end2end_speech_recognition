@@ -6,14 +6,15 @@ from __future__ import division
 from __future__ import print_function
 
 import re
+import os
 import sys
 import unittest
 
-sys.path.append('../../../../')
+sys.path.append(os.path.abspath('../../../../'))
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
-from experiments.utils.data.labels.character import num2char
-from experiments.utils.data.labels.phone import num2phone
-from experiments.utils.measure_time_func import measure_time
+from utils.data.labels.character import idx2char
+from utils.data.labels.phone import idx2phone
+from utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetMultitaskCTC(unittest.TestCase):
@@ -71,10 +72,9 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
         for data, is_new_epoch in dataset:
             inputs, labels_char, labels_phone, inputs_seq_len, input_names = data
 
-            str_true_char = num2char(labels_char[0], map_file_path_char)
+            str_true_char = idx2char(labels_char[0], map_file_path_char)
             str_true_char = re.sub(r'_', ' ', str_true_char)
-            str_true_phone = num2phone(
-                labels_phone[0], map_file_path_phone)
+            str_true_phone = idx2phone(labels_phone[0], map_file_path_phone)
             print('----- %s -----' % input_names[0])
             print(str_true_char)
             print(str_true_phone)

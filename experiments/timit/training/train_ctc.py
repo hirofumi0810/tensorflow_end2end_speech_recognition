@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import join, isfile
+from os.path import join, isfile, isdir, abspath
 import sys
 import time
 import tensorflow as tf
@@ -15,14 +15,14 @@ from setproctitle import setproctitle
 import yaml
 import shutil
 
-sys.path.append('../../../')
+sys.path.append(abspath('../../../'))
 from experiments.timit.data.load_dataset_ctc import Dataset
 from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
-from experiments.utils.data.sparsetensor import list2sparsetensor
-from experiments.utils.training.learning_rate_controller import Controller
-from experiments.utils.training.plot import plot_loss, plot_ler
-from experiments.utils.directory import mkdir_join
-from experiments.utils.parameter import count_total_parameters
+from utils.data.sparsetensor import list2sparsetensor
+from utils.training.learning_rate_controller import Controller
+from utils.training.plot import plot_loss, plot_ler
+from utils.directory import mkdir_join, mkdir
+from utils.parameter import count_total_parameters
 from models.ctc.vanilla_ctc import CTC
 
 
@@ -118,7 +118,7 @@ def do_train(model, params):
 
             # Instantiate a SummaryWriter to output summaries and the graph
             summary_writer = tf.summary.FileWriter(
-                model.model_path, sess.graph)
+                model.save_path, sess.graph)
 
             # Initialize parameters
             sess.run(init_op)
@@ -201,10 +201,10 @@ def do_train(model, params):
 
                     # Save fugure of loss & ler
                     plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
-                              save_path=model.model_path)
+                              save_path=model.save_path)
                     plot_ler(csv_ler_train, csv_ler_dev, csv_steps,
                              label_type=params['label_type'],
-                             save_path=model.model_path)
+                             save_path=model.save_path)
 
                     if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
@@ -224,7 +224,7 @@ def do_train(model, params):
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
                                 # Save model only when best accuracy is obtained (check point)
-                                checkpoint_file = join(model.model_path, 'model.ckpt')
+                                checkpoint_file = join(model.save_path, 'model.ckpt')
                                 save_path = saver.save(
                                     sess, checkpoint_file, global_step=train_data.epoch)
                                 print("Model saved in file: %s" % save_path)
@@ -256,7 +256,7 @@ def do_train(model, params):
                                 print('■■■ ↑Best Score (PER)↑ ■■■')
 
                                 # Save model only when best accuracy is obtained (check point)
-                                checkpoint_file = join(model.model_path, 'model.ckpt')
+                                checkpoint_file = join(model.save_path, 'model.ckpt')
                                 save_path = saver.save(
                                     sess, checkpoint_file, global_step=train_data.epoch)
                                 print("Model saved in file: %s" % save_path)
@@ -287,7 +287,7 @@ def do_train(model, params):
             print('Total time: %.3f hour' % (duration_train / 3600))
 
             # Training was finished correctly
-            with open(join(model.model_path, 'complete.txt'), 'w') as f:
+            with open(join(model.save_path, 'complete.txt'), 'w') as f:
                 f.write('')
 
 
@@ -341,23 +341,32 @@ def main(config_path, model_save_path):
         model.name += '_weightdecay' + str(params['weight_decay'])
 
     # Set save path
-    model.model_path = mkdir_join(
+    model.save_path = mkdir_join(
         model_save_path, 'ctc', params['label_type'], model.name)
 
     # Reset model directory
-    if not isfile(join(model.model_path, 'complete.txt')):
-        tf.gfile.DeleteRecursively(model.model_path)
-        tf.gfile.MakeDirs(model.model_path)
-    else:
-        raise ValueError('File exists.')
+    model_index = 0
+    new_model_path = model.save_path
+    while True:
+        if isfile(join(new_model_path, 'complete.txt')):
+            # Training of the first model have been finished
+            model_index += 1
+            new_model_path = model.save_path + '_' + str(model_index)
+        elif isdir(new_model_path):
+            # Training of the first model have not been finished yet
+            model_index += 1
+            new_model_path = model.save_path + '_' + str(model_index)
+        else:
+            break
+    model.save_path = mkdir(new_model_path)
 
     # Set process name
     setproctitle('timit_ctc_' + params['label_type'])
 
     # Save config file
-    shutil.copyfile(config_path, join(model.model_path, 'config.yml'))
+    shutil.copyfile(config_path, join(model.save_path, 'config.yml'))
 
-    sys.stdout = open(join(model.model_path, 'train.log'), 'w')
+    sys.stdout = open(join(model.save_path, 'train.log'), 'w')
     # TODO(hirofumi): change to logger
     do_train(model=model, params=params)
 

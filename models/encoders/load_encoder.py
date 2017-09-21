@@ -30,15 +30,15 @@ ENCODERS = {
 }
 
 
-def load(model_type):
-    """Select & load model.
+def load(encoder_type):
+    """Select & load encoder.
     Args:
-        model_type (string): name of the ctc model in the key of ENCODERS
+        encoder_type (string): name of the ctc model in the key of ENCODERS
     Returns:
-        model: class object
+        An instance of the encoder
     """
-    if model_type not in ENCODERS:
+    if encoder_type not in ENCODERS.keys():
         raise ValueError(
-            "model_type should be one of [%s], you provided %s." %
-            (", ".join(ENCODERS), model_type))
-    return ENCODERS[model_type]
+            "encoder_type should be one of [%s], you provided %s." %
+            (", ".join(ENCODERS), encoder_type))
+    return ENCODERS[encoder_type]

@@ -6,14 +6,15 @@ from __future__ import division
 from __future__ import print_function
 
 import re
+import os
 import sys
 import unittest
 
-sys.path.append('../../../../')
+sys.path.append(os.path.abspath('../../../../'))
 from experiments.timit.data.load_dataset_ctc import Dataset
-from experiments.utils.data.labels.character import num2char
-from experiments.utils.data.labels.phone import num2phone
-from experiments.utils.measure_time_func import measure_time
+from utils.data.labels.character import idx2char
+from utils.data.labels.phone import idx2phone
+from utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetCTC(unittest.TestCase):
@@ -67,9 +68,9 @@ class TestLoadDatasetCTC(unittest.TestCase):
         print('=> Loading mini-batch...')
         map_file_path = '../../metrics/mapping_files/ctc/' + label_type + '.txt'
         if label_type in ['character', 'character_capital_divide']:
-            map_fn = num2char
+            map_fn = idx2char
         else:
-            map_fn = num2phone
+            map_fn = idx2phone
 
         for data, is_new_epoch in dataset:
             inputs, labels, inputs_seq_len, input_names = data
