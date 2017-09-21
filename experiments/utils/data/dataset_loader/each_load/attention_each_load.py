@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """Base class for loading dataset for the Attention model.
+   In this class, all data will be loaded at each step.
    You can use the multi-GPU version.
 """
 
@@ -13,33 +14,20 @@ from os.path import basename
 import random
 import numpy as np
 
+from experiments.utils.data.dataset_loader.base import Base
+from experiments.utils.data.inputs.frame_stacking import stack_frame
+from experiments.utils.data.inputs.splicing import do_splice
 
-class DatasetBase(object):
+
+class DatasetBase(Base):
 
     def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-
-    def __len__(self):
-        return len(self.input_paths)
+        super(DatasetBase, self).__init__(*args, **kwargs)
 
     def __getitem__(self, index):
         input_i = np.array(self.input_paths[index])
         label_i = np.array(self.label_paths[index])
         return (input_i, label_i)
-
-    def __iter__(self):
-        """Returns self."""
-        return self
-
-    def next(self, batch_size=None):
-        # For python2
-        return self.__next__(batch_size)
-
-    def reset(self):
-        """Reset data counter. This is useful when you'd like to evaluate
-        overall data during training.
-        """
-        self.rest = set(range(0, self.data_num, 1))
 
     def __next__(self, batch_size=None):
         """Generate each mini-batch.
@@ -118,10 +106,18 @@ class DatasetBase(object):
             map(lambda path: basename(path).split('.')[0],
                 np.take(self.input_paths, data_indices, axis=0)))
 
-        if self.input_size is None:
+        if not hasattr(self, 'input_size'):
             self.input_size = input_list[0].shape[1]
             if self.num_stack is not None and self.num_skip is not None:
                 self.input_size *= self.num_stack
+
+        # Frame stacking
+        input_list = stack_frame(input_list,
+                                 self.input_paths[data_indices],
+                                 self.frame_num_dict,
+                                 self.num_stack,
+                                 self.num_skip,
+                                 progressbar=False)
 
         # Compute max frame num in mini-batch
         max_frame_num = max(map(lambda x: x.shape[0], input_list))
@@ -140,7 +136,14 @@ class DatasetBase(object):
         # Set values of each data in mini-batch
         for i_batch in range(len(data_indices)):
             data_i = input_list[i_batch]
-            frame_num = data_i.shape[0]
+            frame_num, input_size = data_i.shape
+
+            # Splicing
+            data_i = data_i.reshape(1, frame_num, input_size)
+            data_i = do_splice(data_i,
+                               splice=self.splice,
+                               batch_size=1).reshape(frame_num, -1)
+
             inputs[i_batch, : frame_num, :] = data_i
             labels[i_batch, :len(label_list[i_batch])] = label_list[i_batch]
             inputs_seq_len[i_batch] = frame_num

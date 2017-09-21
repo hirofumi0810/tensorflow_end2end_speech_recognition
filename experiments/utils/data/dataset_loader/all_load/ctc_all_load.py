@@ -14,33 +14,14 @@ from os.path import basename
 import random
 import numpy as np
 
+from experiments.utils.data.dataset_loader.base import Base
 from experiments.utils.data.inputs.splicing import do_splice
 
 
-class DatasetBase(object):
+class DatasetBase(Base):
 
     def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-
-    def __len__(self):
-        return len(self.input_paths)
-
-    def __getitem__(self, index):
-        return (self.input_list[index], self.label_list[index])
-
-    def __iter__(self):
-        """Returns self."""
-        return self
-
-    def next(self, batch_size=None):
-        # For python2
-        return self.__next__(batch_size)
-
-    def reset(self):
-        """Reset data counter. This is useful when you'd like to evaluate
-        overall data during training.
-        """
-        self.rest = set(range(0, len(self), 1))
+        super(DatasetBase, self).__init__(*args, **kwargs)
 
     def __next__(self, batch_size=None):
         """Generate each mini-batch.
