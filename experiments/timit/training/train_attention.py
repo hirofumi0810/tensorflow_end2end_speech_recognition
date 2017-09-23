@@ -18,7 +18,7 @@ import shutil
 sys.path.append(abspath('../../../'))
 from experiments.timit.data.load_dataset_attention import Dataset
 from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
-from utils.data.sparsetensor import list2sparsetensor
+from utils.io.labels.sparsetensor import list2sparsetensor
 from utils.training.learning_rate_controller import Controller
 from utils.training.plot import plot_loss, plot_ler
 from utils.directory import mkdir_join, mkdir
@@ -124,8 +124,7 @@ def do_train(model, params):
             start_time_step = time.time()
             ler_dev_best = 1
             learning_rate = float(params['learning_rate'])
-            step = 0
-            for data, is_new_epoch in train_data:
+            for step, (data, is_new_epoch) in enumerate(train_data):
 
                 # Create feed dictionary for next mini batch (train)
                 inputs, labels_train, inputs_seq_len, labels_seq_len, _ = data
@@ -146,7 +145,8 @@ def do_train(model, params):
                 if (step + 1) % params['print_step'] == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    (inputs, labels_dev, inputs_seq_len, labels_seq_len, _), _ = dev_data().next()
+                    (inputs, labels_dev, inputs_seq_len,
+                     labels_seq_len, _), _ = dev_data().next()
                     feed_dict_dev = {
                         model.inputs_pl_list[0]: inputs,
                         model.labels_pl_list[0]: labels_dev,
@@ -199,11 +199,10 @@ def do_train(model, params):
                     csv_ler_dev.append(ler_dev)
 
                     duration_step = time.time() - start_time_step
-                    print("Step %d: loss = %.3f (%.3f) / ler = %.4f (%.4f) / lr = %.5f (%.3f min)" %
-                          (step + 1, loss_train, loss_dev, ler_train, ler_dev,
+                    print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / ler = %.4f (%.4f) / lr = %.5f (%.3f min)" %
+                          (step + 1, train_data.epoch_detail, loss_train, loss_dev, ler_train, ler_dev,
                            learning_rate, duration_step / 60))
                     # sys.stdout.flush()
-                    step += 1
                     start_time_step = time.time()
 
                 # Save checkpoint and evaluate model per epoch
@@ -219,7 +218,7 @@ def do_train(model, params):
                              label_type=params['label_type'],
                              save_path=model.save_path)
 
-                    if epoch >= params['eval_start_epoch']:
+                    if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
                         if params['label_type'] in ['character', 'character_capital_divide']:
                             print('=== Dev Data Evaluation ===')
@@ -236,8 +235,10 @@ def do_train(model, params):
                                 ler_dev_best = ler_dev_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
-                                # Save model only when best accuracy is obtained (check point)
-                                checkpoint_file = join(model.save_path, 'model.ckpt')
+                                # Save model only when best accuracy is
+                                # obtained (check point)
+                                checkpoint_file = join(
+                                    model.save_path, 'model.ckpt')
                                 save_path = saver.save(
                                     sess, checkpoint_file, global_step=train_data.epoch)
                                 print("Model saved in file: %s" % save_path)
@@ -269,8 +270,10 @@ def do_train(model, params):
                                 ler_dev_best = ler_dev_epoch
                                 print('■■■ ↑Best Score (PER)↑ ■■■')
 
-                                # Save model only when best accuracy is obtained (check point)
-                                checkpoint_file = join(model.save_path, 'model.ckpt')
+                                # Save model only when best accuracy is
+                                # obtained (check point)
+                                checkpoint_file = join(
+                                    model.save_path, 'model.ckpt')
                                 save_path = saver.save(
                                     sess, checkpoint_file, global_step=train_data.epoch)
                                 print("Model saved in file: %s" % save_path)
@@ -370,7 +373,7 @@ def main(config_path, model_save_path):
         model.model_name += '_weightdecay' + str(params['weight_decay'])
 
     # Set save path
-    model.save_path = mkdir_join(
+    model.save_path = join(
         model_save_path, 'attention', params['label_type'], model.model_name)
 
     # Reset model directory

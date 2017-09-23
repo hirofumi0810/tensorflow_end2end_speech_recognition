@@ -9,14 +9,14 @@ from __future__ import print_function
 
 from os.path import join
 # import numpy as np
-import matplotlib as mpl
-mpl.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-from utils.data.labels.character import idx2char
-from utils.data.labels.phone import idx2phone
+from utils.io.labels.character import idx2char
+from utils.io.labels.phone import idx2phone
 from utils.directory import mkdir_join
 
 plt.style.use('ggplot')

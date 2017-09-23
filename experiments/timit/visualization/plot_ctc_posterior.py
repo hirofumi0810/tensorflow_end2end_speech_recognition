@@ -68,7 +68,7 @@ def do_plot(model, params, epoch=None):
                        dataset=test_data,
                        label_type=params['label_type'],
                        save_path=model.save_path,
-                       show=False)
+                       show=True)
 
 
 def main(model_path, epoch):

@@ -12,9 +12,9 @@ import Levenshtein
 import numpy as np
 
 from experiments.timit.metrics.mapping import map_to_39phone
-from utils.data.labels.character import idx2char
-from utils.data.labels.phone import idx2phone, phone2idx
-from utils.data.sparsetensor import list2sparsetensor, sparsetensor2list
+from utils.io.labels.character import idx2char
+from utils.io.labels.phone import idx2phone, phone2idx
+from utils.io.labels.sparsetensor import list2sparsetensor, sparsetensor2list
 from utils.evaluation.edit_distance import compute_edit_distance
 from utils.progressbar import wrap_generator
 
@@ -42,8 +42,10 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
     train_label_type = label_type
     eval_label_type = dataset.label_type_sub if is_multitask else dataset.label_type
 
-    train_phone2idx_map_file_path = '../metrics/mapping_files/ctc/' + train_label_type + '.txt'
-    eval_phone2idx_map_file_path = '../metrics/mapping_files/ctc/' + eval_label_type + '.txt'
+    train_phone2idx_map_file_path = '../metrics/mapping_files/ctc/' + \
+        train_label_type + '.txt'
+    eval_phone2idx_map_file_path = '../metrics/mapping_files/ctc/' + \
+        eval_label_type + '.txt'
     phone2idx_39_map_file_path = '../metrics/mapping_files/ctc/phone39.txt'
     phone2phone_map_file_path = '../metrics/mapping_files/phone2phone.txt'
     per_mean = 0

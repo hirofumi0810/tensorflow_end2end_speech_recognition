@@ -75,7 +75,7 @@ def do_plot(model, params, epoch=None):
                        dataset=test_data,
                        label_type=params['label_type'],
                        save_path=None,
-                       show=True)
+                       show=False)
 
 
 def main(model_path, epoch):
@@ -123,7 +123,6 @@ def main(model_path, epoch):
         weight_decay=params['weight_decay'])
 
     model.save_path = model_path
-    print(model.save_path)
     do_plot(model=model, params=params, epoch=epoch)
 
 

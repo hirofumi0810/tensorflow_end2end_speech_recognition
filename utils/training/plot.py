@@ -7,13 +7,10 @@ from __future__ import print_function
 
 import os
 import numpy as np
-try:
-    import matplotlib
-    matplotlib.use('Agg')
-    from matplotlib import pyplot as plt
-    plt.style.use('ggplot')
-except ImportError:
-    pass
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
+plt.style.use('ggplot')
 import seaborn as sns
 
 blue = '#4682B4'
