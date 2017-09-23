@@ -11,7 +11,9 @@ from __future__ import print_function
 class Base(object):
 
     def __init__(self, *args, **kwargs):
-        pass
+        self.epoch = 0
+        self.iteration = 0
+        self.is_new_epoch = False
 
     def __len__(self):
         return len(self.input_paths)
@@ -36,7 +38,7 @@ class Base(object):
     @property
     def epoch_detail(self):
         # Floating point version of epoch.
-        return self.iteration * self.batch_size / len(self)
+        return self.iteration / len(self)
 
     def __next__(self):
         raise NotImplementedError

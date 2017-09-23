@@ -14,8 +14,8 @@ from os.path import basename
 import random
 import numpy as np
 
-from experiments.utils.data.dataset_loader.base import Base
-from experiments.utils.data.inputs.splicing import do_splice
+from utils.dataset.base import Base
+from utils.io.inputs.splicing import do_splice
 
 
 class DatasetBase(Base):
@@ -126,4 +126,5 @@ class DatasetBase(Base):
             labels[i_batch, :len(self.label_list[x])] = self.label_list[x]
             inputs_seq_len[i_batch] = frame_num
 
+        self.iteration += len(data_indices)
         return (inputs, labels, inputs_seq_len, input_names), self.is_new_epoch

@@ -12,8 +12,8 @@ import unittest
 
 sys.path.append(os.path.abspath('../../../../'))
 from experiments.timit.data.load_dataset_attention import Dataset
-from utils.data.labels.character import idx2char
-from utils.data.labels.phone import idx2phone
+from utils.io.labels.character import idx2char
+from utils.io.labels.phone import idx2phone
 from utils.measure_time_func import measure_time
 
 
@@ -34,7 +34,8 @@ class TestLoadDatasetAttention(unittest.TestCase):
         # sort
         self.check_loading(label_type='phone61', sort_utt=True)
         self.check_loading(label_type='phone61', sort_utt=True,
-                           sort_stop_epoch=1)
+                           sort_stop_epoch=2)
+        self.check_loading(label_type='phone61', shuffle=True)
 
         # frame stacking
         self.check_loading(label_type='phone61', frame_stacking=True)
@@ -44,12 +45,13 @@ class TestLoadDatasetAttention(unittest.TestCase):
 
     @measure_time
     def check_loading(self, label_type, data_type='dev',
-                      sort_utt=False, sort_stop_epoch=None,
+                      shuffle=False, sort_utt=False, sort_stop_epoch=None,
                       frame_stacking=False, splice=1):
 
         print('========================================')
         print('  label_type: %s' % label_type)
         print('  data_type: %s' % data_type)
+        print('  shuffle: %s' % str(shuffle))
         print('  sort_utt: %s' % str(sort_utt))
         print('  sort_stop_epoch: %s' % str(sort_stop_epoch))
         print('  frame_stacking: %s' % str(frame_stacking))
@@ -60,8 +62,9 @@ class TestLoadDatasetAttention(unittest.TestCase):
         num_skip = 3 if frame_stacking else 1
         dataset = Dataset(
             data_type=data_type, label_type=label_type,
-            batch_size=64,  eos_index=1, max_epoch=2, splice=splice,
+            batch_size=64,  eos_index=1, max_epoch=1, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
+            shuffle=shuffle,
             sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
             progressbar=True)
 
@@ -77,7 +80,9 @@ class TestLoadDatasetAttention(unittest.TestCase):
 
             str_true = map_fn(labels[0][0: labels_seq_len[0]], map_file_path)
             str_true = re.sub(r'_', ' ', str_true)
-            print('----- %s -----' % input_names[0])
+            print('----- %s ----- (epoch: %.3f)' %
+                  (input_names[0], dataset.epoch_detail))
+            print(inputs[0].shape)
             print(str_true)
 
 

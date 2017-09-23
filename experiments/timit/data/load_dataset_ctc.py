@@ -15,8 +15,8 @@ import pickle
 import numpy as np
 
 from utils.progressbar import wrap_iterator
-from utils.data.dataset_loader.all_load.ctc_all_load import DatasetBase
-from utils.data.inputs.frame_stacking import stack_frame
+from utils.dataset.all_load.ctc_all_load import DatasetBase
+from utils.io.inputs.frame_stacking import stack_frame
 
 
 class Dataset(DatasetBase):
@@ -24,7 +24,7 @@ class Dataset(DatasetBase):
     def __init__(self, data_type, label_type, batch_size,
                  max_epoch=None, splice=1,
                  num_stack=1, num_skip=1,
-                 sort_utt=False, sort_stop_epoch=None,
+                 shuffle=False, sort_utt=False, sort_stop_epoch=None,
                  progressbar=False):
         """A class for loading dataset.
         Args:
@@ -36,6 +36,8 @@ class Dataset(DatasetBase):
             splice (int, optional): frames to splice. Default is 1 frame.
             num_stack (int, optional): the number of frames to stack
             num_skip (int, optional): the number of frames to skip
+            shuffle (bool, optional): if True, shuffle utterances. This is
+                disabled when sort_utt is True.
             sort_utt (bool, optional): if True, sort all utterances by the
                 number of frames and utteraces in each mini-batch are shuffled.
                 Otherwise, shuffle utteraces.
@@ -51,19 +53,17 @@ class Dataset(DatasetBase):
 
         super(Dataset, self).__init__()
 
-        self.is_training = True if data_type == 'train' else False
         self.data_type = data_type
         self.label_type = label_type
         self.batch_size = batch_size
         self.max_epoch = max_epoch
-        self.epoch = 0
         self.splice = splice
         self.num_stack = num_stack
         self.num_skip = num_skip
+        self.shuffle = shuffle
         self.sort_utt = sort_utt
         self.sort_stop_epoch = sort_stop_epoch
         self.progressbar = progressbar
-        self.is_new_epoch = False
         self.padded_value = -1
 
         input_path = join(

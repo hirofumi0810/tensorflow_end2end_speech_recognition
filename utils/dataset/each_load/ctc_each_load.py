@@ -14,9 +14,9 @@ from os.path import basename
 import random
 import numpy as np
 
-from experiments.utils.data.dataset_loader.base import Base
-from experiments.utils.data.inputs.frame_stacking import stack_frame
-from experiments.utils.data.inputs.splicing import do_splice
+from utils.dataset.base import Base
+from utils.io.inputs.frame_stacking import stack_frame
+from utils.io.inputs.splicing import do_splice
 
 
 class DatasetBase(Base):
@@ -172,4 +172,5 @@ class DatasetBase(Base):
             inputs_seq_len = inputs_seq_len[np.newaxis, :]
             input_names = np.array(input_names)[np.newaxis, :]
 
+        self.iteration += len(data_indices)
         return (inputs, labels, inputs_seq_len, input_names), self.is_new_epoch

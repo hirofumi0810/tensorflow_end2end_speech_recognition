@@ -12,8 +12,8 @@ import unittest
 
 sys.path.append(os.path.abspath('../../../../'))
 from experiments.timit.data.load_dataset_joint_ctc_attention import Dataset
-from utils.data.labels.character import idx2char
-from utils.data.labels.phone import idx2phone
+from utils.io.labels.character import idx2char
+from utils.io.labels.phone import idx2phone
 from utils.measure_time_func import measure_time
 
 
@@ -34,7 +34,8 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
         # sort
         self.check_loading(label_type='phone61', sort_utt=True)
         self.check_loading(label_type='phone61', sort_utt=True,
-                           sort_stop_epoch=1)
+                           sort_stop_epoch=2)
+        self.check_loading(label_type='phone61', shuffle=True)
 
         # frame stacking
         self.check_loading(label_type='phone61', frame_stacking=True)
@@ -44,12 +45,13 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
 
     @measure_time
     def check_loading(self, label_type, data_type='dev',
-                      sort_utt=False, sort_stop_epoch=None,
+                      shuffle=False, sort_utt=False, sort_stop_epoch=None,
                       frame_stacking=False, splice=1):
 
         print('========================================')
         print('  label_type: %s' % label_type)
         print('  data_type: %s' % data_type)
+        print('  shuffle: %s' % str(sort_utt))
         print('  sort_utt: %s' % str(sort_utt))
         print('  sort_stop_epoch: %s' % str(sort_stop_epoch))
         print('  frame_stacking: %s' % str(frame_stacking))
@@ -62,6 +64,7 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
             data_type=data_type, label_type=label_type,
             batch_size=64, eos_index=1, max_epoch=2, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
+            shufle=shuffle,
             sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
             progressbar=True)
 
