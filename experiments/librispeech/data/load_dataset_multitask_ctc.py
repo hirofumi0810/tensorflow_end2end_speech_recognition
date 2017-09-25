@@ -27,8 +27,7 @@ class Dataset(DatasetBase):
                  progressbar=False, num_gpu=1, is_gpu=False):
         """A class for loading dataset.
         Args:
-            ddata_type (stirng): train_clean100 or train_clean360 or
-                train_other500 or train_all or dev_clean or dev_other or
+            data_type (stirng): train or dev_clean or dev_other or
                 test_clean or test_other
             train_data_size (string): train_clean100 or train_clean360 or
                 train_other500 or train_all
@@ -53,14 +52,11 @@ class Dataset(DatasetBase):
                 dataset at once. Then, you should put dataset on the GPU server
                 you will use to reduce data-communication time between servers.
         """
-        if data_type not in ['train_clean100', 'train_clean360',
-                             'train_other500', 'train_all',
-                             'dev_clean', 'dev_other',
+        if data_type not in ['train', 'dev_clean', 'dev_other',
                              'test_clean', 'test_other']:
             raise TypeError(
-                'data_type is "train_clean100" or "train_clean360" or ' +
-                '"train_other500" or "train_all" or "dev_clean" or ' +
-                '"dev_other" or "test_clean" "test_other".')
+                'data_type is "train" or "dev_clean" or "dev_other" or ' +
+                '"test_clean" "test_other".')
         assert label_type_main == 'word'
         if label_type_sub not in ['character', 'character_capital_divide',
                                   'word']:
@@ -110,13 +106,11 @@ class Dataset(DatasetBase):
         frame_num_tuple_sorted = sorted(self.frame_num_dict.items(),
                                         key=lambda x: x[axis])
         input_paths, label_main_paths, label_sub_paths = [], [], []
-        for input_name, frame_num in frame_num_tuple_sorted:
-            speaker = input_name.split('-')[0]
-            input_paths.append(join(input_path, speaker, input_name + '.npy'))
-            label_main_paths.append(
-                join(label_main_path, speaker, input_name + '.npy'))
-            label_sub_paths.append(
-                join(label_sub_path, speaker, input_name + '.npy'))
+        for utt_name, frame_num in frame_num_tuple_sorted:
+            # ex.) utt_name: speaker-book-utt_index
+            input_paths.append(join(input_path, utt_name + '.npy'))
+            label_main_paths.append(join(label_main_path, utt_name + '.npy'))
+            label_sub_paths.append(join(label_sub_path, utt_name + '.npy'))
         self.input_paths = np.array(input_paths)
         self.label_main_paths = np.array(label_main_paths)
         self.label_sub_paths = np.array(label_sub_paths)
