@@ -143,7 +143,7 @@ class DatasetBase(Base):
 
         # Initialization
         inputs = np.zeros(
-            (len(data_indices), max_frame_num, self.input_size),
+            (len(data_indices), max_frame_num, self.input_size * self.splice),
             dtype=np.float32)
         labels_main = np.array(
             [[self.padded_value] * max_seq_len_main] * len(data_indices))

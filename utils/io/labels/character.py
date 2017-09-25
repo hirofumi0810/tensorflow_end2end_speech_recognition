@@ -92,7 +92,8 @@ def idx2char(index_list, map_file_path, padded_value=-1):
 
     # Remove padded values
     assert type(index_list) == np.ndarray, 'index_list should be np.ndarray.'
-    index_list = np.delete(index_list, np.where(index_list == -1), axis=0)
+    index_list = np.delete(index_list, np.where(
+        index_list == padded_value), axis=0)
 
     # Convert from indices to the corresponding characters
     char_list = list(map(lambda x: map_dict[x], index_list))

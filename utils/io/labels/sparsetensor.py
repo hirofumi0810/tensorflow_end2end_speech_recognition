@@ -12,8 +12,8 @@ import tensorflow as tf
 def list2sparsetensor(labels, padded_value):
     """Convert labels from list to sparse tensor.
     Args:
-        labels: list of labels, size of `[B, max_label_len]`
-        padded_value: int, the value used for padding
+        labels (list): list of labels, size of `[B, max_label_len]`
+        padded_value (int): the value used for padding
     Returns:
         labels_st: A SparseTensor of labels,
             list of (indices, values, dense_shape)
@@ -43,10 +43,10 @@ def sparsetensor2list(labels_st, batch_size):
     """Convert labels from sparse tensor to list.
     Args:
         labels_st: A SparseTensor of labels
-        batch_size: int the size of mini-batch
+        batch_size (int): the size of mini-batch
     Returns:
-        labels: list of np.ndarray, size of `[B]`. Each element is a sequence
-            of target labels of an input.
+        labels (list): list of np.ndarray, size of `[B]`. Each element is a
+            sequence of target labels of an input.
     """
     if isinstance(labels_st, tf.SparseTensorValue):
         # Output of TensorFlow
