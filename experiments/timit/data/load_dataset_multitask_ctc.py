@@ -83,9 +83,15 @@ class Dataset(DatasetBase):
         with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
             self.frame_num_dict = pickle.load(f)
 
-        # Sort paths to input & label by frame num
+        # Sort paths to input & label
+        if sort_utt:
+            # Sort by input lenght
+            axis = 1
+        else:
+            # Sort by name
+            axis = 0
         frame_num_tuple_sorted = sorted(self.frame_num_dict.items(),
-                                        key=lambda x: x[1])
+                                        key=lambda x: x[axis])
         input_paths, label_main_paths, label_sub_paths = [], [], []
         for input_name, frame_num in frame_num_tuple_sorted:
             input_paths.append(join(input_path, input_name + '.npy'))

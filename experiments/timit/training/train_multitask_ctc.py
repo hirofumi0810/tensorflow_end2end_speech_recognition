@@ -221,7 +221,7 @@ def do_train(model, params):
                     if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
                         print('=== Dev Data Evaluation ===')
-                        cer_dev_epoch = do_eval_cer(
+                        cer_dev_epoch, wer_dev_epoch = do_eval_cer(
                             session=sess,
                             decode_op=decode_op_character,
                             model=model,
@@ -230,6 +230,7 @@ def do_train(model, params):
                             eval_batch_size=1,
                             is_multitask=True)
                         print('  CER: %f %%' % (cer_dev_epoch * 100))
+                        print('  WER: %f %%' % (wer_dev_epoch * 100))
                         per_dev_epoch = do_eval_per(
                             session=sess,
                             decode_op=decode_op_phone,
@@ -254,7 +255,7 @@ def do_train(model, params):
                             print("Model saved in file: %s" % save_path)
 
                             print('=== Test Data Evaluation ===')
-                            cer_test = do_eval_cer(
+                            cer_test, wer_test = do_eval_cer(
                                 session=sess,
                                 decode_op=decode_op_character,
                                 model=model,
@@ -263,6 +264,7 @@ def do_train(model, params):
                                 eval_batch_size=1,
                                 is_multitask=True)
                             print('  CER: %f %%' % (cer_test * 100))
+                            print('  WER: %f %%' % (wer_test * 100))
                             per_test = do_eval_per(
                                 session=sess,
                                 decode_op=decode_op_phone,
@@ -341,16 +343,14 @@ def main(config_path, model_save_path):
         model.name += '_dropi' + str(params['dropout_input'])
     if params['dropout_hidden'] != 1:
         model.name += '_droph' + str(params['dropout_hidden'])
-    if params['dropout_output'] != 1:
-        model.name += '_dropo' + str(params['dropout_output'])
     if params['num_stack'] != 1:
         model.name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:
-        model.name += '_weightdecay' + str(params['weight_decay'])
+        model.name += '_wd' + str(params['weight_decay'])
     model.name += '_main' + str(params['main_task_weight'])
 
     # Set save path
-    model.save_path = join(
+    model.save_path = mkdir_join(
         model_save_path, 'ctc', 'char_' + params['label_type_sub'], model.name)
 
     # Reset model directory

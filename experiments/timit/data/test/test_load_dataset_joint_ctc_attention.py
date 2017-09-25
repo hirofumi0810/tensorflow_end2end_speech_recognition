@@ -84,7 +84,8 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
             ctc_str_true = map_fn(ctc_labels[0], ctc_map_file_path)
             att_str_true = re.sub(r'_', ' ', att_str_true)
             ctc_str_true = re.sub(r'_', ' ', ctc_str_true)
-            print('----- %s -----' % input_names[0])
+            print('----- %s ----- (epoch: %.3f)' %
+                  (input_names[0], dataset.epoch_detail))
             print(att_str_true)
             print(ctc_str_true)
 

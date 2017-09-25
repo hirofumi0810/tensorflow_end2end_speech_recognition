@@ -382,7 +382,7 @@ def main(config_path, model_save_path):
         model.model_name += '_weightdecay' + str(params['weight_decay'])
 
     # Set save path
-    model.save_path = join(
+    model.save_path = mkdir_join(
         model_save_path, 'attention', params['label_type'], model.model_name)
 
     # Reset model directory

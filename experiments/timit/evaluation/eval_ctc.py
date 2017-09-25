@@ -19,8 +19,10 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from models.ctc.vanilla_ctc import CTC
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', type=int, default=-1, help='the epoch to restore')
-parser.add_argument('--model_path', type=str, help='path to the model to evaluate')
+parser.add_argument('--epoch', type=int, default=-
+                    1, help='the epoch to restore')
+parser.add_argument('--model_path', type=str,
+                    help='path to the model to evaluate')
 
 
 def do_eval(model, params, epoch=-1):
@@ -83,7 +85,7 @@ def do_eval(model, params, epoch=-1):
 
         print('Test Data Evaluation:')
         if params['label_type'] in ['character', 'character_capital_divide']:
-            cer_test = do_eval_cer(
+            cer_test, wer_test = do_eval_cer(
                 session=sess,
                 decode_op=decode_op,
                 model=model,
@@ -92,6 +94,7 @@ def do_eval(model, params, epoch=-1):
                 eval_batch_size=1,
                 progressbar=True)
             print('  CER: %f %%' % (cer_test * 100))
+            print('  WER: %f %%' % (wer_test * 100))
         else:
             per_test = do_eval_per(
                 session=sess,

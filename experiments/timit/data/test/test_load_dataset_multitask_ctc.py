@@ -78,7 +78,8 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
             str_true_char = idx2char(labels_char[0], map_file_path_char)
             str_true_char = re.sub(r'_', ' ', str_true_char)
             str_true_phone = idx2phone(labels_phone[0], map_file_path_phone)
-            print('----- %s -----' % input_names[0])
+            print('----- %s ----- (epoch: %.3f)' %
+                  (input_names[0], dataset.epoch_detail))
             print(str_true_char)
             print(str_true_phone)
 

@@ -19,8 +19,10 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from models.ctc.multitask_ctc import Multitask_CTC
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', type=int, default=-1, help='the epoch to restore')
-parser.add_argument('--model_path', type=str, help='path to the model to evaluate')
+parser.add_argument('--epoch', type=int, default=-
+                    1, help='the epoch to restore')
+parser.add_argument('--model_path', type=str,
+                    help='path to the model to evaluate')
 
 
 def do_eval(model, params, epoch=None):
@@ -82,7 +84,7 @@ def do_eval(model, params, epoch=None):
             raise ValueError('There are not any checkpoints.')
 
         print('=== Test Data Evaluation ===')
-        cer_test = do_eval_cer(
+        cer_test, wer_test = do_eval_cer(
             session=sess,
             decode_op=decode_op_main,
             model=model,
@@ -92,6 +94,7 @@ def do_eval(model, params, epoch=None):
             progressbar=True,
             is_multitask=True)
         print('  CER: %f %%' % (cer_test * 100))
+        print('  WER: %f %%' % (wer_test * 100))
 
         per_test = do_eval_per(
             session=sess,

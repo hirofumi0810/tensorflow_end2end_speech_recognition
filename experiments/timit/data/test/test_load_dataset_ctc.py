@@ -89,7 +89,8 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
             str_true = map_fn(labels[0], map_file_path)
             str_true = re.sub(r'_', ' ', str_true)
-            print('----- %s -----' % input_names[0])
+            print('----- %s ----- (epoch: %.3f)' %
+                  (input_names[0], dataset.epoch_detail))
             print(inputs[0].shape)
             print(str_true)
 
