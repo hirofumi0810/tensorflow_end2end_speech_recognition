@@ -24,19 +24,19 @@ class Idx2word(object):
                 self.map_dict[int(line[1])] = line[0]
 
     def __call__(self, index_list, padded_value=-1):
-         """
-         Args:
-             index_list (np.ndarray): list of word indices.
+        """
+        Args:
+            index_list (np.ndarray): list of word indices.
                 Batch size 1 is expected.
-             padded_value (int): the value used for padding
-         Returns:
-             word_list (list): list of words
-         """
+            padded_value (int): the value used for padding
+        Returns:
+            word_list (list): list of words
+        """
         # Remove padded values
         assert type(index_list) == np.ndarray, 'index_list should be np.ndarray.'
-        index_list=np.delete(index_list, np.where(index_list == -1), axis=0)
+        index_list = np.delete(index_list, np.where(index_list == -1), axis=0)
 
         # Convert from indices to the corresponding words
-        word_list=list(map(lambda x: self.map_dict[x], index_list))
+        word_list = list(map(lambda x: self.map_dict[x], index_list))
 
         return word_list
