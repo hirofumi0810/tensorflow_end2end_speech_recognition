@@ -27,4 +27,4 @@ param:
   dropout_output: 1.0
   weight_decay: 0
   eval_start_epoch: 1
-  print_step: 100
+  print_step: 50

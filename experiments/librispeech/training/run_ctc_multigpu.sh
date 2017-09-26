@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-MODEL_SAVE_PATH="/n/sd8/inaguma/result/librispeech/"
+MODEL_SAVE_PATH="/n/sd8/inaguma/result/librispeech"
 
 # Select GPU
 if [ $# -lt 2 ]; then
@@ -25,13 +25,17 @@ if [ $# -ne 2 ]; then
   rest_gpu_num=`expr $gpu_num - 1`
   for i in `seq 1 $rest_gpu_num`
   do
-      gpu_index=$gpu_index","${3}
-      shift
+    gpu_index=$gpu_index","${3}
+    shift
   done
 fi
 
+mkdir -p log
+
 # Background job version
-CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_ctc_multigpu.py $config_path $MODEL_SAVE_PATH $gpu_index > log/$filename".log" &
+CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_ctc_multigpu.py \
+  $config_path $MODEL_SAVE_PATH $gpu_index > log/$filename".log" &
 
 # Standard output version
-# CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_ctc_multigpu.py $config_path $MODEL_SAVE_PATH $gpu_index
+# CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_ctc_multigpu.py \
+#   $config_path $MODEL_SAVE_PATH $gpu_index

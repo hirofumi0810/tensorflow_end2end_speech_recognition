@@ -9,28 +9,34 @@ from __future__ import print_function
 import numpy as np
 
 
-def idx2word(index_list, map_file_path, padded_value=-1):
+class Idx2word(object):
     """Convert from index to word.
     Args:
-        index_list (np.ndarray): list of word indices. batch_size == 1 is
-            expected.
         map_file_path (string): path to the mapping file
-        padded_value (int): the value used for padding
-    Returns:
-        word_list: list of words
     """
-    # Read mapping file
-    map_dict = {}
-    with open(map_file_path, 'r') as f:
-        for line in f:
-            line = line.strip().split()
-            map_dict[int(line[1])] = line[0]
 
-    # Remove padded values
-    assert type(index_list) == np.ndarray, 'index_list should be np.ndarray.'
-    index_list = np.delete(index_list, np.where(index_list == -1), axis=0)
+    def __init__(self, map_file_path):
+        # Read the mapping file
+        self.map_dict = {}
+        with open(map_file_path, 'r') as f:
+            for line in f:
+                line = line.strip().split()
+                self.map_dict[int(line[1])] = line[0]
 
-    # Convert from indices to the corresponding words
-    word_list = list(map(lambda x: map_dict[x], index_list))
+    def __call__(self, index_list, padded_value=-1):
+         """
+         Args:
+             index_list (np.ndarray): list of word indices.
+                Batch size 1 is expected.
+             padded_value (int): the value used for padding
+         Returns:
+             word_list (list): list of words
+         """
+        # Remove padded values
+        assert type(index_list) == np.ndarray, 'index_list should be np.ndarray.'
+        index_list=np.delete(index_list, np.where(index_list == -1), axis=0)
 
-    return word_list
+        # Convert from indices to the corresponding words
+        word_list=list(map(lambda x: self.map_dict[x], index_list))
+
+        return word_list
