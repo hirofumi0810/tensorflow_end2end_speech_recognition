@@ -1,17 +1,21 @@
 param:
-  model: blstm_ctc
+  encoder_type: multitask_blstm
   corpus: librispeech
-  label_type: character
-  train_data_size: train_clean100
+  label_type_main: word
+  label_type_sub: character
+  train_data_size: train_all
   feature: fbank
   input_size: 120
+  splice: 1
   num_stack: 3
   num_skip: 3
-  num_unit: 320
+  num_units: 320
   num_proj: 0
-  num_layer: 5
+  num_layers_main: 5
+  num_layers_sub: 3
   bottleneck_dim: 0
-  batch_size: 32
+  main_task_weight: 0.5
+  batch_size: 16
   optimizer: adam
   learning_rate: 1e-3
   decay_start_epoch: 1
@@ -25,3 +29,5 @@ param:
   dropout_hidden: 0.8
   dropout_output: 1.0
   weight_decay: 0
+  eval_start_epoch: 1
+  print_step: 100

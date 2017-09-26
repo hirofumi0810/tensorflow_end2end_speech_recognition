@@ -136,7 +136,7 @@ class DatasetBase(Base):
 
         # Initialization
         inputs = np.zeros(
-            (len(data_indices), max_frame_num, self.input_size),
+            (len(data_indices), max_frame_num, self.input_size * self.splice),
             dtype=np.float32)
         labels = np.array([[self.padded_value] * max_seq_len]
                           * len(data_indices))
@@ -155,7 +155,11 @@ class DatasetBase(Base):
                                batch_size=1).reshape(frame_num, -1)
 
             inputs[i_batch, : frame_num, :] = data_i
-            labels[i_batch, :len(label_list[i_batch])] = label_list[i_batch]
+            if self.is_test:
+                labels[i_batch, 0] = label_list[i_batch]
+            else:
+                labels[i_batch, :len(label_list[i_batch])
+                       ] = label_list[i_batch]
             inputs_seq_len[i_batch] = frame_num
             labels_seq_len[i_batch] = len(label_list[i_batch])
 
