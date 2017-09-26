@@ -17,7 +17,7 @@ import shutil
 
 sys.path.append(abspath('../../../'))
 from experiments.timit.data.load_dataset_joint_ctc_attention import Dataset
-from experiments.timit.metrics.joint_ctc_attention import do_eval_per, do_eval_cer
+from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
 from utils.io.labels.sparsetensor import list2sparsetensor
 from utils.training.learning_rate_controller import Controller
 from utils.training.plot import plot_loss, plot_ler
@@ -36,20 +36,30 @@ def do_train(model, params):
     # Load dataset
     train_data = Dataset(
         data_type='train', label_type=params['label_type'],
-        batch_size=params['batch_size'], max_epoch=params['num_epoch'],
-        eos_index=params['eos_index'], sort_utt=True)
+        batch_size=params['batch_size'], eos_index=params['eos_index'],
+        max_epoch=params['num_epoch'], splice=params['splice'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=True)
     dev_data = Dataset(
         data_type='dev', label_type=params['label_type'],
-        batch_size=params['batch_size'],
-        eos_index=params['eos_index'], sort_utt=False)
-    if params['label_type'] in ['character', 'character_capital_divide']:
+        batch_size=params['batch_size'], eos_index=params['eos_index'],
+        splice=params['splice'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
+    if 'char' in params['label_type']:
         test_data = Dataset(
-            data_type='test', label_type=params['label_type'], batch_size=1,
-            eos_index=params['eos_index'], sort_utt=False)
+            data_type='test', label_type=params['label_type'],
+            batch_size=1, eos_index=params['eos_index'],
+            splice=params['splice'],
+            num_stack=params['num_stack'], num_skip=params['num_skip'],
+            sort_utt=False)
     else:
         test_data = Dataset(
-            data_type='test', label_type='phone39', batch_size=1,
-            eos_index=params['eos_index'], sort_utt=False)
+            data_type='test', label_type='phone39',
+            batch_size=1, eos_index=params['eos_index'],
+            splice=params['splice'],
+            num_stack=params['num_stack'], num_skip=params['num_skip'],
+            sort_utt=False)
     # TODO(hirofumi): add frame_stacking and splice
 
     # Tell TensorFlow that the model will be built into the default graph
@@ -227,7 +237,7 @@ def do_train(model, params):
 
                     if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
-                        if params['label_type'] in ['character', 'character_capital_divide']:
+                        if 'char' in params['label_type']:
                             print('=== Dev Data Evaluation ===')
                             ler_dev_epoch = do_eval_cer(
                                 session=sess,
@@ -268,7 +278,6 @@ def do_train(model, params):
                                 model=model,
                                 dataset=dev_data,
                                 label_type=params['label_type'],
-                                eos_index=params['eos_index'],
                                 eval_batch_size=1)
                             print('  PER: %f %%' % (ler_dev_epoch * 100))
 
@@ -292,7 +301,6 @@ def do_train(model, params):
                                     model=model,
                                     dataset=test_data,
                                     label_type=params['label_type'],
-                                    eos_index=params['eos_index'],
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (ler_test * 100))
 
@@ -393,7 +401,7 @@ def main(config_path, model_save_path):
             # Training of the first model have been finished
             model_index += 1
             new_model_path = model.save_path + '_' + str(model_index)
-        elif isdir(new_model_path):
+        elif isfile(join(new_model_path, 'config.yml')):
             # Training of the first model have not been finished yet
             # tf.gfile.DeleteRecursively(new_model_path)
             # tf.gfile.MakeDirs(new_model_path)

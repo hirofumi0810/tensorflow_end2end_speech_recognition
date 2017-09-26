@@ -11,59 +11,67 @@ import os
 import sys
 import tensorflow as tf
 import yaml
+import argparse
 
-sys.path.append('../../../')
+sys.path.append(os.path.abspath('../../../'))
 from experiments.librispeech.data.load_dataset_ctc import Dataset
 from experiments.librispeech.metrics.ctc import do_eval_cer, do_eval_wer
-from models.ctc.load_model import load
+from models.ctc.vanilla_ctc import CTC
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--epoch', type=int, default=-1, help='the epoch to restore')
+parser.add_argument('--model_path', type=str,
+                    help='path to the model to evaluate')
 
 
-def do_eval(network, params, epoch=None):
+def do_eval(model, params, epoch=None):
     """Evaluate the model.
     Args:
-        network: model to restore
-        params: A dictionary of parameters
-        epoch: int, the epoch to restore
+        model: the model to restore
+        params (dict): A dictionary of parameters
+        epoch (int): the epoch to restore
     """
     # Load dataset
     test_clean_data = Dataset(
-        data_type='test_clean', train_data_size=params['train_data_size'],
-        label_type=params['label_type'], batch_size=params['batch_size'],
+        data_type='dev_clean', train_data_size=params['train_data_size'],
+        label_type=params['label_type'],
+        batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False)
+        shuffle=False, is_gpu=False)
     test_other_data = Dataset(
-        data_type='test_other', train_data_size=params['train_data_size'],
-        label_type=params['label_type'], batch_size=params['batch_size'],
+        data_type='dev_other', train_data_size=params['train_data_size'],
+        label_type=params['label_type'],
+        batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False)
+        shuffle=False, is_gpu=False)
 
     with tf.name_scope('tower_gpu0'):
         # Define placeholders
-        network.create_placeholders()
+        model.create_placeholders()
 
         # Add to the graph each operation (including model definition)
-        _, logits = network.compute_loss(network.inputs_pl_list[0],
-                                         network.labels_pl_list[0],
-                                         network.inputs_seq_len_pl_list[0],
-                                         network.keep_prob_input_pl_list[0],
-                                         network.keep_prob_hidden_pl_list[0],
-                                         network.keep_prob_output_pl_list[0])
-        decode_op = network.decoder(logits,
-                                    network.inputs_seq_len_pl_list[0],
-                                    decode_type='beam_search',
-                                    beam_width=20)
+        _, logits = model.compute_loss(model.inputs_pl_list[0],
+                                       model.labels_pl_list[0],
+                                       model.inputs_seq_len_pl_list[0],
+                                       model.keep_prob_input_pl_list[0],
+                                       model.keep_prob_hidden_pl_list[0],
+                                       model.keep_prob_output_pl_list[0])
+        decode_op = model.decoder(logits,
+                                  model.inputs_seq_len_pl_list[0],
+                                  decode_type='beam_search',
+                                  beam_width=20)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        ckpt = tf.train.get_checkpoint_state(network.model_dir)
+        ckpt = tf.train.get_checkpoint_state(model.save_path)
 
         # If check point exists
         if ckpt:
             # Use last saved model
             model_path = ckpt.model_checkpoint_path
-            if epoch is not None:
+            if epoch != -1:
                 model_path = model_path.split('/')[:-1]
                 model_path = '/'.join(model_path) + '/model.ckpt-' + str(epoch)
             saver.restore(sess, model_path)
@@ -72,31 +80,33 @@ def do_eval(network, params, epoch=None):
             raise ValueError('There are not any checkpoints.')
 
         print('Test Data Evaluation:')
-        if params['label_type'] in ['character', 'character_capital_divide']:
-            cer_clean_test = do_eval_cer(
+        if 'char' in params['label_type']:
+            cer_clean_test, wer_clean_test = do_eval_cer(
                 session=sess,
                 decode_ops=[decode_op],
-                network=network,
+                model=model,
                 dataset=test_clean_data,
                 label_type=params['label_type'],
                 eval_batch_size=params['batch_size'],
                 progressbar=True)
             print('  CER (clean): %f %%' % (cer_clean_test * 100))
+            print('  WER (clean): %f %%' % (wer_clean_test * 100))
 
-            cer_other_test = do_eval_cer(
+            cer_other_test, wer_other_test = do_eval_cer(
                 session=sess,
                 decode_ops=[decode_op],
-                network=network,
+                model=model,
                 dataset=test_other_data,
                 label_type=params['label_type'],
                 eval_batch_size=params['batch_size'],
                 progressbar=True)
             print('  CER (other): %f %%' % (cer_other_test * 100))
+            print('  WER (other): %f %%' % (wer_other_test * 100))
         else:
             wer_clean_test = do_eval_wer(
                 session=sess,
                 decode_ops=[decode_op],
-                network=network,
+                model=model,
                 dataset=test_clean_data,
                 train_data_size=params['train_data_size'],
                 is_test=True,
@@ -107,7 +117,7 @@ def do_eval(network, params, epoch=None):
             wer_other_test = do_eval_wer(
                 session=sess,
                 decode_ops=[decode_op],
-                network=network,
+                model=model,
                 dataset=test_other_data,
                 train_data_size=params['train_data_size'],
                 is_test=True,
@@ -116,10 +126,12 @@ def do_eval(network, params, epoch=None):
             print('  WER (other): %f %%' % (wer_other_test * 100))
 
 
-def main(model_path, epoch):
+def main():
+
+    args = parser.parse_args()
 
     # Load config file
-    with open(os.path.join(model_path, 'config.yml'), "r") as f:
+    with open(os.path.join(args.model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
         params = config['param']
 
@@ -139,36 +151,21 @@ def main(model_path, epoch):
             params['num_classes'] = 26642
 
     # Model setting
-    model = load(model_type=params['model'])
-    network = model(
+    model = CTC(
+        encoder_type=params['encoder_type'],
         input_size=params['input_size'] * params['num_stack'],
-        num_unit=params['num_unit'],
-        num_layer=params['num_layer'],
+        num_units=params['num_units'],
+        num_layers=params['num_layers'],
         num_classes=params['num_classes'],
         parameter_init=params['weight_init'],
         clip_grad=params['clip_grad'],
         clip_activation=params['clip_activation'],
-        dropout_ratio_input=params['dropout_input'],
-        dropout_ratio_hidden=params['dropout_hidden'],
-        dropout_ratio_output=params['dropout_output'],
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 
-    network.model_dir = model_path
-    do_eval(network=network, params=params, epoch=epoch)
+    model.save_path = args.model_path
+    do_eval(model=model, params=params, epoch=args.epoch)
 
 
 if __name__ == '__main__':
-
-    args = sys.argv
-    if len(args) == 2:
-        model_path = args[1]
-        epoch = None
-    elif len(args) == 3:
-        model_path = args[1]
-        epoch = args[2]
-    else:
-        raise ValueError(
-            ("Set a path to saved model.\n"
-             "Usase: python eval_ctc.py path_to_saved_model (epoch)"))
-    main(model_path=model_path, epoch=epoch)
+    main()

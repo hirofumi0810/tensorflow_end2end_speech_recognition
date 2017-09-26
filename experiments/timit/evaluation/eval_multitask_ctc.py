@@ -38,7 +38,7 @@ def do_eval(model, params, epoch=None):
         label_type_sub='phone39',
         batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False, progressbar=True)
+        shuffle=False, progressbar=True)
 
     # Define placeholders
     model.create_placeholders()

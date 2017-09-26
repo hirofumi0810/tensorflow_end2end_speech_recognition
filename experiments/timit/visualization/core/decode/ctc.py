@@ -54,15 +54,15 @@ def decode_test(session, decode_op, model, dataset, label_type, save_path=None):
             # no output
             labels_pred = ['']
         finally:
-            if label_type in ['character', 'character_capital_divide']:
+            if 'char' in label_type:
                 print('----- wav: %s -----' % input_names[0])
-                print('True: %s' % idx2char(labels_true[0], map_file_path))
-                print('Pred: %s' % idx2char(labels_pred[0], map_file_path))
+                print('Ref: %s' % idx2char(labels_true[0], map_file_path))
+                print('Hyp: %s' % idx2char(labels_pred[0], map_file_path))
 
             else:
                 print('----- wav: %s -----' % input_names[0])
-                print('True: %s' % idx2phone(labels_true[0], map_file_path))
-                print('Pred: %s' % idx2phone(labels_pred[0], map_file_path))
+                print('Ref: %s' % idx2phone(labels_true[0], map_file_path))
+                print('Hyp: %s' % idx2phone(labels_pred[0], map_file_path))
 
         if is_new_epoch:
             break
@@ -88,12 +88,12 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
     # Decode character
     print('===== ' + label_type_main + ' =====')
     map_file_path = '../metrics/mapping_files/ctc/' + label_type_main + '.txt'
-    # NOTE: Batch size is expected to be 1
     while True:
 
         # Create feed dictionary for next mini batch
         data, is_new_epoch = dataset.next(batch_size=1)
         inputs, labels_true, _, inputs_seq_len, input_names = data
+        # NOTE: Batch size is expected to be 1
 
         feed_dict = {
             model.inputs_pl_list[0]: inputs,
@@ -108,8 +108,8 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
         labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
 
         print('----- wav: %s -----' % input_names[0])
-        print('True: %s' % idx2char(labels_true[0], map_file_path))
-        print('Pred: %s' % idx2char(labels_pred[0], map_file_path))
+        print('Ref: %s' % idx2char(labels_true[0], map_file_path))
+        print('Hyp: %s' % idx2char(labels_pred[0], map_file_path))
 
         if is_new_epoch:
             break
@@ -140,8 +140,8 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
             labels_pred = ['']
         finally:
             print('----- wav: %s -----' % input_names[0])
-            print('True: %s' % idx2phone(labels_true[0], map_file_path))
-            print('Pred: %s' % idx2phone(labels_pred[0], map_file_path))
+            print('Ref: %s' % idx2phone(labels_true[0], map_file_path))
+            print('Hyp: %s' % idx2phone(labels_pred[0], map_file_path))
 
         if is_new_epoch:
             break

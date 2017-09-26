@@ -39,14 +39,14 @@ def do_eval(model, params, epoch=None):
             batch_size=1, eos_index=params['eos_index'],
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
-            sort_utt=False, progressbar=True)
+            shuffle=False, progressbar=True)
     else:
         test_data = Dataset(
             data_type='test', label_type=params['label_type'],
             batch_size=1, eos_index=params['eos_index'],
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
-            sort_utt=False, progressbar=True)
+            shuffle=False, progressbar=True)
     # TODO(hirofumi): add frame_stacking and splice
 
     # Define placeholders
@@ -89,7 +89,7 @@ def do_eval(model, params, epoch=None):
             raise ValueError('There are not any checkpoints.')
 
         print('Test Data Evaluation:')
-        if params['label_type'] in ['character', 'character_capital_divide']:
+        if 'char' in params['label_type']:
             cer_test, wer_test = do_eval_cer(
                 session=sess,
                 decode_op=decode_op_infer,
@@ -108,7 +108,6 @@ def do_eval(model, params, epoch=None):
                 model=model,
                 dataset=test_data,
                 label_type=params['label_type'],
-                eos_index=params['eos_index'],
                 eval_batch_size=1,
                 progressbar=True)
             print('  PER: %f %%' % (per_test * 100))

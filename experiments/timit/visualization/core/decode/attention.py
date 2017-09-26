@@ -48,7 +48,7 @@ def decode_test(session, decode_op, model, dataset, label_type, save_path=None):
         # Visualize
         labels_pred = session.run(decode_op, feed_dict=feed_dict)
 
-        if label_type in ['character', 'character_capital_divide']:
+        if 'char' in label_type:
             print('----- wav: %s -----' % input_names[0])
             print('True: %s' % idx2char(labels_true[0][1:-1], map_file_path))
             print('Pred: %s' % idx2char(labels_pred[0], map_file_path).replace('>', ''))
