@@ -11,14 +11,20 @@ import os
 import sys
 import tensorflow as tf
 import yaml
+import argparse
 
 sys.path.append(os.path.abspath('../../../'))
 from experiments.timit.data.load_dataset_attention import Dataset
 from experiments.timit.visualization.core.decode.attention import decode_test
 from models.attention import blstm_attention_seq2seq
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--epoch', type=int, default=-1, help='the epoch to restore')
+parser.add_argument('--model_path', type=str,
+                    help='path to the model to evaluate')
 
-def do_decode(model, params, epoch=None):
+
+def do_decode(model, params, epoch):
     """Decode the Attention outputs.
     Args:
         model: the model to restore
@@ -27,8 +33,11 @@ def do_decode(model, params, epoch=None):
     """
     # Load dataset
     test_data = Dataset(
-        data_type='test', label_type=params['label_type'], batch_size=1,
-        eos_index=params['eos_index'], sort_utt=False, progressbar=True)
+        data_type='test', label_type=params['label_type'],
+        batch_size=1, eos_index=params['eos_index'],
+        splice=params['splice'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        shuffle=False, progressbar=True)
 
     # Define placeholders
     model.create_placeholders()
@@ -56,7 +65,7 @@ def do_decode(model, params, epoch=None):
         if ckpt:
             # Use last saved model
             model_path = ckpt.model_checkpoint_path
-            if epoch is not None:
+            if epoch != -1:
                 model_path = model_path.split('/')[:-1]
                 model_path = '/'.join(model_path) + '/model.ckpt-' + str(epoch)
             saver.restore(sess, model_path)
@@ -74,10 +83,12 @@ def do_decode(model, params, epoch=None):
         # save_path=model.save_path)
 
 
-def main(model_path, epoch):
+def main():
+
+    args = parser.parse_args()
 
     # Load config file
-    with open(os.path.join(model_path, 'config.yml'), "r") as f:
+    with open(os.path.join(args.model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
         params = config['param']
 
@@ -120,21 +131,9 @@ def main(model_path, epoch):
         weight_decay=params['weight_decay'],
         beam_width=1)
 
-    model.save_path = model_path
-    do_decode(model=model, params=params, epoch=epoch)
+    model.save_path = args.model_path
+    do_decode(model=model, params=params, epoch=args.epoch)
 
 
 if __name__ == '__main__':
-
-    args = sys.argv
-    if len(args) == 2:
-        model_path = args[1]
-        epoch = None
-    elif len(args) == 3:
-        model_path = args[1]
-        epoch = args[2]
-    else:
-        raise ValueError(
-            ("Set a path to saved model.\n"
-             "Usase: python decode_attention.py path_to_saved_model (epoch)"))
-    main(model_path=model_path, epoch=epoch)
+    main()

@@ -361,7 +361,7 @@ def main(config_path, model_save_path):
             # Training of the first model have been finished
             model_index += 1
             new_model_path = model.save_path + '_' + str(model_index)
-        elif isdir(new_model_path):
+        elif isfile(join(new_model_path, 'config.yml')):
             # Training of the first model have not been finished yet
             # tf.gfile.DeleteRecursively(new_model_path)
             # tf.gfile.MakeDirs(new_model_path)

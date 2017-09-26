@@ -71,7 +71,8 @@ class Dataset(DatasetBase):
         self.padded_value = -1
 
         input_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/inputs/htk/speaker', data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/inputs/htk/speaker',
+            data_type)
         label_main_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc',
             label_type_main, data_type)
@@ -84,12 +85,7 @@ class Dataset(DatasetBase):
             self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label
-        if sort_utt:
-            # Sort by input lenght
-            axis = 1
-        else:
-            # Sort by name
-            axis = 0
+        axis = 1 if sort_utt else 0
         frame_num_tuple_sorted = sorted(self.frame_num_dict.items(),
                                         key=lambda x: x[axis])
         input_paths, label_main_paths, label_sub_paths = [], [], []

@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import join, isfile, isdir, abspath
+from os.path import join, isfile, abspath
 import sys
 import time
 import tensorflow as tf
@@ -206,7 +206,7 @@ def do_train(model, params):
 
                     if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
-                        if params['label_type'] in ['character', 'character_capital_divide']:
+                        if 'char' in params['label_type']:
                             print('=== Dev Data Evaluation ===')
                             ler_dev_epoch, wer_dev_epoch = do_eval_cer(
                                 session=sess,
@@ -355,7 +355,7 @@ def main(config_path, model_save_path):
             # Training of the first model have been finished
             model_index += 1
             new_model_path = model.save_path + '_' + str(model_index)
-        elif isdir(new_model_path):
+        elif isfile(join(new_model_path, 'config.yml')):
             # Training of the first model have not been finished yet
             model_index += 1
             new_model_path = model.save_path + '_' + str(model_index)

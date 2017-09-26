@@ -19,13 +19,12 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from models.ctc.vanilla_ctc import CTC
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', type=int, default=-
-                    1, help='the epoch to restore')
+parser.add_argument('--epoch', type=int, default=-1, help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
 
 
-def do_eval(model, params, epoch=-1):
+def do_eval(model, params, epoch):
     """Evaluate the model.
     Args:
         model: the model to restore
@@ -38,13 +37,13 @@ def do_eval(model, params, epoch=-1):
             data_type='test', label_type='phone39',
             batch_size=1, splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
-            sort_utt=False, progressbar=True)
+            shuffle=False, progressbar=True)
     else:
         test_data = Dataset(
             data_type='test', label_type=params['label_type'],
             batch_size=1, splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
-            sort_utt=False, progressbar=True)
+            shuffle=False, progressbar=True)
 
     # Define placeholders
     model.create_placeholders()
@@ -84,7 +83,7 @@ def do_eval(model, params, epoch=-1):
             raise ValueError('There are not any checkpoints.')
 
         print('Test Data Evaluation:')
-        if params['label_type'] in ['character', 'character_capital_divide']:
+        if 'char' in params['label_type']:
             cer_test, wer_test = do_eval_cer(
                 session=sess,
                 decode_op=decode_op,

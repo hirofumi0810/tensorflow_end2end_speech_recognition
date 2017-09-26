@@ -47,9 +47,11 @@ class Dataset(DatasetBase):
         """
         if data_type not in ['train', 'dev', 'test']:
             raise TypeError('data_type must be "train" or "dev" or "test".')
-        if label_type not in ['phone39', 'phone48', 'phone61', 'character', 'character_capital_divide']:
+        if label_type not in ['phone39', 'phone48', 'phone61', 'character',
+                              'character_capital_divide']:
             raise TypeError(
-                'label_type must be "phone39" or "phone48" or "phone61" or "character" or "character_capital_divide".')
+                'label_type must be "phone39" or "phone48" or "phone61" or ' +
+                '"character" or "character_capital_divide".')
 
         super(Dataset, self).__init__()
 
@@ -67,7 +69,8 @@ class Dataset(DatasetBase):
         self.padded_value = -1
 
         input_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/inputs/htk/speaker', data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset/inputs/htk/speaker',
+            data_type)
         label_path = join(
             '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc',
             label_type, data_type)
@@ -77,12 +80,7 @@ class Dataset(DatasetBase):
             self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label
-        if sort_utt:
-            # Sort by input lenght
-            axis = 1
-        else:
-            # Sort by name
-            axis = 0
+        axis = 1 if sort_utt else 0
         frame_num_tuple_sorted = sorted(self.frame_num_dict.items(),
                                         key=lambda x: x[axis])
         input_paths, label_paths = [], []
