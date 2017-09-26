@@ -163,8 +163,11 @@ class DatasetBase(Base):
                                batch_size=1).reshape(frame_num, -1)
 
             inputs[i_batch, :frame_num, :] = data_i
-            labels_main[i_batch, :len(
-                label_main_list[i_batch])] = label_main_list[i_batch]
+            if self.is_test:
+                labels_main[i_batch, 0] = label_main_list[i_batch]
+            else:
+                labels_main[i_batch, :len(
+                    label_main_list[i_batch])] = label_main_list[i_batch]
             labels_sub[i_batch, :len(
                 label_sub_list[i_batch])] = label_sub_list[i_batch]
             inputs_seq_len[i_batch] = frame_num

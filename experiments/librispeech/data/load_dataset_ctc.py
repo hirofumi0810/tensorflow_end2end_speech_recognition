@@ -50,19 +50,11 @@ class Dataset(DatasetBase):
                 dataset at once. Then, you should put dataset on the GPU server
                 you will use to reduce data-communication time between servers.
         """
-        if data_type not in ['train', 'dev_clean', 'dev_other',
-                             'test_clean', 'test_other']:
-            raise TypeError(
-                'data_type is "train" or "dev_clean" or "dev_other" or ' +
-                '"test_clean" "test_other".')
-        if label_type not in ['character', 'character_capital_divide', 'word']:
-            raise TypeError(
-                'label_type must be "character" or "character_capital_divide" or "word".')
-
         super(Dataset, self).__init__()
 
-        self.is_training = True if 'train' in data_type else False
+        self.is_training = True if data_type == 'train' else False
         self.is_test = True if 'test' in data_type and label_type == 'word' else False
+        # TODO(hirofumi): add phone-level transcripts
 
         self.data_type = data_type
         self.train_data_size = train_data_size
@@ -87,8 +79,8 @@ class Dataset(DatasetBase):
             root = '/n/sd8/inaguma/corpus/librispeech/dataset'
 
         input_path = join(root, 'inputs', train_data_size, data_type)
-        label_path = join(root, 'labels/ctc', train_data_size,
-                          label_type, data_type)
+        label_path = join(root, 'labels/ctc', label_type,
+                          train_data_size, data_type)
 
         # Load the frame number dictionary
         with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
@@ -100,9 +92,10 @@ class Dataset(DatasetBase):
                                         key=lambda x: x[axis])
         input_paths, label_paths = [], []
         for utt_name, frame_num in frame_num_tuple_sorted:
+            speaker = utt_name.split('-')[0]
             # ex.) utt_name: speaker-book-utt_index
-            input_paths.append(join(input_path, utt_name + '.npy'))
-            label_paths.append(join(label_path, utt_name + '.npy'))
+            input_paths.append(join(input_path, speaker, utt_name + '.npy'))
+            label_paths.append(join(label_path, speaker, utt_name + '.npy'))
         self.input_paths = np.array(input_paths)
         self.label_paths = np.array(label_paths)
         # NOTE: Not load dataset yet

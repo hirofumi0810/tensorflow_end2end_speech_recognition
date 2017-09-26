@@ -25,9 +25,11 @@ class TestLoadDatasetCTC(unittest.TestCase):
         self.length_check = False
 
         # data_type
-        self.check_loading(label_type='word', data_type='train_clean100')
+        self.check_loading(label_type='word', data_type='train')
         self.check_loading(label_type='word', data_type='dev_clean')
+        self.check_loading(label_type='word', data_type='dev_other')
         self.check_loading(label_type='word', data_type='test_clean')
+        self.check_loading(label_type='word', data_type='test_other')
         self.check_loading(label_type='character', data_type='test_clean')
 
         # label_type
@@ -73,7 +75,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
             batch_size=64, max_epoch=1, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
             shuffle=shuffle, sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
-            progressbar=True, num_gpu=num_gpu, is_gpu=False)
+            progressbar=True, num_gpu=num_gpu, is_gpu=True)
 
         print('=> Loading mini-batch...')
         if label_type == 'character':
@@ -106,7 +108,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
                         labels[0][0] == None), axis=0)
                     str_true = ' '.join(word_list)
             else:
-                str_true = ''.join(idx2char(labels[0][0], map_file_path))
+                str_true = idx2char(labels[0][0], map_file_path)
             str_true = re.sub(r'_', ' ', str_true)
             print('----- %s (epoch: %.3f) -----' %
                   (input_names[0][0], dataset.epoch_detail))

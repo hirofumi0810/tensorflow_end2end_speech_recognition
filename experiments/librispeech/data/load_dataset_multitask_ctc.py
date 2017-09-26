@@ -65,7 +65,7 @@ class Dataset(DatasetBase):
 
         super(Dataset, self).__init__()
 
-        self.is_training = True if 'train' in data_type else False
+        self.is_training = True if data_type == 'train' else False
         self.is_test = True if 'test' in data_type and label_type_main == 'word' else False
         # TODO(hirofumi): add phone-level transcripts
 
@@ -93,10 +93,10 @@ class Dataset(DatasetBase):
             root = '/n/sd8/inaguma/corpus/librispeech/dataset'
 
         input_path = join(root, 'inputs', train_data_size, data_type)
-        label_main_path = join(root, 'labels/ctc', train_data_size,
-                               label_type_main, data_type)
-        label_sub_path = join(root, 'labels/ctc', train_data_size,
-                              label_type_sub, data_type)
+        label_main_path = join(root, 'labels/ctc', label_type_main,
+                               train_data_size, data_type)
+        label_sub_path = join(root, 'labels/ctc', label_type_sub,
+                              train_data_size, data_type)
 
         with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
             self.frame_num_dict = pickle.load(f)
@@ -107,10 +107,11 @@ class Dataset(DatasetBase):
                                         key=lambda x: x[axis])
         input_paths, label_main_paths, label_sub_paths = [], [], []
         for utt_name, frame_num in frame_num_tuple_sorted:
+            speaker = utt_name.split('-')[0]
             # ex.) utt_name: speaker-book-utt_index
-            input_paths.append(join(input_path, utt_name + '.npy'))
-            label_main_paths.append(join(label_main_path, utt_name + '.npy'))
-            label_sub_paths.append(join(label_sub_path, utt_name + '.npy'))
+            input_paths.append(join(input_path, speaker, utt_name + '.npy'))
+            label_main_paths.append(join(label_main_path, speaker, utt_name + '.npy'))
+            label_sub_paths.append(join(label_sub_path, speaker, utt_name + '.npy'))
         self.input_paths = np.array(input_paths)
         self.label_main_paths = np.array(label_main_paths)
         self.label_sub_paths = np.array(label_sub_paths)

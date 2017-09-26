@@ -25,10 +25,11 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
         self.length_check = False
 
         # data_type
-        self.check_loading(label_type_sub='character',
-                           data_type='train_clean100')
+        self.check_loading(label_type_sub='character', data_type='train')
         self.check_loading(label_type_sub='character', data_type='dev_clean')
+        self.check_loading(label_type_sub='character', data_type='dev_other')
         self.check_loading(label_type_sub='character', data_type='test_clean')
+        self.check_loading(label_type_sub='character', data_type='test_other')
 
         # label_type
         self.check_loading(label_type_sub='character_capital_divide')
@@ -73,7 +74,7 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
             batch_size=64, max_epoch=1, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
             shuffle=shuffle, sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
-            progressbar=True, num_gpu=num_gpu, is_gpu=False)
+            progressbar=True, num_gpu=num_gpu, is_gpu=True)
 
         print('=> Loading mini-batch...')
         if label_type_sub == 'character':
@@ -103,9 +104,8 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
                 word_list = np.delete(labels_word[0][0], np.where(
                     labels_word[0][0] == None), axis=0)
             str_true_word = ' '.join(word_list)
-            str_true_char = ''.join(
-                idx2char(labels_char[0][0], map_file_path_char,
-                         padded_value=dataset.padded_value))
+            str_true_char = idx2char(labels_char[0][0], map_file_path_char,
+                                     padded_value=dataset.padded_value)
             str_true_char = re.sub(r'_', ' ', str_true_char)
             print('----- %s (epoch: %.3f) -----' %
                   (input_names[0][0], dataset.epoch_detail))
