@@ -15,10 +15,10 @@ sys.path.append(os.path.abspath('../../'))
 from models.ctc.multitask_ctc import Multitask_CTC
 from models.test.util import measure_time
 from models.test.data import generate_data, idx2alpha
-from experiments.utils.data.labels.phone import idx2phone
-from experiments.utils.data.sparsetensor import sparsetensor2list
-from experiments.utils.parameter import count_total_parameters
-from experiments.utils.training.learning_rate_controller import Controller
+from utils.io.labels.phone import Idx2phone
+from utils.io.labels.sparsetensor import sparsetensor2list
+from utils.parameter import count_total_parameters
+from utils.training.learning_rate_controller import Controller
 
 
 class TestMultitaskCTC(tf.test.TestCase):
@@ -39,7 +39,7 @@ class TestMultitaskCTC(tf.test.TestCase):
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
-            batch_size = 1
+            batch_size = 2
             inputs, labels_true_char_st, labels_true_phone_st, inputs_seq_len = generate_data(
                 label_type='multitask',
                 model='ctc',
@@ -124,7 +124,7 @@ class TestMultitaskCTC(tf.test.TestCase):
                 learning_rate_pl: learning_rate
             }
 
-            map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61.txt'
+            idx2phone = Idx2phone(map_file_path='./phone61_ctc.txt')
 
             with tf.Session() as sess:
                 # Initialize parameters
@@ -162,7 +162,7 @@ class TestMultitaskCTC(tf.test.TestCase):
                             [ler_op_main, ler_op_sub], feed_dict=feed_dict)
 
                         duration_step = time.time() - start_time_step
-                        print('Step %d: loss = %.3f / cer = %.4f / per = %.4f (%.3f sec) / lr = %.5f' %
+                        print('Step %d: loss = %.3f / cer = %.3f / per = %.3f (%.3f sec) / lr = %.5f' %
                               (step + 1, loss_train, ler_train_char,
                                ler_train_phone, duration_step, learning_rate))
                         start_time_step = time.time()
@@ -182,26 +182,23 @@ class TestMultitaskCTC(tf.test.TestCase):
 
                         print('Character')
                         try:
-                            print('  True: %s' %
+                            print('  Ref: %s' %
                                   idx2alpha(labels_true_char[0]))
-                            print('  Pred: %s' %
+                            print('  Hyp: %s' %
                                   idx2alpha(labels_pred_char[0]))
                         except IndexError:
                             print('Character')
-                            print('  True: %s' %
+                            print('  Ref: %s' %
                                   idx2alpha(labels_true_char[0]))
-                            print('  Pred: %s' % '')
+                            print('  Hyp: %s' % '')
 
                         print('Phone')
                         try:
-                            print('  True: %s' % idx2phone(labels_true_phone[0],
-                                                           map_file_path))
-                            print('  Pred: %s' % idx2phone(labels_pred_phone[0],
-                                                           map_file_path))
+                            print('  Ref: %s' % idx2phone(labels_true_phone[0]))
+                            print('  Hyp: %s' % idx2phone(labels_pred_phone[0]))
                         except IndexError:
-                            print('  True: %s' % idx2phone(labels_true_phone[0],
-                                                           map_file_path))
-                            print('  Pred: %s' % '')
+                            print('  Ref: %s' % idx2phone(labels_true_phone[0]))
+                            print('  Hyp: %s' % '')
                             # NOTE: This is for no prediction
                         print('---------------------------------------------' +
                               '---------------------------------------------')

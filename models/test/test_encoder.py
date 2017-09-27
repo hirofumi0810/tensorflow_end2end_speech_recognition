@@ -24,6 +24,11 @@ class TestEncoder(unittest.TestCase):
 
         print("Encoder Working check.")
 
+        # CNNs
+        self.check_encode(encoder_type='vgg_wang')
+        self.check_encode(encoder_type='cnn_zhang')
+        # self.check_encode(encoder_type='resnet_wang')
+
         # RNNs
         self.check_encode(encoder_type='blstm')
         self.check_encode(encoder_type='lstm')
@@ -38,11 +43,6 @@ class TestEncoder(unittest.TestCase):
         self.check_encode(encoder_type='multitask_blstm')
         self.check_encode(encoder_type='multitask_lstm')
 
-        # CNNs
-        # self.check_encode(encoder_type='cnn')
-        # self.check_encode(encoder_type='vgg')
-        # self.check_encode(encoder_type='resnet')
-
         # Dynamic
         # self.check_encode(encoder_type='pyramidal_blstm')
 
@@ -56,7 +56,8 @@ class TestEncoder(unittest.TestCase):
         with tf.Graph().as_default():
             # Load batch data
             batch_size = 4
-            splice = 11 if encoder_type in ['vgg_blstm', 'vgg_lstm', 'cnn'] else 1
+            splice = 11 if encoder_type in ['vgg_blstm', 'vgg_lstm', 'vgg_wang',
+                                            'resnet_wang', 'cnn_zhang'] else 1
             inputs, _, inputs_seq_len = generate_data(
                 label_type='character',
                 model='ctc',
@@ -87,6 +88,16 @@ class TestEncoder(unittest.TestCase):
                     num_classes_main=0,  # return hidden states
                     num_classes_sub=0,  # return hidden states
                     parameter_init=0.1)
+            elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
+                encoder = load(encoder_type)(
+                    input_size=input_size // 11,
+                    splice=11,
+                    # num_units=256,
+                    # num_layers=5,
+                    num_classes=27,
+                    parameter_init=0.1)
+            else:
+                raise NotImplementedError
 
             # Create placeholders
             inputs_pl = tf.placeholder(tf.float32,
@@ -148,6 +159,8 @@ class TestEncoder(unittest.TestCase):
                 if encoder_type in ['multitask_blstm', 'multitask_lstm']:
                     hidden_states, final_state, hidden_states_sub, final_state_sub = sess.run(
                         [hidden_states_op, final_state_op, hidden_states_sub_op, final_state_sub_op], feed_dict=feed_dict)
+                elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
+                    hidden_states = sess.run(hidden_states_op, feed_dict=feed_dict)
                 else:
                     hidden_states, final_state = sess.run(
                         [hidden_states_op, final_state_op], feed_dict=feed_dict)
@@ -194,6 +207,10 @@ class TestEncoder(unittest.TestCase):
                                 (batch_size, encoder.num_units), final_state_sub[0].h.shape)
                     else:
                         self.assertEqual((batch_size, encoder.num_units), final_state[0].shape)
+
+                elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
+                    self.assertEqual(
+                        (frame_num, batch_size, encoder.num_classes), hidden_states.shape)
 
 
 if __name__ == "__main__":

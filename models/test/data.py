@@ -5,10 +5,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from utils.data.sparsetensor import list2sparsetensor
-from utils.data.labels.phone import phone2idx
-from utils.data.inputs.splicing import do_splice
-from input_pipeline.feature_extraction import wav2feature
+from utils.io.inputs.splicing import do_splice
+from utils.io.inputs.feature_extraction import wav2feature
+from utils.io.labels.sparsetensor import list2sparsetensor
+from utils.io.labels.phone import Phone2idx
 
 
 def _read_text(text_path):
@@ -64,8 +64,10 @@ def generate_data(label_type, model, batch_size=1, splice=1):
     # Splice
     inputs = do_splice(inputs, splice=splice)
 
-    ctc_phone_map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61.txt'
-    att_phone_map_file_path = '../../experiments/timit/metrics/mapping_files/attention/phone61.txt'
+    phone2idx_ctc = Phone2idx(
+        map_file_path='../../experiments/timit/metrics/mapping_files/ctc/phone61.txt')
+    phone2idx_att = Phone2idx(
+        map_file_path='../../experiments/timit/metrics/mapping_files/attention/phone61.txt')
 
     # Make transcripts
     if model == 'ctc':
@@ -80,8 +82,7 @@ def generate_data(label_type, model, batch_size=1, splice=1):
 
         elif label_type == 'phone':
             transcript = _read_phone('./sample/LDC93S1.phn')
-            labels = [
-                phone2idx(transcript.split(' '), ctc_phone_map_file_path)] * batch_size
+            labels = [phone2idx_ctc(transcript.split(' '))] * batch_size
 
             # Convert to SparseTensor
             labels = list2sparsetensor(labels, padded_value=-1)
@@ -92,8 +93,7 @@ def generate_data(label_type, model, batch_size=1, splice=1):
             transcript_phone = _read_phone('./sample/LDC93S1.phn')
             transcript_char = ' ' + transcript_char.replace('.', '') + ' '
             labels_char = [alpha2idx(transcript_char)] * batch_size
-            labels_phone = [
-                phone2idx(transcript_phone.split(' '), ctc_phone_map_file_path)] * batch_size
+            labels_phone = [phone2idx_ctc(transcript_phone.split(' '))] * batch_size
 
             # Convert to SparseTensor
             labels_char = list2sparsetensor(labels_char, padded_value=-1)
@@ -111,8 +111,7 @@ def generate_data(label_type, model, batch_size=1, splice=1):
         elif label_type == 'phone':
             transcript = _read_phone('./sample/LDC93S1.phn')
             transcript = '< ' + transcript + ' >'
-            labels = [phone2idx(transcript.split(
-                ' '), att_phone_map_file_path)] * batch_size
+            labels = [phone2idx_att(transcript.split(' '))] * batch_size
             labels_seq_len = [len(labels[0])] * batch_size
             return inputs, labels, inputs_seq_len, labels_seq_len
 
@@ -122,8 +121,7 @@ def generate_data(label_type, model, batch_size=1, splice=1):
             transcript_char = '<' + transcript_char.replace('.', '') + '>'
             transcript_phone = '< ' + transcript_phone + ' >'
             labels_char = [alpha2idx(transcript_char)] * batch_size
-            labels_phone = [
-                phone2idx(transcript_phone.split(' '), att_phone_map_file_path)] * batch_size
+            labels_phone = [phone2idx_att(transcript_phone.split(' '))] * batch_size
             target_len_char = [len(labels_char[0])] * batch_size
             target_len_phone = [len(labels_phone[0])] * batch_size
             return (inputs, labels_char, labels_phone,
@@ -145,11 +143,9 @@ def generate_data(label_type, model, batch_size=1, splice=1):
         elif label_type == 'phone':
             transcript = _read_phone('./sample/LDC93S1.phn')
             att_transcript = '< ' + transcript + ' >'
-            att_labels = [
-                phone2idx(att_transcript.split(' '), att_phone_map_file_path)] * batch_size
+            att_labels = [phone2idx_att(att_transcript.split(' '))] * batch_size
             labels_seq_len = [len(att_labels[0])] * batch_size
-            ctc_labels = [
-                phone2idx(transcript.split(' '), ctc_phone_map_file_path)] * batch_size
+            ctc_labels = [phone2idx_ctc(transcript.split(' '))] * batch_size
 
             # Convert to SparseTensor
             ctc_labels = list2sparsetensor(ctc_labels, padded_value=-1)

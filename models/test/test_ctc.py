@@ -15,8 +15,8 @@ sys.path.append(os.path.abspath('../../'))
 from models.ctc.vanilla_ctc import CTC
 from models.test.util import measure_time
 from models.test.data import generate_data, idx2alpha
-from utils.data.labels.phone import idx2phone
-from utils.data.sparsetensor import sparsetensor2list
+from utils.io.labels.phone import Idx2phone
+from utils.io.labels.sparsetensor import sparsetensor2list
 from utils.parameter import count_total_parameters
 from utils.training.learning_rate_controller import Controller
 
@@ -25,6 +25,22 @@ class TestCTC(tf.test.TestCase):
 
     def test_ctc(self):
         print("CTC Working check.")
+
+        ##############################
+        # VGG-CTC
+        ##############################
+        self.check_training(encoder_type='vgg_wang', label_type='phone',
+                            lstm_impl=None)
+        self.check_training(encoder_type='vgg_wang', label_type='character',
+                            lstm_impl=None)
+
+        ##############################
+        # CNN-CTC
+        ##############################
+        self.check_training(encoder_type='cnn_zhang', label_type='phone',
+                            lstm_impl=None)
+        self.check_training(encoder_type='cnn_zhang', label_type='character',
+                            lstm_impl=None)
 
         ##############################
         # BLSTM-CTC
@@ -76,12 +92,6 @@ class TestCTC(tf.test.TestCase):
         self.check_training(encoder_type='gru', label_type='phone')
         self.check_training(encoder_type='gru', label_type='character')
 
-        ##############################
-        # CNN-CTC
-        ##############################
-        # self.check_training(encoder_type='cnn', label_type='phone')
-        # self.check_training(encoder_type='cnn', label_type='character')
-
     @measure_time
     def check_training(self, encoder_type, label_type, bidirectional=False,
                        lstm_impl='LSTMBlockCell'):
@@ -95,8 +105,9 @@ class TestCTC(tf.test.TestCase):
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
-            batch_size = 2
-            splice = 1 if encoder_type not in ['vgg_blstm', 'vgg_lstm', 'cnn'] else 11
+            batch_size = 1
+            splice = 1 if encoder_type not in ['vgg_blstm', 'vgg_lstm', 'vgg_wang',
+                                               'resnet_wang', 'cnn_zhang'] else 11
             inputs, labels_true_st, inputs_seq_len = generate_data(
                 label_type=label_type,
                 model='ctc',
@@ -173,7 +184,7 @@ class TestCTC(tf.test.TestCase):
                 learning_rate_pl: learning_rate
             }
 
-            map_file_path = '../../experiments/timit/metrics/mapping_files/ctc/phone61.txt'
+            idx2phone = Idx2phone(map_file_path='./phone61_ctc.txt')
 
             with tf.Session() as sess:
                 # Initialize parameters
@@ -210,7 +221,7 @@ class TestCTC(tf.test.TestCase):
                         ler_train = sess.run(ler_op, feed_dict=feed_dict)
 
                         duration_step = time.time() - start_time_step
-                        print('Step %d: loss = %.3f / ler = %.4f (%.3f sec) / lr = %.5f' %
+                        print('Step %d: loss = %.3f / ler = %.3f (%.3f sec) / lr = %.5f' %
                               (step + 1, loss_train, ler_train, duration_step, learning_rate))
                         start_time_step = time.time()
 
@@ -224,22 +235,19 @@ class TestCTC(tf.test.TestCase):
                             labels_pred = sparsetensor2list(
                                 labels_pred_st, batch_size=batch_size)
                             if label_type == 'character':
-                                print('True: %s' % idx2alpha(labels_true[0]))
-                                print('Pred: %s' % idx2alpha(labels_pred[0]))
+                                print('Ref: %s' % idx2alpha(labels_true[0]))
+                                print('Hyp: %s' % idx2alpha(labels_pred[0]))
                             else:
-                                print('True: %s' % idx2phone(
-                                    labels_true[0], map_file_path))
-                                print('Pred: %s' % idx2phone(
-                                    labels_pred[0], map_file_path))
+                                print('Ref: %s' % idx2phone(labels_true[0]))
+                                print('Hyp: %s' % idx2phone(labels_pred[0]))
 
                         except IndexError:
                             if label_type == 'character':
-                                print('True: %s' % idx2alpha(labels_true[0]))
-                                print('Pred: %s' % '')
+                                print('Ref: %s' % idx2alpha(labels_true[0]))
+                                print('Hyp: %s' % '')
                             else:
-                                print('True: %s' % idx2phone(
-                                    labels_true[0], map_file_path))
-                                print('Pred: %s' % '')
+                                print('Ref: %s' % idx2phone(labels_true[0]))
+                                print('Hyp: %s' % '')
                             # NOTE: This is for no prediction
 
                         if ler_train >= ler_train_pre:

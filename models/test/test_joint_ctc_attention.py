@@ -15,7 +15,7 @@ sys.path.append(os.path.abspath('../../'))
 from models.attention.joint_ctc_attention import JointCTCAttention
 from models.test.util import measure_time
 from models.test.data import generate_data, idx2alpha, idx2phone
-from utils.data.sparsetensor import list2sparsetensor
+from utils.io.labels.sparsetensor import list2sparsetensor
 from utils.parameter import count_total_parameters
 from utils.training.learning_rate_controller import Controller
 
