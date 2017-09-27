@@ -13,8 +13,8 @@ import numpy as np
 
 sys.path.append(os.path.abspath('../../../../'))
 from experiments.librispeech.data.load_dataset_ctc import Dataset
-from utils.io.labels.character import idx2char
-from utils.io.labels.word import idx2word
+from utils.io.labels.character import Idx2char
+from utils.io.labels.word import Idx2word
 from utils.measure_time_func import measure_time
 
 
@@ -86,6 +86,9 @@ class TestLoadDatasetCTC(unittest.TestCase):
             map_file_path = '../../metrics/mapping_files/ctc/word_' + \
                 dataset.train_data_size + '.txt'
 
+        idx2char = Idx2char(map_file_path)
+        idx2word = Idx2word(map_file_path)
+
         for data, is_new_epoch in dataset:
             inputs, labels, inputs_seq_len, input_names = data
 
@@ -102,13 +105,13 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
             if label_type == 'word':
                 if 'test' not in data_type:
-                    str_true = ' '.join(idx2word(labels[0][0], map_file_path))
+                    str_true = ' '.join(idx2word(labels[0][0]))
                 else:
                     word_list = np.delete(labels[0][0], np.where(
                         labels[0][0] == None), axis=0)
                     str_true = ' '.join(word_list)
             else:
-                str_true = idx2char(labels[0][0], map_file_path)
+                str_true = idx2char(labels[0][0])
             str_true = re.sub(r'_', ' ', str_true)
             print('----- %s (epoch: %.3f) -----' %
                   (input_names[0][0], dataset.epoch_detail))

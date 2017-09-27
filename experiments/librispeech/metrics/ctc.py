@@ -185,7 +185,7 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
                     # NOTE: Levenshtein packages only accepts strings)
 
                     # Compute WER
-                    wer_mean = lev.distance(seq_pred, seq_true)
+                    wer_mean += lev.distance(seq_pred, seq_true)
                     wer_mean /= len(labels_true[i_device][i_batch])
 
                     if progressbar:
