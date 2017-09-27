@@ -303,12 +303,13 @@ class CTCBase(object):
         """
         if decode_type not in ['greedy', 'beam_search']:
             raise ValueError('decode_type is "greedy" or "beam_search".')
-        assert isinstance(beam_width, int), "beam_width should be integer."
+        assert isinstance(beam_width, int), "beam_width must be integer."
+        assert beam_width >= 1, "beam_width must be >= 1"
 
-        if decode_type == 'greedy' or beam_width == 1:
+        if beam_width == 1:
             decoded, _ = tf.nn.ctc_greedy_decoder(
                 logits, tf.cast(inputs_seq_len, tf.int32))
-        elif decode_type == 'beam_search':
+        else:
             decoded, _ = tf.nn.ctc_beam_search_decoder(
                 logits, tf.cast(inputs_seq_len, tf.int32),
                 beam_width=beam_width)

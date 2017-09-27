@@ -11,9 +11,11 @@ from models.encoders.core.blstm import BLSTM_Encoder
 from models.encoders.core.lstm import LSTM_Encoder
 from models.encoders.core.bgru import BGRU_Encoder
 from models.encoders.core.gru import GRU_Encoder
-from models.encoders.core.cnn import CNN_Encoder
+from models.encoders.core.cnn_zhang import CNN_Encoder
 from models.encoders.core.vgg_blstm import VGG_BLSTM_Encoder
 from models.encoders.core.vgg_lstm import VGG_LSTM_Encoder
+from models.encoders.core.vgg_wang import VGG_Encoder
+# from models.encoders.core.resnet_wang import ResNet_Encoder
 from models.encoders.core.multitask_blstm import Multitask_BLSTM_Encoder
 from models.encoders.core.multitask_lstm import Multitask_LSTM_Encoder
 
@@ -22,9 +24,11 @@ ENCODERS = {
     "lstm": LSTM_Encoder,
     "bgru": BGRU_Encoder,
     "gru": GRU_Encoder,
-    "cnn": CNN_Encoder,
+    "cnn_zhang": CNN_Encoder,
     "vgg_blstm": VGG_BLSTM_Encoder,
     "vgg_lstm": VGG_LSTM_Encoder,
+    "vgg_wang": VGG_Encoder,
+    # "resnet_wang": ResNet_Encoder,
     "multitask_blstm": Multitask_BLSTM_Encoder,
     "multitask_lstm": Multitask_LSTM_Encoder,
 }

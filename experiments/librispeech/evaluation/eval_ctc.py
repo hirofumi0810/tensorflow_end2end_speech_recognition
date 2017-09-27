@@ -19,7 +19,8 @@ from experiments.librispeech.metrics.ctc import do_eval_cer, do_eval_wer
 from models.ctc.vanilla_ctc import CTC
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', type=int, default=-1, help='the epoch to restore')
+parser.add_argument('--epoch', type=int, default=-1,
+                    help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
 

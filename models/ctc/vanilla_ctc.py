@@ -101,16 +101,11 @@ class CTC(CTCBase):
                                               parameter_init=parameter_init,
                                               bottleneck_dim=bottleneck_dim)
 
-        elif encoder_type == 'cnn':
-            # This implementaion is based on
-            #     https://arxiv.org/abs/1701.02720.
-            # Zhang, Ying, et al.
-            # "Towards end-to-end speech recognition with deep convolutional
-            #  neural networks." arXiv preprint arXiv:1701.02720 (2017).
-            self.encoder = load['cnn'](input_size=input_size,
-                                       splice=splice,
-                                       num_classes=num_classes + 1,
-                                       parameter_init=parameter_init)
+        elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn']:
+            self.encoder = load(encoder_type)(input_size=input_size,
+                                              splice=splice,
+                                              num_classes=num_classes + 1,
+                                              parameter_init=parameter_init)
 
         else:
             raise NotImplementedError

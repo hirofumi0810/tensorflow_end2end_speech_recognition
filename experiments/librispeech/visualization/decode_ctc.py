@@ -19,7 +19,8 @@ from experiments.librispeech.visualization.core.decode.ctc import decode_test
 from models.ctc.vanilla_ctc import CTC
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', type=int, default=-1, help='the epoch to restore')
+parser.add_argument('--epoch', type=int, default=-1,
+                    help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
 
@@ -38,14 +39,14 @@ def do_decode(model, params, epoch=None):
         label_type=params['label_type'],
         batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        shuffle=False, is_gpu=False)
+        shuffle=False, is_gpu=True)
     test_other_data = Dataset(
         data_type='test_other',
         train_data_size=params['train_data_size'],
         label_type=params['label_type'],
         batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        shuffle=False, is_gpu=False)
+        shuffle=False, is_gpu=True)
 
     with tf.name_scope('tower_gpu0'):
         # Define placeholders

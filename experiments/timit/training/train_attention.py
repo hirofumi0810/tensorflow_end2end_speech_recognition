@@ -209,7 +209,7 @@ def do_train(model, params):
                     csv_ler_dev.append(ler_dev)
 
                     duration_step = time.time() - start_time_step
-                    print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / ler = %.4f (%.4f) / lr = %.5f (%.3f min)" %
+                    print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / ler = %.3f (%.3f) / lr = %.5f (%.3f min)" %
                           (step + 1, train_data.epoch_detail, loss_train, loss_dev, ler_train, ler_dev,
                            learning_rate, duration_step / 60))
                     # sys.stdout.flush()
@@ -363,26 +363,29 @@ def main(config_path, model_save_path):
         weight_decay=params['weight_decay'],
         beam_width=1)
 
-    model.model_name = params['model']
-    model.model_name += '_encoder' + str(params['encoder_num_unit'])
-    model.model_name += '_' + str(params['encoder_num_layer'])
-    model.model_name += '_attdim' + str(params['attention_dim'])
-    model.model_name += '_decoder' + str(params['decoder_num_unit'])
-    model.model_name += '_' + str(params['decoder_num_layer'])
-    model.model_name += '_' + params['optimizer']
-    model.model_name += '_lr' + str(params['learning_rate'])
-    model.model_name += '_' + params['attention_type']
+    # Set process name
+    setproctitle('timit_' + model.name + '_' + params['label_type'])
+
+    model.name = params['model']
+    model.name += '_encoder' + str(params['encoder_num_unit'])
+    model.name += '_' + str(params['encoder_num_layer'])
+    model.name += '_attdim' + str(params['attention_dim'])
+    model.name += '_decoder' + str(params['decoder_num_unit'])
+    model.name += '_' + str(params['decoder_num_layer'])
+    model.name += '_' + params['optimizer']
+    model.name += '_lr' + str(params['learning_rate'])
+    model.name += '_' + params['attention_type']
     if bool(params['attention_smoothing']):
-        model.model_name += '_smoothing'
+        model.name += '_smoothing'
     if params['attention_weights_tempareture'] != 1:
-        model.model_name += '_sharpening' + \
+        model.name += '_sharpening' + \
             str(params['attention_weights_tempareture'])
     if params['weight_decay'] != 0:
-        model.model_name += '_weightdecay' + str(params['weight_decay'])
+        model.name += '_weightdecay' + str(params['weight_decay'])
 
     # Set save path
     model.save_path = mkdir_join(
-        model_save_path, 'attention', params['label_type'], model.model_name)
+        model_save_path, 'attention', params['label_type'], model.name)
 
     # Reset model directory
     model_index = 0
@@ -402,9 +405,6 @@ def main(config_path, model_save_path):
         else:
             break
     model.save_path = mkdir(new_model_path)
-
-    # Set process name
-    setproctitle('timit_att_' + params['label_type'])
 
     # Save config file
     shutil.copyfile(config_path, join(model.save_path, 'config.yml'))

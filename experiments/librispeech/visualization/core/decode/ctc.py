@@ -70,12 +70,12 @@ def decode_test(session, decode_op, model, dataset, label_type,
             else:
                 print('----- wav: %s -----' % input_names[0][0])
                 if dataset.is_test:
-                    true_seq = ' '.join(labels_true[0][0])
+                    true_seq = labels_true[0][0][0]
                 else:
                     true_seq = ' '.join(idx2word(labels_true[0][0]))
                 pred_seq = ' '.join(idx2word(labels_pred[0]))
 
-                wer(true_seq.split(), pred_seq.split())
+                # wer(true_seq.split(), pred_seq.split())
                 print('Ref: %s' % true_seq)
                 print('Hyp: %s' % pred_seq)
 
@@ -140,11 +140,18 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
             labels_pred_char = ['']
 
         print('----- wav: %s -----' % input_names[0][0])
-        # print('Ref: %s' % idx2char(
-        #     labels_true_char[0][0], map_file_path_char))
-        print('Ref: %s' % ' '.join(labels_true_word[0][0]))
-        print('Hyp (word): %s' % ' '.join(idx2word(labels_pred_word[0])))
-        print('Hyp (char): %s' % idx2char(labels_pred_char[0]).replace('_', ' '))
+        if dataset.is_test:
+            true_word_seq = labels_true_word[0][0][0]
+        else:
+            true_word_seq = ' '.join(idx2word(labels_true_word[0][0]))
+        pred_word_seq = ' '.join(idx2word(labels_pred_word[0]))
+        print('Ref (word): %s' % true_word_seq)
+        print('Hyp (word): %s' % pred_word_seq)
+
+        true_char_seq = idx2char(labels_true_char[0][0])
+        pred_char_seq = idx2char(labels_pred_char[0]).replace('_', ' ')
+        print('Ref (char): %s' % true_char_seq)
+        print('Hyp (char): %s' % pred_char_seq)
 
         if is_new_epoch:
             break

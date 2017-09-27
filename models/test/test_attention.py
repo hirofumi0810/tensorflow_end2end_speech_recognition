@@ -15,8 +15,8 @@ sys.path.append(os.path.abspath('../../'))
 from models.attention.blstm_attention_seq2seq import AttentionSeq2Seq
 from models.test.util import measure_time
 from models.test.data import generate_data, idx2alpha
-from utils.data.labels.phone import idx2phone
-from utils.data.sparsetensor import list2sparsetensor
+from utils.io.labels.phone import idx2phone
+from utils.io.labels.sparsetensor import list2sparsetensor
 from utils.parameter import count_total_parameters
 from utils.training.learning_rate_controller import Controller
 

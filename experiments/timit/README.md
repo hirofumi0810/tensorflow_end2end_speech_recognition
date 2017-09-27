@@ -13,41 +13,37 @@ cd training
 ### Restoration & Evaluation
 ```
 cd evaluation
-python eval_*.py path_to_trained_model
+python eval_*.py --model_path path_to_trained_model (--epoch epoch_num)
 ```
 
 ### Visualization
 #### Plot LER in training
 ```
 cd visualization
-python plot_ler.py path_to_trained_model
+python plot_ler.py --model_path path_to_trained_model
 ```
-#### Plot loss in training
-```
-cd visualization
-python plot_loss.py path_to_trained_model
-```
+
 #### CTC
 ##### Plot CTC posteriors
 ```
 cd visualization
-python plot_(multitask_)ctc_posteriors.py path_to_trained_model
+python plot_(multitask_)ctc_posteriors.py --model_path path_to_trained_model (--epoch epoch_num)
 ```
 ##### Decoding
 ```
 cd visualization
-python decode_(multitask_)ctc.py path_to_trained_model
+python decode_(multitask_)ctc.py --model_path path_to_trained_model (--epoch epoch_num)
 ```
 #### Attention
 ##### Plot attention weights
 ```
 cd visualization
-python plot_attention_weights.py path_to_trained_model
+python plot_attention_weights.py --model_path path_to_trained_model (--epoch epoch_num)
 ```
 ##### Decoding
 ```
 cd visualization
-python decode_attention.py path_to_trained_model
+python decode_attention.py --model_path path_to_trained_model (--epoch epoch_num)
 ```
 #### Joint CTC-Attention
 comming soon

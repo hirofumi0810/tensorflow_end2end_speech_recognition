@@ -9,7 +9,8 @@ from __future__ import print_function
 
 import math
 import tensorflow as tf
-from models.encoders.core.vgg_blstm import _conv_layer, _max_pool
+
+from models.encoders.core.cnn_util import conv_layer, max_pool
 
 
 class VGG_LSTM_Encoder(object):
@@ -90,75 +91,58 @@ class VGG_LSTM_Encoder(object):
         batch_size = tf.shape(inputs)[0]
         max_time = tf.shape(inputs)[1]
 
-        # Reshape to 4D tensor `[batch_size, max_time, input_size, splice]`
-        inputs = tf.reshape(
-            inputs, shape=[batch_size,
-                           max_time,
-                           self.input_size,
-                           self.splice])
-
-        # Reshape to 5D tensor
-        # `[batch_size, max_time, input_size / 3, 3 (+Δ, ΔΔ), splice]`
-        inputs = tf.reshape(
-            inputs, shape=[batch_size,
-                           max_time,
-                           int(self.input_size / 3), 3, self.splice])
-
         # Reshape to 4D tensor
-        # `[batch_size * max_time, input_size / 3, splice, 3]`
-        inputs = tf.transpose(inputs, (0, 1, 2, 4, 3))
+        # `[batch_size * max_time, input_size / 3, splice, 3(+Δ, ΔΔ)]`
         inputs = tf.reshape(
-            inputs, shape=[batch_size * max_time,
-                           int(self.input_size / 3),
-                           self.splice, 3])
+            inputs,
+            shape=[batch_size * max_time, int(self.input_size / 3), self.splice, 3])
 
         with tf.variable_scope('VGG1'):
-            inputs = _conv_layer(inputs,
-                                 filter_shape=[3, 3, 3, 64],
-                                 parameter_init=self.parameter_init,
-                                 name='conv1')
-            inputs = _conv_layer(inputs,
-                                 filter_shape=[3, 3, 64, 64],
-                                 parameter_init=self.parameter_init,
-                                 name='conv2')
-            inputs = _max_pool(inputs, name='pool')
-            # TODO: try batch normalization
+            inputs = conv_layer(inputs,
+                                filter_shape=[3, 3, 3, 64],
+                                parameter_init=self.parameter_init,
+                                name='conv1')
+            inputs = conv_layer(inputs,
+                                filter_shape=[3, 3, 64, 64],
+                                parameter_init=self.parameter_init,
+                                name='conv2')
+            inputs = max_pool(inputs, name='max_pool')
+            # TODO(hirofumi): try batch normalization
 
         with tf.variable_scope('VGG2'):
-            inputs = _conv_layer(inputs,
-                                 filter_shape=[3, 3, 64, 128],
-                                 parameter_init=self.parameter_init,
-                                 name='conv1')
-            inputs = _conv_layer(inputs,
-                                 filter_shape=[3, 3, 128, 128],
-                                 parameter_init=self.parameter_init,
-                                 name='conv2')
-            inputs = _max_pool(inputs, name='pool')
-            # TODO: try batch normalization
+            inputs = conv_layer(inputs,
+                                filter_shape=[3, 3, 64, 128],
+                                parameter_init=self.parameter_init,
+                                name='conv1')
+            inputs = conv_layer(inputs,
+                                filter_shape=[3, 3, 128, 128],
+                                parameter_init=self.parameter_init,
+                                name='conv2')
+            inputs = max_pool(inputs, name='max_pool')
+            # TODO(hirofumi): try batch normalization
 
-        # Reshape to 5D tensor `[batch_size, max_time, new_h, new_w, 128]`
+        # Reshape to 2D tensor `[batch_size * max_time, new_h * new_w * 128]`
         new_h = math.ceil(self.input_size / 3 / 4)  # expected to be 11 ro 10
         new_w = math.ceil(self.splice / 4)  # expected to be 3
         inputs = tf.reshape(
-            inputs, shape=[batch_size, max_time, new_h, new_w, 128])
-
-        # Reshape to 3D tensor `[batch_size, max_time, new_h * new_w * 128]`
-        inputs = tf.reshape(
-            inputs, shape=[batch_size, max_time, new_h * new_w * 128])
+            inputs, shape=[batch_size * max_time, new_h * new_w * 128])
 
         # Insert linear layer to recude CNN's output demention
-        # from new_h * new_w * 128 to 256
+        # from (new_h * new_w * 128) to 256
         with tf.variable_scope('linear') as scope:
             inputs = tf.contrib.layers.fully_connected(
                 inputs=inputs,
                 num_outputs=256,
-                activation_fn=None,
+                activation_fn=tf.nn.relu,
                 scope=scope)
 
         # Dropout for the VGG-output-hidden connection
-        outputs = tf.nn.dropout(inputs,
-                                keep_prob_input,
-                                name='dropout_input')
+        inputs = tf.nn.dropout(inputs,
+                               keep_prob_input,
+                               name='dropout_input')
+
+        # Reshape back to 3D tensor `[batch_size, max_time, 256]`
+        inputs = tf.reshape(inputs, shape=[batch_size, max_time, 256])
 
         initializer = tf.random_uniform_initializer(
             minval=-self.parameter_init,

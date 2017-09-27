@@ -179,19 +179,20 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
                 for i_batch in range(batch_size_device):
 
                     # Map words to unique characters
-                    seq_pred = ''.join([chr(word_index) for word_index in labels_pred[i_batch]])
-                    seq_true = ''.join([chr(word_index)
-                                        for word_index in labels_true[i_device][i_batch]])
+                    seq_pred = ''.join([chr(word_idx) for word_idx in labels_pred[i_batch]])
+                    seq_true = ''.join([chr(word_idx)
+                                        for word_idx in labels_true[i_device][i_batch]])
                     # NOTE: Levenshtein packages only accepts strings)
 
                     # Compute WER
-                    wer_mean = lev.distance(seq_pred, seq_true)
+                    wer_mean += lev.distance(seq_pred, seq_true)
                     wer_mean /= len(labels_true[i_device][i_batch])
 
                     if progressbar:
                         pbar.update(1)
 
             except IndexError:
+                print('skipped')
                 skip_data_num += batch_size_device
                 # TODO: Conduct decoding again with batch size 1
 

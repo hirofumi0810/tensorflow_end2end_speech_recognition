@@ -14,13 +14,13 @@ def wav2feature(wav_paths, feature_type='logfbank', feature_dim=40,
                 energy=True, delta1=True, delta2=True):
     """Read wav file & convert to MFCC or log mel filterbank features.
     Args:
-        wav_paths: list of the path to a wav file
-        batch_size: int, the batch size
-        feature_type: logfbank or fbank or mfcc
-        feature_dim: int, the demension of each feature
-        energy: if True, add energy
-        delta1: if True, add delta features
-        delta2: if True, add delta delta features
+        wav_paths (list): paths to a wav file
+        batch_size (int, optional): the batch size
+        feature_type (string, optional): logfbank or fbank or mfcc
+        feature_dim (int, optional): the demension of each feature
+        energy (bool, optional): if True, add energy
+        delta1 (bool, optional): if True, add delta features
+        delta2 (bool, optional): if True, add delta delta features
     Returns:
         inputs: A tensor of size `[B, T, input_size]`
         inputs_seq_len: A tensor of size `[B]`

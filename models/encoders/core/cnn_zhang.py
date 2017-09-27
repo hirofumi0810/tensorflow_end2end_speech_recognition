@@ -13,7 +13,7 @@ import tensorflow as tf
 
 class CNN_Encoder(object):
     """CNN encoder.
-       This implementaion is based on
+       This implementation is based on
            https://arxiv.org/abs/1701.02720.
                Zhang, Ying, et al.
                "Towards end-to-end speech recognition with deep convolutional
@@ -65,29 +65,28 @@ class CNN_Encoder(object):
         max_time = tf.shape(inputs)[1]
 
         # Reshape to 4D tensor `[batch_size, max_time, input_size, splice]`
-        inputs = tf.reshape(
-            inputs, shape=[batch_size,
-                           max_time,
-                           self.input_size,
-                           self.splice])
+        # inputs = tf.reshape(
+        #     inputs,
+        #     shape=[batch_size,
+        #                    max_time,
+        #                    self.input_size,
+        #                    self.splice])
 
         # Reshape to 5D tensor
         # `[batch_size, max_time, input_size / 3, 3 (+Δ,ΔΔ), splice]`
-        inputs = tf.reshape(
-            inputs, shape=[batch_size,
-                           max_time,
-                           int(self.input_size / 3),
-                           3,
-                           self.splice])
+        # inputs = tf.reshape(
+        #     inputs, shape=[batch_size,
+        #                    max_time,
+        #                    int(self.input_size / 3),
+        #                    3,
+        #                    self.splice])
 
         # Reshape to 4D tensor
         # `[batch_size * max_time, input_size / 3, splice, 3]`
-        inputs = tf.transpose(inputs, (0, 1, 2, 4, 3))
+        # inputs = tf.transpose(inputs, (0, 1, 2, 4, 3))
         inputs = tf.reshape(
-            inputs, shape=[batch_size * max_time,
-                           int(self.input_size / 3),
-                           self.splice,
-                           3])
+            inputs,
+            shape=[batch_size * max_time, int(self.input_size / 3), self.splice, 3])
 
         # Choose the activation function
         activation = 'relu'
@@ -138,12 +137,12 @@ class CNN_Encoder(object):
         # Reshape to 5D tensor `[batch_size, max_time, new_h, new_w, 256]`
         new_h = math.ceil(self.input_size / 3 / 3)  # expected to be 14
         new_w = self.splice  # expected to be 11
-        outputs = tf.reshape(
-            outputs, shape=[batch_size, max_time, new_h, new_w, 256])
+        # outputs = tf.reshape(
+        #     outputs, shape=[batch_size, max_time, new_h, new_w, 256])
 
         # Reshape to 3D tensor `[batch_size, max_time, new_h * new_w * 256]`
-        outputs = tf.reshape(
-            outputs, shape=[batch_size, max_time, new_h * new_w * 256])
+        # outputs = tf.reshape(
+        #     outputs, shape=[batch_size, max_time, new_h * new_w * 256])
 
         # Reshape to 2D tensor `[batch_size * max_time, new_h * new_w * 256]`
         outputs = tf.reshape(
@@ -174,7 +173,7 @@ class CNN_Encoder(object):
 
         return logits, None
 
-    def _max_pool(self, bottom, name):
+    def _max_pool(self, bottom, name='max_pool'):
         """A max pooling layer.
         Args:
             bottom: A tensor of size `[B * T, H, W, C]`
