@@ -196,7 +196,7 @@ def do_train(model, params):
                     summary_writer.flush()
 
                     duration_step = time.time() - start_time_step
-                    print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / cer = %.4f (%.4f) / per = % .4f (%.4f) / lr = %.5f (%.3f min)" %
+                    print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / cer = %.3f (%.3f) / per = % .3f (%.3f) / lr = %.5f (%.3f min)" %
                           (step + 1, train_data.epoch_detail, loss_train, loss_dev, cer_train, cer_dev,
                            per_train, per_dev, learning_rate, duration_step / 60))
                     sys.stdout.flush()
@@ -332,6 +332,9 @@ def main(config_path, model_save_path):
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 
+    # Set process name
+    setproctitle('timit_' + model.name + '_' + params['label_type'])
+
     model.name += '_' + str(params['num_units'])
     model.name += '_main' + str(params['num_layers_main'])
     model.name += '_sub' + str(params['num_layers_sub'])
@@ -371,9 +374,6 @@ def main(config_path, model_save_path):
         else:
             break
     model.save_path = mkdir(new_model_path)
-
-    # Set process name
-    setproctitle('timit_multitask_ctc')
 
     # Save config file
     shutil.copyfile(config_path, join(model.save_path, 'config.yml'))

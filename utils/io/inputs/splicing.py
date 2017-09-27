@@ -9,13 +9,13 @@ import numpy as np
 def do_splice(inputs, splice=1, batch_size=1):
     """Splice input data. This is expected to be used for DNNs or RNNs.
     Args:
-        inputs: list of size `[B, T, input_size]'
-        splice: int, frames to splice. Default is 1 frame.
+        inputs (np.ndarray): list of size `[B, T, input_size]'
+        splice (int): frames to splice. Default is 1 frame.
             ex.) splice == 11
                 [t-5, ..., t-1, t, t+1, ..., t+5] (total 11 frames)
         batch_size: int,
     Returns:
-        data_spliced: np.ndarray of size
+        data_spliced (np.ndarray): A tensor of size
             `[B, T, input_size * splice]`
     """
     assert isinstance(inputs, np.ndarray), 'inputs should be np.ndarray.'

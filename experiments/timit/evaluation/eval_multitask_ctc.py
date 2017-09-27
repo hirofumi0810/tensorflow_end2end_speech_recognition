@@ -19,8 +19,8 @@ from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from models.ctc.multitask_ctc import Multitask_CTC
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', type=int, default=-
-                    1, help='the epoch to restore')
+parser.add_argument('--epoch', type=int, default=-1,
+                    help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
 

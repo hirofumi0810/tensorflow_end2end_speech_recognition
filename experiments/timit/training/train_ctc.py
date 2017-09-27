@@ -185,7 +185,7 @@ def do_train(model, params):
                     summary_writer.flush()
 
                     duration_step = time.time() - start_time_step
-                    print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / ler = %.4f (%.4f) / lr = %.5f (%.3f min)" %
+                    print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / ler = %.3f (%.3f) / lr = %.5f (%.3f min)" %
                           (step + 1, train_data.epoch_detail, loss_train, loss_dev, ler_train, ler_dev,
                            learning_rate, duration_step / 60))
                     sys.stdout.flush()
@@ -328,6 +328,9 @@ def main(config_path, model_save_path):
                 num_proj=params['num_proj'],
                 weight_decay=params['weight_decay'])
 
+    # Set process name
+    setproctitle('timit_' + model.name + '_' + params['label_type'])
+
     model.name += '_' + str(params['num_units'])
     model.name += '_' + str(params['num_layers'])
     model.name += '_' + params['optimizer']
@@ -362,9 +365,6 @@ def main(config_path, model_save_path):
         else:
             break
     model.save_path = mkdir(new_model_path)
-
-    # Set process name
-    setproctitle('timit_ctc_' + params['label_type'])
 
     # Save config file
     shutil.copyfile(config_path, join(model.save_path, 'config.yml'))

@@ -19,7 +19,8 @@ from experiments.timit.visualization.core.plot.attention import attention_test
 from models.attention import blstm_attention_seq2seq
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', type=int, default=-1, help='the epoch to restore')
+parser.add_argument('--epoch', type=int, default=-1,
+                    help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
 

@@ -7,7 +7,7 @@ from __future__ import print_function
 
 from os.path import basename
 import numpy as np
-from experiments.utils.progressbar import wrap_iterator
+from utils.progressbar import wrap_iterator
 
 
 def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
@@ -18,17 +18,17 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
            "Fast and accurate recurrent neural network acoustic models for speech recognition."
            arXiv preprint arXiv:1507.06947 (2015).
     Args:
-        input_list: list of input data
-        input_paths: list of paths to input data. This is used to get the
+        input_list (list): list of input data
+        input_paths (list): paths to input data. This is used to get the
             number of frames from frame_num_dict.
-        frame_num_dict:
-            key => utterance index
-            value => the number of frames
-        num_stack: int, the number of frames to stack
-        num_skip: int, the number of frames to skip
-        progressbar: if True, visualize progressbar
+        frame_num_dict (dict):
+            key (string) => utterance index
+            value (int) => the number of frames
+        num_stack (int): the number of frames to stack
+        num_skip (int): the number of frames to skip
+        progressbar (bool, optional): if True, visualize progressbar
     Returns:
-        stacked_input_list: list of frame-stacked inputs
+        stacked_input_list (list): list of frame-stacked inputs
     """
     if num_stack == 1 and num_stack == 1:
         return input_list
