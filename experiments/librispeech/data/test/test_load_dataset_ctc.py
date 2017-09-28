@@ -75,7 +75,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
             batch_size=64, max_epoch=1, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
             shuffle=shuffle, sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
-            progressbar=True, num_gpu=num_gpu, is_gpu=True)
+            progressbar=True, num_gpu=num_gpu)
 
         print('=> Loading mini-batch...')
         if label_type == 'character':

@@ -71,20 +71,27 @@ class Dataset(DatasetBase):
         self.num_gpu = num_gpu
         self.padded_value = -1
 
-        if is_gpu:
-            # GPU server
-            root = '/data/inaguma/librispeech'
-        else:
-            # CPU server
-            root = '/n/sd8/inaguma/corpus/librispeech/dataset'
+        # paths where datasets exist
+        dataset_root = ['/data/inaguma/librispeech',
+                        '/n/sd8/inaguma/corpus/librispeech/dataset']
 
-        input_path = join(root, 'inputs', train_data_size, data_type)
-        label_path = join(root, 'labels/ctc', label_type,
+        input_path = join(dataset_root[0], 'inputs', train_data_size,
+                          data_type)
+        label_path = join(dataset_root[0], 'labels/ctc', label_type,
                           train_data_size, data_type)
 
         # Load the frame number dictionary
-        with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
-            self.frame_num_dict = pickle.load(f)
+        if isfile(join(input_path, 'frame_num.pickle')):
+            with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
+                self.frame_num_dict = pickle.load(f)
+        else:
+            dataset_root.pop(0)
+            input_path = join(dataset_root[0], 'inputs', train_data_size,
+                              data_type)
+            label_path = join(dataset_root[0], 'labels/ctc', label_type,
+                              train_data_size, data_type)
+            with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
+                self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label
         axis = 1 if sort_utt else 0

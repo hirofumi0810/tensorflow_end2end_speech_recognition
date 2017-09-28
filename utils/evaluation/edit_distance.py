@@ -7,6 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow as tf
 import Levenshtein as lev
 
@@ -46,29 +47,211 @@ def compute_cer(str_pred, str_true, normalize=True):
     return cer
 
 
-def compute_wer(str_pred, str_true, space_mark=' ', normalize=True):
+def compute_wer(ref, hyp, normalize=True):
     """Compute Word Error Rate.
+        [Reference]
+            https://martin-thoma.com/word-error-rate-calculation/
     Args:
-        str_pred (string): a space separated sentence
-        str_true (string): a space separated sentence
-        normalize (bool, optional): if True, divide by the length of str_true
-        space_mark (string): a string to represent the space
+        ref (list): words in the reference transcript
+        hyp (list): words in the predicted transcript
+        normalize (bool, optional): if True, divide by the length of ref
     Returns:
-        wer (float): word error rate between str_pred and str_true
+        wer (float): Word Error Rate between ref and hyp
     """
-    words_pred = str_pred.split(space_mark)
-    words_true = str_true.split(space_mark)
+    # Initialisation
+    d = np.zeros((len(ref) + 1) * (len(hyp) + 1), dtype=np.uint16)
+    d = d.reshape((len(ref) + 1, len(hyp) + 1))
+    for i in range(len(ref) + 1):
+        for j in range(len(hyp) + 1):
+            if i == 0:
+                d[0][j] = j
+            elif j == 0:
+                d[i][0] = i
 
-    # Prepare mapping from word to index
-    vocab_tmp = set(words_pred + words_true)
-    word2idx = dict(zip(vocab_tmp, range(len(vocab_tmp))))
+    # Computation
+    for i in range(1, len(ref) + 1):
+        for j in range(1, len(hyp) + 1):
+            if ref[i - 1] == hyp[j - 1]:
+                d[i][j] = d[i - 1][j - 1]
+            else:
+                substitution = d[i - 1][j - 1] + 1
+                insertion = d[i][j - 1] + 1
+                deletion = d[i - 1][j] + 1
+                d[i][j] = min(substitution, insertion, deletion)
 
-    # Map words to unique characters
-    seq_pred = ''.join([chr(word2idx[word]) for word in words_pred])
-    seq_true = ''.join([chr(word2idx[word]) for word in words_true])
-    # NOTE: Levenshtein packages only accepts strings)
-
-    wer = lev.distance(seq_pred, seq_true)
+    wer = d[len(ref)][len(hyp)]
     if normalize:
-        wer /= len(words_true)
+        wer /= len(ref)
     return wer
+
+
+def wer_align(ref, hyp):
+    """Compute Word Error Rate.
+        [Reference]
+            https://github.com/zszyellow/WER-in-python
+    Args:
+        ref (list): words in the reference transcript
+        hyp (list): words in the predicted transcript
+    Returns:
+        substitute (int):
+        insert (int):
+        delete (int):
+    """
+    # Build the matrix
+    d = np.zeros((len(ref) + 1) * (len(hyp) + 1),
+                 dtype=np.uint8).reshape((len(ref) + 1, len(hyp) + 1))
+    for i in range(len(ref) + 1):
+        for j in range(len(hyp) + 1):
+            if i == 0:
+                d[0][j] = j
+            elif j == 0:
+                d[i][0] = i
+    for i in range(1, len(ref) + 1):
+        for j in range(1, len(hyp) + 1):
+            if ref[i - 1] == hyp[j - 1]:
+                d[i][j] = d[i - 1][j - 1]
+            else:
+                substitute = d[i - 1][j - 1] + 1
+                insert = d[i][j - 1] + 1
+                delete = d[i - 1][j] + 1
+                d[i][j] = min(substitute, insert, delete)
+    result = float(d[len(ref)][len(hyp)]) / len(ref) * 100
+    result = str("%.2f" % result) + "%"
+
+    # Find out the manipulation steps
+    x = len(ref)
+    y = len(hyp)
+    error_list = []
+    while True:
+        if x == 0 and y == 0:
+            break
+        else:
+            if d[x][y] == d[x - 1][y - 1] and ref[x - 1] == hyp[y - 1]:
+                error_list.append("e")
+                x = x - 1
+                y = y - 1
+            elif d[x][y] == d[x][y - 1] + 1:
+                error_list.append("i")
+                x = x
+                y = y - 1
+            elif d[x][y] == d[x - 1][y - 1] + 1:
+                error_list.append("s")
+                x = x - 1
+                y = y - 1
+            else:
+                error_list.append("d")
+                x = x - 1
+                y = y
+    error_list = error_list[::-1]
+
+    # Print the result in aligned way
+    print("REF: ", end='')
+    for i in range(len(error_list)):
+        if error_list[i] == "i":
+            count = 0
+            for j in range(i):
+                if error_list[j] == "d":
+                    count += 1
+            index = i - count
+            print(" " * (len(hyp[index])), end=' ')
+        elif error_list[i] == "s":
+            count1 = 0
+            for j in range(i):
+                if error_list[j] == "i":
+                    count1 += 1
+            index1 = i - count1
+            count2 = 0
+            for j in range(i):
+                if error_list[j] == "d":
+                    count2 += 1
+            index2 = i - count2
+            if len(ref[index1]) < len(hyp[index2]):
+                print(ref[index1] + " " * (len(hyp[index2]) - len(ref[index1])), end=' ')
+            else:
+                print(ref[index1], end=' ')
+        else:
+            count = 0
+            for j in range(i):
+                if error_list[j] == "i":
+                    count += 1
+            index = i - count
+            print(ref[index], end=' ')
+
+    print("\nHYP: ", end='')
+    for i in range(len(error_list)):
+        if error_list[i] == "d":
+            count = 0
+            for j in range(i):
+                if error_list[j] == "i":
+                    count += 1
+            index = i - count
+            print(" " * (len(ref[index])), end=' ')
+        elif error_list[i] == "s":
+            count1 = 0
+            for j in range(i):
+                if error_list[j] == "i":
+                    count1 += 1
+            index1 = i - count1
+            count2 = 0
+            for j in range(i):
+                if error_list[j] == "d":
+                    count2 += 1
+            index2 = i - count2
+            if len(ref[index1]) > len(hyp[index2]):
+                print(hyp[index2] + " " * (len(ref[index1]) - len(hyp[index2])), end=' ')
+            else:
+                print(hyp[index2], end=' ')
+        else:
+            count = 0
+            for j in range(i):
+                if error_list[j] == "d":
+                    count += 1
+            index = i - count
+            print(hyp[index], end=' ')
+
+    print("\nEVA: ", end='')
+    for i in range(len(error_list)):
+        if error_list[i] == "d":
+            count = 0
+            for j in range(i):
+                if error_list[j] == "i":
+                    count += 1
+            index = i - count
+            print("D" + " " * (len(ref[index]) - 1), end=' ')
+        elif error_list[i] == "i":
+            count = 0
+            for j in range(i):
+                if error_list[j] == "d":
+                    count += 1
+            index = i - count
+            print("I" + " " * (len(hyp[index]) - 1), end=' ')
+        elif error_list[i] == "s":
+            count1 = 0
+            for j in range(i):
+                if error_list[j] == "i":
+                    count1 += 1
+            index1 = i - count1
+            count2 = 0
+            for j in range(i):
+                if error_list[j] == "d":
+                    count2 += 1
+            index2 = i - count2
+            if len(ref[index1]) > len(hyp[index2]):
+                print("S" + " " * (len(ref[index1]) - 1), end=' ')
+            else:
+                print("S" + " " * (len(hyp[index2]) - 1), end=' ')
+        else:
+            count = 0
+            for j in range(i):
+                if error_list[j] == "i":
+                    count += 1
+            index = i - count
+            print(" " * (len(ref[index])), end=' ')
+
+    print("\nWER: " + result)
+
+    substitute = error_list.count('s')
+    insert = error_list.count('i')
+    delete = error_list.count('d')
+
+    return substitute, insert, delete
