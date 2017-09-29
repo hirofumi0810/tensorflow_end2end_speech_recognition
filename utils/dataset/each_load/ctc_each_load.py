@@ -37,7 +37,7 @@ class DatasetBase(Base):
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size `[num_gpu, B, T, input_dim]`
                 labels: list of target labels of size `[num_gpu, B, T]`
-                inputs_seq_len: list of length of inputs of size `[num_gpu, B]`
+                # inputs_seq_len: list of length of inputs of size `[num_gpu, B]`
                 input_names: list of file name of input data of size `[num_gpu, B]`
             is_new_epoch (bool): If true, 1 epoch is finished
         """
@@ -136,7 +136,7 @@ class DatasetBase(Base):
             dtype=np.float32)
         labels = np.array([[self.padded_value] * max_seq_len]
                           * len(data_indices))
-        inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
+        # inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
         input_names = list(
             map(lambda path: basename(path).split('.')[0],
                 np.take(self.input_paths, data_indices, axis=0)))
@@ -158,7 +158,7 @@ class DatasetBase(Base):
             else:
                 labels[i_batch, :len(label_list[i_batch])
                        ] = label_list[i_batch]
-            inputs_seq_len[i_batch] = frame_num
+            # inputs_seq_len[i_batch] = frame_num
 
         ###############
         # Multi-GPUs
@@ -167,14 +167,16 @@ class DatasetBase(Base):
             # Now we split the mini-batch data by num_gpu
             inputs = np.array_split(inputs, self.num_gpu, axis=0)
             labels = np.array_split(labels, self.num_gpu, axis=0)
-            inputs_seq_len = np.array_split(
-                inputs_seq_len, self.num_gpu, axis=0)
+            # inputs_seq_len = np.array_split(
+            #     inputs_seq_len, self.num_gpu, axis=0)
             input_names = np.array_split(input_names, self.num_gpu, axis=0)
         else:
             inputs = inputs[np.newaxis, :, :, :]
             labels = labels[np.newaxis, :, :]
-            inputs_seq_len = inputs_seq_len[np.newaxis, :]
+            # inputs_seq_len = inputs_seq_len[np.newaxis, :]
             input_names = np.array(input_names)[np.newaxis, :]
 
         self.iteration += len(data_indices)
-        return (inputs, labels, inputs_seq_len, input_names), self.is_new_epoch
+
+        # return (inputs, labels, inputs_seq_len, input_names), self.is_new_epoch
+        return (inputs, labels, input_names), self.is_new_epoch

@@ -31,7 +31,7 @@ class DatasetBase(Base):
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size `[B, T, input_dim]`
                 labels: list of target labels of size `[B, T]`
-                inputs_seq_len: list of length of inputs of size `[B]`
+                # inputs_seq_len: list of length of inputs of size `[B]`
                 input_names: list of file name of input data of size `[B]`
             is_new_epoch (bool): If true, 1 epoch is finished
         """
@@ -106,7 +106,7 @@ class DatasetBase(Base):
         labels = np.array(
             [[self.padded_value] * max_seq_len] * len(data_indices),
             dtype=np.int32)
-        inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
+        # inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
         input_names = np.array(list(
             map(lambda path: basename(path).split('.')[0],
                 np.take(self.input_paths, data_indices, axis=0))))
@@ -124,7 +124,9 @@ class DatasetBase(Base):
 
             inputs[i_batch, :frame_num, :] = data_i
             labels[i_batch, :len(self.label_list[x])] = self.label_list[x]
-            inputs_seq_len[i_batch] = frame_num
+            # inputs_seq_len[i_batch] = frame_num
 
         self.iteration += len(data_indices)
-        return (inputs, labels, inputs_seq_len, input_names), self.is_new_epoch
+
+        # return (inputs, labels, inputs_seq_len, input_names), self.is_new_epoch
+        return (inputs, labels, input_names), self.is_new_epoch
