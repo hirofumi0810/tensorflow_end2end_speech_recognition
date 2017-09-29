@@ -141,6 +141,8 @@ def main():
         num_classes_main=params['num_classes_main'],
         num_classes_sub=params['num_classes_sub'],
         main_task_weight=params['main_task_weight'],
+        lstm_impl=params['lstm_impl'],
+        use_peephole=params['use_peephole'],
         parameter_init=params['weight_init'],
         clip_grad=params['clip_grad'],
         clip_activation=params['clip_activation'],

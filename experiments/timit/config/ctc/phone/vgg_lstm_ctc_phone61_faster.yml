@@ -7,6 +7,8 @@ param:
   splice: 11
   num_stack: 1
   num_skip: 1
+  lstm_impl: LSTMBlockCell
+  use_peephole: True
   num_units: 256
   num_proj: 0
   num_layers: 5

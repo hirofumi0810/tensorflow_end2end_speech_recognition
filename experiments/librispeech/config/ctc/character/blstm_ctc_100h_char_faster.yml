@@ -8,6 +8,8 @@ param:
   splice: 1
   num_stack: 3
   num_skip: 3
+  lstm_impl: LSTMBlockCell
+  use_peephole: True
   num_units: 320
   num_proj: 0
   num_layers: 5
@@ -15,9 +17,9 @@ param:
   batch_size: 32
   optimizer: adam
   learning_rate: 1e-3
-  decay_start_epoch: 1
-  decay_rate: 0.75
-  decay_patient_epoch: 1
+  decay_start_epoch: 5
+  decay_rate: 0.1
+  decay_patient_epoch: 3
   num_epoch: 30
   weight_init: 0.1
   clip_grad: 5.0
@@ -25,6 +27,6 @@ param:
   dropout_input: 1.0
   dropout_hidden: 0.8
   dropout_output: 1.0
-  weight_decay: 0
+  weight_decay: 1e-8
   eval_start_epoch: 1
-  print_step: 50
+  print_step: 100
