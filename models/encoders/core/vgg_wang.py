@@ -63,12 +63,11 @@ class VGG_Encoder(object):
             None, 0] else None
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len,
+    def __call__(self, inputs,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
-            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -93,14 +92,17 @@ class VGG_Encoder(object):
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 3, 96],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv1')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 96, 96],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv2')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 96, 96],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv3')
             inputs = max_pool(inputs, name='max_pool')
             # TODO(hirofumi): try batch normalization
@@ -109,18 +111,22 @@ class VGG_Encoder(object):
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 96, 192],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv1')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 192, 192],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv2')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 192, 192],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv3')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 192, 192],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv4')
             inputs = max_pool(inputs, name='max_pool')
             # TODO(hirofumi): try batch normalization
@@ -129,18 +135,22 @@ class VGG_Encoder(object):
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 192, 384],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv1')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 384, 384],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv2')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 384, 384],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv3')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 384, 384],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv4')
             inputs = max_pool(inputs, name='max_pool')
             # TODO(hirofumi): try batch normalization

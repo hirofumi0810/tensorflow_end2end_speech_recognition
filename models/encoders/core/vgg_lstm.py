@@ -11,6 +11,7 @@ import math
 import tensorflow as tf
 
 from models.encoders.core.cnn_util import conv_layer, max_pool
+from models.encoders.core.rnn_util import sequence_length
 
 
 class VGG_LSTM_Encoder(object):
@@ -71,12 +72,11 @@ class VGG_LSTM_Encoder(object):
 
         self.return_hidden_states = True if num_classes == 0 else False
 
-    def __call__(self, inputs, inputs_seq_len,
+    def __call__(self, inputs,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
-            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -87,12 +87,13 @@ class VGG_LSTM_Encoder(object):
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder
         """
-        # inputs: 3D tensor `[batch_size, max_time, input_size * splice]`
+        # inputs: `[B, T, input_size * splice]`
         batch_size = tf.shape(inputs)[0]
         max_time = tf.shape(inputs)[1]
+        inputs_seq_len = sequence_length(
+            inputs, time_major=False, dtype=tf.int64)
 
-        # Reshape to 4D tensor
-        # `[batch_size * max_time, input_size / 3, splice, 3(+Δ, ΔΔ)]`
+        # Reshape to 4D tensor `[B * T, input_size / 3, splice, 3(+Δ, ΔΔ)]`
         inputs = tf.reshape(
             inputs,
             shape=[batch_size * max_time, int(self.input_size / 3), self.splice, 3])
@@ -101,10 +102,12 @@ class VGG_LSTM_Encoder(object):
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 3, 64],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv1')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 64, 64],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv2')
             inputs = max_pool(inputs, name='max_pool')
             # TODO(hirofumi): try batch normalization
@@ -113,15 +116,17 @@ class VGG_LSTM_Encoder(object):
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 64, 128],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv1')
             inputs = conv_layer(inputs,
                                 filter_shape=[3, 3, 128, 128],
                                 parameter_init=self.parameter_init,
+                                relu=True,
                                 name='conv2')
             inputs = max_pool(inputs, name='max_pool')
             # TODO(hirofumi): try batch normalization
 
-        # Reshape to 2D tensor `[batch_size * max_time, new_h * new_w * 128]`
+        # Reshape to 2D tensor `[B * T, new_h * new_w * 128]`
         new_h = math.ceil(self.input_size / 3 / 4)  # expected to be 11 ro 10
         new_w = math.ceil(self.splice / 4)  # expected to be 3
         inputs = tf.reshape(
@@ -141,7 +146,7 @@ class VGG_LSTM_Encoder(object):
                                keep_prob_input,
                                name='dropout_input')
 
-        # Reshape back to 3D tensor `[batch_size, max_time, 256]`
+        # Reshape back to 3D tensor `[B, T, 256]`
         inputs = tf.reshape(inputs, shape=[batch_size, max_time, 256])
 
         initializer = tf.random_uniform_initializer(
@@ -181,19 +186,14 @@ class VGG_LSTM_Encoder(object):
                 elif self.lstm_impl == 'LSTMBlockFusedCell':
                     raise NotImplementedError
 
-                    # NOTE: This should be faster than
-                    tf.contrib.rnn.LSTMBlockFusedCell
-                    lstm = tf.contrib.rnn.LSTMBlockFusedCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        # clip_cell=True,
-                        use_peephole=self.use_peephole)
-                    # TODO: cell clipping (update for rc1.3)
+                elif self.lstm_impl == 'CudnnLSTM':
+                    raise NotImplementedError
 
                 else:
                     raise IndexError(
                         'lstm_impl is "BasicLSTMCell" or "LSTMCell" or ' +
-                        '"LSTMBlockCell" or "LSTMBlockFusedCell".')
+                        '"LSTMBlockCell" or "LSTMBlockFusedCell" or ' +
+                        '"CudnnLSTM".')
 
                 # Dropout for the hidden-hidden connections
                 lstm = tf.contrib.rnn.DropoutWrapper(
@@ -228,7 +228,8 @@ class VGG_LSTM_Encoder(object):
                 outputs = tf.contrib.layers.fully_connected(
                     outputs, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
-                    weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                    weights_initializer=tf.truncated_normal_initializer(
+                        stddev=self.parameter_init),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
 
@@ -240,7 +241,8 @@ class VGG_LSTM_Encoder(object):
             logits_2d = tf.contrib.layers.fully_connected(
                 outputs, self.num_classes,
                 activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 
@@ -248,7 +250,7 @@ class VGG_LSTM_Encoder(object):
             logits = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to time-major: `[max_time, batch_size, num_classes]'
+            # Convert to time-major: `[T, B, num_classes]'
             logits = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections

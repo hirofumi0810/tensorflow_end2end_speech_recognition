@@ -22,12 +22,16 @@ class MultitaskCTCBase(CTCBase):
             sub task (except for a blank label)
         main_task_weight (float): the weight of loss of the main task.
             Set between 0 to 1.
+        lstm_impl (string, optional):
+            BasicLSTMCell or LSTMCell or LSTMBlockCell or
+                LSTMBlockFusedCell or CudnnLSTM.
+            Choose the background implementation of tensorflow.
         clip_grad (float): range of gradient clipping (> 0)
         weight_decay (float): a parameter for weight decay
     """
 
     def __init__(self, input_size, splice, num_classes_main, num_classes_sub,
-                 main_task_weight, clip_grad, weight_decay):
+                 main_task_weight, lstm_impl, clip_grad, weight_decay):
 
         super(MultitaskCTCBase, self).__init__(input_size, splice,
                                                num_classes_main,
@@ -42,12 +46,11 @@ class MultitaskCTCBase(CTCBase):
         # Placeholder for multi-task
         self.labels_sub_pl_list = []
 
-    def __call__(self, inputs, inputs_seq_len,
+    def __call__(self, inputs,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
-            inputs_seq_len: A tensor of size `[B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -59,8 +62,7 @@ class MultitaskCTCBase(CTCBase):
             logits_sub: A tensor of size `[T, B, num_classes]`
         """
         logits_main, logits_sub, final_state, final_state_sub = self.encoder(
-            inputs, inputs_seq_len, keep_prob_input,
-            keep_prob_hidden, keep_prob_output)
+            inputs, keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         return logits_main, logits_sub
 
@@ -77,8 +79,6 @@ class MultitaskCTCBase(CTCBase):
             tf.SparseTensor(tf.placeholder(tf.int64, name='indices_sub'),
                             tf.placeholder(tf.int32, name='values_sub'),
                             tf.placeholder(tf.int64, name='shape_sub')))
-        self.inputs_seq_len_pl_list.append(
-            tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
         self.keep_prob_input_pl_list.append(
             tf.placeholder(tf.float32, name='keep_prob_input'))
         self.keep_prob_hidden_pl_list.append(
@@ -86,7 +86,7 @@ class MultitaskCTCBase(CTCBase):
         self.keep_prob_output_pl_list.append(
             tf.placeholder(tf.float32, name='keep_prob_output'))
 
-    def compute_loss(self, inputs, labels_main, labels_sub, inputs_seq_len,
+    def compute_loss(self, inputs, labels_main, labels_sub,
                      keep_prob_input, keep_prob_hidden, keep_prob_output,
                      scope=None):
         """Operation for computing ctc loss.
@@ -94,7 +94,6 @@ class MultitaskCTCBase(CTCBase):
             inputs: A tensor of size `[B, T, input_size]`
             labels_main: A SparseTensor of target labels in the main task
             labels_sub: A SparseTensor of target labels in the sub task
-            inputs_seq_len: A tensor of size `[B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -109,8 +108,9 @@ class MultitaskCTCBase(CTCBase):
         """
         # Build model graph
         logits_main, logits_sub = self(
-            inputs, inputs_seq_len,
+            inputs,
             keep_prob_input, keep_prob_hidden, keep_prob_output)
+        inputs_seq_len = self.sequence_length(logits_main)
 
         # Weight decay
         if self.weight_decay > 0:
@@ -182,29 +182,30 @@ class MultitaskCTCBase(CTCBase):
 
         return total_loss, logits_main, logits_sub
 
-    def decoder(self, logits_main, logits_sub, inputs_seq_len, decode_type,
-                beam_width=None):
+    def decoder(self, logits_main, logits_sub, beam_width=1):
         """Operation for decoding.
         Args:
             logits_main: A tensor of size `[T, B, input_size]`
             logits_sub: A tensor of size `[T, B, input_size]`
-            inputs_seq_len: A tensor of size `[B]`
-            decode_type: greedy or beam_search
-            beam_width: beam width for beam search
+            beam_width (int, optional): beam width for beam search.
+                1 disables beam search, which mean greedy decoding.
         Return:
             decode_op_main: operation for decoding of the main task
             decode_op_sub: operation for decoding of the sub task
         """
-        if decode_type not in ['greedy', 'beam_search']:
-            raise ValueError('decode_type is "greedy" or "beam_search".')
+        assert isinstance(beam_width, int), "beam_width must be integer."
+        assert beam_width >= 1, "beam_width must be >= 1"
 
-        if decode_type == 'greedy':
+        inputs_seq_len = self.sequence_length(
+            logits_main, time_major=True, dtype=tf.int32)
+
+        if beam_width == 1:
             decoded_main, _ = tf.nn.ctc_greedy_decoder(
                 logits_main, tf.cast(inputs_seq_len, tf.int32))
             decoded_sub, _ = tf.nn.ctc_greedy_decoder(
                 logits_sub, tf.cast(inputs_seq_len, tf.int32))
 
-        elif decode_type == 'beam_search':
+        else:
             if beam_width is None:
                 raise ValueError('Set beam_width.')
 

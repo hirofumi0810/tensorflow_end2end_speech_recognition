@@ -44,7 +44,7 @@ def avg_pool(bottom, name='avg_pool'):
 
 
 def conv_layer(bottom, filter_shape, parameter_init,
-               through_relu=True, name='conv'):
+               relu=True, name='conv'):
     """A convolutional layer
     Args:
         bottom: A tensor of size `[B * T, H, W, C]`
@@ -64,7 +64,7 @@ def conv_layer(bottom, filter_shape, parameter_init,
                                    padding='SAME')
         outputs = tf.nn.bias_add(conv_bottom, b)
 
-        if not through_relu:
+        if not relu:
             return outputs
 
         return tf.nn.relu(outputs)

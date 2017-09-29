@@ -24,32 +24,55 @@ class TestEncoder(unittest.TestCase):
 
         print("Encoder Working check.")
 
+        # BLSTM
+        self.check_encode(encoder_type='blstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='blstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='blstm', lstm_impl='LSTMBlockCell')
+        # self.check_encode(encoder_type='blstm', lstm_impl='LSTMBlockFusedCell')
+        # self.check_encode(encoder_type='blstm', lstm_impl='CudnnLSTM')
+
+        # LSTM
+        self.check_encode(encoder_type='lstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='lstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='lstm', lstm_impl='LSTMBlockCell')
+        # self.check_encode(encoder_type='lstm', lstm_impl='LSTMBlockFusedCell')
+        # self.check_encode(encoder_type='lstm', lstm_impl='CudnnLSTM')
+
+        # GRUs
+        self.check_encode(encoder_type='bgru')
+        self.check_encode(encoder_type='gru')
+
+        # VGG-BLSTM
+        self.check_encode(encoder_type='vgg_blstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='vgg_blstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='vgg_blstm', lstm_impl='LSTMBlockCell')
+
+        # VGG-LSTM
+        self.check_encode(encoder_type='vgg_lstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='vgg_lstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='vgg_lstm', lstm_impl='LSTMBlockCell')
+
         # CNNs
         self.check_encode(encoder_type='vgg_wang')
         self.check_encode(encoder_type='cnn_zhang')
         # self.check_encode(encoder_type='resnet_wang')
 
-        # RNNs
-        self.check_encode(encoder_type='blstm')
-        self.check_encode(encoder_type='lstm')
-        self.check_encode(encoder_type='bgru')
-        self.check_encode(encoder_type='gru')
-
-        # CNN-RNNs
-        self.check_encode(encoder_type='vgg_blstm')
-        self.check_encode(encoder_type='vgg_lstm')
-
         # Multi-task
-        self.check_encode(encoder_type='multitask_blstm')
-        self.check_encode(encoder_type='multitask_lstm')
+        self.check_encode(encoder_type='multitask_blstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='multitask_blstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='multitask_blstm', lstm_impl='LSTMBlockCell')
+        self.check_encode(encoder_type='multitask_lstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='multitask_lstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='multitask_lstm', lstm_impl='LSTMBlockCell')
 
         # Dynamic
         # self.check_encode(encoder_type='pyramidal_blstm')
 
-    def check_encode(self, encoder_type):
+    def check_encode(self, encoder_type, lstm_impl=None):
 
         print('==================================================')
         print('  encoder_type: %s' % encoder_type)
+        print('  lstm_impl: %s' % lstm_impl)
         print('==================================================')
 
         tf.reset_default_graph()
@@ -58,7 +81,7 @@ class TestEncoder(unittest.TestCase):
             batch_size = 4
             splice = 11 if encoder_type in ['vgg_blstm', 'vgg_lstm', 'vgg_wang',
                                             'resnet_wang', 'cnn_zhang'] else 1
-            inputs, _, inputs_seq_len = generate_data(
+            inputs, _, _ = generate_data(
                 label_type='character',
                 model='ctc',
                 batch_size=batch_size,
@@ -66,7 +89,14 @@ class TestEncoder(unittest.TestCase):
             frame_num, input_size = inputs[0].shape
 
             # Define model graph
-            if encoder_type in ['blstm', 'lstm', 'bgru', 'gru']:
+            if encoder_type in ['blstm', 'lstm']:
+                encoder = load(encoder_type)(
+                    num_units=256,
+                    num_layers=5,
+                    num_classes=0,  # return hidden states
+                    lstm_impl=lstm_impl,
+                    parameter_init=0.1)
+            elif encoder_type in ['bgru', 'gru']:
                 encoder = load(encoder_type)(
                     num_units=256,
                     num_layers=5,
@@ -79,6 +109,7 @@ class TestEncoder(unittest.TestCase):
                     num_units=256,
                     num_layers=5,
                     num_classes=0,  # return hidden states
+                    lstm_impl=lstm_impl,
                     parameter_init=0.1)
             elif encoder_type in ['multitask_blstm', 'multitask_lstm']:
                 encoder = load(encoder_type)(
@@ -87,15 +118,15 @@ class TestEncoder(unittest.TestCase):
                     num_layers_sub=3,
                     num_classes_main=0,  # return hidden states
                     num_classes_sub=0,  # return hidden states
+                    lstm_impl=lstm_impl,
                     parameter_init=0.1)
             elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                 encoder = load(encoder_type)(
                     input_size=input_size // 11,
                     splice=11,
-                    # num_units=256,
-                    # num_layers=5,
                     num_classes=27,
                     parameter_init=0.1)
+                # NOTE: topology is pre-defined
             else:
                 raise NotImplementedError
 
@@ -103,9 +134,6 @@ class TestEncoder(unittest.TestCase):
             inputs_pl = tf.placeholder(tf.float32,
                                        shape=[None, None, input_size],
                                        name='inputs')
-            inputs_seq_len_pl = tf.placeholder(tf.int64,
-                                               shape=[None],
-                                               name='inputs_seq_len')
             keep_prob_input_pl = tf.placeholder(tf.float32,
                                                 name='keep_prob_input')
             keep_prob_hidden_pl = tf.placeholder(tf.float32,
@@ -117,14 +145,12 @@ class TestEncoder(unittest.TestCase):
             if encoder_type in ['multitask_blstm', 'multitask_lstm']:
                 hidden_states_op, final_state_op, hidden_states_sub_op, final_state_sub_op = encoder(
                     inputs=inputs_pl,
-                    inputs_seq_len=inputs_seq_len_pl,
                     keep_prob_input=keep_prob_input_pl,
                     keep_prob_hidden=keep_prob_hidden_pl,
                     keep_prob_output=keep_prob_output_pl)
             else:
                 hidden_states_op, final_state_op = encoder(
                     inputs=inputs_pl,
-                    inputs_seq_len=inputs_seq_len_pl,
                     keep_prob_input=keep_prob_input_pl,
                     keep_prob_hidden=keep_prob_hidden_pl,
                     keep_prob_output=keep_prob_output_pl)
@@ -145,7 +171,7 @@ class TestEncoder(unittest.TestCase):
             # Make feed dict
             feed_dict = {
                 inputs_pl: inputs,
-                inputs_seq_len_pl: inputs_seq_len,
+                # inputs_seq_len_pl: inputs_seq_len,
                 keep_prob_input_pl: 0.9,
                 keep_prob_hidden_pl: 0.9,
                 keep_prob_output_pl: 1.0

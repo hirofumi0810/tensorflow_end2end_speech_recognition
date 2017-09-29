@@ -59,7 +59,7 @@ def generate_data(label_type, model, batch_size=1, splice=1):
     inputs, inputs_seq_len = wav2feature(
         ['./sample/LDC93S1.wav'] * batch_size,
         feature_type='logfbank', feature_dim=40,
-        energy=True, delta1=True, delta2=True)
+        energy=False, delta1=True, delta2=True)
 
     # Splice
     inputs = do_splice(inputs, splice=splice)

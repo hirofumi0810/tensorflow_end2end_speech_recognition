@@ -9,6 +9,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+from models.encoders.core.rnn_util import sequence_length
+
 
 class BLSTM_Encoder(object):
     """Bidirectional LSTM encoder.
@@ -19,7 +21,8 @@ class BLSTM_Encoder(object):
             (except for a blank label). if 0, return hidden states before
             passing through the softmax layer
         lstm_impl (string, optional):
-            BasicLSTMCell or LSTMCell or LSTMBlockCell or LSTMBlockFusedCell.
+            BasicLSTMCell or LSTMCell or LSTMBlockCell or
+                LSTMBlockFusedCell or CudnnLSTM.
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest implementation).
         use_peephole (bool, optional): if True, use peephole
@@ -62,12 +65,11 @@ class BLSTM_Encoder(object):
 
         self.return_hidden_states = True if num_classes == 0 else False
 
-    def __call__(self, inputs, inputs_seq_len,
+    def __call__(self, inputs,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
-            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -78,6 +80,12 @@ class BLSTM_Encoder(object):
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder
         """
+        # inputs: `[B, T, input_size]`
+        batch_size = tf.shape(inputs)[0]
+        input_size = tf.shape(inputs)[2]
+        inputs_seq_len = sequence_length(
+            inputs, time_major=False, dtype=tf.int64)
+
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(
             inputs, keep_prob_input, name='dropout_input')
@@ -86,91 +94,159 @@ class BLSTM_Encoder(object):
             minval=-self.parameter_init, maxval=self.parameter_init)
 
         # Hidden layers
-        for i_layer in range(1, self.num_layers + 1, 1):
-            with tf.variable_scope('blstm_hidden' + str(i_layer),
-                                   initializer=initializer) as scope:
+        if self.lstm_impl == 'CudnnLSTM':
+            stacked_lstm = tf.contrib.cudnn_rnn.CudnnLSTM(
+                num_layers=self.num_layers,
+                num_units=self.num_units,
+                input_size=input_size,
+                input_mode='auto_select',
+                direction='bidirectional',
+                dropout=0,
+                seed=0)
 
-                if self.lstm_impl == 'BasicLSTMCell':
-                    lstm_fw = tf.contrib.rnn.BasicLSTMCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        state_is_tuple=True,
-                        activation=tf.tanh)
-                    lstm_bw = tf.contrib.rnn.BasicLSTMCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        state_is_tuple=True,
-                        activation=tf.tanh)
+            params_size_t = stacked_lstm.params_size()
+            init_h = tf.zeros(
+                [self.num_layers * 2, batch_size, self.num_units],
+                dtype=tf.float32, name="init_lstm_h")
+            init_c = tf.zeros(
+                [self.num_layers * 2, batch_size, self.num_units],
+                dtype=tf.float32, name="init_lstm_c")
+            # cudnn_params = tf.Variable(tf.random_uniform(
+            #     [params_size_t], -self.parameter_init, self.parameter_init),
+            #     validate_shape=False, name="lstm_params", trainable=True)
+            lstm_params = tf.get_variable(
+                "lstm_params",
+                initializer=tf.random_uniform(
+                    [params_size_t], -self.parameter_init, self.parameter_init),
+                validate_shape=False,
+                trainable=True)
+            # TODO is_training=is_training should be changed!
 
-                elif self.lstm_impl == 'LSTMCell':
-                    lstm_fw = tf.contrib.rnn.LSTMCell(
-                        self.num_units,
-                        use_peepholes=self.use_peephole,
-                        cell_clip=self.clip_activation,
-                        num_proj=self.num_proj,
-                        forget_bias=1.0,
-                        state_is_tuple=True)
-                    lstm_bw = tf.contrib.rnn.LSTMCell(
-                        self.num_units,
-                        use_peepholes=self.use_peephole,
-                        cell_clip=self.clip_activation,
-                        num_proj=self.num_proj,
-                        forget_bias=1.0,
-                        state_is_tuple=True)
+            # outputs = tf.contrib.layers.fully_connected(
+            #     activation_fn=None, inputs=outputs,
+            #     num_outputs=nproj, scope="projection")
+            # TODO: add projection layers
 
-                elif self.lstm_impl == 'LSTMBlockCell':
-                    # NOTE: This should be faster than tf.contrib.rnn.LSTMCell
-                    lstm_fw = tf.contrib.rnn.LSTMBlockCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        # clip_cell=True,
-                        use_peephole=self.use_peephole)
-                    lstm_bw = tf.contrib.rnn.LSTMBlockCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        # clip_cell=True,
-                        use_peephole=self.use_peephole)
-                    # TODO: cell clipping (update for rc1.3)
+            outputs, output_h, output_c = stacked_lstm(
+                input_data=inputs,
+                input_h=init_h,
+                input_c=init_c,
+                params=lstm_params,
+                is_training=True)
+            # NOTE: outputs: `[T, B, num_units * num_direction]`
 
-                elif self.lstm_impl == 'LSTMBlockFusedCell':
-                    raise NotImplementedError
+            final_state = tf.contrib.rnn.LSTMStateTuple(h=output_h, c=output_c)
+            # TODO: add dropout
+            # raise NotImplementedError
 
-                    # NOTE: This should be faster than
-                    tf.contrib.rnn.LSTMBlockFusedCell
-                    lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        # clip_cell=True,
-                        use_peephole=self.use_peephole)
-                    lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        # clip_cell=True,
-                        use_peephole=self.use_peephole)
-                    # TODO: cell clipping (update for rc1.3)
+        else:
+            for i_layer in range(1, self.num_layers + 1, 1):
+                with tf.variable_scope('blstm_hidden' + str(i_layer),
+                                       initializer=initializer) as scope:
 
-                else:
-                    raise IndexError(
-                        'lstm_impl is "BasicLSTMCell" or "LSTMCell" or ' +
-                        '"LSTMBlockCell" or "LSTMBlockFusedCell".')
+                    if self.lstm_impl == 'BasicLSTMCell':
+                        lstm_fw = tf.contrib.rnn.BasicLSTMCell(
+                            self.num_units,
+                            forget_bias=1.0,
+                            state_is_tuple=True,
+                            activation=tf.tanh)
+                        lstm_bw = tf.contrib.rnn.BasicLSTMCell(
+                            self.num_units,
+                            forget_bias=1.0,
+                            state_is_tuple=True,
+                            activation=tf.tanh)
 
-                # Dropout for the hidden-hidden connections
-                lstm_fw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_fw, output_keep_prob=keep_prob_hidden)
-                lstm_bw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_bw, output_keep_prob=keep_prob_hidden)
+                    elif self.lstm_impl == 'LSTMCell':
+                        lstm_fw = tf.contrib.rnn.LSTMCell(
+                            self.num_units,
+                            use_peepholes=self.use_peephole,
+                            cell_clip=self.clip_activation,
+                            num_proj=self.num_proj,
+                            forget_bias=1.0,
+                            state_is_tuple=True)
+                        lstm_bw = tf.contrib.rnn.LSTMCell(
+                            self.num_units,
+                            use_peepholes=self.use_peephole,
+                            cell_clip=self.clip_activation,
+                            num_proj=self.num_proj,
+                            forget_bias=1.0,
+                            state_is_tuple=True)
 
-                # Ignore 2nd return (the last state)
-                (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
-                    cell_fw=lstm_fw,
-                    cell_bw=lstm_bw,
-                    inputs=outputs,
-                    sequence_length=inputs_seq_len,
-                    dtype=tf.float32,
-                    scope=scope)
-                # NOTE: initial states are zero states by default
+                    elif self.lstm_impl == 'LSTMBlockCell':
+                        # NOTE: This should be faster than tf.contrib.rnn.LSTMCell
+                        lstm_fw = tf.contrib.rnn.LSTMBlockCell(
+                            self.num_units,
+                            forget_bias=1.0,
+                            # clip_cell=True,
+                            use_peephole=self.use_peephole)
+                        lstm_bw = tf.contrib.rnn.LSTMBlockCell(
+                            self.num_units,
+                            forget_bias=1.0,
+                            # clip_cell=True,
+                            use_peephole=self.use_peephole)
+                        # TODO: cell clipping (update for rc1.3)
 
-                outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
+                    elif self.lstm_impl == 'LSTMBlockFusedCell':
+                        # NOTE: This should be faster than
+                        # tf.contrib.rnn.LSTMBlockFusedCell
+                        lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
+                            self.num_units,
+                            forget_bias=1.0,
+                            # clip_cell=True,
+                            use_peephole=self.use_peephole)
+                        lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
+                            self.num_units,
+                            forget_bias=1.0,
+                            # clip_cell=True,
+                            use_peephole=self.use_peephole)
+                        # TODO: cell clipping (update for rc1.3)
+                        lstm_bw = tf.contrib.rnn.TimeReversedFusedRNN(lstm_bw)
+
+                    else:
+                        raise IndexError(
+                            'lstm_impl is "BasicLSTMCell" or "LSTMCell" or ' +
+                            '"LSTMBlockCell" or "LSTMBlockFusedCell" or ' +
+                            '"CudnnLSTM".')
+
+                    if self.lstm_impl == 'LSTMBlockFusedCell':
+                        with tf.variable_scope("lstm_fw") as scope:
+                            outputs_fw, final_state_fw = lstm_bw(
+                                outputs, dtype=tf.float32,
+                                sequence_length=inputs_seq_len, scope=scope)
+                        with tf.variable_scope("lstm_bw") as scope:
+                            outputs_bw, final_state_bw = lstm_bw(
+                                outputs, dtype=tf.float32,
+                                sequence_length=inputs_seq_len, scope=scope)
+                        final_state = tf.contrib.rnn.LSTMStateTuple(
+                            h=final_state_fw, c=final_state_bw)
+
+                        # TODO: add dropout
+
+                        # outputs = tf.concat_v2([outputs_fw, outputs_bw], 2, name="output")
+                        outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
+
+                        # if self.num_proj > 0:
+                        #     outputs = tf.contrib.layers.fully_connected(
+                        #         activation_fn=None, inputs=outputs,
+                        #         num_outputs=self.num_proj, scope="projection")
+                        # TODO: add projection layers
+                    else:
+                        # Dropout for the hidden-hidden connections
+                        lstm_fw = tf.contrib.rnn.DropoutWrapper(
+                            lstm_fw, output_keep_prob=keep_prob_hidden)
+                        lstm_bw = tf.contrib.rnn.DropoutWrapper(
+                            lstm_bw, output_keep_prob=keep_prob_hidden)
+
+                        (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
+                            cell_fw=lstm_fw,
+                            cell_bw=lstm_bw,
+                            inputs=outputs,
+                            sequence_length=inputs_seq_len,
+                            dtype=tf.float32,
+                            scope=scope)
+                        # NOTE: initial states are zero states by default
+
+                        outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
         if self.return_hidden_states:
             return outputs, final_state
@@ -181,15 +257,13 @@ class BLSTM_Encoder(object):
         else:
             outputs = tf.reshape(outputs, shape=[-1, self.num_proj * 2])
 
-        # inputs: `[batch_size, max_time, input_size]`
-        batch_size = tf.shape(inputs)[0]
-
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.variable_scope('bottleneck') as scope:
                 outputs = tf.contrib.layers.fully_connected(
                     outputs, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
-                    weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                    weights_initializer=tf.truncated_normal_initializer(
+                        stddev=self.parameter_init),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
 
@@ -201,7 +275,8 @@ class BLSTM_Encoder(object):
             logits_2d = tf.contrib.layers.fully_connected(
                 outputs, self.num_classes,
                 activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 
@@ -209,7 +284,7 @@ class BLSTM_Encoder(object):
             logits = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to time-major: `[max_time, batch_size, num_classes]'
+            # Convert to time-major: `[T, B, num_classes]'
             logits = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections
