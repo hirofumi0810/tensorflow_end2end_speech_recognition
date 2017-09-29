@@ -61,8 +61,7 @@ class Kana2idx(object):
         kana_list = list(str_char)
         index_list = []
 
-        i = 0
-        while i < len(kana_list):
+        for i in range(len(kana_list)):
             # Check whether next kana character is a double consonant
             if i != len(kana_list) - 1:
                 if kana_list[i] + kana_list[i + 1] in self.map_dict.keys():
@@ -80,7 +79,6 @@ class Kana2idx(object):
                 else:
                     raise ValueError(
                         'There are no kana character such as %s' % kana_list[i])
-            i += 1
 
         return np.array(index_list)
 
@@ -89,9 +87,15 @@ class Idx2char(object):
     """Convert from index to character.
     Args:
         map_file_path (string): path to the mapping file
+        capital_divide (bool, optional): set True when using capital-divided
+            character sequences
+        space_mark (string): the space mark to divide a sequence into words
     """
 
-    def __init__(self, map_file_path):
+    def __init__(self, map_file_path, capital_divide=False, space_mark=' '):
+        self.capital_divide = capital_divide
+        self.space_mark = space_mark
+
         # Read the mapping file
         self.map_dict = {}
         with open(map_file_path, 'r') as f:
@@ -116,6 +120,16 @@ class Idx2char(object):
         # Convert from indices to the corresponding characters
         char_list = list(map(lambda x: self.map_dict[x], index_list))
 
-        str_char = ''.join(char_list)
+        if self.capital_divide:
+            char_list_tmp = []
+            for i in range(len(char_list)):
+                if i != 0 and 'A' <= char_list[i] <= 'Z':
+                    char_list_tmp += [self.space_mark, char_list[i].lower()]
+                else:
+                    char_list_tmp += [char_list[i].lower()]
+            str_char = ''.join(char_list_tmp)
+        else:
+            str_char = ''.join(char_list)
+
         return str_char
         # TODO: change to batch version

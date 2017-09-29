@@ -39,14 +39,14 @@ def do_decode(model, params, epoch=None):
         label_type=params['label_type'],
         batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        shuffle=False, is_gpu=True)
+        shuffle=False)
     test_other_data = Dataset(
         data_type='test_other',
         train_data_size=params['train_data_size'],
         label_type=params['label_type'],
         batch_size=1, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        shuffle=False, is_gpu=True)
+        shuffle=False)
 
     with tf.name_scope('tower_gpu0'):
         # Define placeholders

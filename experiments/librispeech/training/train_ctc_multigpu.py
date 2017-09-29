@@ -41,20 +41,19 @@ def do_train(model, params, gpu_indices):
         batch_size=params['batch_size'], max_epoch=params['num_epoch'],
         splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True, sort_stop_epoch=None,
-        num_gpu=len(gpu_indices), is_gpu=True)
+        sort_utt=True, sort_stop_epoch=None, num_gpu=len(gpu_indices))
     dev_data_clean = Dataset(
         data_type='dev_clean', train_data_size=params['train_data_size'],
         label_type=params['label_type'],
         batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False, num_gpu=len(gpu_indices), is_gpu=True)
+        sort_utt=False, num_gpu=len(gpu_indices))
     dev_data_other = Dataset(
         data_type='dev_other', train_data_size=params['train_data_size'],
         label_type=params['label_type'],
         batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False, num_gpu=len(gpu_indices), is_gpu=True)
+        sort_utt=False, num_gpu=len(gpu_indices))
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default(), tf.device('/cpu:0'):

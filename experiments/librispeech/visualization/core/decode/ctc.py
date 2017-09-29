@@ -13,7 +13,7 @@ import sys
 from utils.io.labels.character import Idx2char
 from utils.io.labels.word import Idx2word
 from utils.io.labels.sparsetensor import sparsetensor2list
-from experiments.librispeech.metrics.wer import wer
+from utils.evaluation.edit_distance import wer_align
 
 
 def decode_test(session, decode_op, model, dataset, label_type,
@@ -29,9 +29,13 @@ def decode_test(session, decode_op, model, dataset, label_type,
             train_other500 or train_all
         save_path (string, optional): path to save decoding results
     """
-    if 'char' in label_type:
+    if label_type == 'character':
         idx2char = Idx2char(
-            map_file_path='../metrics/mapping_files/ctc/' + label_type + '.txt')
+            map_file_path='../metrics/mapping_files/ctc/character.txt')
+    elif label_type == 'character_capital_divide':
+        idx2char = Idx2char(
+            map_file_path='../metrics/mapping_files/ctc/character_capital_divide.txt',
+            capital_divide=True)
     elif label_type == 'word':
         idx2word = Idx2word(
             map_file_path='../metrics/mapping_files/ctc/word_' + train_data_size + '.txt')
@@ -62,22 +66,23 @@ def decode_test(session, decode_op, model, dataset, label_type,
             # no output
             labels_pred = ['']
         finally:
-            if 'char' in label_type:
-                print('----- wav: %s -----' % input_names[0][0])
-                print('Ref: %s' % idx2char(labels_true[0][0]).replace('_', ' '))
-                print('Hyp: %s' % idx2char(labels_pred[0]).replace('_', ' '))
-
+            print('----- wav: %s -----' % input_names[0][0])
+            if label_type == 'character':
+                true_seq = idx2char(labels_true[0][0]).replace('_', ' ')
+                pred_seq = idx2char(labels_pred[0]).replace('_', ' ')
+            elif label_type == 'character_capital_divide':
+                true_seq = idx2char(labels_true[0][0])
+                pred_seq = idx2char(labels_pred[0])
             else:
-                print('----- wav: %s -----' % input_names[0][0])
                 if dataset.is_test:
                     true_seq = labels_true[0][0][0]
                 else:
                     true_seq = ' '.join(idx2word(labels_true[0][0]))
                 pred_seq = ' '.join(idx2word(labels_pred[0]))
 
-                # wer(true_seq.split(), pred_seq.split())
-                print('Ref: %s' % true_seq)
-                print('Hyp: %s' % pred_seq)
+            print('Ref: %s' % true_seq)
+            print('Hyp: %s' % pred_seq)
+            # wer_align(ref=true_seq.split(), hyp=pred_seq.split())
 
         if is_new_epoch:
             break

@@ -9,14 +9,10 @@ from __future__ import print_function
 
 import re
 from tqdm import tqdm
-import Levenshtein as lev
 
 from utils.io.labels.character import Idx2char
-from utils.io.labels.word import Idx2word
-from utils.io.labels.sparsetensor import list2sparsetensor, sparsetensor2list
-from utils.evaluation.edit_distance import compute_edit_distance, compute_cer, compute_wer
-
-# TODO: livenshtein と tensorflowのどちらで計算するか分けて動作を比較する
+from utils.io.labels.sparsetensor import sparsetensor2list
+from utils.evaluation.edit_distance import compute_cer, compute_wer, wer_align
 
 
 def do_eval_cer(session, decode_ops, model, dataset, label_type,
@@ -40,8 +36,14 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
     # Reset data counter
     dataset.reset()
 
-    idx2char = Idx2char(
-        map_file_path='../metrics/mapping_files/ctc/' + label_type + '.txt')
+    if label_type == 'character':
+        idx2char = Idx2char(
+            map_file_path='../metrics/mapping_files/ctc/character.txt')
+    elif label_type == 'character_capital_divide':
+        idx2char = Idx2char(
+            map_file_path='../metrics/mapping_files/ctc/character_capital_divide.txt',
+            capital_divide=True,
+            space_mark='_')
 
     cer_mean, wer_mean = 0, 0
     skip_data_num = 0
@@ -73,8 +75,7 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
                 for i_batch in range(batch_size_device):
 
                     # Convert from list of index to string
-                    str_true = idx2char(
-                        labels_true[i_device][i_batch])
+                    str_true = idx2char(labels_true[i_device][i_batch])
                     str_pred = idx2char(labels_pred[i_batch])
 
                     # Remove consecutive spaces
@@ -84,16 +85,16 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
                     str_true = re.sub(r'[\']+', "", str_true)
                     str_pred = re.sub(r'[\']+', "", str_pred)
 
-                    # Convert to lower case
-                    if label_type == 'character_capital_divide':
-                        str_true = str_true.lower()
-                        str_pred = str_pred.lower()
-
                     # Compute WER
-                    wer_mean += compute_wer(str_pred=str_pred,
-                                            str_true=str_true,
-                                            normalize=True,
-                                            space_mark='_')
+                    wer_mean += compute_wer(ref=str_pred.split('_'),
+                                            hyp=str_true.split('_'),
+                                            normalize=True)
+                    # substitute, insert, delete = wer_align(
+                    #     ref=str_pred.split('_'),
+                    #     hyp=str_true.split('_'))
+                    # print(substitute)
+                    # print(insert)
+                    # print(delete)
 
                     # Remove spaces
                     str_true = re.sub(r'[_]+', "", str_true)
@@ -178,15 +179,16 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
 
                 for i_batch in range(batch_size_device):
 
-                    # Map words to unique characters
-                    seq_pred = ''.join([chr(word_idx) for word_idx in labels_pred[i_batch]])
-                    seq_true = ''.join([chr(word_idx)
-                                        for word_idx in labels_true[i_device][i_batch]])
-                    # NOTE: Levenshtein packages only accepts strings)
-
                     # Compute WER
-                    wer_mean += lev.distance(seq_pred, seq_true)
-                    wer_mean /= len(labels_true[i_device][i_batch])
+                    wer_mean += compute_wer(ref=labels_pred[i_batch],
+                                            hyp=labels_true[i_device][i_batch],
+                                            normalize=True)
+                    # substitute, insert, delete = wer_align(
+                    #     ref=labels_pred[i_batch],
+                    #     hyp=labels_true[i_device][i_batch])
+                    # print(substitute)
+                    # print(insert)
+                    # print(delete)
 
                     if progressbar:
                         pbar.update(1)
