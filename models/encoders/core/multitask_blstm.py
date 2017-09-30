@@ -9,8 +9,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from models.encoders.core.rnn_util import sequence_length
-
 
 class Multitask_BLSTM_Encoder(object):
     """Multi-task bidirectional LSTM encoder.
@@ -74,11 +72,12 @@ class Multitask_BLSTM_Encoder(object):
 
         self.return_hidden_states = True if num_classes_main == 0 or num_classes_sub == 0 else False
 
-    def __call__(self, inputs,
+    def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -93,8 +92,6 @@ class Multitask_BLSTM_Encoder(object):
         """
         # inputs: `[B, T, input_size]`
         batch_size = tf.shape(inputs)[0]
-        inputs_seq_len = sequence_length(
-            inputs, time_major=False, dtype=tf.int64)
 
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(
@@ -140,7 +137,8 @@ class Multitask_BLSTM_Encoder(object):
                             state_is_tuple=True)
 
                     elif self.lstm_impl == 'LSTMBlockCell':
-                        # NOTE: This should be faster than tf.contrib.rnn.LSTMCell
+                        # NOTE: This should be faster than
+                        # tf.contrib.rnn.LSTMCell
                         lstm_fw = tf.contrib.rnn.LSTMBlockCell(
                             self.num_units,
                             forget_bias=1.0,
@@ -178,7 +176,8 @@ class Multitask_BLSTM_Encoder(object):
                         scope=scope)
                     # NOTE: initial states are zero states by default
 
-                    outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
+                    outputs = tf.concat(
+                        axis=2, values=[outputs_fw, outputs_bw])
 
                     if i_layer == self.num_layers_sub:
                         outputs_sub = outputs
@@ -188,7 +187,8 @@ class Multitask_BLSTM_Encoder(object):
                             output_node = self.num_units * 2
                         else:
                             output_node = self.num_proj * 2
-                        outputs_sub_2d = tf.reshape(outputs_sub, shape=[-1, output_node])
+                        outputs_sub_2d = tf.reshape(
+                            outputs_sub, shape=[-1, output_node])
 
                         with tf.variable_scope('output_sub') as scope:
                             logits_sub_2d = tf.contrib.layers.fully_connected(

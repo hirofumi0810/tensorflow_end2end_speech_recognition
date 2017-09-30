@@ -75,10 +75,7 @@ def do_train(model, params):
             optimizer=params['optimizer'],
             learning_rate=learning_rate_pl)
         decode_op_character, decode_op_phone = model.decoder(
-            logits_main,
-            logits_sub,
-            model.inputs_seq_len_pl_list[0],
-            decode_type='beam_search',
+            logits_main, logits_sub, model.inputs_seq_len_pl_list[0],
             beam_width=20)
         cer_op, per_op = model.compute_ler(
             decode_op_character, decode_op_phone,

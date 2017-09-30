@@ -22,7 +22,7 @@ class Dataset(DatasetBase):
     def __init__(self, data_type, train_data_size, label_type, batch_size,
                  max_epoch=None, splice=1,
                  num_stack=1, num_skip=1,
-                 shuffle=False, sort_utt=True, sort_stop_epoch=None,
+                 shuffle=False, sort_utt=False, sort_stop_epoch=None,
                  progressbar=False, num_gpu=1, is_gpu=False):
         """A class for loading dataset.
         Args:
@@ -45,10 +45,6 @@ class Dataset(DatasetBase):
                 will revert back to a random order
             progressbar (bool, optional): if True, visualize progressbar
             num_gpu (int): if more than 1, divide batch_size by num_gpu
-            is_gpu (bool): if True, use dataset in the GPU server. This is
-                useful when data size is very large and you cannot load all
-                dataset at once. Then, you should put dataset on the GPU server
-                you will use to reduce data-communication time between servers.
         """
         super(Dataset, self).__init__()
 

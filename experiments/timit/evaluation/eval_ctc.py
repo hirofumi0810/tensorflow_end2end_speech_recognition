@@ -58,7 +58,6 @@ def do_eval(model, params, epoch):
                                    model.keep_prob_output_pl_list[0])
     decode_op = model.decoder(logits,
                               model.inputs_seq_len_pl_list[0],
-                              decode_type='beam_search',
                               beam_width=20)
     per_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 

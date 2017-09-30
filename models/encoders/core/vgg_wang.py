@@ -63,11 +63,12 @@ class VGG_Encoder(object):
             None, 0] else None
         self.name = name
 
-    def __call__(self, inputs,
+    def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -156,7 +157,8 @@ class VGG_Encoder(object):
             # TODO(hirofumi): try batch normalization
 
         # Reshape to 2D tensor `[batch_size * max_time, new_h * new_w * 384]`
-        new_h = math.ceil(self.input_size / (3 * 2**3))  # expected to be 5 or 6
+        new_h = math.ceil(self.input_size / (3 * 2**3)
+                          )  # expected to be 5 or 6
         new_w = math.ceil(self.splice / (2**3))  # expected to be 2
         inputs = tf.reshape(
             inputs, shape=[batch_size * max_time, new_h * new_w * 384])

@@ -42,11 +42,12 @@ class CNN_Encoder(object):
         self.parameter_init = parameter_init
         self.name = name
 
-    def __call__(self, inputs,
+    def __call__(self, inputs, inputs_seq_len,
                  keep_prob_hidden, keep_prob_input, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes

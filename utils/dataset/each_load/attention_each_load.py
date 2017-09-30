@@ -35,11 +35,16 @@ class DatasetBase(Base):
             batch_size (int, optional): the size of mini-batch
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
-                inputs: list of input data of size `[num_gpu, B, T, input_dim]`
-                labels: list of target labels of size `[num_gpu, B, T]`
-                inputs_seq_len: list of length of inputs of size `[num_gpu, B]`
-                labels_seq_len: list of length of target labels of size `[num_gpu, B]`
-                input_names: list of file name of input data of size `[num_gpu, B]`
+                inputs: list of input data of size
+                    `[num_gpu, B, T, input_dim]`
+                labels: list of target labels of size
+                    `[num_gpu, B, T]`
+                inputs_seq_len: list of length of inputs of size
+                    `[num_gpu, B]`
+                labels_seq_len: list of length of target labels of size
+                    `[num_gpu, B]`
+                input_names: list of file name of input data of size
+                    `[num_gpu, B]`
             is_new_epoch (bool): If true, 1 epoch is finished
         """
         if self.max_epoch is not None and self.epoch >= self.max_epoch:
@@ -111,9 +116,6 @@ class DatasetBase(Base):
         label_list = np.array(list(
             map(lambda path: np.load(path),
                 np.take(self.label_paths, data_indices, axis=0))))
-        input_names = list(
-            map(lambda path: basename(path).split('.')[0],
-                np.take(self.input_paths, data_indices, axis=0)))
 
         if not hasattr(self, 'input_size'):
             self.input_size = input_list[0].shape[1]
@@ -140,8 +142,11 @@ class DatasetBase(Base):
             dtype=np.float32)
         labels = np.array([[self.padded_value] * max_seq_len]
                           * len(data_indices))
-        inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
+        inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
         labels_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
+        input_names = list(
+            map(lambda path: basename(path).split('.')[0],
+                np.take(self.input_paths, data_indices, axis=0)))
 
         # Set values of each data in mini-batch
         for i_batch in range(len(data_indices)):

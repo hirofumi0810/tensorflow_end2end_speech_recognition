@@ -45,34 +45,34 @@ class TestCTC(tf.test.TestCase):
         ##############################
         # BLSTM-CTC
         ##############################
-        self.check_training(encoder_type='blstm', label_type='phone',
-                            lstm_impl='BasicLSTMCell')
+        # self.check_training(encoder_type='blstm', label_type='phone',
+        #                     lstm_impl='BasicLSTMCell')
         self.check_training(encoder_type='blstm', label_type='phone',
                             lstm_impl='LSTMCell')
-        self.check_training(encoder_type='blstm', label_type='phone',
-                            lstm_impl='LSTMBlockCell')
+        # self.check_training(encoder_type='blstm', label_type='phone',
+        #                     lstm_impl='LSTMBlockCell')
+        # self.check_training(encoder_type='blstm', label_type='character')
+
         # self.check_training(encoder_type='blstm', label_type='phone',
         #                     lstm_impl='CudnnLSTM')
         # self.check_training(encoder_type='blstm', label_type='phone',
         #                     lstm_impl='LSTMBlockFusedCell')
-        self.check_training(encoder_type='blstm', label_type='character')
-
-        raise ValueError
 
         ##############################
         # LSTM-CTC
         ##############################
-        self.check_training(encoder_type='lstm', label_type='phone',
-                            lstm_impl='BasicLSTMCell')
+        # self.check_training(encoder_type='lstm', label_type='phone',
+        #                     lstm_impl='BasicLSTMCell')
         self.check_training(encoder_type='lstm', label_type='phone',
                             lstm_impl='LSTMCell')
-        self.check_training(encoder_type='lstm', label_type='phone',
-                            lstm_impl='LSTMBlockCell')
+        # self.check_training(encoder_type='lstm', label_type='phone',
+        #                     lstm_impl='LSTMBlockCell')
+        # self.check_training(encoder_type='lstm', label_type='character')
+
         # self.check_training(encoder_type='lstm', label_type='phone',
         #                     lstm_impl='CudnnLSTM')
         # self.check_training(encoder_type='lstm', label_type='phone',
         #                     lstm_impl='LSTMBlockFusedCell')
-        self.check_training(encoder_type='lstm', label_type='character')
 
         ##############################
         # VGG-BLSTM-CTC
@@ -146,6 +146,7 @@ class TestCTC(tf.test.TestCase):
             loss_op, logits = model.compute_loss(
                 model.inputs_pl_list[0],
                 model.labels_pl_list[0],
+                model.inputs_seq_len_pl_list[0],
                 model.keep_prob_input_pl_list[0],
                 model.keep_prob_hidden_pl_list[0],
                 model.keep_prob_output_pl_list[0])
@@ -154,6 +155,7 @@ class TestCTC(tf.test.TestCase):
                                    learning_rate=learning_rate_pl)
             # NOTE: Adam does not run on Adam
             decode_op = model.decoder(logits,
+                                      model.inputs_seq_len_pl_list[0],
                                       beam_width=20)
             ler_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 
@@ -183,6 +185,7 @@ class TestCTC(tf.test.TestCase):
             feed_dict = {
                 model.inputs_pl_list[0]: inputs,
                 model.labels_pl_list[0]: labels_true_st,
+                model.inputs_seq_len_pl_list[0]: inputs_seq_len,
                 model.keep_prob_input_pl_list[0]: 1.0,
                 model.keep_prob_hidden_pl_list[0]: 1.0,
                 model.keep_prob_output_pl_list[0]: 1.0,

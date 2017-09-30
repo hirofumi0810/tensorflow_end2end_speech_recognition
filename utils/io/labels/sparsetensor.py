@@ -26,7 +26,7 @@ def list2sparsetensor(labels, padded_value):
     indices, values = [], []
     for i_utt, each_label in enumerate(labels):
         for i_l, l in enumerate(each_label):
-            # -1 or None means empty
+            # NOTE: -1 or None means empty
             if l == padded_value:
                 break
             indices.append([i_utt, i_l])

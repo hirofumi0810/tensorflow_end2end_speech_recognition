@@ -11,7 +11,6 @@ import math
 import tensorflow as tf
 
 from models.encoders.core.cnn_util import conv_layer, max_pool
-from models.encoders.core.rnn_util import sequence_length
 
 
 class VGG_LSTM_Encoder(object):
@@ -72,11 +71,12 @@ class VGG_LSTM_Encoder(object):
 
         self.return_hidden_states = True if num_classes == 0 else False
 
-    def __call__(self, inputs,
+    def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -90,8 +90,6 @@ class VGG_LSTM_Encoder(object):
         # inputs: `[B, T, input_size * splice]`
         batch_size = tf.shape(inputs)[0]
         max_time = tf.shape(inputs)[1]
-        inputs_seq_len = sequence_length(
-            inputs, time_major=False, dtype=tf.int64)
 
         # Reshape to 4D tensor `[B * T, input_size / 3, splice, 3(+Δ, ΔΔ)]`
         inputs = tf.reshape(

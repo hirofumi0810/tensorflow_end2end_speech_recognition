@@ -68,7 +68,7 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
 
         labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
         for i_device, labels_pred_st in enumerate(labels_pred_st_list):
-            batch_size_device = len(inputs_seq_len[i_device])
+            batch_size_device = len(inputs[i_device])
             try:
                 labels_pred = sparsetensor2list(labels_pred_st,
                                                 batch_size_device)
@@ -172,7 +172,7 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
 
         labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
         for i_device, labels_pred_st in enumerate(labels_pred_st_list):
-            batch_size_device = len(inputs_seq_len[i_device])
+            batch_size_device = len(inputs[i_device])
             try:
                 labels_pred = sparsetensor2list(labels_pred_st,
                                                 batch_size_device)

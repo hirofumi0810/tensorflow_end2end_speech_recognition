@@ -9,19 +9,18 @@ import re
 import os
 import sys
 import unittest
+import numpy as np
 
 sys.path.append(os.path.abspath('../../../../'))
 from experiments.timit.data.load_dataset_ctc import Dataset
-from utils.io.labels.character import idx2char
-from utils.io.labels.phone import idx2phone
+from utils.io.labels.character import Idx2char
+from utils.io.labels.phone import Idx2phone
 from utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetCTC(unittest.TestCase):
 
     def test(self):
-
-        self.length_check = False
 
         # data_type
         self.check_loading(label_type='phone61', data_type='train')
@@ -71,23 +70,28 @@ class TestLoadDatasetCTC(unittest.TestCase):
             progressbar=True)
 
         print('=> Loading mini-batch...')
-        map_file_path = '../../metrics/mapping_files/ctc/' + label_type + '.txt'
         if label_type in ['character', 'character_capital_divide']:
-            map_fn = idx2char
+            map_fn = Idx2char(
+                map_file_path='../../metrics/mapping_files/ctc/' + label_type + '.txt')
         else:
-            map_fn = idx2phone
+            map_fn = Idx2phone(
+                map_file_path='../../metrics/mapping_files/ctc/' + label_type + '.txt')
 
         for data, is_new_epoch in dataset:
             inputs, labels, inputs_seq_len, input_names = data
 
-            if not self.length_check:
-                for i, l in zip(inputs[0], labels[0]):
-                    if len(i) < len(l):
+            # length check
+            for i_batch, l_batch in zip(inputs, labels):
+                if len(np.where(l_batch == dataset.padded_value)[0]) > 0:
+                    if i_batch.shape[0] < np.where(l_batch == dataset.padded_value)[0][0]:
                         raise ValueError(
                             'input length must be longer than label length.')
-                self.length_check = True
+                else:
+                    if i_batch.shape[0] < len(l_batch):
+                        raise ValueError(
+                            'input length must be longer than label length.')
 
-            str_true = map_fn(labels[0], map_file_path)
+            str_true = map_fn(labels[0])
             str_true = re.sub(r'_', ' ', str_true)
             print('----- %s ----- (epoch: %.3f)' %
                   (input_names[0], dataset.epoch_detail))

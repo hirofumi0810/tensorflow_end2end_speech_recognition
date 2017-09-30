@@ -12,8 +12,8 @@ import unittest
 
 sys.path.append(os.path.abspath('../../../../'))
 from experiments.timit.data.load_dataset_attention import Dataset
-from utils.io.labels.character import idx2char
-from utils.io.labels.phone import idx2phone
+from utils.io.labels.character import Idx2char
+from utils.io.labels.phone import Idx2phone
 from utils.measure_time_func import measure_time
 
 
@@ -69,16 +69,17 @@ class TestLoadDatasetAttention(unittest.TestCase):
             progressbar=True)
 
         print('=> Loading mini-batch...')
-        map_file_path = '../../metrics/mapping_files/attention/' + label_type + '.txt'
         if label_type in ['character', 'character_capital_divide']:
-            map_fn = idx2char
+            map_fn = Idx2char(
+                map_file_path='../../metrics/mapping_files/attention/' + label_type + '.txt')
         else:
-            map_fn = idx2phone
+            map_fn = Idx2phone(
+                map_file_path='../../metrics/mapping_files/attention/' + label_type + '.txt')
 
         for data, is_new_epoch in dataset:
             inputs, labels, inputs_seq_len, labels_seq_len, input_names = data
 
-            str_true = map_fn(labels[0][0: labels_seq_len[0]], map_file_path)
+            str_true = map_fn(labels[0][0: labels_seq_len[0]])
             str_true = re.sub(r'_', ' ', str_true)
             print('----- %s ----- (epoch: %.3f)' %
                   (input_names[0], dataset.epoch_detail))

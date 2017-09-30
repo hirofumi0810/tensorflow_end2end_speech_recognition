@@ -24,7 +24,7 @@ class Dataset(DatasetBase):
     def __init__(self, data_type, label_type, batch_size, eos_index,
                  max_epoch=None, splice=1,
                  num_stack=1, num_skip=1,
-                 shuffle=False, sort_utt=True, sort_stop_epoch=None,
+                 shuffle=False, sort_utt=False, sort_stop_epoch=None,
                  progressbar=False):
         """A class for loading dataset.
         Args:

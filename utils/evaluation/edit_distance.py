@@ -32,6 +32,30 @@ def compute_edit_distance(session, labels_true_st, labels_pred_st):
     return edit_distances
 
 
+def compute_per(ref, hyp, normalize=True):
+    """Compute Phone Error Rate.
+    Args:
+        ref (list): phones in the reference transcript
+        hyp (list): phones in the predicted transcript
+        normalize (bool, optional): if True, divide by the length of str_true
+    Returns:
+        per (float): Phone Error Rate between str_true and str_pred
+    """
+    # Build mapping of phone to index
+    phone_set = set(ref + hyp)
+    phone2char = dict(zip(phone_set, range(len(phone_set))))
+
+    # Map phones to a single char array
+    # NOTE: Levenshtein packages only accepts strings
+    phones_ref = [chr(phone2char[p]) for p in ref]
+    phones_hyp = [chr(phone2char[p]) for p in hyp]
+
+    per = lev.distance(''.join(phones_ref), ''.join(phones_hyp))
+    if normalize:
+        per /= len(ref)
+    return per
+
+
 def compute_cer(str_pred, str_true, normalize=True):
     """Compute Character Error Rate.
     Args:
@@ -166,7 +190,8 @@ def wer_align(ref, hyp):
                     count2 += 1
             index2 = i - count2
             if len(ref[index1]) < len(hyp[index2]):
-                print(ref[index1] + " " * (len(hyp[index2]) - len(ref[index1])), end=' ')
+                print(ref[index1] + " " *
+                      (len(hyp[index2]) - len(ref[index1])), end=' ')
             else:
                 print(ref[index1], end=' ')
         else:
@@ -198,7 +223,8 @@ def wer_align(ref, hyp):
                     count2 += 1
             index2 = i - count2
             if len(ref[index1]) > len(hyp[index2]):
-                print(hyp[index2] + " " * (len(ref[index1]) - len(hyp[index2])), end=' ')
+                print(hyp[index2] + " " *
+                      (len(ref[index1]) - len(hyp[index2])), end=' ')
             else:
                 print(hyp[index2], end=' ')
         else:

@@ -43,7 +43,8 @@ class CTCBase(object):
         assert splice % 2 == 1, 'splice must be the odd number'
         if clip_grad is not None:
             assert float(clip_grad) > 0, 'clip_grad must be larger than 0.'
-        assert float(weight_decay) >= 0, 'weight_decay must not be a negative value.'
+        assert float(
+            weight_decay) >= 0, 'weight_decay must not be a negative value.'
 
         # Network size
         self.input_size = int(input_size)
@@ -53,7 +54,7 @@ class CTCBase(object):
 
         # Regularization
         self.clip_grad = clip_grad
-        self.weight_decay = weight_decay
+        self.weight_decay = float(weight_decay)
 
         # Summaries for TensorBoard
         self.summaries_train = []
@@ -67,11 +68,12 @@ class CTCBase(object):
         self.keep_prob_hidden_pl_list = []
         self.keep_prob_output_pl_list = []
 
-    def __call__(self, inputs,
+    def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -82,7 +84,8 @@ class CTCBase(object):
             logits: A tensor of size `[T, B, num_classes]`
         """
         logits, final_state = self.encoder(
-            inputs, keep_prob_input, keep_prob_hidden, keep_prob_output)
+            inputs, inputs_seq_len,
+            keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         return logits
 
@@ -96,6 +99,8 @@ class CTCBase(object):
             tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
                             tf.placeholder(tf.int32, name='values'),
                             tf.placeholder(tf.int64, name='shape')))
+        self.inputs_seq_len_pl_list.append(
+            tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
         self.keep_prob_input_pl_list.append(
             tf.placeholder(tf.float32, name='keep_prob_input'))
         self.keep_prob_hidden_pl_list.append(
@@ -131,12 +136,13 @@ class CTCBase(object):
         """
         raise NotImplementedError
 
-    def compute_loss(self, inputs, labels, keep_prob_input,
+    def compute_loss(self, inputs, labels, inputs_seq_len, keep_prob_input,
                      keep_prob_hidden, keep_prob_output, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
             labels: A SparseTensor of target labels
+            inputs_seq_len: A tensor of size `[B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -149,9 +155,8 @@ class CTCBase(object):
             logits: A tensor of size `[T, B, input_size]`
         """
         # Build model graph
-        logits = self(inputs,
+        logits = self(inputs, inputs_seq_len,
                       keep_prob_input, keep_prob_hidden, keep_prob_output)
-        inputs_seq_len = self.sequence_length(logits)
 
         # Weight decay
         if self.weight_decay > 0:
@@ -166,6 +171,7 @@ class CTCBase(object):
             ctc_losses = tf.nn.ctc_loss(
                 labels,
                 logits,
+                # tf.cast(inputs_seq_len, tf.int32),
                 inputs_seq_len,
                 preprocess_collapse_repeated=False,
                 ctc_merge_repeated=True,
@@ -297,26 +303,11 @@ class CTCBase(object):
 
         return clipped_grads_and_vars
 
-    def sequence_length(self, inputs, time_major=True, dtype=tf.int32):
-        """Inspect the length of the sequence of input data.
-        Args:
-            inputs: A tensor of size `[B, T, input_size]`
-            time_major (bool, optional): set True if inputs is time-major
-            dtype (optional): default is tf.int32
-        Returns:
-            seq_len: A tensor of size `[B,]`
-        """
-        time_axis = 0 if time_major else 1
-        with tf.variable_scope("seq_len"):
-            used = tf.sign(tf.reduce_max(tf.abs(inputs), axis=2))
-            seq_len = tf.reduce_sum(used, axis=time_axis)
-            seq_len = tf.cast(seq_len, dtype)
-        return seq_len
-
-    def decoder(self, logits, beam_width=1):
+    def decoder(self, logits, inputs_seq_len, beam_width=1):
         """Operation for decoding.
         Args:
             logits: A tensor of size `[T, B, input_size]`
+            inputs_seq_len: A tensor of size `[B]`
             beam_width (int, optional): beam width for beam search.
                 1 disables beam search, which mean greedy decoding.
         Return:
@@ -325,8 +316,7 @@ class CTCBase(object):
         assert isinstance(beam_width, int), "beam_width must be integer."
         assert beam_width >= 1, "beam_width must be >= 1"
 
-        inputs_seq_len = self.sequence_length(
-            logits, time_major=True, dtype=tf.int32)
+        # inputs_seq_len = tf.cast(inputs_seq_len, tf.int32)
 
         if beam_width == 1:
             decoded, _ = tf.nn.ctc_greedy_decoder(
@@ -351,7 +341,7 @@ class CTCBase(object):
         Return:
             posteriors_op: operation for computing posteriors for each class
         """
-        # Convert to batch-major: `[batch_size, max_time, num_classes]'
+        # Convert to batch-major: `[B, T, num_classes]'
         logits = tf.transpose(logits, (1, 0, 2))
 
         logits_2d = tf.reshape(logits, [-1, self.num_classes])
@@ -425,7 +415,8 @@ class CTCBase(object):
             # Histogram
             with tf.name_scope("dev"):
                 for var in trainable_vars:
-                    self.summaries_dev.append(tf.summary.histogram(var.name, var))
+                    self.summaries_dev.append(
+                        tf.summary.histogram(var.name, var))
 
             # Mean
             with tf.name_scope("mean_dev"):

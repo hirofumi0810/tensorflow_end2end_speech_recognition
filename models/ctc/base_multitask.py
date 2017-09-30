@@ -46,11 +46,12 @@ class MultitaskCTCBase(CTCBase):
         # Placeholder for multi-task
         self.labels_sub_pl_list = []
 
-    def __call__(self, inputs,
+    def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -62,7 +63,8 @@ class MultitaskCTCBase(CTCBase):
             logits_sub: A tensor of size `[T, B, num_classes]`
         """
         logits_main, logits_sub, final_state, final_state_sub = self.encoder(
-            inputs, keep_prob_input, keep_prob_hidden, keep_prob_output)
+            inputs, inputs_seq_len,
+            keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         return logits_main, logits_sub
 
@@ -79,6 +81,8 @@ class MultitaskCTCBase(CTCBase):
             tf.SparseTensor(tf.placeholder(tf.int64, name='indices_sub'),
                             tf.placeholder(tf.int32, name='values_sub'),
                             tf.placeholder(tf.int64, name='shape_sub')))
+        self.inputs_seq_len_pl_list.append(
+            tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
         self.keep_prob_input_pl_list.append(
             tf.placeholder(tf.float32, name='keep_prob_input'))
         self.keep_prob_hidden_pl_list.append(
@@ -86,7 +90,7 @@ class MultitaskCTCBase(CTCBase):
         self.keep_prob_output_pl_list.append(
             tf.placeholder(tf.float32, name='keep_prob_output'))
 
-    def compute_loss(self, inputs, labels_main, labels_sub,
+    def compute_loss(self, inputs, labels_main, labels_sub, inputs_seq_len,
                      keep_prob_input, keep_prob_hidden, keep_prob_output,
                      scope=None):
         """Operation for computing ctc loss.
@@ -94,6 +98,7 @@ class MultitaskCTCBase(CTCBase):
             inputs: A tensor of size `[B, T, input_size]`
             labels_main: A SparseTensor of target labels in the main task
             labels_sub: A SparseTensor of target labels in the sub task
+            inputs_seq_len: A tensor of size `[B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -108,9 +113,8 @@ class MultitaskCTCBase(CTCBase):
         """
         # Build model graph
         logits_main, logits_sub = self(
-            inputs,
+            inputs, inputs_seq_len,
             keep_prob_input, keep_prob_hidden, keep_prob_output)
-        inputs_seq_len = self.sequence_length(logits_main)
 
         # Weight decay
         if self.weight_decay > 0:
@@ -125,7 +129,8 @@ class MultitaskCTCBase(CTCBase):
             ctc_losses = tf.nn.ctc_loss(
                 labels_main,
                 logits_main,
-                tf.cast(inputs_seq_len, tf.int32),
+                # tf.cast(inputs_seq_len, tf.int32),
+                inputs_seq_len,
                 preprocess_collapse_repeated=False,
                 ctc_merge_repeated=True,
                 ignore_longer_outputs_than_inputs=False,
@@ -139,7 +144,8 @@ class MultitaskCTCBase(CTCBase):
             ctc_losses = tf.nn.ctc_loss(
                 labels_sub,
                 logits_sub,
-                tf.cast(inputs_seq_len, tf.int32),
+                # tf.cast(inputs_seq_len, tf.int32),
+                inputs_seq_len,
                 preprocess_collapse_repeated=False,
                 ctc_merge_repeated=True,
                 ignore_longer_outputs_than_inputs=False,
@@ -182,11 +188,12 @@ class MultitaskCTCBase(CTCBase):
 
         return total_loss, logits_main, logits_sub
 
-    def decoder(self, logits_main, logits_sub, beam_width=1):
+    def decoder(self, logits_main, logits_sub, inputs_seq_len, beam_width=1):
         """Operation for decoding.
         Args:
             logits_main: A tensor of size `[T, B, input_size]`
             logits_sub: A tensor of size `[T, B, input_size]`
+            inputs_seq_len: A tensor of size `[B]`
             beam_width (int, optional): beam width for beam search.
                 1 disables beam search, which mean greedy decoding.
         Return:
@@ -196,24 +203,20 @@ class MultitaskCTCBase(CTCBase):
         assert isinstance(beam_width, int), "beam_width must be integer."
         assert beam_width >= 1, "beam_width must be >= 1"
 
-        inputs_seq_len = self.sequence_length(
-            logits_main, time_major=True, dtype=tf.int32)
+        # inputs_seq_len = tf.cast(inputs_seq_len, tf.int32)
 
         if beam_width == 1:
             decoded_main, _ = tf.nn.ctc_greedy_decoder(
-                logits_main, tf.cast(inputs_seq_len, tf.int32))
+                logits_main, inputs_seq_len)
             decoded_sub, _ = tf.nn.ctc_greedy_decoder(
-                logits_sub, tf.cast(inputs_seq_len, tf.int32))
+                logits_sub, inputs_seq_len)
 
         else:
-            if beam_width is None:
-                raise ValueError('Set beam_width.')
-
             decoded_main, _ = tf.nn.ctc_beam_search_decoder(
-                logits_main, tf.cast(inputs_seq_len, tf.int32),
+                logits_main, inputs_seq_len,
                 beam_width=beam_width)
             decoded_sub, _ = tf.nn.ctc_beam_search_decoder(
-                logits_sub, tf.cast(inputs_seq_len, tf.int32),
+                logits_sub, inputs_seq_len,
                 beam_width=beam_width)
 
         decode_op_main = tf.to_int32(decoded_main[0])
@@ -232,7 +235,7 @@ class MultitaskCTCBase(CTCBase):
             posteriors_op_sub: operation for computing posteriors for each
                 class in the sub task
         """
-        # Convert to batch-major: `[batch_size, max_time, num_classes]'
+        # Convert to batch-major: `[B, T, num_classes]'
         logits_main = tf.transpose(logits_main, (1, 0, 2))
         logits_sub = tf.transpose(logits_sub, (1, 0, 2))
 

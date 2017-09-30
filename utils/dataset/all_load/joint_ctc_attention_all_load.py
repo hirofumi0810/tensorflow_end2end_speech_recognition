@@ -29,12 +29,18 @@ class DatasetBase(Base):
             batch_size (int, optional): the size of mini-batch
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
-                inputs: list of input data of size `[B, T, input_dim]`
-                att_labels: list of target labels for Attention, of size `[B, T]`
-                ctc_labels: list of target labels for CTC, of size `[B, T]`
-                inputs_seq_len: list of length of inputs of size `[B]`
-                att_labels_seq_len: list of length of target labels for Attention, of size `[B]`
-                input_names: list of file name of input data of size `[B]`
+                inputs: list of input data of size
+                    `[B, T, input_dim]`
+                att_labels: list of target labels for Attention, of size
+                    `[B, T]`
+                ctc_labels: list of target labels for CTC, of size
+                    `[B, T]`
+                inputs_seq_len: list of length of inputs of size
+                    `[B]`
+                att_labels_seq_len: list of length of target labels for Attention, of size
+                    `[B]`
+                input_names: list of file name of input data of size
+                    `[B]`
             is_new_epoch (bool): If true, one epoch is finished
         """
         if self.max_epoch is not None and self.epoch >= self.max_epoch:
@@ -104,8 +110,7 @@ class DatasetBase(Base):
         # Initialization
         inputs = np.zeros(
             (len(data_indices), max_frame_num,
-             self.input_list[0].shape[-1] * self.splice),
-            dtype=np.int32)
+             self.input_list[0].shape[-1] * self.splice), dtype=np.float32)
         att_labels = np.array(
             [[self.att_padded_value] * att_max_seq_len] * len(data_indices),
             dtype=np.int32)
@@ -138,5 +143,6 @@ class DatasetBase(Base):
             att_labels_seq_len[i_batch] = len(self.att_label_list[x])
 
         self.iteration += len(data_indices)
+
         return (inputs, att_labels, ctc_labels, inputs_seq_len,
                 att_labels_seq_len, input_names), self.is_new_epoch

@@ -9,8 +9,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from models.encoders.core.rnn_util import sequence_length
-
 
 class BGRU_Encoder(object):
     """Bidirectional GRU-CTC model.
@@ -44,11 +42,12 @@ class BGRU_Encoder(object):
 
         self.return_hidden_states = True if num_classes == 0 else False
 
-    def __call__(self, inputs,
+    def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -61,8 +60,6 @@ class BGRU_Encoder(object):
         """
         # inputs: `[B, T, input_size]`
         batch_size = tf.shape(inputs)[0]
-        inputs_seq_len = sequence_length(
-            inputs, time_major=False, dtype=tf.int64)
 
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(

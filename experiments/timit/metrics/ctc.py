@@ -14,7 +14,7 @@ from experiments.timit.metrics.mapping import Map2phone39
 from utils.io.labels.character import Idx2char
 from utils.io.labels.phone import Idx2phone
 from utils.io.labels.sparsetensor import sparsetensor2list
-from utils.evaluation.edit_distance import compute_cer, compute_wer
+from utils.evaluation.edit_distance import compute_per, compute_cer, compute_wer, wer_align
 
 
 def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
@@ -70,7 +70,7 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
             model.keep_prob_output_pl_list[0]: 1.0
         }
 
-        batch_size_each = len(inputs_seq_len)
+        batch_size_each = len(inputs)
 
         # Evaluate by 39 phones
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
@@ -96,10 +96,9 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
             phone_true_list = map2phone39_eval(phone_true_list)
 
             # Compute PER
-            per_mean += compute_wer(str_pred=' '.join(phone_pred_list),
-                                    str_true=' '.join(phone_true_list),
-                                    normalize=True,
-                                    space_mark=' ')
+            per_mean += compute_per(ref=phone_pred_list,
+                                    hyp=phone_true_list,
+                                    normalize=True)
 
             if progressbar:
                 pbar.update(1)
@@ -131,8 +130,14 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
     # Reset data counter
     dataset.reset()
 
-    idx2char = Idx2char(
-        map_file_path='../metrics/mapping_files/ctc/' + label_type + '.txt')
+    if label_type == 'character':
+        idx2char = Idx2char(
+            map_file_path='../metrics/mapping_files/ctc/character.txt')
+    elif label_type == 'character_capital_divide':
+        idx2char = Idx2char(
+            map_file_path='../metrics/mapping_files/ctc/character_capital_divide.txt',
+            capital_divide=True,
+            space_mark='_')
 
     cer_mean, wer_mean = 0, 0
     if progressbar:
@@ -153,7 +158,7 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
             model.keep_prob_output_pl_list[0]: 1.0
         }
 
-        batch_size_each = len(inputs_seq_len)
+        batch_size_each = len(inputs)
 
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
         labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
@@ -170,20 +175,20 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
             str_true = re.sub(r'[\'\":;!?,.-]+', "", str_true)
             str_pred = re.sub(r'[\'\":;!?,.-]+', "", str_pred)
 
-            # Convert to lower case
-            if label_type == 'character_capital_divide':
-                str_true = str_true.lower()
-                str_pred = str_pred.lower()
-
             # Compute WER
-            wer_mean += compute_wer(str_pred=str_pred,
-                                    str_true=str_true,
-                                    normalize=True,
-                                    space_mark='_')
+            wer_mean += compute_wer(hyp=str_pred.split('_'),
+                                    ref=str_true.split('_'),
+                                    normalize=True)
+            # substitute, insert, delete = wer_align(
+            #     ref=str_pred.split('_'),
+            #     hyp=str_true.split('_'))
+            # print(substitute)
+            # print(insert)
+            # print(delete)
 
             # Remove spaces
-            str_pred = re.sub(r'[_]+', '_', str_pred)
-            str_true = re.sub(r'[_]+', '_', str_true)
+            str_pred = re.sub(r'[_]+', "", str_pred)
+            str_true = re.sub(r'[_]+', "", str_true)
 
             # Compute CER
             cer_mean += compute_cer(str_pred=str_pred,

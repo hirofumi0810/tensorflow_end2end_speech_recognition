@@ -9,8 +9,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from models.encoders.core.rnn_util import sequence_length
-
 
 class BLSTM_Encoder(object):
     """Bidirectional LSTM encoder.
@@ -65,11 +63,12 @@ class BLSTM_Encoder(object):
 
         self.return_hidden_states = True if num_classes == 0 else False
 
-    def __call__(self, inputs,
+    def __call__(self, inputs, inputs_seq_len,
                  keep_prob_input, keep_prob_hidden, keep_prob_output):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -83,8 +82,6 @@ class BLSTM_Encoder(object):
         # inputs: `[B, T, input_size]`
         batch_size = tf.shape(inputs)[0]
         input_size = tf.shape(inputs)[2]
-        inputs_seq_len = sequence_length(
-            inputs, time_major=False, dtype=tf.int64)
 
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(
@@ -173,7 +170,8 @@ class BLSTM_Encoder(object):
                             state_is_tuple=True)
 
                     elif self.lstm_impl == 'LSTMBlockCell':
-                        # NOTE: This should be faster than tf.contrib.rnn.LSTMCell
+                        # NOTE: This should be faster than
+                        # tf.contrib.rnn.LSTMCell
                         lstm_fw = tf.contrib.rnn.LSTMBlockCell(
                             self.num_units,
                             forget_bias=1.0,
@@ -223,7 +221,8 @@ class BLSTM_Encoder(object):
                         # TODO: add dropout
 
                         # outputs = tf.concat_v2([outputs_fw, outputs_bw], 2, name="output")
-                        outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
+                        outputs = tf.concat(
+                            axis=2, values=[outputs_fw, outputs_bw])
 
                         # if self.num_proj > 0:
                         #     outputs = tf.contrib.layers.fully_connected(
@@ -246,7 +245,8 @@ class BLSTM_Encoder(object):
                             scope=scope)
                         # NOTE: initial states are zero states by default
 
-                        outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
+                        outputs = tf.concat(
+                            axis=2, values=[outputs_fw, outputs_bw])
 
         if self.return_hidden_states:
             return outputs, final_state

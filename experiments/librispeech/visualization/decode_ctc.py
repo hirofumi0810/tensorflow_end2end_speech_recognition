@@ -61,7 +61,6 @@ def do_decode(model, params, epoch=None):
                                        model.keep_prob_output_pl_list[0])
         decode_op = model.decoder(logits,
                                   model.inputs_seq_len_pl_list[0],
-                                  decode_type='beam_search',
                                   beam_width=20)
 
     # Create a saver for writing training checkpoints
