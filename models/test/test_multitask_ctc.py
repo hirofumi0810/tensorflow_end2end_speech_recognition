@@ -47,6 +47,7 @@ class TestMultitaskCTC(tf.test.TestCase):
 
         print('==================================================')
         print('  encoder_type: %s' % str(encoder_type))
+        print('  lstm_impl: %s' % str(lstm_impl))
         print('==================================================')
 
         tf.reset_default_graph()
@@ -75,7 +76,7 @@ class TestMultitaskCTC(tf.test.TestCase):
                 clip_grad=5.0,
                 clip_activation=50,
                 num_proj=256,
-                bottleneck_dim=50,
+                # bottleneck_dim=50,
                 weight_decay=1e-8)
 
             # Define placeholders

@@ -10,7 +10,7 @@ from __future__ import print_function
 from os.path import join
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 plt.style.use('ggplot')
 import seaborn as sns
@@ -76,7 +76,7 @@ def posterior_test(session, posteriors_op, model, dataset, label_type,
                  ':', label='blank', color='grey')
         plt.xlabel('Time [sec]', fontsize=12)
         plt.ylabel('Posteriors', fontsize=12)
-        plt.xlim([0, frame_num / 100])
+        plt.xlim([0, frame_num * num_stack / 100])
         plt.ylim([0.05, 1.05])
         plt.xticks(list(range(0, int(frame_num * num_stack / 100) + 1, 1)))
         plt.yticks(list(range(0, 2, 1)))

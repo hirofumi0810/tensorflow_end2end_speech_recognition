@@ -330,7 +330,7 @@ class CTCBase(object):
 
         return decode_op
 
-    def posteriors(self, logits, blank_prior=1., softmax_tempareture=1):
+    def posteriors(self, logits, blank_prior=1, softmax_tempareture=1):
         """Operation for computing posteriors of each time steps.
         Args:
             logits: A tensor of size `[T, B, input_size]`
@@ -347,6 +347,14 @@ class CTCBase(object):
         logits_2d = tf.reshape(logits, [-1, self.num_classes])
 
         # TODO: Divide by blank prior
+        # mask = tf.one_hot(
+        #     indices=tf.shape(logits_2d),
+        #     depth=self.num_classes + 1,
+        #     on_value=1,
+        #     off_value=0,
+        #     axis=-1)
+        # mask /= blank_prior
+        # logits_2d = tf.multiply(logits_2d, mask)
 
         # Apply smoothing
         logits_2d /= softmax_tempareture

@@ -218,8 +218,8 @@ def do_train(model, params, gpu_indices):
                                       ] = inputs[i_gpu]
                         feed_dict_dev[model.labels_pl_list[i_gpu]] = list2sparsetensor(
                             labels[i_gpu], padded_value=dev_data_other.padded_value)
-                        feed_dict_dev[model.inputs_pl_list[i_gpu]
-                                      ] = inputs[i_gpu]
+                        feed_dict_dev[model.inputs_seq_len_pl_list[i_gpu]
+                                      ] = inputs_seq_len[i_gpu]
                         feed_dict_dev[model.keep_prob_input_pl_list[i_gpu]] = 1.0
                         feed_dict_dev[model.keep_prob_hidden_pl_list[i_gpu]] = 1.0
                         feed_dict_dev[model.keep_prob_output_pl_list[i_gpu]] = 1.0

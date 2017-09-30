@@ -33,9 +33,9 @@ class MultitaskCTCBase(CTCBase):
     def __init__(self, input_size, splice, num_classes_main, num_classes_sub,
                  main_task_weight, lstm_impl, clip_grad, weight_decay):
 
-        super(MultitaskCTCBase, self).__init__(input_size, splice,
-                                               num_classes_main,
-                                               clip_grad, weight_decay)
+        super(MultitaskCTCBase, self).__init__(
+            input_size, splice, num_classes_main, lstm_impl,
+            clip_grad, weight_decay)
 
         self.num_classes_sub = int(num_classes_sub) + 1  # plus blank label
         if float(main_task_weight) < 0 or float(main_task_weight) > 1:

@@ -17,10 +17,10 @@ param:
   batch_size: 16
   optimizer: adam
   learning_rate: 1e-3
-  decay_start_epoch: 1
-  decay_rate: 0.75
-  decay_patient_epoch: 1
-  num_epoch: 30
+  decay_start_epoch: 5
+  decay_rate: 0.1
+  decay_patient_epoch: 2
+  num_epoch: 20
   weight_init: 0.1
   clip_grad: 5.0
   clip_activation: 50
@@ -29,4 +29,4 @@ param:
   dropout_output: 1.0
   weight_decay: 0
   eval_start_epoch: 1
-  print_step: 50
+  print_step: 200
