@@ -12,8 +12,8 @@ import unittest
 
 sys.path.append(os.path.abspath('../../../../'))
 from experiments.timit.data.load_dataset_multitask_ctc import Dataset
-from utils.io.labels.character import idx2char
-from utils.io.labels.phone import idx2phone
+from utils.io.labels.character import Idx2char
+from utils.io.labels.phone import Idx2phone
 from utils.measure_time_func import measure_time
 
 
@@ -69,15 +69,17 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
             progressbar=True)
 
         print('=> Loading mini-batch...')
-        map_file_path_char = '../../metrics/mapping_files/ctc/' + label_type_main + '.txt'
-        map_file_path_phone = '../../metrics/mapping_files/ctc/phone61.txt'
+        idx2char = Idx2char(
+            map_file_path='../../metrics/mapping_files/ctc/' + label_type_main + '.txt')
+        idx2phone = Idx2phone(
+            map_file_path='../../metrics/mapping_files/ctc/phone61.txt')
 
         for data, is_new_epoch in dataset:
             inputs, labels_char, labels_phone, inputs_seq_len, input_names = data
 
-            str_true_char = idx2char(labels_char[0], map_file_path_char)
+            str_true_char = idx2char(labels_char[0])
             str_true_char = re.sub(r'_', ' ', str_true_char)
-            str_true_phone = idx2phone(labels_phone[0], map_file_path_phone)
+            str_true_phone = idx2phone(labels_phone[0])
             print('----- %s ----- (epoch: %.3f)' %
                   (input_names[0], dataset.epoch_detail))
             print(str_true_char)

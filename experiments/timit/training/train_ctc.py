@@ -45,7 +45,7 @@ def do_train(model, params):
         batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
-    if params['label_type'] in ['character', 'character_capital_divide']:
+    if 'char' in params['label_type']:
         test_data = Dataset(
             data_type='test', label_type=params['label_type'],
             batch_size=1, splice=params['splice'],
@@ -79,7 +79,6 @@ def do_train(model, params):
             learning_rate=learning_rate_pl)
         decode_op = model.decoder(logits,
                                   model.inputs_seq_len_pl_list[0],
-                                  decode_type='beam_search',
                                   beam_width=20)
         ler_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 
@@ -322,6 +321,8 @@ def main(config_path, model_save_path):
                 num_units=params['num_units'],
                 num_layers=params['num_layers'],
                 num_classes=params['num_classes'],
+                lstm_impl=params['lstm_impl'],
+                use_peephole=params['use_peephole'],
                 parameter_init=params['weight_init'],
                 clip_grad=params['clip_grad'],
                 clip_activation=params['clip_activation'],

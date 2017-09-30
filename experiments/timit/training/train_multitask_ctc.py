@@ -75,10 +75,7 @@ def do_train(model, params):
             optimizer=params['optimizer'],
             learning_rate=learning_rate_pl)
         decode_op_character, decode_op_phone = model.decoder(
-            logits_main,
-            logits_sub,
-            model.inputs_seq_len_pl_list[0],
-            decode_type='beam_search',
+            logits_main, logits_sub, model.inputs_seq_len_pl_list[0],
             beam_width=20)
         cer_op, per_op = model.compute_ler(
             decode_op_character, decode_op_phone,
@@ -326,6 +323,8 @@ def main(config_path, model_save_path):
         num_classes_main=params['num_classes_main'],
         num_classes_sub=params['num_classes_sub'],
         main_task_weight=params['main_task_weight'],
+        lstm_impl=params['lstm_impl'],
+        use_peephole=params['use_peephole'],
         parameter_init=params['weight_init'],
         clip_grad=params['clip_grad'],
         clip_activation=params['clip_activation'],

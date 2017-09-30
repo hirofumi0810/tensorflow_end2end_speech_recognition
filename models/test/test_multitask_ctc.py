@@ -26,11 +26,24 @@ class TestMultitaskCTC(tf.test.TestCase):
     def test_multiask_ctc(self):
         print("Multitask CTC Working check.")
 
-        self.check_training(encoder_type='multitask_blstm')
-        self.check_training(encoder_type='multitask_lstm')
+        # BLSTM
+        self.check_training(encoder_type='multitask_blstm',
+                            lstm_impl='BasicLSTMCell')
+        self.check_training(encoder_type='multitask_blstm',
+                            lstm_impl='LSTMCell')
+        self.check_training(encoder_type='multitask_blstm',
+                            lstm_impl='LSTMBlockCell')
+
+        # LSTM
+        self.check_training(encoder_type='multitask_lstm',
+                            lstm_impl='BasicLSTMCell')
+        self.check_training(encoder_type='multitask_lstm',
+                            lstm_impl='LSTMCell')
+        self.check_training(encoder_type='multitask_lstm',
+                            lstm_impl='LSTMBlockCell')
 
     @measure_time
-    def check_training(self, encoder_type):
+    def check_training(self, encoder_type, lstm_impl='LSTMBlockCell'):
 
         print('==================================================')
         print('  encoder_type: %s' % str(encoder_type))
@@ -57,6 +70,7 @@ class TestMultitaskCTC(tf.test.TestCase):
                 num_classes_main=num_classes_main,
                 num_classes_sub=num_classes_sub,
                 main_task_weight=0.8,
+                lstm_impl=lstm_impl,
                 parameter_init=0.1,
                 clip_grad=5.0,
                 clip_activation=50,
@@ -85,7 +99,6 @@ class TestMultitaskCTC(tf.test.TestCase):
                 logits_main,
                 logits_sub,
                 model.inputs_seq_len_pl_list[0],
-                decode_type='beam_search',
                 beam_width=20)
             ler_op_main, ler_op_sub = model.compute_ler(
                 decode_op_main, decode_op_sub,
@@ -194,10 +207,13 @@ class TestMultitaskCTC(tf.test.TestCase):
 
                         print('Phone')
                         try:
-                            print('  Ref: %s' % idx2phone(labels_true_phone[0]))
-                            print('  Hyp: %s' % idx2phone(labels_pred_phone[0]))
+                            print('  Ref: %s' %
+                                  idx2phone(labels_true_phone[0]))
+                            print('  Hyp: %s' %
+                                  idx2phone(labels_pred_phone[0]))
                         except IndexError:
-                            print('  Ref: %s' % idx2phone(labels_true_phone[0]))
+                            print('  Ref: %s' %
+                                  idx2phone(labels_true_phone[0]))
                             print('  Hyp: %s' % '')
                             # NOTE: This is for no prediction
                         print('---------------------------------------------' +

@@ -33,6 +33,7 @@ class CTC(CTCBase):
                 LSTMCell: tf.contrib.rnn.LSTMCell
                 LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
                 LSTMBlockFusedCell: under implementation
+                CudnnLSTM: under implementation
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest).
         use_peephole (bool, optional): if True, use peephole connection. This
@@ -67,7 +68,9 @@ class CTC(CTCBase):
                  bottleneck_dim=None):
 
         super(CTC, self).__init__(
-            input_size, splice, num_classes, clip_grad, weight_decay)
+            input_size, splice, num_classes, lstm_impl,
+            clip_grad, weight_decay)
+
         self.name = encoder_type + '_ctc'
 
         if encoder_type in ['blstm', 'lstm']:
@@ -101,7 +104,7 @@ class CTC(CTCBase):
                                               parameter_init=parameter_init,
                                               bottleneck_dim=bottleneck_dim)
 
-        elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn']:
+        elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
             self.encoder = load(encoder_type)(input_size=input_size,
                                               splice=splice,
                                               num_classes=num_classes + 1,

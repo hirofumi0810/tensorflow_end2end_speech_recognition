@@ -16,6 +16,8 @@ OPTIMIZER_CLS_NAMES = {
     "adam": tf.train.AdamOptimizer,
     "rmsprop": tf.train.RMSPropOptimizer,
     "sgd": tf.train.GradientDescentOptimizer,
+    "momentum": tf.train.MomentumOptimizer,
+    "nestrov": tf.train.MomentumOptimizer
 }
 
 
@@ -26,25 +28,32 @@ class CTCBase(object):
         splice (int): frames to splice. Default is 1 frame.
         num_classes (int): the number of classes of target labels
             (except for a blank label)
+        lstm_impl (string, optional):
+            BasicLSTMCell or LSTMCell or LSTMBlockCell or
+                LSTMBlockFusedCell or CudnnLSTM.
+            Choose the background implementation of tensorflow.
         clip_grad (float): the range of gradient clipping (> 0)
         weight_decay (float): a parameter for weight decay
     """
 
-    def __init__(self, input_size, splice, num_classes, clip_grad,
-                 weight_decay):
+    def __init__(self, input_size, splice, num_classes, lstm_impl,
+                 clip_grad, weight_decay):
         assert input_size % 3 == 0, 'input_size must be divisible by 3 (+ delta, double delta features).'
         # NOTE: input features are expected to including Δ and ΔΔ features
         assert splice % 2 == 1, 'splice must be the odd number'
-        assert clip_grad > 0, 'clip_grad must be larger than 0.'
-        assert weight_decay >= 0, 'weight_decay must not be a negative value.'
+        if clip_grad is not None:
+            assert float(clip_grad) > 0, 'clip_grad must be larger than 0.'
+        assert float(
+            weight_decay) >= 0, 'weight_decay must not be a negative value.'
 
         # Network size
         self.input_size = int(input_size)
         self.splice = int(splice)
         self.num_classes = int(num_classes) + 1  # plus blank label
+        self.lstm_impl = lstm_impl
 
         # Regularization
-        self.clip_grad = float(clip_grad)
+        self.clip_grad = clip_grad
         self.weight_decay = float(weight_decay)
 
         # Summaries for TensorBoard
@@ -64,7 +73,7 @@ class CTCBase(object):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
-            inputs_seq_len: A tensor of size `[B]`
+            inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob_input (placeholder, float): A probability to keep nodes
                 in the input-hidden connection
             keep_prob_hidden (placeholder, float): A probability to keep nodes
@@ -75,8 +84,8 @@ class CTCBase(object):
             logits: A tensor of size `[T, B, num_classes]`
         """
         logits, final_state = self.encoder(
-            inputs, inputs_seq_len, keep_prob_input,
-            keep_prob_hidden, keep_prob_output)
+            inputs, inputs_seq_len,
+            keep_prob_input, keep_prob_hidden, keep_prob_output)
 
         return logits
 
@@ -91,7 +100,7 @@ class CTCBase(object):
                             tf.placeholder(tf.int32, name='values'),
                             tf.placeholder(tf.int64, name='shape')))
         self.inputs_seq_len_pl_list.append(
-            tf.placeholder(tf.int64, shape=[None], name='inputs_seq_len'))
+            tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
         self.keep_prob_input_pl_list.append(
             tf.placeholder(tf.float32, name='keep_prob_input'))
         self.keep_prob_hidden_pl_list.append(
@@ -162,7 +171,8 @@ class CTCBase(object):
             ctc_losses = tf.nn.ctc_loss(
                 labels,
                 logits,
-                tf.cast(inputs_seq_len, tf.int32),
+                # tf.cast(inputs_seq_len, tf.int32),
+                inputs_seq_len,
                 preprocess_collapse_repeated=False,
                 ctc_merge_repeated=True,
                 ignore_longer_outputs_than_inputs=False,
@@ -210,11 +220,15 @@ class CTCBase(object):
                 (", ".join(OPTIMIZER_CLS_NAMES), optimizer))
 
         # Select optimizer
-        if optimizer == 'sgd':
+        if optimizer == 'momentum':
             return OPTIMIZER_CLS_NAMES[optimizer](
                 learning_rate=learning_rate,
                 momentum=0.9)
-            # NOTE: Default momentum of SGD is 0.9
+        elif optimizer == 'nestrov':
+            return OPTIMIZER_CLS_NAMES[optimizer](
+                learning_rate=learning_rate,
+                momentum=0.9,
+                use_nesterov=True)
         else:
             return OPTIMIZER_CLS_NAMES[optimizer](
                 learning_rate=learning_rate)
@@ -289,46 +303,55 @@ class CTCBase(object):
 
         return clipped_grads_and_vars
 
-    def decoder(self, logits, inputs_seq_len, decode_type='greedy',
-                beam_width=1):
+    def decoder(self, logits, inputs_seq_len, beam_width=1):
         """Operation for decoding.
         Args:
             logits: A tensor of size `[T, B, input_size]`
             inputs_seq_len: A tensor of size `[B]`
-            decode_type (string): greedy or beam_search. Defalult is greedy.
             beam_width (int, optional): beam width for beam search.
-                Default is 1 (best path decoding).
+                1 disables beam search, which mean greedy decoding.
         Return:
             decode_op: A SparseTensor
         """
-        if decode_type not in ['greedy', 'beam_search']:
-            raise ValueError('decode_type is "greedy" or "beam_search".')
         assert isinstance(beam_width, int), "beam_width must be integer."
         assert beam_width >= 1, "beam_width must be >= 1"
 
+        # inputs_seq_len = tf.cast(inputs_seq_len, tf.int32)
+
         if beam_width == 1:
             decoded, _ = tf.nn.ctc_greedy_decoder(
-                logits, tf.cast(inputs_seq_len, tf.int32))
+                logits, inputs_seq_len)
         else:
             decoded, _ = tf.nn.ctc_beam_search_decoder(
-                logits, tf.cast(inputs_seq_len, tf.int32),
+                logits, inputs_seq_len,
                 beam_width=beam_width)
 
         decode_op = tf.to_int32(decoded[0])
 
         return decode_op
 
-    def posteriors(self, logits):
+    def posteriors(self, logits, blank_prior=1., softmax_tempareture=1):
         """Operation for computing posteriors of each time steps.
         Args:
             logits: A tensor of size `[T, B, input_size]`
+            blank_prior (float): A prior for blank classes. posteriors are
+                divided by this prior.
+            softmax_tempareture (float): A tempareture parameter for the
+                softmax layer
         Return:
             posteriors_op: operation for computing posteriors for each class
         """
-        # Convert to batch-major: `[batch_size, max_time, num_classes]'
+        # Convert to batch-major: `[B, T, num_classes]'
         logits = tf.transpose(logits, (1, 0, 2))
 
         logits_2d = tf.reshape(logits, [-1, self.num_classes])
+
+        # TODO: Divide by blank prior
+
+        # Apply smoothing
+        logits_2d /= softmax_tempareture
+        # TODO: which is first??
+
         posteriors_op = tf.nn.softmax(logits_2d)
 
         return posteriors_op
@@ -392,7 +415,8 @@ class CTCBase(object):
             # Histogram
             with tf.name_scope("dev"):
                 for var in trainable_vars:
-                    self.summaries_dev.append(tf.summary.histogram(var.name, var))
+                    self.summaries_dev.append(
+                        tf.summary.histogram(var.name, var))
 
             # Mean
             with tf.name_scope("mean_dev"):

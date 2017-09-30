@@ -58,6 +58,9 @@ class BGRU_Encoder(object):
             logits: A tensor of size `[T, B, num_classes]`
             final_state: A final hidden state of the encoder
         """
+        # inputs: `[B, T, input_size]`
+        batch_size = tf.shape(inputs)[0]
+
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(
             inputs, keep_prob_input, name='dropout_input')
@@ -96,15 +99,13 @@ class BGRU_Encoder(object):
         # Reshape to apply the same weights over the timesteps
         outputs = tf.reshape(outputs, shape=[-1, self.num_units * 2])
 
-        # inputs: `[batch_size, max_time, input_size]`
-        batch_size = tf.shape(inputs)[0]
-
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.variable_scope('bottleneck') as scope:
                 outputs = tf.contrib.layers.fully_connected(
                     outputs, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
-                    weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                    weights_initializer=tf.truncated_normal_initializer(
+                        stddev=self.parameter_init),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
 
@@ -116,7 +117,8 @@ class BGRU_Encoder(object):
             logits_2d = tf.contrib.layers.fully_connected(
                 outputs, self.num_classes,
                 activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 
@@ -124,7 +126,7 @@ class BGRU_Encoder(object):
             logits = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes])
 
-            # Convert to time-major: `[max_time, batch_size, num_classes]'
+            # Convert to time-major: `[T, B, num_classes]'
             logits = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections

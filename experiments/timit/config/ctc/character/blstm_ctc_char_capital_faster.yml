@@ -7,6 +7,8 @@ param:
   splice: 1
   num_stack: 3
   num_skip: 3
+  lstm_impl: LSTMBlockCell
+  use_peephole: True
   num_units: 256
   num_proj: 0
   num_layers: 5
@@ -25,5 +27,5 @@ param:
   dropout_hidden: 0.5
   dropout_output: 1.0
   weight_decay: 0
-  eval_start_epoch: 20
+  eval_start_epoch: 10
   print_step: 10

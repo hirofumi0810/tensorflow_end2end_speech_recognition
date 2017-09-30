@@ -114,7 +114,6 @@ def do_train(model, params, gpu_indices):
                         decode_op_tower = model.decoder(
                             tower_logits,
                             model.inputs_seq_len_pl_list[i_gpu],
-                            decode_type='beam_search',
                             beam_width=20)
                         decode_ops.append(decode_op_tower)
                         ler_op_tower = model.compute_ler(
@@ -212,15 +211,15 @@ def do_train(model, params, gpu_indices):
                 if (step + 1) % int(params['print_step'] / len(gpu_indices)) == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    (inputs, labels, inputs_seq_len, _), _ = dev_data_other.next()
+                    (inputs, labels, inputs_seq_len,  _), _ = dev_data_other.next()
                     feed_dict_dev = {}
                     for i_gpu in range(len(gpu_indices)):
                         feed_dict_dev[model.inputs_pl_list[i_gpu]
                                       ] = inputs[i_gpu]
                         feed_dict_dev[model.labels_pl_list[i_gpu]] = list2sparsetensor(
                             labels[i_gpu], padded_value=dev_data_other.padded_value)
-                        feed_dict_dev[model.inputs_seq_len_pl_list[i_gpu]
-                                      ] = inputs_seq_len[i_gpu]
+                        feed_dict_dev[model.inputs_pl_list[i_gpu]
+                                      ] = inputs[i_gpu]
                         feed_dict_dev[model.keep_prob_input_pl_list[i_gpu]] = 1.0
                         feed_dict_dev[model.keep_prob_hidden_pl_list[i_gpu]] = 1.0
                         feed_dict_dev[model.keep_prob_output_pl_list[i_gpu]] = 1.0
@@ -269,6 +268,13 @@ def do_train(model, params, gpu_indices):
                              label_type=params['label_type'],
                              save_path=model.save_path)
 
+                    # Save model (check point)
+                    checkpoint_file = join(
+                        model.save_path, 'model.ckpt')
+                    save_path = saver.save(
+                        sess, checkpoint_file, global_step=train_data.epoch)
+                    print("Model saved in file: %s" % save_path)
+
                     if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
                         if params['label_type'] != 'word':
@@ -281,8 +287,10 @@ def do_train(model, params, gpu_indices):
                                 dataset=dev_data_clean,
                                 label_type=params['label_type'],
                                 eval_batch_size=params['batch_size'])
-                            print('  CER (clean): %f %%' % (ler_dev_clean_epoch * 100))
-                            print('  WER (clean): %f %%' % (wer_dev_clean_epoch * 100))
+                            print('  CER (clean): %f %%' %
+                                  (ler_dev_clean_epoch * 100))
+                            print('  WER (clean): %f %%' %
+                                  (wer_dev_clean_epoch * 100))
 
                             # Dev-other
                             ler_dev_other_epoch, wer_dev_other_epoch = do_eval_cer(
@@ -292,19 +300,14 @@ def do_train(model, params, gpu_indices):
                                 dataset=dev_data_other,
                                 label_type=params['label_type'],
                                 eval_batch_size=params['batch_size'])
-                            print('  CER (other): %f %%' % (ler_dev_other_epoch * 100))
-                            print('  WER (other): %f %%' % (wer_dev_other_epoch * 100))
+                            print('  CER (other): %f %%' %
+                                  (ler_dev_other_epoch * 100))
+                            print('  WER (other): %f %%' %
+                                  (wer_dev_other_epoch * 100))
 
                             if ler_dev_other_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_other_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
-
-                                # Save model only when best accuracy is
-                                # obtained (check point)
-                                checkpoint_file = join(model.save_path, 'model.ckpt')
-                                save_path = saver.save(
-                                    sess, checkpoint_file, global_step=train_data.epoch)
-                                print("Model saved in file: %s" % save_path)
 
                         else:
                             print('=== Dev Data Evaluation ===')
@@ -316,7 +319,8 @@ def do_train(model, params, gpu_indices):
                                 dataset=dev_data_clean,
                                 train_data_size=params['train_data_size'],
                                 eval_batch_size=params['batch_size'])
-                            print('  WER (clean): %f %%' % (ler_dev_clean_epoch * 100))
+                            print('  WER (clean): %f %%' %
+                                  (ler_dev_clean_epoch * 100))
 
                             # Dev-other
                             ler_dev_other_epoch = do_eval_wer(
@@ -326,18 +330,12 @@ def do_train(model, params, gpu_indices):
                                 dataset=dev_data_other,
                                 train_data_size=params['train_data_size'],
                                 eval_batch_size=params['batch_size'])
-                            print('  WER (other): %f %%' % (ler_dev_other_epoch * 100))
+                            print('  WER (other): %f %%' %
+                                  (ler_dev_other_epoch * 100))
 
                             if ler_dev_other_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_other_epoch
                                 print('■■■ ↑Best Score (WER)↑ ■■■')
-
-                                # Save model only when best accuracy is
-                                # obtained (check point)
-                                checkpoint_file = join(model.save_path, 'model.ckpt')
-                                save_path = saver.save(
-                                    sess, checkpoint_file, global_step=train_data.epoch)
-                                print("Model saved in file: %s" % save_path)
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -388,6 +386,8 @@ def main(config_path, model_save_path, gpu_indices):
                 num_units=params['num_units'],
                 num_layers=params['num_layers'],
                 num_classes=params['num_classes'],
+                lstm_impl=params['lstm_impl'],
+                use_peephole=params['use_peephole'],
                 parameter_init=params['weight_init'],
                 clip_grad=params['clip_grad'],
                 clip_activation=params['clip_activation'],

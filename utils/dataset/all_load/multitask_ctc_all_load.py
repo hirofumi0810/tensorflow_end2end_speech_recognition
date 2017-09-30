@@ -29,11 +29,16 @@ class DatasetBase(Base):
             batch_size (int, optional): the size of mini-batch
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
-                inputs: list of input data of size `[B, T, input_dim]`
-                labels_main: list of target labels in the main task, of size `[B, T]`
-                labels_sub: list of target labels in the sub task, of size `[B, T]`
-                inputs_seq_len: list of length of inputs of size `[B]`
-                input_names: list of file name of input data of size `[B]`
+                inputs: list of input data of size
+                    `[B, T, input_dim]`
+                labels_main: list of target labels in the main task, of size
+                    `[B, T]`
+                labels_sub: list of target labels in the sub task, of size
+                    `[B, T]`
+                inputs_seq_len: list of length of inputs of size
+                    `[B]`
+                input_names: list of file name of input data of size
+                    `[B]`
             is_new_epoch (bool): If true, one epoch is finished
         """
         if self.max_epoch is not None and self.epoch >= self.max_epoch:
@@ -103,15 +108,14 @@ class DatasetBase(Base):
         # Initialization
         inputs = np.zeros(
             (len(data_indices), max_frame_num,
-             self.input_list[0].shape[-1] * self.splice),
-            dtype=np.int32)
+             self.input_list[0].shape[-1] * self.splice), dtype=np.float32)
         labels_main = np.array(
             [[self.padded_value] * max_seq_len_main] * len(data_indices),
             dtype=np.int32)
         labels_sub = np.array(
             [[self.padded_value] * max_seq_len_sub] * len(data_indices),
             dtype=np.int32)
-        inputs_seq_len = np.empty((len(data_indices),), dtype=np.int32)
+        inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
         input_names = np.array(list(
             map(lambda path: basename(path).split('.')[0],
                 np.take(self.input_paths, data_indices, axis=0))))
@@ -135,5 +139,6 @@ class DatasetBase(Base):
             inputs_seq_len[i_batch] = frame_num
 
         self.iteration += len(data_indices)
+
         return (inputs, labels_main, labels_sub, inputs_seq_len,
                 input_names), self.is_new_epoch

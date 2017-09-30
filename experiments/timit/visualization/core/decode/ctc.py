@@ -10,9 +10,10 @@ from __future__ import print_function
 from os.path import join
 import sys
 
-from utils.io.labels.character import idx2char
-from utils.io.labels.phone import idx2phone
+from utils.io.labels.character import Idx2char
+from utils.io.labels.phone import Idx2phone
 from utils.io.labels.sparsetensor import sparsetensor2list
+from utils.evaluation.edit_distance import wer_align
 
 
 def decode_test(session, decode_op, model, dataset, label_type, save_path=None):
@@ -26,7 +27,16 @@ def decode_test(session, decode_op, model, dataset, label_type, save_path=None):
             character_capital_divide
         save_path (string, optional): path to save decoding results
     """
-    map_file_path = '../metrics/mapping_files/ctc/' + label_type + '.txt'
+    if label_type == 'character':
+        map_fn = Idx2char(
+            map_file_path='../metrics/mapping_files/ctc/character.txt')
+    elif label_type == 'character_capital_divide':
+        map_fn = Idx2char(
+            map_file_path='../metrics/mapping_files/ctc/character_capital_divide.txt',
+            capital_divide=True)
+    else:
+        map_fn = Idx2phone(
+            map_file_path='../metrics/mapping_files/ctc/' + label_type + '.txt')
 
     if save_path is not None:
         sys.stdout = open(join(model.model_dir, 'decode.txt'), 'w')
@@ -54,15 +64,15 @@ def decode_test(session, decode_op, model, dataset, label_type, save_path=None):
             # no output
             labels_pred = ['']
         finally:
-            if 'char' in label_type:
-                print('----- wav: %s -----' % input_names[0])
-                print('Ref: %s' % idx2char(labels_true[0], map_file_path))
-                print('Hyp: %s' % idx2char(labels_pred[0], map_file_path))
-
+            print('----- wav: %s -----' % input_names[0])
+            if label_type == 'character':
+                true_seq = map_fn(labels_true[0]).replace('_', ' ')
+                pred_seq = map_fn(labels_pred[0]).replace('_', ' ')
             else:
-                print('----- wav: %s -----' % input_names[0])
-                print('Ref: %s' % idx2phone(labels_true[0], map_file_path))
-                print('Hyp: %s' % idx2phone(labels_pred[0], map_file_path))
+                true_seq = map_fn(labels_true[0])
+                pred_seq = map_fn(labels_pred[0])
+            print('Ref: %s' % true_seq)
+            print('Hyp: %s' % pred_seq)
 
         if is_new_epoch:
             break
@@ -82,12 +92,15 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
         label_type_sub (string): phone39 or phone48 or phone61
         save_path (string, optional): path to save decoding results
     """
+    # TODO: fix
+
     if save_path is not None:
         sys.stdout = open(join(model.model_dir, 'decode.txt'), 'w')
 
     # Decode character
     print('===== ' + label_type_main + ' =====')
-    map_file_path = '../metrics/mapping_files/ctc/' + label_type_main + '.txt'
+    idx2char = Idx2char(
+        map_file_path='../metrics/mapping_files/ctc/' + label_type_main + '.txt')
     while True:
 
         # Create feed dictionary for next mini batch
@@ -108,15 +121,16 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
         labels_pred = sparsetensor2list(labels_pred_st, batch_size=1)
 
         print('----- wav: %s -----' % input_names[0])
-        print('Ref: %s' % idx2char(labels_true[0], map_file_path))
-        print('Hyp: %s' % idx2char(labels_pred[0], map_file_path))
+        print('Ref: %s' % idx2char(labels_true[0]))
+        print('Hyp: %s' % idx2char(labels_pred[0]))
 
         if is_new_epoch:
             break
 
     # Decode phone
     print('\n===== ' + label_type_sub + ' =====')
-    map_file_path = '../metrics/mapping_files/ctc/' + label_type_sub + '.txt'
+    idx2phone = Idx2phone(
+        map_file_path='../metrics/mapping_files/ctc/' + label_type_sub + '.txt')
     while True:
 
         # Create feed dictionary for next mini batch
@@ -140,8 +154,8 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
             labels_pred = ['']
         finally:
             print('----- wav: %s -----' % input_names[0])
-            print('Ref: %s' % idx2phone(labels_true[0], map_file_path))
-            print('Hyp: %s' % idx2phone(labels_pred[0], map_file_path))
+            print('Ref: %s' % idx2phone(labels_true[0]))
+            print('Hyp: %s' % idx2phone(labels_pred[0]))
 
         if is_new_epoch:
             break

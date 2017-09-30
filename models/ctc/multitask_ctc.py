@@ -33,6 +33,7 @@ class Multitask_CTC(MultitaskCTCBase):
                 LSTMCell: tf.contrib.rnn.LSTMCell
                 LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
                 LSTMBlockFusedCell: under implementation
+                CudnnLSTM: under implementation
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest).
         use_peephole (bool, optional): if True, use peephole connection. This
@@ -71,7 +72,8 @@ class Multitask_CTC(MultitaskCTCBase):
 
         super(Multitask_CTC, self).__init__(
             input_size, splice, num_classes_main, num_classes_sub,
-            main_task_weight, clip_grad, weight_decay)
+            main_task_weight, lstm_impl, clip_grad, weight_decay)
+
         self.name = encoder_type + '_ctc'
 
         if ['multitask_blstm', 'multitask_lstm']:

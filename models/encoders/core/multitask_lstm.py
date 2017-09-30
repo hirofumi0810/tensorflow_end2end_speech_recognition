@@ -90,12 +90,12 @@ class Multitask_LSTM_Encoder(object):
             final_state: A final hidden state of the encoder in the main task
             final_state_sub: A final hidden state of the encoder in the sub task
         """
+        # inputs: `[B, T, input_size]`
+        batch_size = tf.shape(inputs)[0]
+
         # Dropout for the input-hidden connection
         outputs = tf.nn.dropout(
             inputs, keep_prob_input, name='dropout_input')
-
-        # inputs: `[batch_size, max_time, input_size]`
-        batch_size = tf.shape(inputs)[0]
 
         initializer = tf.random_uniform_initializer(
             minval=-self.parameter_init, maxval=self.parameter_init)
@@ -133,19 +133,14 @@ class Multitask_LSTM_Encoder(object):
                 elif self.lstm_impl == 'LSTMBlockFusedCell':
                     raise NotImplementedError
 
-                    # NOTE: This should be faster than
-                    tf.contrib.rnn.LSTMBlockFusedCell
-                    lstm = tf.contrib.rnn.LSTMBlockFusedCell(
-                        self.num_units,
-                        forget_bias=1.0,
-                        # clip_cell=True,
-                        use_peephole=self.use_peephole)
-                    # TODO: cell clipping (update for rc1.3)
+                elif self.lstm_impl == 'CudnnLSTM':
+                    raise ValueError
 
                 else:
                     raise IndexError(
                         'lstm_impl is "BasicLSTMCell" or "LSTMCell" or ' +
-                        '"LSTMBlockCell" or "LSTMBlockFusedCell".')
+                        '"LSTMBlockCell" or "LSTMBlockFusedCell" or ' +
+                        '"CudnnLSTM".')
 
                 # Dropout for the hidden-hidden connections
                 lstm = tf.contrib.rnn.DropoutWrapper(
@@ -172,7 +167,7 @@ class Multitask_LSTM_Encoder(object):
         with tf.variable_scope('multi_lstm', initializer=initializer, reuse=True) as scope_lstm:
             # Stack multiple cells
             stacked_lstm_sub = tf.contrib.rnn.MultiRNNCell(
-                lstm_list, state_is_tuple=True)
+                lstm_list_sub, state_is_tuple=True)
 
             # Ignore 2nd return (the last state)
             outputs_sub, final_state_sub = tf.nn.dynamic_rnn(
@@ -194,7 +189,8 @@ class Multitask_LSTM_Encoder(object):
             logits_sub_2d = tf.contrib.layers.fully_connected(
                 outputs_sub_2d, self.num_classes_sub,
                 activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope_output)
 
@@ -203,8 +199,7 @@ class Multitask_LSTM_Encoder(object):
                 logits_sub_2d,
                 shape=[batch_size, -1, self.num_classes_sub])
 
-            # Convert to time-major: `[max_time, batch_size,
-            # num_classes]'
+            # Convert to time-major: `[T, B, num_classes]'
             logits_sub = tf.transpose(logits_sub, (1, 0, 2))
 
             # Dropout for the hidden-output connections
@@ -227,7 +222,8 @@ class Multitask_LSTM_Encoder(object):
                 outputs_2d = tf.contrib.layers.fully_connected(
                     outputs_2d, self.bottleneck_dim,
                     activation_fn=tf.nn.relu,
-                    weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                    weights_initializer=tf.truncated_normal_initializer(
+                        stddev=self.parameter_init),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
 
@@ -240,7 +236,8 @@ class Multitask_LSTM_Encoder(object):
             logits_2d = tf.contrib.layers.fully_connected(
                 outputs_2d, self.num_classes_main,
                 activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.1),
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 
@@ -248,7 +245,7 @@ class Multitask_LSTM_Encoder(object):
             logits = tf.reshape(
                 logits_2d, shape=[batch_size, -1, self.num_classes_main])
 
-            # Convert to time-major: `[max_time, batch_size, num_classes]'
+            # Convert to time-major: `[T, B, num_classes]'
             logits = tf.transpose(logits, (1, 0, 2))
 
             # Dropout for the hidden-output connections

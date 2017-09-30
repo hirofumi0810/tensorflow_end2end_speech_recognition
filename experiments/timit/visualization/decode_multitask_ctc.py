@@ -53,10 +53,8 @@ def do_decode(model, params, epoch):
         model.keep_prob_hidden_pl_list[0],
         model.keep_prob_output_pl_list[0])
     decode_op_main, decode_op_sub = model.decoder(
-        logits_main,
-        logits_sub,
+        logits_main, logits_sub,
         model.inputs_seq_len_pl_list[0],
-        decode_type='beam_search',
         beam_width=20)
 
     # Create a saver for writing training checkpoints
@@ -121,6 +119,9 @@ def main():
         num_classes_main=params['num_classes_main'],
         num_classes_sub=params['num_classes_sub'],
         main_task_weight=params['main_task_weight'],
+        lstm_impl=params['lstm_impl'],
+        use_peephole=params['use_peephole'],
+        parameter_init=params['weight_init'],
         clip_grad=params['clip_grad'],
         clip_activation=params['clip_activation'],
         num_proj=params['num_proj'],

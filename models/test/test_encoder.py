@@ -24,32 +24,59 @@ class TestEncoder(unittest.TestCase):
 
         print("Encoder Working check.")
 
+        # BLSTM
+        self.check_encode(encoder_type='blstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='blstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='blstm', lstm_impl='LSTMBlockCell')
+        # self.check_encode(encoder_type='blstm', lstm_impl='LSTMBlockFusedCell')
+        # self.check_encode(encoder_type='blstm', lstm_impl='CudnnLSTM')
+
+        # LSTM
+        self.check_encode(encoder_type='lstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='lstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='lstm', lstm_impl='LSTMBlockCell')
+        # self.check_encode(encoder_type='lstm', lstm_impl='LSTMBlockFusedCell')
+        # self.check_encode(encoder_type='lstm', lstm_impl='CudnnLSTM')
+
+        # GRUs
+        self.check_encode(encoder_type='bgru')
+        self.check_encode(encoder_type='gru')
+
+        # VGG-BLSTM
+        self.check_encode(encoder_type='vgg_blstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='vgg_blstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='vgg_blstm', lstm_impl='LSTMBlockCell')
+
+        # VGG-LSTM
+        self.check_encode(encoder_type='vgg_lstm', lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='vgg_lstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='vgg_lstm', lstm_impl='LSTMBlockCell')
+
         # CNNs
         self.check_encode(encoder_type='vgg_wang')
         self.check_encode(encoder_type='cnn_zhang')
         # self.check_encode(encoder_type='resnet_wang')
 
-        # RNNs
-        self.check_encode(encoder_type='blstm')
-        self.check_encode(encoder_type='lstm')
-        self.check_encode(encoder_type='bgru')
-        self.check_encode(encoder_type='gru')
-
-        # CNN-RNNs
-        self.check_encode(encoder_type='vgg_blstm')
-        self.check_encode(encoder_type='vgg_lstm')
-
         # Multi-task
-        self.check_encode(encoder_type='multitask_blstm')
-        self.check_encode(encoder_type='multitask_lstm')
+        self.check_encode(encoder_type='multitask_blstm',
+                          lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='multitask_blstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='multitask_blstm',
+                          lstm_impl='LSTMBlockCell')
+        self.check_encode(encoder_type='multitask_lstm',
+                          lstm_impl='BasicLSTMCell')
+        self.check_encode(encoder_type='multitask_lstm', lstm_impl='LSTMCell')
+        self.check_encode(encoder_type='multitask_lstm',
+                          lstm_impl='LSTMBlockCell')
 
         # Dynamic
         # self.check_encode(encoder_type='pyramidal_blstm')
 
-    def check_encode(self, encoder_type):
+    def check_encode(self, encoder_type, lstm_impl=None):
 
         print('==================================================')
         print('  encoder_type: %s' % encoder_type)
+        print('  lstm_impl: %s' % lstm_impl)
         print('==================================================')
 
         tf.reset_default_graph()
@@ -66,7 +93,14 @@ class TestEncoder(unittest.TestCase):
             frame_num, input_size = inputs[0].shape
 
             # Define model graph
-            if encoder_type in ['blstm', 'lstm', 'bgru', 'gru']:
+            if encoder_type in ['blstm', 'lstm']:
+                encoder = load(encoder_type)(
+                    num_units=256,
+                    num_layers=5,
+                    num_classes=0,  # return hidden states
+                    lstm_impl=lstm_impl,
+                    parameter_init=0.1)
+            elif encoder_type in ['bgru', 'gru']:
                 encoder = load(encoder_type)(
                     num_units=256,
                     num_layers=5,
@@ -79,6 +113,7 @@ class TestEncoder(unittest.TestCase):
                     num_units=256,
                     num_layers=5,
                     num_classes=0,  # return hidden states
+                    lstm_impl=lstm_impl,
                     parameter_init=0.1)
             elif encoder_type in ['multitask_blstm', 'multitask_lstm']:
                 encoder = load(encoder_type)(
@@ -87,15 +122,15 @@ class TestEncoder(unittest.TestCase):
                     num_layers_sub=3,
                     num_classes_main=0,  # return hidden states
                     num_classes_sub=0,  # return hidden states
+                    lstm_impl=lstm_impl,
                     parameter_init=0.1)
             elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                 encoder = load(encoder_type)(
                     input_size=input_size // 11,
                     splice=11,
-                    # num_units=256,
-                    # num_layers=5,
                     num_classes=27,
                     parameter_init=0.1)
+                # NOTE: topology is pre-defined
             else:
                 raise NotImplementedError
 
@@ -103,7 +138,7 @@ class TestEncoder(unittest.TestCase):
             inputs_pl = tf.placeholder(tf.float32,
                                        shape=[None, None, input_size],
                                        name='inputs')
-            inputs_seq_len_pl = tf.placeholder(tf.int64,
+            inputs_seq_len_pl = tf.placeholder(tf.int32,
                                                shape=[None],
                                                name='inputs_seq_len')
             keep_prob_input_pl = tf.placeholder(tf.float32,
@@ -160,7 +195,8 @@ class TestEncoder(unittest.TestCase):
                     hidden_states, final_state, hidden_states_sub, final_state_sub = sess.run(
                         [hidden_states_op, final_state_op, hidden_states_sub_op, final_state_sub_op], feed_dict=feed_dict)
                 elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
-                    hidden_states = sess.run(hidden_states_op, feed_dict=feed_dict)
+                    hidden_states = sess.run(
+                        hidden_states_op, feed_dict=feed_dict)
                 else:
                     hidden_states, final_state = sess.run(
                         [hidden_states_op, final_state_op], feed_dict=feed_dict)
@@ -170,10 +206,14 @@ class TestEncoder(unittest.TestCase):
                         (batch_size, frame_num, encoder.num_units * 2), hidden_states.shape)
 
                     if encoder_type in ['blstm', 'vgg_blstm', 'multitask_blstm']:
-                        self.assertEqual((batch_size, encoder.num_units), final_state[0].c.shape)
-                        self.assertEqual((batch_size, encoder.num_units), final_state[0].h.shape)
-                        self.assertEqual((batch_size, encoder.num_units), final_state[1].c.shape)
-                        self.assertEqual((batch_size, encoder.num_units), final_state[1].h.shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[0].c.shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[0].h.shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[1].c.shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[1].h.shape)
 
                         if encoder_type == 'multitask_blstm':
                             self.assertEqual(
@@ -187,16 +227,20 @@ class TestEncoder(unittest.TestCase):
                             self.assertEqual(
                                 (batch_size, encoder.num_units), final_state_sub[1].h.shape)
                     else:
-                        self.assertEqual((batch_size, encoder.num_units), final_state[0].shape)
-                        self.assertEqual((batch_size, encoder.num_units), final_state[1].shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[0].shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[1].shape)
 
                 elif encoder_type in ['lstm', 'gru', 'vgg_lstm']:
                     self.assertEqual(
                         (batch_size, frame_num, encoder.num_units), hidden_states.shape)
 
                     if encoder_type in ['lstm', 'vgg_lstm', 'multitask_lstm']:
-                        self.assertEqual((batch_size, encoder.num_units), final_state[0].c.shape)
-                        self.assertEqual((batch_size, encoder.num_units), final_state[0].h.shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[0].c.shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[0].h.shape)
 
                         if encoder_type == 'multitask_lstm':
                             self.assertEqual(
@@ -206,7 +250,8 @@ class TestEncoder(unittest.TestCase):
                             self.assertEqual(
                                 (batch_size, encoder.num_units), final_state_sub[0].h.shape)
                     else:
-                        self.assertEqual((batch_size, encoder.num_units), final_state[0].shape)
+                        self.assertEqual(
+                            (batch_size, encoder.num_units), final_state[0].shape)
 
                 elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                     self.assertEqual(
