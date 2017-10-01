@@ -23,14 +23,19 @@ parser.add_argument('--epoch', type=int, default=-1,
                     help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
+parser.add_argument('--beam_width', type=int, default=20,
+                    help='beam_width (int, optional): beam width for beam search.' +
+                    ' 1 disables beam search, which mean greedy decoding.')
 
 
-def do_decode(model, params, epoch):
+def do_decode(model, params, epoch, beam_width):
     """Decode the CTC outputs.
     Args:
         model: the model to restore
         params (dict): A dictionary of parameters
         epoch (int): the epoch to restore
+        beam_width (int): beam_width (int, optional): beam width for beam search.
+            1 disables beam search, which mean greedy decoding.
     """
     # Load dataset
     test_data = Dataset(
@@ -52,7 +57,7 @@ def do_decode(model, params, epoch):
     decode_op = model.decoder(
         logits,
         model.inputs_seq_len_pl_list[0],
-        beam_width=20)
+        beam_width=beam_width)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -120,7 +125,8 @@ def main():
         weight_decay=params['weight_decay'])
 
     model.save_path = args.model_path
-    do_decode(model=model, params=params, epoch=args.epoch)
+    do_decode(model=model, params=params, epoch=args.epoch,
+              beam_width=args.beam_width)
 
 
 if __name__ == '__main__':

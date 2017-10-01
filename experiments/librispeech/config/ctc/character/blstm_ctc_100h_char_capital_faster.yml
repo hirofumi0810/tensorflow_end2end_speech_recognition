@@ -27,6 +27,8 @@ param:
   dropout_input: 1.0
   dropout_hidden: 0.8
   dropout_output: 1.0
-  weight_decay: 1e-8
+  weight_decay: 0
   eval_start_epoch: 1
   print_step: 100
+  beam_width: 20
+  sort_stop_epoch: 1
