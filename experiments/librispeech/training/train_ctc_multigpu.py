@@ -41,7 +41,8 @@ def do_train(model, params, gpu_indices):
         batch_size=params['batch_size'], max_epoch=params['num_epoch'],
         splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True, sort_stop_epoch=None, num_gpu=len(gpu_indices))
+        sort_utt=True, sort_stop_epoch=params['sort_stop_epoch'],
+        num_gpu=len(gpu_indices))
     dev_data_clean = Dataset(
         data_type='dev_clean', train_data_size=params['train_data_size'],
         label_type=params['label_type'],
@@ -114,7 +115,7 @@ def do_train(model, params, gpu_indices):
                         decode_op_tower = model.decoder(
                             tower_logits,
                             model.inputs_seq_len_pl_list[i_gpu],
-                            beam_width=20)
+                            beam_width=params['beam_width'])
                         decode_ops.append(decode_op_tower)
                         ler_op_tower = model.compute_ler(
                             decode_op_tower, model.labels_pl_list[i_gpu])
@@ -218,8 +219,8 @@ def do_train(model, params, gpu_indices):
                                       ] = inputs[i_gpu]
                         feed_dict_dev[model.labels_pl_list[i_gpu]] = list2sparsetensor(
                             labels[i_gpu], padded_value=dev_data_other.padded_value)
-                        feed_dict_dev[model.inputs_pl_list[i_gpu]
-                                      ] = inputs[i_gpu]
+                        feed_dict_dev[model.inputs_seq_len_pl_list[i_gpu]
+                                      ] = inputs_seq_len[i_gpu]
                         feed_dict_dev[model.keep_prob_input_pl_list[i_gpu]] = 1.0
                         feed_dict_dev[model.keep_prob_hidden_pl_list[i_gpu]] = 1.0
                         feed_dict_dev[model.keep_prob_output_pl_list[i_gpu]] = 1.0

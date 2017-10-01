@@ -68,21 +68,21 @@ def decode_test(session, decode_op, model, dataset, label_type,
         finally:
             print('----- wav: %s -----' % input_names[0][0])
             if label_type == 'character':
-                true_seq = idx2char(labels_true[0][0]).replace('_', ' ')
-                pred_seq = idx2char(labels_pred[0]).replace('_', ' ')
+                str_true = idx2char(labels_true[0][0]).replace('_', ' ')
+                str_pred = idx2char(labels_pred[0]).replace('_', ' ')
             elif label_type == 'character_capital_divide':
-                true_seq = idx2char(labels_true[0][0])
-                pred_seq = idx2char(labels_pred[0])
+                str_true = idx2char(labels_true[0][0])
+                str_pred = idx2char(labels_pred[0])
             else:
                 if dataset.is_test:
-                    true_seq = labels_true[0][0][0]
+                    str_true = labels_true[0][0][0]
                 else:
-                    true_seq = ' '.join(idx2word(labels_true[0][0]))
-                pred_seq = ' '.join(idx2word(labels_pred[0]))
+                    str_true = ' '.join(idx2word(labels_true[0][0]))
+                str_pred = ' '.join(idx2word(labels_pred[0]))
 
-            print('Ref: %s' % true_seq)
-            print('Hyp: %s' % pred_seq)
-            # wer_align(ref=true_seq.split(), hyp=pred_seq.split())
+            print('Ref: %s' % str_true)
+            print('Hyp: %s' % str_pred)
+            # wer_align(ref=str_true.split(), hyp=str_pred.split())
 
         if is_new_epoch:
             break
@@ -146,17 +146,17 @@ def decode_test_multitask(session, decode_op_main, decode_op_sub, model,
 
         print('----- wav: %s -----' % input_names[0][0])
         if dataset.is_test:
-            true_word_seq = labels_true_word[0][0][0]
+            str_true_word = labels_true_word[0][0][0]
         else:
-            true_word_seq = ' '.join(idx2word(labels_true_word[0][0]))
-        pred_word_seq = ' '.join(idx2word(labels_pred_word[0]))
-        print('Ref (word): %s' % true_word_seq)
-        print('Hyp (word): %s' % pred_word_seq)
+            str_true_word = ' '.join(idx2word(labels_true_word[0][0]))
+        str_pred_word = ' '.join(idx2word(labels_pred_word[0]))
+        print('Ref (word): %s' % str_true_word)
+        print('Hyp (word): %s' % str_pred_word)
 
-        true_char_seq = idx2char(labels_true_char[0][0])
-        pred_char_seq = idx2char(labels_pred_char[0]).replace('_', ' ')
-        print('Ref (char): %s' % true_char_seq)
-        print('Hyp (char): %s' % pred_char_seq)
+        str_true_char = idx2char(labels_true_char[0][0])
+        str_pred_char = idx2char(labels_pred_char[0]).replace('_', ' ')
+        print('Ref (char): %s' % str_true_char)
+        print('Hyp (char): %s' % str_pred_char)
 
         if is_new_epoch:
             break

@@ -39,7 +39,7 @@ def do_train(model, params):
         batch_size=params['batch_size'], max_epoch=params['num_epoch'],
         splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True, sort_stop_epoch=None)
+        sort_utt=True, sort_stop_epoch=params['sort_stop_epoch'])
     dev_data = Dataset(
         data_type='dev', label_type=params['label_type'],
         batch_size=params['batch_size'], splice=params['splice'],
@@ -79,7 +79,7 @@ def do_train(model, params):
             learning_rate=learning_rate_pl)
         decode_op = model.decoder(logits,
                                   model.inputs_seq_len_pl_list[0],
-                                  beam_width=20)
+                                  beam_width=params['beam_width'])
         ler_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 
         # Define learning rate controller
@@ -214,8 +214,8 @@ def do_train(model, params):
                                 dataset=dev_data,
                                 label_type=params['label_type'],
                                 eval_batch_size=1)
-                            print('  CER: %f %%' % (ler_dev_epoch * 100))
                             print('  WER: %f %%' % (wer_dev_epoch * 100))
+                            print('  CER: %f %%' % (ler_dev_epoch * 100))
 
                             if ler_dev_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_epoch
@@ -237,8 +237,8 @@ def do_train(model, params):
                                     dataset=test_data,
                                     label_type=params['label_type'],
                                     eval_batch_size=1)
-                                print('  CER: %f %%' % (ler_test * 100))
                                 print('  WER: %f %%' % (wer_test * 100))
+                                print('  CER: %f %%' % (ler_test * 100))
 
                         else:
                             print('=== Dev Data Evaluation ===')

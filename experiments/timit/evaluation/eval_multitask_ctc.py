@@ -23,20 +23,28 @@ parser.add_argument('--epoch', type=int, default=-1,
                     help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
+parser.add_argument('--beam_width', type=int, default=20,
+                    help='beam_width (int, optional): beam width for beam search.' +
+                    ' 1 disables beam search, which mean greedy decoding.')
+parser.add_argument('--batch_size', type=int, default=1,
+                    help='the size of mini-batch when evaluation')
 
 
-def do_eval(model, params, epoch=None):
+def do_eval(model, params, epoch, batch_size, beam_width):
     """Evaluate the model.
     Args:
         model: the model to restore
         params (dict): A dictionary of parameters
         epoch (int): the epoch to restore
+        batch_size (int): the size of mini-batch when evaluation
+        beam_width (int): beam_width (int, optional): beam width for beam search.
+            1 disables beam search, which mean greedy decoding.
     """
     # Load dataset
     test_data = Dataset(
         data_type='test', label_type_main=params['label_type_main'],
         label_type_sub='phone39',
-        batch_size=1, splice=params['splice'],
+        batch_size=batch_size, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         shuffle=False, progressbar=True)
 
@@ -55,7 +63,7 @@ def do_eval(model, params, epoch=None):
     decode_op_main, decode_op_sub = model.decoder(
         logits_main, logits_sub,
         model.inputs_seq_len_pl_list[0],
-        beam_width=20)
+        beam_width=beam_width)
     _, per_op = model.compute_ler(
         decode_op_main, decode_op_sub,
         model.labels_pl_list[0], model.labels_sub_pl_list[0])
@@ -91,8 +99,8 @@ def do_eval(model, params, epoch=None):
             eval_batch_size=1,
             progressbar=True,
             is_multitask=True)
-        print('  CER: %f %%' % (cer_test * 100))
         print('  WER: %f %%' % (wer_test * 100))
+        print('  CER: %f %%' % (cer_test * 100))
 
         per_test = do_eval_per(
             session=sess,
@@ -148,7 +156,9 @@ def main():
         weight_decay=params['weight_decay'])
 
     model.save_path = args.model_path
-    do_eval(model=model, params=params, epoch=args.epoch)
+    do_eval(model=model, params=params,
+            epoch=args.epoch, batch_size=args.batch_size,
+            beam_width=args.beam_width)
 
 
 if __name__ == '__main__':

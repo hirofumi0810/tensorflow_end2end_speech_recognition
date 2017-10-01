@@ -41,7 +41,7 @@ def do_train(model, params):
         batch_size=params['batch_size'], max_epoch=params['num_epoch'],
         splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True, sort_stop_epoch=None)
+        sort_utt=True, sort_stop_epoch=params['sort_stop_epoch'])
     dev_data = Dataset(
         data_type='dev', label_type_main=params['label_type_main'],
         label_type_sub=params['label_type_sub'],
@@ -76,7 +76,7 @@ def do_train(model, params):
             learning_rate=learning_rate_pl)
         decode_op_character, decode_op_phone = model.decoder(
             logits_main, logits_sub, model.inputs_seq_len_pl_list[0],
-            beam_width=20)
+            beam_width=params['beam_width'])
         cer_op, per_op = model.compute_ler(
             decode_op_character, decode_op_phone,
             model.labels_pl_list[0], model.labels_sub_pl_list[0])
@@ -226,8 +226,8 @@ def do_train(model, params):
                             label_type=params['label_type_main'],
                             eval_batch_size=1,
                             is_multitask=True)
-                        print('  CER: %f %%' % (cer_dev_epoch * 100))
                         print('  WER: %f %%' % (wer_dev_epoch * 100))
+                        print('  CER: %f %%' % (cer_dev_epoch * 100))
                         per_dev_epoch = do_eval_per(
                             session=sess,
                             decode_op=decode_op_phone,
@@ -260,8 +260,8 @@ def do_train(model, params):
                                 label_type=params['label_type_main'],
                                 eval_batch_size=1,
                                 is_multitask=True)
-                            print('  CER: %f %%' % (cer_test * 100))
                             print('  WER: %f %%' % (wer_test * 100))
+                            print('  CER: %f %%' % (cer_test * 100))
                             per_test = do_eval_per(
                                 session=sess,
                                 decode_op=decode_op_phone,
@@ -332,7 +332,8 @@ def main(config_path, model_save_path):
         weight_decay=params['weight_decay'])
 
     # Set process name
-    setproctitle('timit_' + model.name + '_' + params['label_type'])
+    setproctitle('timit_' + model.name + '_' +
+                 params['label_type_main'] + '_' + params['label_type_sub'])
 
     model.name += '_' + str(params['num_units'])
     model.name += '_main' + str(params['num_layers_main'])

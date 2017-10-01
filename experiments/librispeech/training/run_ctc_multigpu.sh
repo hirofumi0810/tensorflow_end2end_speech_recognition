@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-MODEL_SAVE_PATH="/n/sd8/inaguma/result/librispeech"
+MODEL_SAVE_PATH="/n/sd8/inaguma/result/tensorflow/librispeech"
 
 # Select GPU
 if [ $# -lt 2 ]; then

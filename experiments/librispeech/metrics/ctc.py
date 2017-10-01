@@ -11,6 +11,7 @@ import re
 from tqdm import tqdm
 
 from utils.io.labels.character import Idx2char
+from utils.io.labels.word import Idx2word
 from utils.io.labels.sparsetensor import sparsetensor2list
 from utils.evaluation.edit_distance import compute_cer, compute_wer, wer_align
 
@@ -149,6 +150,9 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
     # Reset data counter
     dataset.reset()
 
+    idx2word = Idx2word(
+        map_file_path='../metrics/mapping_files/ctc/word_' + train_data_size + '.txt')
+
     wer_mean = 0
     skip_data_num = 0
     if progressbar:
@@ -179,16 +183,24 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
 
                 for i_batch in range(batch_size_device):
 
+                    str_true = ' '.join(
+                        idx2word(labels_true[i_device][i_batch]))
+                    str_pred = ' '.join(idx2word(labels_pred[i_batch]))
+
+                    # if len(str_true.split(' ')) == 0:
+                    #     print(str_true)
+                    #     print(str_pred)
+
                     # Compute WER
-                    wer_mean += compute_wer(ref=labels_pred[i_batch],
-                                            hyp=labels_true[i_device][i_batch],
+                    wer_mean += compute_wer(ref=str_true.split(' '),
+                                            hyp=str_pred.split(' '),
                                             normalize=True)
                     # substitute, insert, delete = wer_align(
-                    #     ref=labels_pred[i_batch],
-                    #     hyp=labels_true[i_device][i_batch])
+                    #     ref=str_true.split(' '),
+                    #     hyp=str_pred.split(' '))
                     # print(substitute)
                     # print(insert)
-                    # print(delete)
+                    # print(delete)1
 
                     if progressbar:
                         pbar.update(1)

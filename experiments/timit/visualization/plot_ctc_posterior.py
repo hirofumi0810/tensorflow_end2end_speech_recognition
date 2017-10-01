@@ -49,7 +49,9 @@ def do_plot(model, params, epoch):
                                    model.keep_prob_input_pl_list[0],
                                    model.keep_prob_hidden_pl_list[0],
                                    model.keep_prob_output_pl_list[0])
-    posteriors_op = model.posteriors(logits)
+    posteriors_op = model.posteriors(logits,
+                                     blank_prior=1,
+                                     softmax_tempareture=1)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -74,6 +76,7 @@ def do_plot(model, params, epoch):
                        model=model,
                        dataset=test_data,
                        label_type=params['label_type'],
+                       num_stack=params['num_stack'],
                        save_path=model.save_path,
                        show=True)
 
