@@ -26,7 +26,8 @@ green = '#006400'
 
 sys.path.append(os.path.abspath('../../../'))
 from experiments.librispeech.data.load_dataset_ctc import Dataset
-from models.ctc.vanilla_ctc import CTC
+# from models.ctc.vanilla_ctc import CTC
+from models.ctc.distillation_ctc import CTC
 from utils.directory import mkdir_join
 
 parser = argparse.ArgumentParser()
@@ -34,28 +35,31 @@ parser.add_argument('--epoch', type=int, default=-1,
                     help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
+parser.add_argument('--eval_batch_size', type=str, default=1,
+                    help='the size of mini-batch in evaluation')
 
 
-def do_decode(model, params, epoch):
-    """Decode the CTC outputs.
+def do_plot(model, params, epoch, eval_batch_size):
+    """Plot the CTC posteriors.
     Args:
         model: the model to restore
         params (dict): A dictionary of parameters
         epoch (int): the epoch to restore
+        eval_batch_size (int): the size of mini-batch in evaluation
     """
     # Load dataset
     test_clean_data = Dataset(
         data_type='test_clean',
         train_data_size=params['train_data_size'],
         label_type=params['label_type'],
-        batch_size=1, splice=params['splice'],
+        batch_size=eval_batch_size, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         shuffle=False)
     test_other_data = Dataset(
         data_type='test_other',
         train_data_size=params['train_data_size'],
         label_type=params['label_type'],
-        batch_size=1, splice=params['splice'],
+        batch_size=eval_batch_size, splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         shuffle=False)
 
@@ -72,9 +76,7 @@ def do_decode(model, params, epoch):
             model.keep_prob_hidden_pl_list[0],
             model.keep_prob_output_pl_list[0],
             softmax_temperature=params['softmax_temperature'])
-        posteriors_op = model.posteriors(logits,
-                                         blank_prior=1,
-                                         softmax_temperature=1)
+        posteriors_op = model.posteriors(logits, blank_prior=1)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -128,13 +130,10 @@ def posterior_test(session, posteriors_op, model, dataset, label_type,
         save_path (string, string): path to save ctc outputs
         show (bool, optional): if True, show each figure
     """
-    while True:
+    for data, is_new_epoch in dataset:
 
         # Create feed dictionary for next mini batch
-        data, is_new_epoch = dataset.next(batch_size=1)
         inputs, _, inputs_seq_len, input_names = data
-        # NOTE: Batch size is expected to be 1
-
         feed_dict = {
             model.inputs_pl_list[0]: inputs[0],
             model.inputs_seq_len_pl_list[0]: inputs_seq_len[0],
@@ -143,40 +142,39 @@ def posterior_test(session, posteriors_op, model, dataset, label_type,
             model.keep_prob_output_pl_list[0]: 1.0
         }
 
-        # Visualize
-        max_frame_num = inputs[0].shape[1]
+        batch_size, max_frame_num = inputs[0].shape[:2]
         posteriors = session.run(posteriors_op, feed_dict=feed_dict)
+        posteriors = posteriors.reshape(-1,
+                                        max_frame_num, model.num_classes)
 
-        i_batch = 0  # index in mini-batch
-        posteriors_index = np.array(
-            [i_batch * max_frame_num + i for i in range(max_frame_num)])
-        posteriors = posteriors[posteriors_index][:int(
-            inputs_seq_len[0][0]), :]
+        # Visualize
+        for i_batch in range(batch_size):
+            prob = posteriors[i_batch][:int(inputs_seq_len[0][i_batch]), :]
 
-        plt.clf()
-        plt.figure(figsize=(10, 4))
-        frame_num = posteriors.shape[0]
-        times_probs = np.arange(frame_num) * num_stack / 100
+            plt.clf()
+            plt.figure(figsize=(10, 4))
+            frame_num = int(inputs_seq_len[0][i_batch])
+            times_probs = np.arange(frame_num) * num_stack / 100
 
-        # NOTE: Blank class is set to the last class in TensorFlow
-        for i in range(0, posteriors.shape[1] - 1, 1):
-            plt.plot(times_probs, posteriors[:, i])
-        plt.plot(times_probs, posteriors[:, -1],
-                 ':', label='blank', color='grey')
-        plt.xlabel('Time [sec]', fontsize=12)
-        plt.ylabel('Posteriors', fontsize=12)
-        plt.xlim([0, frame_num * num_stack / 100])
-        plt.ylim([0.05, 1.05])
-        plt.xticks(list(range(0, int(frame_num * num_stack / 100) + 1, 1)))
-        plt.yticks(list(range(0, 2, 1)))
-        plt.legend(loc="upper right", fontsize=12)
+            # NOTE: Blank class is set to the last class in TensorFlow
+            for i in range(0, prob.shape[-1] - 1, 1):
+                plt.plot(times_probs, prob[:, i])
+            plt.plot(times_probs, prob[:, -1],
+                     ':', label='blank', color='grey')
+            plt.xlabel('Time [sec]', fontsize=12)
+            plt.ylabel('Posteriors', fontsize=12)
+            plt.xlim([0, frame_num * num_stack / 100])
+            plt.ylim([0.05, 1.05])
+            plt.xticks(list(range(0, int(frame_num * num_stack / 100) + 1, 1)))
+            plt.yticks(list(range(0, 2, 1)))
+            plt.legend(loc="upper right", fontsize=12)
 
-        plt.show()
+            plt.show()
 
-        # Save as a png file
-        if save_path is not None:
-            plt.savefig(os.path.join(
-                save_path, input_names[0][0] + '.png'), dvi=500)
+            # Save as a png file
+            if save_path is not None:
+                plt.savefig(os.path.join(
+                    save_path, input_names[0][i_batch] + '.png'), dvi=500)
 
         if is_new_epoch:
             break
@@ -222,7 +220,8 @@ def main():
         weight_decay=params['weight_decay'])
 
     model.save_path = args.model_path
-    do_decode(model=model, params=params, epoch=args.epoch)
+    do_plot(model=model, params=params, epoch=args.epoch,
+            eval_batch_size=args.eval_batch_size)
 
 
 if __name__ == '__main__':
