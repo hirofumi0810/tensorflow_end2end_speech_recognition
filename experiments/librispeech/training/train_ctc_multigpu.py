@@ -141,7 +141,7 @@ def do_train(model, params, gpu_indices):
             learning_rate_init=params['learning_rate'],
             decay_start_epoch=params['decay_start_epoch'],
             decay_rate=params['decay_rate'],
-            decay_patient_epoch=1,
+            decay_patient_epoch=params['decay_patient_epoch'],
             lower_better=True)
 
         # Build the summary tensor based on the TensorFlow collection of

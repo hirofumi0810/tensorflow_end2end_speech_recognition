@@ -15,9 +15,8 @@ class BGRU_Encoder(object):
     Args:
         num_units (int): the number of units in each layer
         num_layers (int): the number of layers
-        num_classes (int): the number of classes of target labels
-            (except for a blank label). if 0, return hidden states before
-            passing through the softmax layer
+        num_classes (int): the number of classes of target labels.
+            If 0, return hidden states before passing through the softmax layer
         parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
         bottleneck_dim (int, optional): the dimensions of the bottleneck layer

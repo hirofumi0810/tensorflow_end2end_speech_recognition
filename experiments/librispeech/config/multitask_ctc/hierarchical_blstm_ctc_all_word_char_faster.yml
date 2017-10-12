@@ -17,7 +17,7 @@ param:
   num_layers_sub: 3
   bottleneck_dim: 0
   main_task_weight: 0.5
-  batch_size: 16
+  batch_size: 20
   optimizer: rmsprop
   learning_rate: 1e-3
   decay_start_epoch: 5

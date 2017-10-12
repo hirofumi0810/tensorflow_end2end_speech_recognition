@@ -23,7 +23,6 @@ class CNN_Encoder(object):
         input_size (int): the dimensions of input vectors
         splice (int): frames to splice. Default is 1 frame.
         num_classes (int): the number of classes of target labels
-            (except for a blank label)
         parameter_init (float, optional): Range of uniform distribution to
             initialize weight parameters
         name (string, optional): the name of encoder
