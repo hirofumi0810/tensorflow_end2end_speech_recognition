@@ -36,8 +36,6 @@ class VGG_Encoder(object):
         # num_units (int): the number of units in each layer
         # num_layers (int): the number of layers
         num_classes (int): the number of classes of target labels
-            (except for a blank label). if 0, return hidden states before
-            passing through the softmax layer
         parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
         clip_activation (float, optional): the range of activation clipping (> 0)

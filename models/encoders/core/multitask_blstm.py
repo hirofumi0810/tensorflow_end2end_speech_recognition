@@ -17,9 +17,11 @@ class Multitask_BLSTM_Encoder(object):
         num_layers_main (int): the number of layers of the main task
         num_layers_sub (int): the number of layers of the sub task
         num_classes_main (int): the number of classes of target labels in the
-            main task (except for a blank label)
+            main task. If 0, return hidden states before passing through the
+            softmax layer
         num_classes_sub (int): the number of classes of target labels in the
-            sub task (except for a blank label)
+            sub task. If 0, return hidden states before passing through the
+            softmax layer
         lstm_impl (string, optional):
             BasicLSTMCell or LSTMCell or LSTMBlockCell or LSTMBlockFusedCell.
             Choose the background implementation of tensorflow.
