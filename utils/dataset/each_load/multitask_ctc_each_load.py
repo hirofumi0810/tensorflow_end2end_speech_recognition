@@ -37,11 +37,11 @@ class DatasetBase(Base):
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size
-                    `[num_gpu, B, T, input_dim]`
+                    `[num_gpu, B, T_in, input_size]`
                 labels_main: list of target labels in the main task, of size
-                    `[num_gpu, B, T]`
+                    `[num_gpu, B, T_in]`
                 labels_sub: list of target labels in the sub task, of size
-                    `[num_gpu, B, T]`
+                    `[num_gpu, B, T_in]`
                 inputs_seq_len: list of length of inputs of size
                     `[num_gpu, B]`
                 input_names: list of file name of input data of size

@@ -30,11 +30,11 @@ class DatasetBase(Base):
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size
-                    `[B, T, input_dim]`
+                    `[B, T_int, input_size]`
                 att_labels: list of target labels for Attention, of size
-                    `[B, T]`
+                    `[B, T_out]`
                 ctc_labels: list of target labels for CTC, of size
-                    `[B, T]`
+                    `[B, T_out]`
                 inputs_seq_len: list of length of inputs of size
                     `[B]`
                 att_labels_seq_len: list of length of target labels for Attention, of size
@@ -53,6 +53,14 @@ class DatasetBase(Base):
         # reset
         if self.is_new_epoch:
             self.is_new_epoch = False
+
+        if not self.is_test:
+            self.att_padded_value = self.eos_index
+            self.ctc_padded_value = -1
+        else:
+            self.att_padded_value = None
+            self.ctc_padded_value = None
+        # TODO(hirofumi): move this
 
         if self.sort_utt:
             # Sort all uttrances by length
@@ -104,19 +112,17 @@ class DatasetBase(Base):
                                 self.input_list[data_indices]))
 
         # Compute max target label length in mini-batch
-        att_max_seq_len = max(map(len, self.att_label_list[data_indices]))
-        ctc_max_seq_len = max(map(len, self.ctc_label_list[data_indices]))
+        max_seq_len = max(map(len, self.label_list[data_indices])) + 2
+        # NOTE: + <SOS> and <EOS>
 
         # Initialization
         inputs = np.zeros(
             (len(data_indices), max_frame_num,
              self.input_list[0].shape[-1] * self.splice), dtype=np.float32)
         att_labels = np.array(
-            [[self.att_padded_value] * att_max_seq_len] * len(data_indices),
-            dtype=np.int32)
+            [[self.att_padded_value] * max_seq_len] * len(data_indices))
         ctc_labels = np.array(
-            [[self.ctc_padded_value] * ctc_max_seq_len] * len(data_indices),
-            dtype=np.int32)
+            [[self.ctc_padded_value] * (max_seq_len - 2)] * len(data_indices))
         inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
         att_labels_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
         input_names = np.array(list(
@@ -135,12 +141,21 @@ class DatasetBase(Base):
                                batch_size=1).reshape(frame_num, -1)
 
             inputs[i_batch, :frame_num, :] = data_i
-            att_labels[i_batch, :len(self.att_label_list[x])
-                       ] = self.att_label_list[x]
-            ctc_labels[i_batch, :len(self.ctc_label_list[x])
-                       ] = self.ctc_label_list[x]
+            if self.is_test:
+                att_labels[i_batch, 0] = self.label_list[x]
+                ctc_labels[i_batch, 0] = self.label_list[x]
+                # NOTE: transcript is saved as string
+            else:
+                att_labels[i_batch, 0] = self.sos_index
+                att_labels[i_batch, 1:len(self.label_list[x]) + 1
+                           ] = self.label_list[x]
+                att_labels[i_batch, len(self.label_list[x]) + 1
+                           ] = self.eos_index
+                ctc_labels[i_batch, :len(self.label_list[x])
+                           ] = self.label_list[x]
             inputs_seq_len[i_batch] = frame_num
-            att_labels_seq_len[i_batch] = len(self.att_label_list[x])
+            att_labels_seq_len[i_batch] = len(self.label_list[x]) + 2
+            # TODO: +2 ??
 
         self.iteration += len(data_indices)
 

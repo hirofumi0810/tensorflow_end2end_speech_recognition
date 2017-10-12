@@ -36,9 +36,9 @@ class DatasetBase(Base):
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size
-                    `[num_gpu, B, T, input_dim]`
+                    `[num_gpu, B, T_in, input_size]`
                 labels: list of target labels of size
-                    `[num_gpu, B, T]`
+                    `[num_gpu, B, T_out]`
                 inputs_seq_len: list of length of inputs of size
                     `[num_gpu, B]`
                 input_names: list of file name of input data of size
@@ -138,8 +138,8 @@ class DatasetBase(Base):
         inputs = np.zeros(
             (len(data_indices), max_frame_num, self.input_size * self.splice),
             dtype=np.float32)
-        labels = np.array([[self.padded_value] * max_seq_len]
-                          * len(data_indices))
+        labels = np.array(
+            [[self.padded_value] * max_seq_len] * len(data_indices))
         inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
         input_names = list(
             map(lambda path: basename(path).split('.')[0],

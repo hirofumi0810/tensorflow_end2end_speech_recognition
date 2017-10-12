@@ -36,9 +36,9 @@ class DatasetBase(Base):
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size
-                    `[num_gpu, B, T, input_dim]`
+                    `[num_gpu, B, T_in, input_size]`
                 labels: list of target labels of size
-                    `[num_gpu, B, T]`
+                    `[num_gpu, B, T_out]`
                 inputs_seq_len: list of length of inputs of size
                     `[num_gpu, B]`
                 labels_seq_len: list of length of target labels of size
@@ -134,14 +134,15 @@ class DatasetBase(Base):
         max_frame_num = max(map(lambda x: x.shape[0], input_list))
 
         # Compute max target label length in mini-batch
-        max_seq_len = max(map(len, label_list))
+        max_seq_len = max(map(len, label_list)) + 2
+        # NOTE: + <SOS> and <EOS>
 
         # Initialization
         inputs = np.zeros(
             (len(data_indices), max_frame_num, self.input_size * self.splice),
             dtype=np.float32)
-        labels = np.array([[self.padded_value] * max_seq_len]
-                          * len(data_indices))
+        labels = np.array(
+            [[self.padded_value] * max_seq_len] * len(data_indices))
         inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
         labels_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
         input_names = list(
@@ -162,11 +163,15 @@ class DatasetBase(Base):
             inputs[i_batch, : frame_num, :] = data_i
             if self.is_test:
                 labels[i_batch, 0] = label_list[i_batch]
+                # NOTE: transcript is saved as string
             else:
-                labels[i_batch, :len(label_list[i_batch])
-                       ] = label_list[i_batch]
+                labels[i_batch, 0] = self.sos_index
+                labels[i_batch, 1:len(label_list[i_batch]) +
+                       1] = label_list[i_batch]
+                labels[i_batch, len(label_list[i_batch]) + 1] = self.eos_index
             inputs_seq_len[i_batch] = frame_num
-            labels_seq_len[i_batch] = len(label_list[i_batch])
+            labels_seq_len[i_batch] = len(label_list[i_batch]) + 2
+            # TODO: +2 ??
 
         ###############
         # Multi-GPUs

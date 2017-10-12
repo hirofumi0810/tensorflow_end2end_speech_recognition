@@ -30,7 +30,7 @@ class DatasetBase(Base):
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size
-                    `[B, T, input_dim]`
+                    `[B, T, input_size]`
                 labels: list of target labels of size
                     `[B, T]`
                 inputs_seq_len: list of length of inputs of size
@@ -49,6 +49,12 @@ class DatasetBase(Base):
         # reset
         if self.is_new_epoch:
             self.is_new_epoch = False
+
+        if not self.is_test:
+            self.padded_value = -1
+        else:
+            self.padded_value = None
+        # TODO(hirofumi): move this
 
         if self.sort_utt:
             # Sort all uttrances by length
@@ -107,8 +113,7 @@ class DatasetBase(Base):
             (len(data_indices), max_frame_num,
              self.input_list[0].shape[-1] * self.splice), dtype=np.float32)
         labels = np.array(
-            [[self.padded_value] * max_seq_len] * len(data_indices),
-            dtype=np.int32)
+            [[self.padded_value] * max_seq_len] * len(data_indices))
         inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
         input_names = np.array(list(
             map(lambda path: basename(path).split('.')[0],
@@ -126,7 +131,12 @@ class DatasetBase(Base):
                                batch_size=1).reshape(frame_num, -1)
 
             inputs[i_batch, :frame_num, :] = data_i
-            labels[i_batch, :len(self.label_list[x])] = self.label_list[x]
+            if self.is_test:
+                labels[i_batch, 0] = self.label_list[x]
+                # NOTE: transcript is saved as string
+            else:
+                labels[i_batch, :len(self.label_list[x])
+                       ] = self.label_list[x]
             inputs_seq_len[i_batch] = frame_num
 
         self.iteration += len(data_indices)
