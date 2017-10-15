@@ -1,14 +1,14 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Base class of the CTC model."""
+"""CTC model."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-
+from models.encoders.load_encoder import load
 
 OPTIMIZER_CLS_NAMES = {
     "adagrad": tf.train.AdagradOptimizer,
@@ -21,40 +21,92 @@ OPTIMIZER_CLS_NAMES = {
 }
 
 
-class CTCBase(object):
+class CTC(object):
     """Connectionist Temporal Classification (CTC) network.
     Args:
+        encoder_type (string): The type of an encoder
+            blstm: Bidirectional LSTM
+            lstm: Unidirectional LSTM
+            bgru: Bidirectional GRU
+            gru: Unidirectional GRU
+            vgg_blstm: VGG + Bidirectional LSTM
+            vgg_lstm: VGG + Unidirectional LSTM
         input_size (int): the dimensions of input vectors
-        splice (int): frames to splice. Default is 1 frame.
+        num_units (int): the number of units in each layer
+        num_layers (int): the number of layers
         num_classes (int): the number of classes of target labels
             (except for a blank label)
-        lstm_impl (string, optional):
-            BasicLSTMCell or LSTMCell or LSTMBlockCell or
-                LSTMBlockFusedCell or CudnnLSTM.
+        lstm_impl (string, optional): a base implementation of LSTM. This is
+            not used for GRU models.
+                BasicLSTMCell: tf.contrib.rnn.BasicLSTMCell (no peephole)
+                LSTMCell: tf.contrib.rnn.LSTMCell
+                LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
+                LSTMBlockFusedCell: under implementation
+                CudnnLSTM: under implementation
             Choose the background implementation of tensorflow.
-        clip_grad (float): the range of gradient clipping (> 0)
-        weight_decay (float): a parameter for weight decay
+            Default is LSTMBlockCell.
+        use_peephole (bool, optional): if True, use peephole connection. This
+            is not used for GRU models.
+        splice (int, optional): the number of frames to splice. This is used
+            when using CNN-like encoder. Default is 1 frame.
+        parameter_init (float, optional): the range of uniform distribution to
+            initialize weight parameters (>= 0)
+        clip_grad (float, optional): the range of gradient clipping (> 0)
+        clip_activation (float, optional): the range of activation clipping
+            (> 0). This is not used for GRU models.
+        num_proj (int, optional): the number of nodes in the projection layer.
+            This is not used for GRU models.
+        weight_decay (float, optional): a parameter for weight decay
+        bottleneck_dim (int, optional): the dimensions of the bottleneck layer
     """
 
-    def __init__(self, input_size, splice, num_classes, lstm_impl,
-                 clip_grad, weight_decay):
+    def __init__(self,
+                 encoder_type,
+                 input_size,
+                 num_units,
+                 num_layers,
+                 num_classes,
+                 lstm_impl='LSTMBlockCell',
+                 use_peephole=True,
+                 splice=1,
+                 parameter_init=0.1,
+                 clip_grad=None,
+                 clip_activation=None,
+                 num_proj=None,
+                 weight_decay=0.0,
+                 bottleneck_dim=None):
+
+        super(CTC, self).__init__()
+
         assert input_size % 3 == 0, 'input_size must be divisible by 3 (+ delta, double delta features).'
-        # NOTE: input features are expected to including Δ and ΔΔ features
         assert splice % 2 == 1, 'splice must be the odd number'
         if clip_grad is not None:
             assert float(clip_grad) > 0, 'clip_grad must be larger than 0.'
         assert float(
             weight_decay) >= 0, 'weight_decay must not be a negative value.'
 
-        # Network size
-        self.input_size = int(input_size)
-        self.splice = int(splice)
-        self.num_classes = int(num_classes) + 1  # plus blank label
+        # Encoder setting
+        self.encoder_type = encoder_type
+        self.input_size = input_size
+        self.splice = splice
+        self.num_units = num_units
+        if int(num_proj) == 0:
+            self.num_proj = None
+        elif num_proj is not None:
+            self.num_proj = int(num_proj)
+        else:
+            self.num_proj = None
+        self.num_layers = num_layers
+        self.bottleneck_dim = bottleneck_dim
+        self.num_classes = num_classes + 1  # + blank
         self.lstm_impl = lstm_impl
+        self.use_peephole = use_peephole
 
         # Regularization
+        self.parameter_init = parameter_init
         self.clip_grad = clip_grad
-        self.weight_decay = float(weight_decay)
+        self.clip_activation = clip_activation
+        self.weight_decay = weight_decay
 
         # Summaries for TensorBoard
         self.summaries_train = []
@@ -64,28 +116,120 @@ class CTCBase(object):
         self.inputs_pl_list = []
         self.labels_pl_list = []
         self.inputs_seq_len_pl_list = []
-        self.keep_prob_input_pl_list = []
-        self.keep_prob_hidden_pl_list = []
-        self.keep_prob_output_pl_list = []
+        self.keep_prob_pl_list = []
 
-    def __call__(self, inputs, inputs_seq_len,
-                 keep_prob_input, keep_prob_hidden, keep_prob_output):
+        self.name = encoder_type + '_ctc'
+
+        if encoder_type in ['blstm', 'lstm']:
+            self.encoder = load(encoder_type)(
+                num_units=num_units,
+                num_proj=self.num_proj,
+                num_layers=num_layers,
+                lstm_impl=lstm_impl,
+                use_peephole=use_peephole,
+                parameter_init=parameter_init,
+                clip_activation=clip_activation)
+
+        elif encoder_type in ['vgg_blstm', 'vgg_lstm']:
+            self.encoder = load(encoder_type)(
+                input_size=input_size,
+                splice=splice,
+                num_units=num_units,
+                num_proj=self.num_proj,
+                num_layers=num_layers,
+                lstm_impl=lstm_impl,
+                use_peephole=use_peephole,
+                parameter_init=parameter_init,
+                clip_activation=clip_activation)
+
+        elif encoder_type in ['bgru', 'gru']:
+            self.encoder = load(encoder_type)(
+                num_units=num_units,
+                num_layers=num_layers,
+                parameter_init=parameter_init)
+
+        elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
+            self.encoder = load(encoder_type)(
+                input_size=input_size,
+                splice=splice,
+                parameter_init=parameter_init)
+
+        else:
+            self.encoder = None
+
+    def _build(self, inputs, inputs_seq_len, keep_prob):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
-            keep_prob_input (placeholder, float): A probability to keep nodes
-                in the input-hidden connection
-            keep_prob_hidden (placeholder, float): A probability to keep nodes
+            keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
-            keep_prob_output (placeholder, float): A probability to keep nodes
-                in the hidden-output connection
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
         """
-        logits, final_state = self.encoder(
-            inputs, inputs_seq_len,
-            keep_prob_input, keep_prob_hidden, keep_prob_output)
+        # inputs: `[B, T, input_size]`
+        batch_size = tf.shape(inputs)[0]
+
+        encoder_outputs, final_state = self.encoder(
+            inputs, inputs_seq_len, keep_prob)
+
+        # Reshape to apply the same weights over the timesteps
+        if final_state is None:
+            # CNN-like topology such as VGG and ResNet
+            output_dim = tf.shape(
+                encoder_outputs).get_shape().as_list()[-1]
+            outputs_2d = tf.reshape(
+                encoder_outputs, shape=[-1, output_dim])
+        elif 'lstm' not in self.encoder_type or self.num_proj is None:
+            if 'b' in self.encoder_type:
+                # bidirectional
+                outputs_2d = tf.reshape(
+                    encoder_outputs, shape=[-1, self.num_units * 2])
+            else:
+                # unidirectional
+                outputs_2d = tf.reshape(
+                    encoder_outputs, shape=[-1, self.num_units])
+        else:
+            if 'b' in self.encoder_type:
+                # bidirectional
+                outputs_2d = tf.reshape(
+                    encoder_outputs, shape=[-1, self.num_proj * 2])
+            else:
+                # unidirectional
+                outputs_2d = tf.reshape(
+                    encoder_outputs, shape=[-1, self.num_proj])
+
+        if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
+            with tf.variable_scope('bottleneck') as scope:
+                outputs_2d = tf.contrib.layers.fully_connected(
+                    outputs_2d,
+                    num_outputs=self.bottleneck_dim,
+                    activation_fn=tf.nn.relu,
+                    weights_initializer=tf.truncated_normal_initializer(
+                        stddev=self.parameter_init),
+                    biases_initializer=tf.zeros_initializer(),
+                    scope=scope)
+
+            # Dropout for the hidden-output connections
+            outputs_2d = tf.nn.dropout(
+                outputs_2d, keep_prob, name='dropout_bottleneck')
+
+        with tf.variable_scope('output') as scope:
+            logits_2d = tf.contrib.layers.fully_connected(
+                outputs_2d,
+                num_outputs=self.num_classes,
+                activation_fn=None,
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
+                biases_initializer=tf.zeros_initializer(),
+                scope=scope)
+
+            # Reshape back to the original shape
+            logits = tf.reshape(
+                logits_2d, shape=[batch_size, -1, self.num_classes])
+
+            # Convert to time-major: `[T, B, num_classes]'
+            logits = tf.transpose(logits, (1, 0, 2))
 
         return logits
 
@@ -101,12 +245,8 @@ class CTCBase(object):
                             tf.placeholder(tf.int64, name='shape')))
         self.inputs_seq_len_pl_list.append(
             tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
-        self.keep_prob_input_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_input'))
-        self.keep_prob_hidden_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_hidden'))
-        self.keep_prob_output_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_output'))
+        self.keep_prob_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob'))
 
     def _add_noise_to_inputs(self, inputs, stddev=0.075):
         """Add gaussian noise to the inputs.
@@ -136,27 +276,22 @@ class CTCBase(object):
         """
         raise NotImplementedError
 
-    def compute_loss(self, inputs, labels, inputs_seq_len, keep_prob_input,
-                     keep_prob_hidden, keep_prob_output, scope=None):
+    def compute_loss(self, inputs, labels, inputs_seq_len,
+                     keep_prob, scope=None):
         """Operation for computing ctc loss.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
             labels: A SparseTensor of target labels
             inputs_seq_len: A tensor of size `[B]`
-            keep_prob_input (placeholder, float): A probability to keep nodes
-                in the input-hidden connection
-            keep_prob_hidden (placeholder, float): A probability to keep nodes
+            keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
-            keep_prob_output (placeholder, float): A probability to keep nodes
-                in the hidden-output connection
             scope (optional): A scope in the model tower
         Returns:
             total_loss: operation for computing total ctc loss
             logits: A tensor of size `[T, B, input_size]`
         """
         # Build model graph
-        logits = self(inputs, inputs_seq_len,
-                      keep_prob_input, keep_prob_hidden, keep_prob_output)
+        logits = self._build(inputs, inputs_seq_len, keep_prob)
 
         # Weight decay
         if self.weight_decay > 0:
@@ -258,16 +393,19 @@ class CTCBase(object):
             clipped_grads_and_vars = self._clip_gradients(grads_and_vars,
                                                           clip_norm)
 
-            # Create gradient updates
-            train_op = self.optimizer.apply_gradients(
-                clipped_grads_and_vars,
-                global_step=global_step)
+            # Create operation for gradient update
+            with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+                train_op = self.optimizer.apply_gradients(
+                    clipped_grads_and_vars,
+                    global_step=global_step)
 
         else:
             # Use the optimizer to apply the gradients that minimize the loss
             # and also increment the global step counter as a single training
             # step
-            train_op = self.optimizer.minimize(loss, global_step=global_step)
+            with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+                train_op = self.optimizer.minimize(
+                    loss, global_step=global_step)
 
         return train_op
 
@@ -306,7 +444,7 @@ class CTCBase(object):
     def decoder(self, logits, inputs_seq_len, beam_width=1):
         """Operation for decoding.
         Args:
-            logits: A tensor of size `[T, B, input_size]`
+            logits: A tensor of size `[T, B, num_classes]`
             inputs_seq_len: A tensor of size `[B]`
             beam_width (int, optional): beam width for beam search.
                 1 disables beam search, which mean greedy decoding.
@@ -330,14 +468,12 @@ class CTCBase(object):
 
         return decode_op
 
-    def posteriors(self, logits, blank_prior=1, softmax_tempareture=1):
+    def posteriors(self, logits, blank_prior=1):
         """Operation for computing posteriors of each time steps.
         Args:
-            logits: A tensor of size `[T, B, input_size]`
+            logits: A tensor of size `[T, B, num_classes]`
             blank_prior (float): A prior for blank classes. posteriors are
                 divided by this prior.
-            softmax_tempareture (float): A tempareture parameter for the
-                softmax layer
         Return:
             posteriors_op: operation for computing posteriors for each class
         """
@@ -355,10 +491,6 @@ class CTCBase(object):
         #     axis=-1)
         # mask /= blank_prior
         # logits_2d = tf.multiply(logits_2d, mask)
-
-        # Apply smoothing
-        logits_2d /= softmax_tempareture
-        # TODO: which is first??
 
         posteriors_op = tf.nn.softmax(logits_2d)
 

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Pyramidal bidirectional LSTM Encoder class."""
+"""Pyramidal bidirectional LSTM encoder."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -10,37 +10,32 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-class PyramidalBLSTMEncoder(EncoderBase):
-    """Pyramidal Bidirectional LSTM Encoder.
+class PyramidBLSTMEncoder(object):
+    """Pyramidal bidirectional LSTM Encoder.
     Args:
         num_units (int): the number of units in each layer
         num_layers (int): the number of layers
-        num_classes (int): the number of classes of target labels.
-            If 0, return hidden states before passing through the softmax layer
-        lstm_impl (string, optional):
-            BasicLSTMCell or LSTMCell or LSTMBlockCell or
-                LSTMBlockFusedCell or CudnnLSTM.
+        lstm_impl (string, optional): BasicLSTMCell or LSTMCell or
+            LSTMBlockCell or LSTMBlockFusedCell or CudnnLSTM.
             Choose the background implementation of tensorflow.
-            Default is LSTMBlockCell (the fastest implementation).
+            Default is LSTMBlockCell.
         use_peephole (bool, optional): if True, use peephole
         parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
         clip_activation (float, optional): the range of activation clipping (> 0)
         # num_proj (int, optional): the number of nodes in the projection layer
-        # bottleneck_dim (int, optional): the dimensions of the bottleneck layer
+        concat (bool, optional):
         name (string, optional): the name of encoder
     """
 
     def __init__(self,
                  num_units,
                  num_layers,
-                 num_classes,
-                 lstm_impl='LSTMBlockCell',
-                 use_peephole=True,
-                 parameter_init=0.1,
-                 clip_activation=5.0,
-                 num_proj=None,
-                 bottleneck_dim=None,
+                 lstm_impl,
+                 use_peephole,
+                 parameter_init,
+                 clip_activation,
+                 num_proj,
                  concat=False,
                  name='pblstm_encoder'):
 
@@ -48,45 +43,32 @@ class PyramidalBLSTMEncoder(EncoderBase):
             raise ValueError('num_unit should be even number.')
 
         self.num_units = num_units
+        self.num_proj = None
         self.num_layers = num_layers
-        self.num_classes = num_classes
         self.lstm_impl = lstm_impl
         self.use_peephole = use_peephole
         self.parameter_init = parameter_init
         self.clip_activation = clip_activation
-        self.num_proj = None
-        self.bottleneck_dim = None
         self.name = name
 
-        self.return_hidden_states = True if num_classes == 0 else False
-
     def _build(self, inputs, inputs_seq_len,
-               keep_prob_input, keep_prob_hidden, keep_prob_output):
+               keep_prob):
         """Construct Pyramidal Bidirectional LSTM encoder.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
-            keep_prob_input (placeholder, float): A probability to keep nodes
-                in the input-hidden connection
-            keep_prob_hidden (placeholder, float): A probability to keep nodes
+            keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
-            keep_prob_output (placeholder, float): A probability to keep nodes
-                in the hidden-output connection
         Returns:
-            logits: A tensor of size `[T, B, num_classes]`
+            outputs: Encoder states, a tensor of size
+                `[T, B, num_units (num_proj)]`
             final_state: A final hidden state of the encoder
         """
-        # inputs: `[B, T, input_size]`
-        batch_size = tf.shape(inputs)[0]
-
-        # Dropout for the input-hidden connection
-        outputs = tf.nn.dropout(
-            inputs, keep_prob_input, name='dropout_input')
-
         initializer = tf.random_uniform_initializer(
             minval=-self.parameter_init, maxval=self.parameter_init)
 
         # Hidden layers
+        outputs = inputs
         for i_layer in range(1, self.num_layers + 1, 1):
             with tf.variable_scope('pblstm_hidden' + str(i_layer),
                                    initializer=initializer) as scope:
@@ -110,9 +92,9 @@ class PyramidalBLSTMEncoder(EncoderBase):
 
                 # Dropout for the hidden-hidden connections
                 lstm_fw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_fw, output_keep_prob=keep_prob_hidden)
+                    lstm_fw, output_keep_prob=keep_prob)
                 lstm_bw = tf.contrib.rnn.DropoutWrapper(
-                    lstm_bw, output_keep_prob=keep_prob_hidden)
+                    lstm_bw, output_keep_prob=keep_prob)
 
                 if i_layer > 0:
                     # Convert to time-major: `[T, B, input_size]`
@@ -154,31 +136,7 @@ class PyramidalBLSTMEncoder(EncoderBase):
                 # Concatenate each direction
                 outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
-        if self.return_hidden_states:
-            return outputs, final_state
-
-        with tf.variable_scope('output') as scope:
-            logits_2d = tf.contrib.layers.fully_connected(
-                outputs, self.num_classes,
-                activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(
-                    stddev=self.parameter_init),
-                biases_initializer=tf.zeros_initializer(),
-                scope=scope)
-
-            # Reshape back to the original shape
-            logits = tf.reshape(
-                logits_2d, shape=[batch_size, -1, self.num_classes])
-
-            # Convert to time-major: `[T, B, num_classes]'
-            logits = tf.transpose(logits, (1, 0, 2))
-
-            # Dropout for the hidden-output connections
-            logits = tf.nn.dropout(
-                logits, keep_prob_output, name='dropout_output')
-            # NOTE: This may lead to bad results
-
-        return logits, final_state
+        return outputs, final_state
 
     def _concat_fn(self, current_time, x, tensor_list):
         """Concatenate each 2 time steps to reduce time resolution.

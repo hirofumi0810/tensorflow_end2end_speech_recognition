@@ -68,3 +68,64 @@ def conv_layer(bottom, filter_shape, parameter_init,
             return outputs
 
         return tf.nn.relu(outputs)
+
+
+def batch_normalization(tensor, is_training=False, epsilon=0.001, momentum=0.9,
+                        fused_batch_norm=False, name=None):
+    """Performs batch normalization on given 4-D tensor.
+    Args:
+        tensor:
+    Returns:
+
+    The features are assumed to be in NHWC format. Noe that you need to
+    run UPDATE_OPS in order for this function to perform correctly, e.g.:
+
+    with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+      train_op = optimizer.minimize(loss)
+
+    Based on: https://arxiv.org/abs/1502.03167
+    """
+    with tf.variable_scope(name, default_name="batch_norm"):
+        channels = tensor.shape.as_list()[-1]
+        axes = list(range(tensor.shape.ndims - 1))  # [0,1,2]
+
+        beta = tf.get_variable(
+            'beta', channels, initializer=tf.zeros_initializer())
+        gamma = tf.get_variable(
+            'gamma', channels, initializer=tf.ones_initializer())
+        # NOTE: these are trainable
+
+        avg_mean = tf.get_variable(
+            "avg_mean", channels, initializer=tf.zeros_initializer(),
+            trainable=False)
+        avg_variance = tf.get_variable(
+            "avg_variance", channels, initializer=tf.ones_initializer(),
+            trainable=False)
+
+        if is_training:
+            if fused_batch_norm:
+                mean, variance = None, None
+            else:
+                mean, variance = tf.nn.moments(tensor, axes=axes)
+        else:
+            mean, variance = avg_mean, avg_variance
+
+        if fused_batch_norm:
+            tensor, mean, variance = tf.nn.fused_batch_norm(
+                tensor, scale=gamma, offset=beta, mean=mean, variance=variance,
+                epsilon=epsilon, is_training=is_training)
+        else:
+            tensor = tf.nn.batch_normalization(
+                tensor, mean, variance, beta, gamma, epsilon)
+
+        if is_training:
+            update_mean = tf.assign(
+                avg_mean, avg_mean * momentum + mean * (1.0 - momentum))
+            update_variance = tf.assign(
+                avg_variance, avg_variance * momentum + variance * (1.0 - momentum))
+
+            # Ops before gradient update
+            tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, update_mean)
+            tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, update_variance)
+
+    return tensor

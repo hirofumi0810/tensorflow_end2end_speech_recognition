@@ -10,80 +10,58 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-class LSTM_Encoder(object):
+class LSTMEncoder(object):
     """Unidirectional LSTM encoder.
     Args:
         num_units (int): the number of units in each layer
         num_layers (int): the number of layers
-        num_classes (int): the number of classes of target labels.
-            If 0, return hidden states before passing through the softmax layer
-        lstm_impl (string, optional):
-            BasicLSTMCell or LSTMCell or LSTMBlockCell or LSTMBlockFusedCell.
+        lstm_impl (string):　BasicLSTMCell or LSTMCell or LSTMBlockCell or
+            LSTMBlockFusedCell or　CudnnLSTM.
             Choose the background implementation of tensorflow.
-            Default is LSTMBlockCell (the fastest implementation).
-        use_peephole (bool, optional): if True, use peephole
-        parameter_init (float, optional): the range of uniform distribution to
+            Default is LSTMBlockCell.
+        use_peephole (bool): if True, use peephole
+        parameter_init (float): the range of uniform distribution to
             initialize weight parameters (>= 0)
-        clip_activation (float, optional): the range of activation clipping (> 0)
-        num_proj (int, optional): the number of nodes in the projection layer
-        bottleneck_dim (int, optional): the dimensions of the bottleneck layer
+        clip_activation (float): the range of activation clipping (> 0)
+        num_proj (int): the number of nodes in the projection layer
         name (string, optional): the name of encoder
     """
 
     def __init__(self,
                  num_units,
                  num_layers,
-                 num_classes,
-                 lstm_impl='LSTMBlockCell',
-                 use_peephole=True,
-                 parameter_init=0.1,
-                 clip_activation=5.0,
-                 num_proj=None,
-                 bottleneck_dim=None,
+                 lstm_impl,
+                 use_peephole,
+                 parameter_init,
+                 clip_activation,
+                 num_proj,
                  name='lstm_encoder'):
+        if num_proj == 0:
+            raise ValueError
 
         self.num_units = num_units
+        if lstm_impl != 'LSTMCell':
+            self.num_proj = None
+        # TODO: fix this
         self.num_layers = num_layers
-        self.num_classes = num_classes
         self.lstm_impl = lstm_impl
         self.use_peephole = use_peephole
         self.parameter_init = parameter_init
         self.clip_activation = clip_activation
-        if lstm_impl != 'LSTMCell':
-            self.num_proj = None
-        elif num_proj not in [None, 0]:
-            self.num_proj = int(num_proj)
-        else:
-            self.num_proj = None
-        self.bottleneck_dim = int(bottleneck_dim) if bottleneck_dim not in [
-            None, 0] else None
         self.name = name
 
-        self.return_hidden_states = True if num_classes == 0 else False
-
-    def __call__(self, inputs, inputs_seq_len,
-                 keep_prob_input, keep_prob_hidden, keep_prob_output):
+    def __call__(self, inputs, inputs_seq_len, keep_prob):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
-            keep_prob_input (placeholder, float): A probability to keep nodes
-                in the input-hidden connection
-            keep_prob_hidden (placeholder, float): A probability to keep nodes
+            keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
-            keep_prob_output (placeholder, float): A probability to keep nodes
-                in the hidden-output connection
         Returns:
-            logits: A tensor of size `[T, B, num_classes]`
+            outputs: Encoder states, a tensor of size
+                `[T, B, num_units (num_proj)]`
             final_state: A final hidden state of the encoder
         """
-        # inputs: `[B, T, input_size]`
-        batch_size = tf.shape(inputs)[0]
-
-        # Dropout for the input-hidden connection
-        inputs = tf.nn.dropout(
-            inputs, keep_prob_input, name='dropout_input')
-
         initializer = tf.random_uniform_initializer(
             minval=-self.parameter_init, maxval=self.parameter_init)
 
@@ -131,7 +109,7 @@ class LSTM_Encoder(object):
 
                 # Dropout for the hidden-hidden connections
                 lstm = tf.contrib.rnn.DropoutWrapper(
-                    lstm, output_keep_prob=keep_prob_hidden)
+                    lstm, output_keep_prob=keep_prob)
 
                 lstm_list.append(lstm)
 
@@ -148,48 +126,4 @@ class LSTM_Encoder(object):
                 scope=scope)
             # NOTE: initial states are zero states by default
 
-        if self.return_hidden_states:
-            return outputs, final_state
-
-        # Reshape to apply the same weights over the timesteps
-        if self.num_proj is None:
-            outputs = tf.reshape(outputs, shape=[-1, self.num_units])
-        else:
-            outputs = tf.reshape(outputs, shape=[-1, self.num_proj])
-
-        if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
-            with tf.variable_scope('bottleneck') as scope:
-                outputs = tf.contrib.layers.fully_connected(
-                    outputs, self.bottleneck_dim,
-                    activation_fn=tf.nn.relu,
-                    weights_initializer=tf.truncated_normal_initializer(
-                        stddev=self.parameter_init),
-                    biases_initializer=tf.zeros_initializer(),
-                    scope=scope)
-
-                # Dropout for the hidden-output connections
-                outputs = tf.nn.dropout(
-                    outputs, keep_prob_output, name='dropout_output_bottle')
-
-        with tf.variable_scope('output') as scope:
-            logits_2d = tf.contrib.layers.fully_connected(
-                outputs, self.num_classes,
-                activation_fn=None,
-                weights_initializer=tf.truncated_normal_initializer(
-                    stddev=self.parameter_init),
-                biases_initializer=tf.zeros_initializer(),
-                scope=scope)
-
-            # Reshape back to the original shape
-            logits = tf.reshape(
-                logits_2d, shape=[batch_size, -1, self.num_classes])
-
-            # Convert to time-major: `[T, B, num_classes]'
-            logits = tf.transpose(logits, (1, 0, 2))
-
-            # Dropout for the hidden-output connections
-            logits = tf.nn.dropout(
-                logits, keep_prob_output, name='dropout_output')
-            # NOTE: This may lead to bad results
-
-            return logits, final_state
+        return outputs, final_state
