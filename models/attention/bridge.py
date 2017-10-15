@@ -31,8 +31,9 @@ class Bridge(object):
     All logic is contained in the `_create` method, which returns an
     initial state for the decoder.
     Args:
-        encoder_outputs: A namedtuple that corresponds to the the encoder
-            outputs.
+        encoder_outputs (namedtuple): A namedtuple that corresponds to the the
+            encoder outputs.
+            `(outputs, final_state, partial_outputs, attention_window_length)`
         decoder_state_size: An integer or tuple of integers defining the
             state size of the decoder.
     """
@@ -99,8 +100,8 @@ class InitialStateBridge(Bridge):
     through an additional layer to match them to the decoder state size.
     The input function remains unmodified.
     Args:
-        encoder_outputs: A namedtuple that corresponds to the the encoder
-            outputs.
+        encoder_outputs (namedtuple): A namedtuple that corresponds to the
+            encoder outputs.
         decoder_state_size: An integer or tuple of integers defining the
             state size of the decoder.
         bridge_input: Which attribute of the `encoder_outputs` to use for the
@@ -154,6 +155,9 @@ class InitialStateBridge(Bridge):
             inputs=bridge_input_concat,
             num_outputs=total_decoder_state_size,
             activation_fn=self._activation_fn,
+            weights_initializer=tf.truncated_normal_initializer(
+                stddev=self.parameter_init),
+            biases_initializer=tf.zeros_initializer(),
             reuse=self.reuse,
             scope="bridge")
 

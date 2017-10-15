@@ -6,16 +6,16 @@
 *.npy
 __pycache__
 .dropbox.attr
-
-# csj
-*_ss
-*_ss.sh
-*_ss.py
-*_ss.txt
-csj/fine_tuning
+.ftpconfig
+model.*
+checkpoint
+*temp
 
 # librispeech
-word2num*.txt
+*_multitask*
 
-# temporal
+# csj
+*_ss*
+csj/fine_tuning
+
 bn_blstm_ctc.py
