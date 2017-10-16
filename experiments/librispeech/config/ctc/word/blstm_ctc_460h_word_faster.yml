@@ -2,7 +2,7 @@ param:
   # corpus
   corpus: librispeech
   label_type: word_freq10
-  train_data_size: train100h
+  train_data_size: train460h
 
   # features
   feature: fbank
@@ -38,5 +38,5 @@ param:
   sort_stop_epoch: 3
 
   eval_start_epoch: 3
-  print_step: 50
+  print_step: 100
   beam_width: 20

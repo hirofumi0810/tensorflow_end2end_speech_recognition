@@ -22,39 +22,46 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
     def test(self):
 
-        self.length_check = False
-
         # data_type
-        self.check_loading(label_type='word', data_type='train')
-        self.check_loading(label_type='word', data_type='dev_clean')
-        self.check_loading(label_type='word', data_type='dev_other')
-        self.check_loading(label_type='word', data_type='test_clean')
-        self.check_loading(label_type='word', data_type='test_other')
-        self.check_loading(label_type='character', data_type='test_clean')
-
-        # label_type
-        self.check_loading(label_type='character_capital_divide')
-        self.check_loading(label_type='word')
+        self.check(label_type='word_freq10', data_type='train')
+        self.check(label_type='word_freq10', data_type='dev_clean')
+        self.check(label_type='word_freq10', data_type='dev_other')
+        self.check(label_type='word_freq10', data_type='test_clean')
+        self.check(label_type='word_freq10', data_type='test_other')
+        self.check(label_type='character', data_type='train')
+        self.check(label_type='character', data_type='dev_clean')
+        self.check(label_type='character', data_type='dev_other')
+        self.check(label_type='character', data_type='test_clean')
+        self.check(label_type='character', data_type='test_other')
+        self.check(label_type='character_capital_divide', data_type='train')
+        self.check(label_type='character_capital_divide',
+                   data_type='dev_clean')
+        self.check(label_type='character_capital_divide',
+                   data_type='dev_other')
+        self.check(label_type='character_capital_divide',
+                   data_type='test_clean')
+        self.check(label_type='character_capital_divide',
+                   data_type='test_other')
 
         # sort
-        self.check_loading(label_type='character', sort_utt=True)
-        self.check_loading(label_type='character', sort_utt=True,
-                           sort_stop_epoch=2)
-        self.check_loading(label_type='character', shuffle=True)
+        self.check(label_type='character', sort_utt=True)
+        self.check(label_type='character', sort_utt=True,
+                   sort_stop_epoch=2)
+        self.check(label_type='character', shuffle=True)
 
         # frame stacking
-        self.check_loading(label_type='character', frame_stacking=True)
+        self.check(label_type='character', frame_stacking=True)
 
         # splicing
-        self.check_loading(label_type='character', splice=11)
+        self.check(label_type='character', splice=11)
 
         # multi-GPU
-        self.check_loading(label_type='character', num_gpu=8)
+        self.check(label_type='character', num_gpu=8)
 
     @measure_time
-    def check_loading(self, label_type, data_type='dev_clean',
-                      shuffle=False,  sort_utt=False, sort_stop_epoch=None,
-                      frame_stacking=False, splice=1, num_gpu=1):
+    def check(self, label_type, data_type='dev_clean',
+              shuffle=False,  sort_utt=False, sort_stop_epoch=None,
+              frame_stacking=False, splice=1, num_gpu=1):
 
         print('========================================')
         print('  label_type: %s' % label_type)
@@ -70,7 +77,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
         num_stack = 3 if frame_stacking else 1
         num_skip = 3 if frame_stacking else 1
         dataset = Dataset(
-            data_type=data_type, train_data_size='train_clean100',
+            data_type=data_type, train_data_size='train100h',
             label_type=label_type,
             batch_size=64, max_epoch=1, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
@@ -79,11 +86,9 @@ class TestLoadDatasetCTC(unittest.TestCase):
 
         print('=> Loading mini-batch...')
         if label_type == 'character':
-            map_file_path = '../../metrics/mapping_files/ctc/character.txt'
-        elif label_type == 'character_capital_divide':
-            map_file_path = '../../metrics/mapping_files/ctc/character_capital.txt'
-        elif label_type == 'word':
-            map_file_path = '../../metrics/mapping_files/ctc/word_' + \
+            map_file_path = '../../metrics/mapping_files/character.txt'
+        else:
+            map_file_path = '../../metrics/mapping_files/' + label_type + '_' + \
                 dataset.train_data_size + '.txt'
 
         idx2char = Idx2char(map_file_path)
@@ -92,18 +97,17 @@ class TestLoadDatasetCTC(unittest.TestCase):
         for data, is_new_epoch in dataset:
             inputs, labels, inputs_seq_len, input_names = data
 
-            if not self.length_check:
+            if data_type == 'train':
                 for i, l in zip(inputs[0], labels[0]):
                     if len(i) < len(l):
                         raise ValueError(
                             'input length must be longer than label length.')
-                self.length_check = True
 
             if num_gpu > 1:
                 for inputs_gpu in inputs:
                     print(inputs_gpu.shape)
 
-            if label_type == 'word':
+            if 'word' in label_type:
                 if 'test' not in data_type:
                     str_true = ' '.join(idx2word(labels[0][0]))
                 else:
@@ -111,14 +115,18 @@ class TestLoadDatasetCTC(unittest.TestCase):
                         labels[0][0] == None), axis=0)
                     str_true = ' '.join(word_list)
             else:
-                str_true = idx2char(labels[0][0])
-            str_true = re.sub(r'_', ' ', str_true)
+                if 'test' not in data_type:
+                    str_true = idx2char(labels[0][0])
+                    str_true = re.sub(r'_', ' ', str_true)
+                else:
+                    str_true = labels[0][0][0]
+
             print('----- %s (epoch: %.3f) -----' %
                   (input_names[0][0], dataset.epoch_detail))
             print(inputs[0].shape)
             print(str_true)
 
-            if dataset.epoch_detail >= 0.05:
+            if dataset.epoch_detail >= 0.1:
                 break
 
 

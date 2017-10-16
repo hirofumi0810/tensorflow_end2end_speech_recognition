@@ -1,15 +1,15 @@
 param:
   # corpus
   corpus: librispeech
-  label_type: word_freq10
+  label_type: character_capital_divide
   train_data_size: train100h
 
   # features
   feature: fbank
   input_size: 120
   splice: 1
-  num_stack: 3
-  num_skip: 3
+  num_stack: 1
+  num_skip: 1
 
   # topology
   encoder_type: blstm
@@ -35,8 +35,8 @@ param:
   decay_start_epoch: 5
   decay_rate: 0.5
   decay_patient_epoch: 3
-  sort_stop_epoch: 3
+  sort_stop_epoch: 1
 
-  eval_start_epoch: 3
+  eval_start_epoch: 1
   print_step: 50
   beam_width: 20
