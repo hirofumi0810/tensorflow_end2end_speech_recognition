@@ -1,9 +1,9 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Base class for laoding dataset for the Jont CTC-Attention model.
-   In this class, all data will be loaded at once.
-   You can use only the single GPU version.
+"""Base class for loading dataset for the Attention model.
+   In this class, all data will be loaded at each step.
+   You can use the multi-GPU version.
 """
 
 from __future__ import absolute_import
@@ -15,6 +15,7 @@ import random
 import numpy as np
 
 from utils.dataset.base import Base
+from utils.io.inputs.frame_stacking import stack_frame
 from utils.io.inputs.splicing import do_splice
 
 
@@ -23,6 +24,11 @@ class DatasetBase(Base):
     def __init__(self, *args, **kwargs):
         super(DatasetBase, self).__init__(*args, **kwargs)
 
+    def __getitem__(self, index):
+        input_i = np.array(self.input_paths[index])
+        label_i = np.array(self.label_paths[index])
+        return (input_i, label_i)
+
     def __next__(self, batch_size=None):
         """Generate each mini-batch.
         Args:
@@ -30,18 +36,16 @@ class DatasetBase(Base):
         Returns:
             A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
                 inputs: list of input data of size
-                    `[B, T_int, input_size]`
-                att_labels: list of target labels for Attention, of size
-                    `[B, T_out]`
-                ctc_labels: list of target labels for CTC, of size
-                    `[B, T_out]`
+                    `[num_gpu, B, T_in, input_size]`
+                labels: list of target labels of size
+                    `[num_gpu, B, T_out]`
                 inputs_seq_len: list of length of inputs of size
-                    `[B]`
-                att_labels_seq_len: list of length of target labels for Attention, of size
-                    `[B]`
+                    `[num_gpu, B]`
+                labels_seq_len: list of length of target labels of size
+                    `[num_gpu, B]`
                 input_names: list of file name of input data of size
-                    `[B]`
-            is_new_epoch (bool): If true, one epoch is finished
+                    `[num_gpu, B]`
+            is_new_epoch (bool): If true, 1 epoch is finished
         """
         if self.max_epoch is not None and self.epoch >= self.max_epoch:
             raise StopIteration
@@ -55,11 +59,9 @@ class DatasetBase(Base):
             self.is_new_epoch = False
 
         if not self.is_test:
-            self.att_padded_value = self.eos_index
-            self.ctc_padded_value = -1
+            self.padded_value = self.eos_index
         else:
-            self.att_padded_value = None
-            self.ctc_padded_value = None
+            self.padded_value = None
         # TODO(hirofumi): move this
 
         if self.sort_utt:
@@ -107,31 +109,49 @@ class DatasetBase(Base):
                 self.is_new_epoch = True
                 self.epoch += 1
 
+        # Load dataset in mini-batch
+        input_list = np.array(list(
+            map(lambda path: np.load(path),
+                np.take(self.input_paths, data_indices, axis=0))))
+        label_list = np.array(list(
+            map(lambda path: np.load(path),
+                np.take(self.label_paths, data_indices, axis=0))))
+
+        if not hasattr(self, 'input_size'):
+            self.input_size = input_list[0].shape[1]
+            if self.num_stack is not None and self.num_skip is not None:
+                self.input_size *= self.num_stack
+
+        # Frame stacking
+        input_list = stack_frame(input_list,
+                                 self.input_paths[data_indices],
+                                 self.frame_num_dict,
+                                 self.num_stack,
+                                 self.num_skip,
+                                 progressbar=False)
+
         # Compute max frame num in mini-batch
-        max_frame_num = max(map(lambda x: x.shape[0],
-                                self.input_list[data_indices]))
+        max_frame_num = max(map(lambda x: x.shape[0], input_list))
 
         # Compute max target label length in mini-batch
-        max_seq_len = max(map(len, self.label_list[data_indices])) + 2
+        max_seq_len = max(map(len, label_list)) + 2
         # NOTE: + <SOS> and <EOS>
 
         # Initialization
         inputs = np.zeros(
-            (len(data_indices), max_frame_num,
-             self.input_list[0].shape[-1] * self.splice), dtype=np.float32)
-        att_labels = np.array(
-            [[self.att_padded_value] * max_seq_len] * len(data_indices))
-        ctc_labels = np.array(
-            [[self.ctc_padded_value] * (max_seq_len - 2)] * len(data_indices))
+            (len(data_indices), max_frame_num, self.input_size * self.splice),
+            dtype=np.float32)
+        labels = np.array(
+            [[self.padded_value] * max_seq_len] * len(data_indices))
         inputs_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
-        att_labels_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
-        input_names = np.array(list(
+        labels_seq_len = np.zeros((len(data_indices),), dtype=np.int32)
+        input_names = list(
             map(lambda path: basename(path).split('.')[0],
-                np.take(self.input_paths, data_indices, axis=0))))
+                np.take(self.input_paths, data_indices, axis=0)))
 
         # Set values of each data in mini-batch
-        for i_batch, x in enumerate(data_indices):
-            data_i = self.input_list[x]
+        for i_batch in range(len(data_indices)):
+            data_i = input_list[i_batch]
             frame_num, input_size = data_i.shape
 
             # Splicing
@@ -140,24 +160,39 @@ class DatasetBase(Base):
                                splice=self.splice,
                                batch_size=1).reshape(frame_num, -1)
 
-            inputs[i_batch, :frame_num, :] = data_i
+            inputs[i_batch, : frame_num, :] = data_i
             if self.is_test:
-                att_labels[i_batch, 0] = self.label_list[x]
-                ctc_labels[i_batch, 0] = self.label_list[x]
+                labels[i_batch, 0] = label_list[i_batch]
                 # NOTE: transcript is saved as string
             else:
-                att_labels[i_batch, 0] = self.sos_index
-                att_labels[i_batch, 1:len(self.label_list[x]) + 1
-                           ] = self.label_list[x]
-                att_labels[i_batch, len(self.label_list[x]) + 1
-                           ] = self.eos_index
-                ctc_labels[i_batch, :len(self.label_list[x])
-                           ] = self.label_list[x]
+                labels[i_batch, 0] = self.sos_index
+                labels[i_batch, 1:len(label_list[i_batch]) +
+                       1] = label_list[i_batch]
+                labels[i_batch, len(label_list[i_batch]) + 1] = self.eos_index
             inputs_seq_len[i_batch] = frame_num
-            att_labels_seq_len[i_batch] = len(self.label_list[x]) + 2
+            labels_seq_len[i_batch] = len(label_list[i_batch]) + 2
             # TODO: +2 ??
+
+        ###############
+        # Multi-GPUs
+        ###############
+        if self.num_gpu > 1:
+            # Now we split the mini-batch data by num_gpu
+            inputs = np.array_split(inputs, self.num_gpu, axis=0)
+            labels = np.array_split(labels, self.num_gpu, axis=0)
+            inputs_seq_len = np.array_split(
+                inputs_seq_len, self.num_gpu, axis=0)
+            labels_seq_len = np.array_split(
+                labels_seq_len, self.num_gpu, axis=0)
+            input_names = np.array_split(input_names, self.num_gpu, axis=0)
+        else:
+            inputs = inputs[np.newaxis, :, :, :]
+            labels = labels[np.newaxis, :, :]
+            inputs_seq_len = inputs_seq_len[np.newaxis, :]
+            labels_seq_len = labels_seq_len[np.newaxis, :]
+            input_names = np.array(input_names)[np.newaxis, :]
 
         self.iteration += len(data_indices)
 
-        return (inputs, att_labels, ctc_labels, inputs_seq_len,
-                att_labels_seq_len, input_names), self.is_new_epoch
+        return (inputs, labels, inputs_seq_len, labels_seq_len,
+                input_names), self.is_new_epoch
