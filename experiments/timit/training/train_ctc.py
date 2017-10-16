@@ -23,7 +23,7 @@ from utils.training.learning_rate_controller import Controller
 from utils.training.plot import plot_loss, plot_ler
 from utils.directory import mkdir_join, mkdir
 from utils.parameter import count_total_parameters
-from models.ctc.vanilla_ctc import CTC
+from models.ctc.ctc import CTC
 
 
 def do_train(model, params):
@@ -70,9 +70,7 @@ def do_train(model, params):
             model.inputs_pl_list[0],
             model.labels_pl_list[0],
             model.inputs_seq_len_pl_list[0],
-            model.keep_prob_input_pl_list[0],
-            model.keep_prob_hidden_pl_list[0],
-            model.keep_prob_output_pl_list[0])
+            model.keep_prob_pl_list[0])
         train_op = model.train(
             loss_op,
             optimizer=params['optimizer'],
@@ -133,13 +131,11 @@ def do_train(model, params):
                 # Create feed dictionary for next mini batch (train)
                 inputs, labels, inputs_seq_len, _ = data
                 feed_dict_train = {
-                    model.inputs_pl_list[0]: inputs,
+                    model.inputs_pl_list[0]: inputs[0],
                     model.labels_pl_list[0]: list2sparsetensor(
-                        labels, padded_value=train_data.padded_value),
-                    model.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                    model.keep_prob_input_pl_list[0]: params['dropout_input'],
-                    model.keep_prob_hidden_pl_list[0]: params['dropout_hidden'],
-                    model.keep_prob_output_pl_list[0]: params['dropout_output'],
+                        labels[0], padded_value=train_data.padded_value),
+                    model.inputs_seq_len_pl_list[0]: inputs_seq_len[0],
+                    model.keep_prob_pl_list[0]: 1 - float(params['dropout']),
                     learning_rate_pl: learning_rate
                 }
 
@@ -151,13 +147,11 @@ def do_train(model, params):
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels, inputs_seq_len, _), _ = dev_data.next()
                     feed_dict_dev = {
-                        model.inputs_pl_list[0]: inputs,
+                        model.inputs_pl_list[0]: inputs[0],
                         model.labels_pl_list[0]: list2sparsetensor(
-                            labels, padded_value=dev_data.padded_value),
-                        model.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                        model.keep_prob_input_pl_list[0]: 1.0,
-                        model.keep_prob_hidden_pl_list[0]: 1.0,
-                        model.keep_prob_output_pl_list[0]: 1.0
+                            labels[0], padded_value=dev_data.padded_value),
+                        model.inputs_seq_len_pl_list[0]: inputs_seq_len[0],
+                        model.keep_prob_pl_list[0]: 1.0
                     }
 
                     # Compute loss
@@ -168,9 +162,7 @@ def do_train(model, params):
                     csv_loss_dev.append(loss_dev)
 
                     # Change to evaluation mode
-                    feed_dict_train[model.keep_prob_input_pl_list[0]] = 1.0
-                    feed_dict_train[model.keep_prob_hidden_pl_list[0]] = 1.0
-                    feed_dict_train[model.keep_prob_output_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_pl_list[0]] = 1.0
 
                     # Compute accuracy & update event files
                     ler_train, summary_str_train = sess.run(
@@ -214,8 +206,8 @@ def do_train(model, params):
                                 dataset=dev_data,
                                 label_type=params['label_type'],
                                 eval_batch_size=1)
-                            print('  WER: %f %%' % (wer_dev_epoch * 100))
                             print('  CER: %f %%' % (ler_dev_epoch * 100))
+                            print('  WER: %f %%' % (wer_dev_epoch * 100))
 
                             if ler_dev_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_epoch
@@ -236,9 +228,10 @@ def do_train(model, params):
                                     model=model,
                                     dataset=test_data,
                                     label_type=params['label_type'],
+                                    is_test=True,
                                     eval_batch_size=1)
-                                print('  WER: %f %%' % (wer_test * 100))
                                 print('  CER: %f %%' % (ler_test * 100))
+                                print('  WER: %f %%' % (wer_test * 100))
 
                         else:
                             print('=== Dev Data Evaluation ===')
@@ -272,6 +265,7 @@ def do_train(model, params):
                                     model=model,
                                     dataset=test_data,
                                     label_type=params['label_type'],
+                                    is_test=True,
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (ler_test * 100))
 
@@ -324,13 +318,13 @@ def main(config_path, model_save_path):
                 lstm_impl=params['lstm_impl'],
                 use_peephole=params['use_peephole'],
                 parameter_init=params['weight_init'],
-                clip_grad=params['clip_grad'],
+                clip_grad_norm=params['clip_grad_norm'],
                 clip_activation=params['clip_activation'],
                 num_proj=params['num_proj'],
                 weight_decay=params['weight_decay'])
 
     # Set process name
-    setproctitle('timit_' + model.name + '_' + params['label_type'])
+    setproctitle('tf_timit_' + model.name + '_' + params['label_type'])
 
     model.name += '_' + str(params['num_units'])
     model.name += '_' + str(params['num_layers'])
@@ -338,10 +332,8 @@ def main(config_path, model_save_path):
     model.name += '_lr' + str(params['learning_rate'])
     if params['num_proj'] != 0:
         model.name += '_proj' + str(params['num_proj'])
-    if params['dropout_input'] != 1:
-        model.name += '_dropi' + str(params['dropout_input'])
-    if params['dropout_hidden'] != 1:
-        model.name += '_droph' + str(params['dropout_hidden'])
+    if params['dropout'] != 0:
+        model.name += '_drop' + str(params['dropout'])
     if params['num_stack'] != 1:
         model.name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:

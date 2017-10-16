@@ -14,14 +14,12 @@ from os.path import join
 import pickle
 import numpy as np
 
-from utils.progressbar import wrap_iterator
-from utils.dataset.all_load.attention_all_load import DatasetBase
-from utils.io.inputs.frame_stacking import stack_frame
+from utils.dataset.attention import DatasetBase
 
 
 class Dataset(DatasetBase):
 
-    def __init__(self, data_type, label_type, batch_size, eos_index,
+    def __init__(self, data_type, label_type, batch_size, map_file_path,
                  max_epoch=None, splice=1,
                  num_stack=1, num_skip=1,
                  shuffle=False, sort_utt=False, sort_stop_epoch=None,
@@ -32,7 +30,7 @@ class Dataset(DatasetBase):
             label_type (string): stirng, phone39 or phone48 or phone61 or
                 character or character_capital_divide
             batch_size (int): the size of mini-batch
-            eos_index (int): the index of <EOS> class
+            map_file_path (string): path to the mapping file
             max_epoch (int, optional): the max epoch. None means infinite loop.
             splice (int, optional): frames to splice. Default is 1 frame.
             num_stack (int, optional): the number of frames to stack
@@ -54,13 +52,14 @@ class Dataset(DatasetBase):
                 'label_type must be "phone39" or "phone48" or "phone61" or ' +
                 '"character" or "character_capital_divide".')
 
-        super(Dataset, self).__init__()
+        super(Dataset, self).__init__(map_file_path=map_file_path)
+
+        self.is_test = True if data_type == 'test' else False
 
         self.data_type = data_type
         self.label_type = label_type
         self.batch_size = batch_size
         self.max_epoch = max_epoch
-        self.eos_index = eos_index
         self.splice = splice
         self.num_stack = num_stack
         self.num_skip = num_skip
@@ -68,14 +67,15 @@ class Dataset(DatasetBase):
         self.sort_utt = sort_utt
         self.sort_stop_epoch = sort_stop_epoch
         self.progressbar = progressbar
-        self.padded_value = eos_index
+        self.num_gpu = 1
 
         input_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/inputs/htk/speaker',
-            data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset', 'inputs', data_type)
+        # NOTE: ex.) save_path: timit_dataset_path/inputs/data_type/***.npy
         label_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/labels/attention',
-            label_type, data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset', 'labels', data_type, label_type)
+        # NOTE: ex.) save_path:
+        # timit_dataset_path/labels/data_type/character*/***.npy
 
         # Load the frame number dictionary
         with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
@@ -91,23 +91,6 @@ class Dataset(DatasetBase):
             label_paths.append(join(label_path, input_name + '.npy'))
         self.input_paths = np.array(input_paths)
         self.label_paths = np.array(label_paths)
-
-        # Load all dataset in advance
-        print('=> Loading dataset (%s, %s)...' % (data_type, label_type))
-        input_list, label_list = [], []
-        for i in wrap_iterator(range(len(self.input_paths)), self.progressbar):
-            input_list.append(np.load(self.input_paths[i]))
-            label_list.append(np.load(self.label_paths[i]))
-        self.input_list = np.array(input_list)
-        self.label_list = np.array(label_list)
-
-        # Frame stacking
-        print('=> Stacking frames...')
-        self.input_list = stack_frame(self.input_list,
-                                      self.input_paths,
-                                      self.frame_num_dict,
-                                      num_stack,
-                                      num_skip,
-                                      progressbar)
+        # NOTE: Not load dataset yet
 
         self.rest = set(range(0, len(self.input_paths), 1))

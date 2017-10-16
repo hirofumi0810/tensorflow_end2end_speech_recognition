@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import join, isfile, isdir, abspath
+from os.path import join, isfile, abspath
 import sys
 import time
 import tensorflow as tf
@@ -23,7 +23,7 @@ from utils.training.learning_rate_controller import Controller
 from utils.training.plot import plot_loss, plot_ler
 from utils.directory import mkdir_join, mkdir
 from utils.parameter import count_total_parameters
-from models.attention import blstm_attention_seq2seq
+from models.attention.attention_seq2seq import AttentionSeq2Seq
 
 
 def do_train(model, params):
@@ -39,7 +39,9 @@ def do_train(model, params):
         batch_size=params['batch_size'], eos_index=params['eos_index'],
         max_epoch=params['num_epoch'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True)
+        sort_utt=False)
+    # sort_stop_epoch=params['sort_stop_epoch']
+    # TODO: check sort_utt
     dev_data = Dataset(
         data_type='dev', label_type=params['label_type'],
         batch_size=params['batch_size'], eos_index=params['eos_index'],
@@ -60,7 +62,6 @@ def do_train(model, params):
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             sort_utt=False)
-    # TODO(hirofumi): add frame_stacking & splice
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -75,9 +76,9 @@ def do_train(model, params):
             model.labels_pl_list[0],
             model.inputs_seq_len_pl_list[0],
             model.labels_seq_len_pl_list[0],
-            model.keep_prob_input_pl_list[0],
-            model.keep_prob_hidden_pl_list[0],
-            model.keep_prob_output_pl_list[0])
+            model.keep_prob_encoder_pl_list[0],
+            model.keep_prob_decoder_pl_list[0],
+            model.keep_prob_embedding_pl_list[0])
         train_op = model.train(
             loss_op,
             optimizer=params['optimizer'],
@@ -139,13 +140,13 @@ def do_train(model, params):
                 # Create feed dictionary for next mini batch (train)
                 inputs, labels_train, inputs_seq_len, labels_seq_len, _ = data
                 feed_dict_train = {
-                    model.inputs_pl_list[0]: inputs,
-                    model.labels_pl_list[0]: labels_train,
-                    model.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                    model.labels_seq_len_pl_list[0]: labels_seq_len,
-                    model.keep_prob_input_pl_list[0]: params['dropout_input'],
-                    model.keep_prob_hidden_pl_list[0]: params['dropout_hidden'],
-                    model.keep_prob_output_pl_list[0]: params['dropout_output'],
+                    model.inputs_pl_list[0]: inputs[0],
+                    model.labels_pl_list[0]: labels_train[0],
+                    model.inputs_seq_len_pl_list[0]: inputs_seq_len[0],
+                    model.labels_seq_len_pl_list[0]: labels_seq_len[0],
+                    model.keep_prob_encoder_pl_list[0]: params['dropout_encoder'],
+                    model.keep_prob_decoder_pl_list[0]: params['dropout_decoder'],
+                    model.keep_prob_embedding_pl_list[0]: params['dropout_embedding'],
                     learning_rate_pl: learning_rate
                 }
 
@@ -158,13 +159,13 @@ def do_train(model, params):
                     (inputs, labels_dev, inputs_seq_len,
                      labels_seq_len, _), _ = dev_data().next()
                     feed_dict_dev = {
-                        model.inputs_pl_list[0]: inputs,
-                        model.labels_pl_list[0]: labels_dev,
-                        model.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                        model.labels_seq_len_pl_list[0]: labels_seq_len,
-                        model.keep_prob_input_pl_list[0]: 1.0,
-                        model.keep_prob_hidden_pl_list[0]: 1.0,
-                        model.keep_prob_output_pl_list[0]: 1.0
+                        model.inputs_pl_list[0]: inputs[0],
+                        model.labels_pl_list[0]: labels_dev[0],
+                        model.inputs_seq_len_pl_list[0]: inputs_seq_len[0],
+                        model.labels_seq_len_pl_list[0]: labels_seq_len[0],
+                        model.keep_prob_encoder_pl_list[0]: 1.0,
+                        model.keep_prob_decoder_pl_list[0]: 1.0,
+                        model.keep_prob_embedding_pl_list[0]: 1.0
                     }
 
                     # Compute loss
@@ -175,9 +176,9 @@ def do_train(model, params):
                     csv_loss_dev.append(loss_dev)
 
                     # Change to evaluation mode
-                    feed_dict_train[model.keep_prob_input_pl_list[0]] = 1.0
-                    feed_dict_train[model.keep_prob_hidden_pl_list[0]] = 1.0
-                    feed_dict_train[model.keep_prob_output_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_encoder_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_decoder_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_embedding_pl_list[0]] = 1.0
 
                     # Predict class ids & update even files
                     predicted_ids_train, summary_str_train = sess.run(
@@ -191,13 +192,13 @@ def do_train(model, params):
                     # Convert to sparsetensor to compute LER
                     feed_dict_ler_train = {
                         model.labels_st_true_pl: list2sparsetensor(
-                            labels_train, padded_value=train_data.padded_value),
+                            labels_train[0], padded_value=train_data.padded_value),
                         model.labels_st_pred_pl: list2sparsetensor(
                             predicted_ids_train, padded_value=train_data.padded_value)
                     }
                     feed_dict_ler_dev = {
                         model.labels_st_true_pl: list2sparsetensor(
-                            labels_dev, padded_value=dev_data.padded_value),
+                            labels_dev[0], padded_value=dev_data.padded_value),
                         model.labels_st_pred_pl: list2sparsetensor(
                             predicted_ids_dev, padded_value=dev_data.padded_value)
                     }
@@ -228,11 +229,12 @@ def do_train(model, params):
                              label_type=params['label_type'],
                              save_path=model.save_path)
 
-                    if train_data.epoch >= params['eval_start_epoch']:
+                    # if train_data.epoch >= params['eval_start_epoch']:
+                    if train_data.epoch >= 5:
                         start_time_eval = time.time()
                         if 'char' in params['label_type']:
                             print('=== Dev Data Evaluation ===')
-                            ler_dev_epoch = do_eval_cer(
+                            ler_dev_epoch, wer_dev_epoch = do_eval_cer(
                                 session=sess,
                                 decode_op=decode_op_infer,
                                 model=model,
@@ -240,6 +242,7 @@ def do_train(model, params):
                                 label_type=params['label_type'],
                                 eval_batch_size=1)
                             print('  CER: %f %%' % (ler_dev_epoch * 100))
+                            print('  WER: %f %%' % (wer_dev_epoch * 100))
 
                             if ler_dev_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_epoch
@@ -254,7 +257,7 @@ def do_train(model, params):
                                 print("Model saved in file: %s" % save_path)
 
                                 print('=== Test Data Evaluation ===')
-                                ler_test = do_eval_cer(
+                                ler_test, wer_test = do_eval_cer(
                                     session=sess,
                                     decode_op=decode_op_infer,
                                     model=model,
@@ -262,6 +265,7 @@ def do_train(model, params):
                                     label_type=params['label_type'],
                                     eval_batch_size=1)
                                 print('  CER: %f %%' % (ler_test * 100))
+                                print('  WER: %f %%' % (wer_test * 100))
 
                         else:
                             print('=== Dev Data Evaluation ===')
@@ -325,63 +329,71 @@ def main(config_path, model_save_path):
         config = yaml.load(f)
         params = config['param']
 
-    params['sos_index'] = 0
-    params['eos_index'] = 1
+    # Except for a <SOS> and <EOS> class
     if params['label_type'] == 'phone61':
-        params['num_classes'] = 63
+        params['num_classes'] = 61
     elif params['label_type'] == 'phone48':
-        params['num_classes'] = 50
+        params['num_classes'] = 48
     elif params['label_type'] == 'phone39':
-        params['num_classes'] = 41
+        params['num_classes'] = 39
     elif params['label_type'] == 'character':
-        params['num_classes'] = 30
+        params['num_classes'] = 28
     elif params['label_type'] == 'character_capital_divide':
-        params['num_classes'] = 74
+        params['num_classes'] = 72
+
+    params['sos_index'] = params['num_classes']
+    params['eos_index'] = params['num_classes'] + 1
 
     # Model setting
-    # AttentionModel = load(model_type=config['model_name'])
-    model = blstm_attention_seq2seq.BLSTMAttetion(
+    model = AttentionSeq2Seq(
         input_size=params['input_size'],
-        encoder_num_unit=params['encoder_num_unit'],
-        encoder_num_layer=params['encoder_num_layer'],
-        attention_dim=params['attention_dim'],
+        encoder_type=params['encoder_type'],
+        encoder_num_units=params['encoder_num_units'],
+        encoder_num_layers=params['encoder_num_layers'],
+        encoder_num_proj=params['encoder_num_proj'],
         attention_type=params['attention_type'],
-        decoder_num_unit=params['decoder_num_unit'],
-        decoder_num_layer=params['decoder_num_layer'],
+        attention_dim=params['attention_dim'],
+        decoder_type=params['decoder_type'],
+        decoder_num_units=params['decoder_num_units'],
+        decoder_num_layers=params['decoder_num_layers'],
         embedding_dim=params['embedding_dim'],
         num_classes=params['num_classes'],
         sos_index=params['sos_index'],
         eos_index=params['eos_index'],
         max_decode_length=params['max_decode_length'],
-        attention_smoothing=params['attention_smoothing'],
-        attention_weights_tempareture=params['attention_weights_tempareture'],
-        logits_tempareture=params['logits_tempareture'],
+        lstm_impl='LSTMBlockCell',
+        use_peephole=params['use_peephole'],
         parameter_init=params['weight_init'],
-        clip_grad=params['clip_grad'],
+        clip_grad_norm=params['clip_grad_norm'],
         clip_activation_encoder=params['clip_activation_encoder'],
         clip_activation_decoder=params['clip_activation_decoder'],
         weight_decay=params['weight_decay'],
-        beam_width=1)
+        time_major=True,
+        sharpening_factor=params['sharpening_factor'],
+        logits_temperature=params['logits_temperature'])
 
     # Set process name
-    setproctitle('timit_' + model.name + '_' + params['label_type'])
+    setproctitle('tf_timit_' + model.name + '_' + params['label_type'])
 
     model.name = params['model']
-    model.name += '_encoder' + str(params['encoder_num_unit'])
+    model.name += '_en' + str(params['encoder_num_unit'])
     model.name += '_' + str(params['encoder_num_layer'])
-    model.name += '_attdim' + str(params['attention_dim'])
-    model.name += '_decoder' + str(params['decoder_num_unit'])
+    model.name += '_att' + str(params['attention_dim'])
+    model.name += '_de' + str(params['decoder_num_unit'])
     model.name += '_' + str(params['decoder_num_layer'])
     model.name += '_' + params['optimizer']
     model.name += '_lr' + str(params['learning_rate'])
     model.name += '_' + params['attention_type']
-    if bool(params['attention_smoothing']):
-        model.name += '_smoothing'
-    if params['attention_weights_tempareture'] != 1:
-        model.name += '_sharpening' + \
-            str(params['attention_weights_tempareture'])
+    if params['dropout'] != 0:
+        model.name += '_drop' + str(params['dropout'])
+    if params['num_stack'] != 1:
+        model.name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:
-        model.name += '_weightdecay' + str(params['weight_decay'])
+        model.name += 'wd' + str(params['weight_decay'])
+    if params['sharpening_factor'] != 1:
+        model.name += '_sharp' + str(params['sharpening_factor'])
+    if params['logits_temperature'] != 1:
+        model.name += '_temp' + str(params['logits_temperature'])
 
     # Set save path
     model.save_path = mkdir_join(
@@ -397,9 +409,6 @@ def main(config_path, model_save_path):
             new_model_path = model.save_path + '_' + str(model_index)
         elif isfile(join(new_model_path, 'config.yml')):
             # Training of the first model have not been finished yet
-            # tf.gfile.DeleteRecursively(new_model_path)
-            # tf.gfile.MakeDirs(new_model_path)
-            # break
             model_index += 1
             new_model_path = model.save_path + '_' + str(model_index)
         else:

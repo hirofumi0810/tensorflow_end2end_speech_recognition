@@ -14,9 +14,7 @@ from os.path import join
 import pickle
 import numpy as np
 
-from utils.progressbar import wrap_iterator
-from utils.dataset.all_load.multitask_ctc_all_load import DatasetBase
-from utils.io.inputs.frame_stacking import stack_frame
+from utils.dataset.multitask_ctc import DatasetBase
 
 
 class Dataset(DatasetBase):
@@ -56,6 +54,8 @@ class Dataset(DatasetBase):
 
         super(Dataset, self).__init__()
 
+        self.is_test = True if data_type == 'test' else False
+
         self.data_type = data_type
         self.label_type_main = label_type_main
         self.label_type_sub = label_type_sub
@@ -68,17 +68,17 @@ class Dataset(DatasetBase):
         self.sort_utt = sort_utt
         self.sort_stop_epoch = sort_stop_epoch
         self.progressbar = progressbar
-        self.padded_value = -1
+        self.num_gpu = 1
 
         input_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/inputs/htk/speaker',
-            data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset', 'inputs', data_type)
+        # NOTE: ex.) save_path: timit_dataset_path/inputs/data_type/***.npy
         label_main_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc',
-            label_type_main, data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset', 'labels', data_type, label_type_main)
         label_sub_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset/labels/ctc',
-            label_type_sub, data_type)
+            '/n/sd8/inaguma/corpus/timit/dataset', 'labels', data_type, label_type_sub)
+        # NOTE: ex.) save_path:
+        # timit_dataset_path/labels/data_type/character*/***.npy
 
         # Load the frame number dictionary
         with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
@@ -99,26 +99,6 @@ class Dataset(DatasetBase):
         self.input_paths = np.array(input_paths)
         self.label_main_paths = np.array(label_main_paths)
         self.label_sub_paths = np.array(label_sub_paths)
-
-        # Load all dataset in advance
-        print('=> Loading dataset (%s, %s, %s)...' %
-              (data_type, label_type_main, label_type_sub))
-        input_list, label_main_list, label_sub_list = [], [], []
-        for i in wrap_iterator(range(len(self.input_paths)), self.progressbar):
-            input_list.append(np.load(self.input_paths[i]))
-            label_main_list.append(np.load(self.label_main_paths[i]))
-            label_sub_list.append(np.load(self.label_sub_paths[i]))
-        self.input_list = np.array(input_list)
-        self.label_main_list = np.array(label_main_list)
-        self.label_sub_list = np.array(label_sub_list)
-
-        # Frame stacking
-        print('=> Stacking frames...')
-        self.input_list = stack_frame(self.input_list,
-                                      self.input_paths,
-                                      self.frame_num_dict,
-                                      num_stack,
-                                      num_skip,
-                                      progressbar)
+        # NOTE: Not load dataset yet
 
         self.rest = set(range(0, len(self.input_paths), 1))

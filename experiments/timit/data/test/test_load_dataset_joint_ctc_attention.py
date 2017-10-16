@@ -58,11 +58,14 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
         print('  splice: %d' % splice)
         print('========================================')
 
+        map_file_path = '../../metrics/mapping_files/' + label_type + '.txt'
+
         num_stack = 3 if frame_stacking else 1
         num_skip = 3 if frame_stacking else 1
         dataset = Dataset(
             data_type=data_type, label_type=label_type,
-            batch_size=64, eos_index=1, max_epoch=2, splice=splice,
+            batch_size=64, map_file_path=map_file_path,
+            max_epoch=2, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
             shuffle=shuffle,
             sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
@@ -70,25 +73,25 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
 
         print('=> Loading mini-batch...')
         if label_type in ['character', 'character_capital_divide']:
-            map_fn_ctc = Idx2char(
-                map_file_path='../../metrics/mapping_files/ctc/' + label_type + '.txt')
-            map_fn_att = Idx2char(
-                map_file_path='../../metrics/mapping_files/attention/' + label_type + '.txt')
+            map_fn = Idx2char(map_file_path=map_file_path)
         else:
-            map_fn_ctc = Idx2phone(
-                map_file_path='../../metrics/mapping_files/ctc/' + label_type + '.txt')
-            map_fn_att = Idx2phone(
-                map_file_path='../../metrics/mapping_files/attention/' + label_type + '.txt')
+            map_fn = Idx2phone(map_file_path=map_file_path)
 
         for data, is_new_epoch in dataset:
             inputs, att_labels, ctc_labels, inputs_seq_len, att_labels_seq_len, input_names = data
 
-            att_str_true = map_fn_att(att_labels[0][0: att_labels_seq_len[0]])
-            ctc_str_true = map_fn_ctc(ctc_labels[0])
-            att_str_true = re.sub(r'_', ' ', att_str_true)
-            ctc_str_true = re.sub(r'_', ' ', ctc_str_true)
+            if data_type != 'test':
+                att_str_true = map_fn(
+                    att_labels[0][0][0: att_labels_seq_len[0][0]])
+                att_str_true = re.sub(r'_', ' ', att_str_true)
+                ctc_str_true = map_fn(ctc_labels[0][0])
+                ctc_str_true = re.sub(r'_', ' ', ctc_str_true)
+            else:
+                att_str_true = att_labels[0][0][0]
+                ctc_str_true = ctc_labels[0][0][0]
+
             print('----- %s ----- (epoch: %.3f)' %
-                  (input_names[0], dataset.epoch_detail))
+                  (input_names[0][0], dataset.epoch_detail))
             print(att_str_true)
             print(ctc_str_true)
 

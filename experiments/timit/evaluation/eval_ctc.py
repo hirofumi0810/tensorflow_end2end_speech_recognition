@@ -16,7 +16,7 @@ import argparse
 sys.path.append(os.path.abspath('../../../'))
 from experiments.timit.data.load_dataset_ctc import Dataset
 from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
-from models.ctc.vanilla_ctc import CTC
+from models.ctc.ctc import CTC
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--epoch', type=int, default=-1,
@@ -26,31 +26,31 @@ parser.add_argument('--model_path', type=str,
 parser.add_argument('--beam_width', type=int, default=20,
                     help='beam_width (int, optional): beam width for beam search.' +
                     ' 1 disables beam search, which mean greedy decoding.')
-parser.add_argument('--batch_size', type=int, default=1,
-                    help='the size of mini-batch when evaluation')
+parser.add_argument('--eval_batch_size', type=str, default=1,
+                    help='the size of mini-batch in evaluation')
 
 
-def do_eval(model, params, epoch, batch_size, beam_width):
+def do_eval(model, params, epoch, beam_width, eval_batch_size):
     """Evaluate the model.
     Args:
         model: the model to restore
         params (dict): A dictionary of parameters
         epoch (int): the epoch to restore
-        batch_size (int): the size of mini-batch when evaluation
         beam_width (int): beam_width (int, optional): beam width for beam search.
             1 disables beam search, which mean greedy decoding.
+        eval_batch_size (int): the size of mini-batch when evaluation
     """
     # Load dataset
     if 'phone' in params['label_type']:
         test_data = Dataset(
             data_type='test', label_type='phone39',
-            batch_size=batch_size, splice=params['splice'],
+            batch_size=eval_batch_size, splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             shuffle=False, progressbar=True)
     else:
         test_data = Dataset(
             data_type='test', label_type=params['label_type'],
-            batch_size=batch_size, splice=params['splice'],
+            batch_size=eval_batch_size, splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             shuffle=False, progressbar=True)
 
@@ -61,9 +61,7 @@ def do_eval(model, params, epoch, batch_size, beam_width):
     _, logits = model.compute_loss(model.inputs_pl_list[0],
                                    model.labels_pl_list[0],
                                    model.inputs_seq_len_pl_list[0],
-                                   model.keep_prob_input_pl_list[0],
-                                   model.keep_prob_hidden_pl_list[0],
-                                   model.keep_prob_output_pl_list[0])
+                                   model.keep_prob_pl_list[0])
     decode_op = model.decoder(logits,
                               model.inputs_seq_len_pl_list[0],
                               beam_width=beam_width)
@@ -98,10 +96,11 @@ def do_eval(model, params, epoch, batch_size, beam_width):
                 model=model,
                 dataset=test_data,
                 label_type=params['label_type'],
-                eval_batch_size=1,
+                is_test=True,
+                eval_batch_size=eval_batch_size,
                 progressbar=True)
-            print('  WER: %f %%' % (wer_test * 100))
             print('  CER: %f %%' % (cer_test * 100))
+            print('  WER: %f %%' % (wer_test * 100))
         else:
             per_test = do_eval_per(
                 session=sess,
@@ -110,7 +109,8 @@ def do_eval(model, params, epoch, batch_size, beam_width):
                 model=model,
                 dataset=test_data,
                 label_type=params['label_type'],
-                eval_batch_size=1,
+                is_test=True,
+                eval_batch_size=eval_batch_size,
                 progressbar=True)
             print('  PER: %f %%' % (per_test * 100))
 
@@ -146,14 +146,14 @@ def main():
         lstm_impl=params['lstm_impl'],
         use_peephole=params['use_peephole'],
         parameter_init=params['weight_init'],
-        clip_grad=params['clip_grad'],
+        clip_grad_norm=params['clip_grad_norm'],
         clip_activation=params['clip_activation'],
         num_proj=params['num_proj'],
         weight_decay=params['weight_decay'])
 
     model.save_path = args.model_path
     do_eval(model=model, params=params,
-            epoch=args.epoch, batch_size=args.batch_size,
+            epoch=args.epoch, eval_batch_size=args.eval_batch_size,
             beam_width=args.beam_width)
 
 
