@@ -7,22 +7,23 @@ param:
   # features
   feature: fbank
   input_size: 120
-  splice: 1
-  num_stack: 3
-  num_skip: 3
+  splice: 11
+  num_stack: 1
+  num_skip: 1
 
   # topology
-  encoder_type: blstm
-  lstm_impl: LSTMBlockCell
-  use_peephole: True
+  encoder_type: vgg_wang
+  lstm_impl: None  # not used
+  use_peephole: False  # not used
+  num_units: 0  # not used
+  num_proj: 0  # not used
+  num_layers: 0   # not used
   num_units: 320
-  num_proj: 0
-  num_layers: 5
   bottleneck_dim: 0
 
   # optimization
-  batch_size: 32
-  optimizer: rmsprop
+  batch_size: 5
+  optimizer: adam
   learning_rate: 1e-3
   num_epoch: 20
 
