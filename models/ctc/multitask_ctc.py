@@ -30,11 +30,11 @@ class MultitaskCTC(CTC):
             Set between 0 to 1
         lstm_impl (string, optional): a base implementation of LSTM. This is
             not used for GRU models.
-                BasicLSTMCell: tf.contrib.rnn.BasicLSTMCell (no peephole)
-                LSTMCell: tf.contrib.rnn.LSTMCell
-                LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
-                LSTMBlockFusedCell: under implementation
-                CudnnLSTM: under implementation
+                - BasicLSTMCell: tf.contrib.rnn.BasicLSTMCell (no peephole)
+                - LSTMCell: tf.contrib.rnn.LSTMCell
+                - LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
+                - LSTMBlockFusedCell: under implementation
+                - CudnnLSTM: under implementation
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell (the fastest).
         use_peephole (bool, optional): if True, use peephole connection. This
@@ -43,13 +43,16 @@ class MultitaskCTC(CTC):
             when using CNN-like encoder. Default is 1 frame.
         parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
-        clip_grad (float, optional): the range of gradient clipping (> 0)
-        clip_activation (float, optional): the range of activation clipping
-            (> 0). This is not used for GRU models.
+        clip_grad_norm (float, optional): the range of clipping of gradient
+            norm (> 0)
+        clip_activation (float, optional): the range of clipping of cell
+            activation (> 0). This is not used for GRU models.
         num_proj (int, optional): the number of nodes in the projection layer.
             This is not used for GRU models.
         weight_decay (float, optional): a parameter for weight decay
         bottleneck_dim (int, optional): the dimensions of the bottleneck layer
+        time_major (bool, optional): if True, time-major computation will be
+            performed
     """
 
     def __init__(self,
@@ -65,17 +68,18 @@ class MultitaskCTC(CTC):
                  use_peephole=True,
                  splice=1,
                  parameter_init=0.1,
-                 clip_grad=None,
+                 clip_grad_norm=None,
                  clip_activation=None,
                  num_proj=None,
                  weight_decay=0.0,
-                 bottleneck_dim=None):
+                 bottleneck_dim=None,
+                 time_major=True):
 
         super(MultitaskCTC, self).__init__(
             encoder_type, input_size, num_units, num_layers_main,
             num_classes_main, lstm_impl, use_peephole, splice,
-            parameter_init, clip_grad, clip_activation, num_proj,
-            weight_decay, bottleneck_dim)
+            parameter_init, clip_grad_norm, clip_activation, num_proj,
+            weight_decay, bottleneck_dim, time_major)
 
         self.num_classes_sub = num_classes_sub + 1  # + blank label
         if float(main_task_weight) < 0 or float(main_task_weight) > 1:
@@ -97,7 +101,8 @@ class MultitaskCTC(CTC):
                 lstm_impl=lstm_impl,
                 use_peephole=use_peephole,
                 parameter_init=parameter_init,
-                clip_activation=clip_activation)
+                clip_activation=clip_activation,
+                time_major=time_major)
         else:
             raise NotImplementedError
 
@@ -114,6 +119,7 @@ class MultitaskCTC(CTC):
         """
         # inputs: `[B, T, input_size]`
         batch_size = tf.shape(inputs)[0]
+        max_time = tf.shape(inputs)[1]
 
         encoder_outputs, final_state, encoder_outputs_sub, final_state_sub = self.encoder(
             inputs, inputs_seq_len, keep_prob)
@@ -155,13 +161,19 @@ class MultitaskCTC(CTC):
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 
-            # Reshape back to the original shape
-            logits_sub = tf.reshape(
-                logits_sub_2d,
-                shape=[batch_size, -1, self.num_classes_sub])
+            if self.time_major:
+                # Reshape back to the original shape
+                logits_sub = tf.reshape(
+                    logits_sub_2d,
+                    shape=[max_time, batch_size, self.num_classes_sub])
+            else:
+                # Reshape back to the original shape
+                logits_sub = tf.reshape(
+                    logits_sub_2d,
+                    shape=[batch_size, max_time, self.num_classes_sub])
 
-            # Convert to time-major: `[T, B, num_classes]'
-            logits_sub = tf.transpose(logits_sub, (1, 0, 2))
+                # Convert to time-major: `[T, B, num_classes]'
+                logits = tf.transpose(logits_sub, [1, 0, 2])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.variable_scope('bottleneck') as scope:
@@ -186,12 +198,19 @@ class MultitaskCTC(CTC):
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 
-            # Reshape back to the original shape
-            logits = tf.reshape(
-                logits_2d, shape=[batch_size, -1, self.num_classes])
+            if self.time_major:
+                # Reshape back to the original shape
+                logits = tf.reshape(
+                    logits_2d,
+                    shape=[max_time, batch_size, self.num_classes])
+            else:
+                # Reshape back to the original shape
+                logits = tf.reshape(
+                    logits_2d,
+                    shape=[batch_size, max_time, self.num_classes])
 
-            # Convert to time-major: `[T, B, num_classes]'
-            logits = tf.transpose(logits, (1, 0, 2))
+                # Convert to time-major: `[T, B, num_classes]'
+                logits = tf.transpose(logits, [1, 0, 2])
 
         return logits, logits_sub
 

@@ -21,26 +21,28 @@ from utils.parameter import count_total_parameters
 from utils.training.learning_rate_controller import Controller
 
 
-class TestCTC(tf.test.TestCase):
+class TestCTCTraining(tf.test.TestCase):
 
     def test(self):
         print("CTC Working check.")
 
         # VGG-CTC
-        self.check(encoder_type='vgg_wang')
+        # self.check(encoder_type='vgg_wang')
 
         # GRU-CTC
-        # self.check(encoder_type='bgru')
-        # self.check(encoder_type='gru')
+        self.check(encoder_type='bgru')
+        self.check(encoder_type='gru')
 
         # LSTM-CTC
-        # self.check(encoder_type='lstm', lstm_impl='BasicLSTMCell')
-        # self.check(encoder_type='lstm', lstm_impl='LSTMCell')
-        # self.check(encoder_type='lstm', lstm_impl='LSTMBlockCell')
+        self.check(encoder_type='lstm', lstm_impl='BasicLSTMCell')
+        self.check(encoder_type='lstm', lstm_impl='LSTMCell')
+        self.check(encoder_type='lstm', lstm_impl='LSTMBlockCell')
 
         # BLSTM-CTC
-        # self.check(encoder_type='blstm', lstm_impl='BasicLSTMCell')
-        # self.check(encoder_type='blstm', lstm_impl='LSTMCell')
+        self.check(encoder_type='blstm', lstm_impl='BasicLSTMCell')
+        self.check(encoder_type='blstm', lstm_impl='LSTMCell')
+        self.check(encoder_type='blstm', lstm_impl='LSTMBlockCell',
+                   time_major=True)
         self.check(encoder_type='blstm', lstm_impl='LSTMBlockCell',
                    save_params=False)
 
@@ -59,12 +61,14 @@ class TestCTC(tf.test.TestCase):
 
     @measure_time
     def check(self, encoder_type, label_type='character',
-              lstm_impl=None, save_params=False):
+              lstm_impl=None, time_major=False, save_params=False):
 
         print('==================================================')
         print('  encoder_type: %s' % encoder_type)
         print('  label_type: %s' % label_type)
         print('  lstm_impl: %s' % lstm_impl)
+        print('  time_major: %s' % str(time_major))
+        print('  save_params: %s' % str(save_params))
         print('==================================================')
 
         tf.reset_default_graph()
@@ -90,12 +94,13 @@ class TestCTC(tf.test.TestCase):
                         num_classes=num_classes,
                         lstm_impl=lstm_impl,
                         parameter_init=0.1,
-                        clip_grad=5.0,
+                        clip_grad_norm=5.0,
                         clip_activation=50,
                         num_proj=256,
+                        weight_decay=1e-8,
                         # bottleneck_dim=50,
                         bottleneck_dim=None,
-                        weight_decay=1e-8)
+                        time_major=time_major)
 
             # Define placeholders
             model.create_placeholders()
@@ -119,7 +124,7 @@ class TestCTC(tf.test.TestCase):
             # Define learning rate controller
             learning_rate = 1e-3
             lr_controller = Controller(learning_rate_init=learning_rate,
-                                       decay_start_epoch=10,
+                                       decay_start_epoch=20,
                                        decay_rate=0.9,
                                        decay_patient_epoch=5,
                                        lower_better=True)

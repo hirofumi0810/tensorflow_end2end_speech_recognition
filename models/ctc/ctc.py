@@ -8,20 +8,12 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+
+from models.model_base import ModelBase
 from models.encoders.load_encoder import load
 
-OPTIMIZER_CLS_NAMES = {
-    "adagrad": tf.train.AdagradOptimizer,
-    "adadelta": tf.train.AdadeltaOptimizer,
-    "adam": tf.train.AdamOptimizer,
-    "rmsprop": tf.train.RMSPropOptimizer,
-    "sgd": tf.train.GradientDescentOptimizer,
-    "momentum": tf.train.MomentumOptimizer,
-    "nestrov": tf.train.MomentumOptimizer
-}
 
-
-class CTC(object):
+class CTC(ModelBase):
     """Connectionist Temporal Classification (CTC) network.
     Args:
         encoder_type (string): The type of an encoder
@@ -38,11 +30,11 @@ class CTC(object):
             (except for a blank label)
         lstm_impl (string, optional): a base implementation of LSTM. This is
             not used for GRU models.
-                BasicLSTMCell: tf.contrib.rnn.BasicLSTMCell (no peephole)
-                LSTMCell: tf.contrib.rnn.LSTMCell
-                LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
-                LSTMBlockFusedCell: under implementation
-                CudnnLSTM: under implementation
+                - BasicLSTMCell: tf.contrib.rnn.BasicLSTMCell (no peephole)
+                - LSTMCell: tf.contrib.rnn.LSTMCell
+                - LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
+                - LSTMBlockFusedCell: under implementation
+                - CudnnLSTM: under implementation
             Choose the background implementation of tensorflow.
             Default is LSTMBlockCell.
         use_peephole (bool, optional): if True, use peephole connection. This
@@ -51,13 +43,16 @@ class CTC(object):
             when using CNN-like encoder. Default is 1 frame.
         parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
-        clip_grad (float, optional): the range of gradient clipping (> 0)
-        clip_activation (float, optional): the range of activation clipping
-            (> 0). This is not used for GRU models.
+        clip_grad_norm (float, optional): the range of clipping of gradient
+            norm (> 0)
+        clip_activation (float, optional): the range of clipping of cell
+            activation (> 0). This is not used for GRU models.
         num_proj (int, optional): the number of nodes in the projection layer.
             This is not used for GRU models.
         weight_decay (float, optional): a parameter for weight decay
         bottleneck_dim (int, optional): the dimensions of the bottleneck layer
+        time_major (bool, optional): if True, time-major computation will be
+            performed
     """
 
     def __init__(self,
@@ -70,18 +65,20 @@ class CTC(object):
                  use_peephole=True,
                  splice=1,
                  parameter_init=0.1,
-                 clip_grad=None,
+                 clip_grad_norm=None,
                  clip_activation=None,
                  num_proj=None,
                  weight_decay=0.0,
-                 bottleneck_dim=None):
+                 bottleneck_dim=None,
+                 time_major=True):
 
         super(CTC, self).__init__()
 
         assert input_size % 3 == 0, 'input_size must be divisible by 3 (+ delta, double delta features).'
         assert splice % 2 == 1, 'splice must be the odd number'
-        if clip_grad is not None:
-            assert float(clip_grad) > 0, 'clip_grad must be larger than 0.'
+        if clip_grad_norm is not None:
+            assert float(
+                clip_grad_norm) > 0, 'clip_grad_norm must be larger than 0.'
         assert float(
             weight_decay) >= 0, 'weight_decay must not be a negative value.'
 
@@ -104,7 +101,7 @@ class CTC(object):
 
         # Regularization
         self.parameter_init = parameter_init
-        self.clip_grad = clip_grad
+        self.clip_grad_norm = clip_grad_norm
         self.clip_activation = clip_activation
         self.weight_decay = weight_decay
 
@@ -118,6 +115,7 @@ class CTC(object):
         self.inputs_seq_len_pl_list = []
         self.keep_prob_pl_list = []
 
+        self.time_major = time_major
         self.name = encoder_type + '_ctc'
 
         if encoder_type in ['blstm', 'lstm']:
@@ -128,7 +126,8 @@ class CTC(object):
                 lstm_impl=lstm_impl,
                 use_peephole=use_peephole,
                 parameter_init=parameter_init,
-                clip_activation=clip_activation)
+                clip_activation=clip_activation,
+                time_major=time_major)
 
         elif encoder_type in ['vgg_blstm', 'vgg_lstm']:
             self.encoder = load(encoder_type)(
@@ -140,19 +139,22 @@ class CTC(object):
                 lstm_impl=lstm_impl,
                 use_peephole=use_peephole,
                 parameter_init=parameter_init,
-                clip_activation=clip_activation)
+                clip_activation=clip_activation,
+                time_major=time_major)
 
         elif encoder_type in ['bgru', 'gru']:
             self.encoder = load(encoder_type)(
                 num_units=num_units,
                 num_layers=num_layers,
-                parameter_init=parameter_init)
+                parameter_init=parameter_init,
+                time_major=time_major)
 
         elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
             self.encoder = load(encoder_type)(
                 input_size=input_size,
                 splice=splice,
-                parameter_init=parameter_init)
+                parameter_init=parameter_init,
+                time_major=time_major)
 
         else:
             self.encoder = None
@@ -169,6 +171,7 @@ class CTC(object):
         """
         # inputs: `[B, T, input_size]`
         batch_size = tf.shape(inputs)[0]
+        max_time = tf.shape(inputs)[1]
 
         encoder_outputs, final_state = self.encoder(
             inputs, inputs_seq_len, keep_prob)
@@ -224,12 +227,17 @@ class CTC(object):
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 
-            # Reshape back to the original shape
-            logits = tf.reshape(
-                logits_2d, shape=[batch_size, -1, self.num_classes])
+            if self.time_major:
+                # Reshape back to the original shape
+                logits = tf.reshape(
+                    logits_2d, shape=[max_time, batch_size, self.num_classes])
+            else:
+                # Reshape back to the original shape
+                logits = tf.reshape(
+                    logits_2d, shape=[batch_size, max_time, self.num_classes])
 
-            # Convert to time-major: `[T, B, num_classes]'
-            logits = tf.transpose(logits, (1, 0, 2))
+                # Convert to time-major: `[T, B, num_classes]'
+                logits = tf.transpose(logits, [1, 0, 2])
 
         return logits
 
@@ -248,34 +256,6 @@ class CTC(object):
         self.keep_prob_pl_list.append(
             tf.placeholder(tf.float32, name='keep_prob'))
 
-    def _add_noise_to_inputs(self, inputs, stddev=0.075):
-        """Add gaussian noise to the inputs.
-        Args:
-            inputs: the noise free input-features.
-            stddev (float, optional): The standart deviation of the noise.
-                Default is 0.075.
-        Returns:
-            inputs: Input features plus noise.
-        """
-        # if stddev != 0:
-        #     with tf.variable_scope("input_noise"):
-        #         # Add input noise with a standart deviation of stddev.
-        #         inputs = tf.random_normal(
-        #             tf.shape(inputs), 0.0, stddev) + inputs
-        # return inputs
-        raise NotImplementedError
-
-    def _add_noise_to_gradients(grads_and_vars, gradient_noise_scale,
-                                stddev=0.075):
-        """Adds scaled noise from a 0-mean normal distribution to gradients.
-        Args:
-            grads_and_vars:
-            gradient_noise_scale:
-            stddev (float):
-        Returns:
-        """
-        raise NotImplementedError
-
     def compute_loss(self, inputs, labels, inputs_seq_len,
                      keep_prob, scope=None):
         """Operation for computing ctc loss.
@@ -287,8 +267,9 @@ class CTC(object):
                 in the hidden-hidden connection
             scope (optional): A scope in the model tower
         Returns:
-            total_loss: operation for computing total ctc loss
-            logits: A tensor of size `[T, B, input_size]`
+            total_loss: operation for computing total ctc loss (ctc loss + L2).
+                 This is a single scalar tensor to minimize.
+            logits: A tensor of size `[T, B, num_classes]`
         """
         # Build model graph
         logits = self._build(inputs, inputs_seq_len, keep_prob)
@@ -338,108 +319,6 @@ class CTC(object):
             tf.summary.scalar('ctc_loss_dev', ctc_loss))
 
         return total_loss, logits
-
-    def _set_optimizer(self, optimizer, learning_rate):
-        """Set optimizer.
-        Args:
-            optimizer (string): the name of the optimizer in
-                OPTIMIZER_CLS_NAMES
-            learning_rate (float): A learning rate
-        Returns:
-            optimizer:
-        """
-        optimizer = optimizer.lower()
-        if optimizer not in OPTIMIZER_CLS_NAMES:
-            raise ValueError(
-                "Optimizer name should be one of [%s], you provided %s." %
-                (", ".join(OPTIMIZER_CLS_NAMES), optimizer))
-
-        # Select optimizer
-        if optimizer == 'momentum':
-            return OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate,
-                momentum=0.9)
-        elif optimizer == 'nestrov':
-            return OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate,
-                momentum=0.9,
-                use_nesterov=True)
-        else:
-            return OPTIMIZER_CLS_NAMES[optimizer](
-                learning_rate=learning_rate)
-
-    def train(self, loss, optimizer, learning_rate, clip_norm=False):
-        """Operation for training. Only the sigle GPU training is supported.
-        Args:
-            loss: An operation for computing loss
-            optimizer (string): name of the optimizer in OPTIMIZER_CLS_NAMES
-            learning_rate (placeholder): A learning rate
-            clip_norm (bool, optional): if True, clip gradients norm by
-                self.clip_grad
-        Returns:
-            train_op: operation for training
-        """
-        # Create a variable to track the global step
-        global_step = tf.Variable(0, name='global_step', trainable=False)
-
-        # Set optimizer
-        self.optimizer = self._set_optimizer(optimizer, learning_rate)
-
-        if self.clip_grad is not None:
-            # Compute gradients
-            grads_and_vars = self.optimizer.compute_gradients(loss)
-
-            # Clip gradients
-            clipped_grads_and_vars = self._clip_gradients(grads_and_vars,
-                                                          clip_norm)
-
-            # Create operation for gradient update
-            with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                train_op = self.optimizer.apply_gradients(
-                    clipped_grads_and_vars,
-                    global_step=global_step)
-
-        else:
-            # Use the optimizer to apply the gradients that minimize the loss
-            # and also increment the global step counter as a single training
-            # step
-            with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                train_op = self.optimizer.minimize(
-                    loss, global_step=global_step)
-
-        return train_op
-
-    def _clip_gradients(self, grads_and_vars, _clip_norm):
-        """Clip gradients.
-        Args:
-            grads_and_vars: list of (grads, vars) tuples
-            _clip_norm: if True, clip gradients norm by self.clip_grad
-        Returns:
-            clipped_grads_and_vars: list of (clipped grads, vars)
-        """
-        # TODO: Optionally add gradient noise
-
-        clipped_grads_and_vars = []
-
-        if _clip_norm:
-            # Clip gradient norm
-            for grad, var in grads_and_vars:
-                if grad is not None:
-                    clipped_grads_and_vars.append(
-                        (tf.clip_by_norm(grad, clip_norm=self.clip_grad), var))
-        else:
-            # Clip gradient
-            for grad, var in grads_and_vars:
-                if grad is not None:
-                    clipped_grads_and_vars.append(
-                        (tf.clip_by_value(grad,
-                                          clip_value_min=-self.clip_grad,
-                                          clip_value_max=self.clip_grad), var))
-
-        # TODO: Add histograms for variables, gradients (norms)
-        # self._tensorboard(trainable_vars)
-
-        return clipped_grads_and_vars
 
     def decoder(self, logits, inputs_seq_len, beam_width=1):
         """Operation for decoding.
@@ -513,72 +392,3 @@ class CTC(object):
         self.summaries_dev.append(tf.summary.scalar('ler_dev', ler_op))
 
         return ler_op
-
-    def _tensorboard(self, trainable_vars, dev=True):
-        """Compute statistics for TensorBoard plot.
-        Args:
-            trainable_vars:
-            dev (bool, optional): if True, show values in the dev set
-        """
-        # Histogram
-        with tf.name_scope("train"):
-            for var in trainable_vars:
-                self.summaries_train.append(
-                    tf.summary.histogram(var.name, var))
-
-        # Mean
-        with tf.name_scope("mean_train"):
-            for var in trainable_vars:
-                self.summaries_train.append(
-                    tf.summary.scalar(var.name, tf.reduce_mean(var)))
-
-        # Standard deviation
-        with tf.name_scope("stddev_train"):
-            for var in trainable_vars:
-                self.summaries_train.append(
-                    tf.summary.scalar(var.name, tf.sqrt(
-                        tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
-
-        # Max
-        with tf.name_scope("max_train"):
-            for var in trainable_vars:
-                self.summaries_train.append(
-                    tf.summary.scalar(var.name, tf.reduce_max(var)))
-
-        # Min
-        with tf.name_scope("min_train"):
-            for var in trainable_vars:
-                self.summaries_train.append(
-                    tf.summary.scalar(var.name, tf.reduce_min(var)))
-
-        if dev:
-            # Histogram
-            with tf.name_scope("dev"):
-                for var in trainable_vars:
-                    self.summaries_dev.append(
-                        tf.summary.histogram(var.name, var))
-
-            # Mean
-            with tf.name_scope("mean_dev"):
-                for var in trainable_vars:
-                    self.summaries_dev.append(
-                        tf.summary.scalar(var.name, tf.reduce_mean(var)))
-
-            # Standard deviation
-            with tf.name_scope("stddev_dev"):
-                for var in trainable_vars:
-                    self.summaries_dev.append(
-                        tf.summary.scalar(var.name, tf.sqrt(
-                            tf.reduce_mean(tf.square(var - tf.reduce_mean(var))))))
-
-            # Max
-            with tf.name_scope("max_dev"):
-                for var in trainable_vars:
-                    self.summaries_dev.append(
-                        tf.summary.scalar(var.name, tf.reduce_max(var)))
-
-            # Min
-            with tf.name_scope("min_dev"):
-                for var in trainable_vars:
-                    self.summaries_dev.append(
-                        tf.summary.scalar(var.name, tf.reduce_min(var)))

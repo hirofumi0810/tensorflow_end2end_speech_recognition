@@ -27,27 +27,24 @@ class TestMultitaskCTC(tf.test.TestCase):
         print("Multitask CTC Working check.")
 
         # BLSTM
-        self.check(encoder_type='multitask_blstm',
-                   lstm_impl='BasicLSTMCell')
-        self.check(encoder_type='multitask_blstm',
-                   lstm_impl='LSTMCell')
-        self.check(encoder_type='multitask_blstm',
-                   lstm_impl='LSTMBlockCell')
+        self.check(encoder_type='multitask_blstm', lstm_impl='BasicLSTMCell')
+        self.check(encoder_type='multitask_blstm', lstm_impl='LSTMCell')
+        self.check(encoder_type='multitask_blstm', lstm_impl='LSTMBlockCell')
+        self.check(encoder_type='multitask_blstm', lstm_impl='LSTMBlockCell',
+                   time_major=True)
 
         # LSTM
-        self.check(encoder_type='multitask_lstm',
-                   lstm_impl='BasicLSTMCell')
-        self.check(encoder_type='multitask_lstm',
-                   lstm_impl='LSTMCell')
-        self.check(encoder_type='multitask_lstm',
-                   lstm_impl='LSTMBlockCell')
+        self.check(encoder_type='multitask_lstm', lstm_impl='BasicLSTMCell')
+        self.check(encoder_type='multitask_lstm', lstm_impl='LSTMCell')
+        self.check(encoder_type='multitask_lstm', lstm_impl='LSTMBlockCell')
 
     @measure_time
-    def check(self, encoder_type, lstm_impl):
+    def check(self, encoder_type, lstm_impl, time_major=False):
 
         print('==================================================')
         print('  encoder_type: %s' % str(encoder_type))
         print('  lstm_impl: %s' % str(lstm_impl))
+        print('  time_major: %s' % str(time_major))
         print('==================================================')
 
         tf.reset_default_graph()
@@ -73,12 +70,13 @@ class TestMultitaskCTC(tf.test.TestCase):
                 main_task_weight=0.8,
                 lstm_impl=lstm_impl,
                 parameter_init=0.1,
-                clip_grad=5.0,
+                clip_grad_norm=5.0,
                 clip_activation=50,
                 num_proj=256,
+                weight_decay=1e-8,
                 # bottleneck_dim=50,
                 bottleneck_dim=None,
-                weight_decay=1e-8)
+                time_major=time_major)
 
             # Define placeholders
             model.create_placeholders()
