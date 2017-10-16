@@ -7,30 +7,31 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from models.encoders.core.blstm import BLSTM_Encoder
-from models.encoders.core.lstm import LSTM_Encoder
-from models.encoders.core.bgru import BGRU_Encoder
-from models.encoders.core.gru import GRU_Encoder
-from models.encoders.core.cnn_zhang import CNN_Encoder
-from models.encoders.core.vgg_blstm import VGG_BLSTM_Encoder
-from models.encoders.core.vgg_lstm import VGG_LSTM_Encoder
-from models.encoders.core.vgg_wang import VGG_Encoder
-# from models.encoders.core.resnet_wang import ResNet_Encoder
-from models.encoders.core.multitask_blstm import Multitask_BLSTM_Encoder
-from models.encoders.core.multitask_lstm import Multitask_LSTM_Encoder
+from models.encoders.core.blstm import BLSTMEncoder
+from models.encoders.core.lstm import LSTMEncoder
+from models.encoders.core.gru import GRUEncoder, BGRUEncoder
+from models.encoders.core.cnn_zhang import CNNEncoder
+from models.encoders.core.vgg_blstm import VGGBLSTMEncoder
+from models.encoders.core.vgg_lstm import VGGLSTMEncoder
+from models.encoders.core.vgg_wang import VGGEncoder
+# from models.encoders.core.resnet_wang import ResNetEncoder
+from models.encoders.core.multitask_blstm import MultitaskBLSTMEncoder
+from models.encoders.core.multitask_lstm import MultitaskLSTMEncoder
+from models.encoders.core.pyramidal_blstm import PyramidBLSTMEncoder
 
 ENCODERS = {
-    "blstm": BLSTM_Encoder,
-    "lstm": LSTM_Encoder,
-    "bgru": BGRU_Encoder,
-    "gru": GRU_Encoder,
-    "cnn_zhang": CNN_Encoder,
-    "vgg_blstm": VGG_BLSTM_Encoder,
-    "vgg_lstm": VGG_LSTM_Encoder,
-    "vgg_wang": VGG_Encoder,
-    # "resnet_wang": ResNet_Encoder,
-    "multitask_blstm": Multitask_BLSTM_Encoder,
-    "multitask_lstm": Multitask_LSTM_Encoder,
+    "blstm": BLSTMEncoder,
+    "lstm": LSTMEncoder,
+    "bgru": BGRUEncoder,
+    "gru": GRUEncoder,
+    "vgg_blstm": VGGBLSTMEncoder,
+    "vgg_lstm": VGGLSTMEncoder,
+    "cnn_zhang": CNNEncoder,
+    "vgg_wang": VGGEncoder,
+    # "resnet_wang": ResNetEncoder,
+    "multitask_blstm": MultitaskBLSTMEncoder,
+    "multitask_lstm": MultitaskLSTMEncoder,
+    "pyramid_blstm": PyramidBLSTMEncoder,
 }
 
 

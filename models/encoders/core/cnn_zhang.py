@@ -11,7 +11,7 @@ import math
 import tensorflow as tf
 
 
-class CNN_Encoder(object):
+class CNNEncoder(object):
     """CNN encoder.
        This implementation is based on
            https://arxiv.org/abs/1701.02720.

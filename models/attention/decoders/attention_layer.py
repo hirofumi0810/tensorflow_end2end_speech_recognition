@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Attention layers for calculating attention weights."""
+"""Attention layer for computing attention weights."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -9,242 +9,249 @@ from __future__ import print_function
 
 import tensorflow as tf
 
+ATTENTION_TYPE = ['content', 'location', 'hybrid', 'MLP_dot',
+                  'luong_dot', 'luong_general', 'luong_concat',
+                  'baidu_attetion']
+
 
 class AttentionLayer(object):
-    """Attention layer. This implementation is based on
-        https://arxiv.org/abs/1409.0473.
-            Bahdanau, Dzmitry., et al.
-            "Neural machine translation by jointly learning to align and
-                translate."
-            in Processings of ICLR, 2015.
-        https://arxiv.org/abs/1506.07503.
-            Chorowski, Jan K., et al.
-            "Attention-based models for speech recognition."
-            in Processings of NIPS, 2015..
+    """Attention layer.
     Args:
-        num_unit: Number of units used in the attention layer
-        attention_smoothing: bool, if True, replace exp to sigmoid function in
-            the softmax layer of computing attention weights
-        attention_weights_tempareture: A float value,
         attention_type: string, content or location or hybrid or layer_dot
+        num_units (int): the number of units used in the attention layer
+        attention_weights_tempareture (float): a smoothing factor in the
+            softmax layer for computing attention weights
+        name (string): the name of the attention layer
     """
 
-    def __init__(self, num_unit, attention_smoothing,
-                 attention_weights_tempareture,
-                 attention_type, name='attention_layer'):
-        self.num_unit = num_unit
-        self.attention_smoothing = attention_smoothing
-        self.attention_weights_tempareture = attention_weights_tempareture
+    def __init__(self, attention_type, num_units,
+                 attention_weights_tempareture, name='attention_layer'):
         self.attention_type = attention_type
+        self.num_units = num_units
+        self.attention_weights_tempareture = attention_weights_tempareture
         self.name = name
 
-    def __call__(self, *args, **kwargs):
-        with tf.variable_scope(self.name):
-            return self._build(*args, **kwargs)
-
-    def _build(self, encoder_states, current_decoder_state, values,
-               values_length, attention_weights):
+    def __call__(self, encoder_outputs, decoder_output,
+                 encoder_outputs_length, attention_weights):
         """Computes attention scores and outputs.
         Args:
-            encoder_states: The outputs of the encoder and equivalent to
-                `values`. This is used to calculate attention scores.
-                A tensor of shape `[batch_size, time, encoder_num_units]`
-                where each element in the `time` dimension corresponds to the
-                decoder states for that value.
-            current_decoder_state: The current state of the docoder.
-                This is used to calculate attention scores.
-                A tensor of shape `[batch_size, decoder_num_units]`
-            values: The sequence of encoder outputs to compute attention over.
-                A tensor of shape `[batch_size, time, encoder_num_units]`.
-            values_length: An int32 tensor of shape `[batch_size]` defining
-                the sequence length of the attention values.
-            attention_weights:
+            encoder_outputs: The outputs of the encoder. A tensor of size
+                `[B, T_in, encoder_num_units]`
+            decoder_output: The current state of the docoder. A tensor of size
+                `[B, decoder_num_units]`
+            encoder_outputs_length: An int32 tensor of size `[B]` defining
+                the sequence length of `encoder_outputs`
+            attention_weights: This is used for the location-based
+                attention. A tensor of size `[B, T_in]`
         Returns:
-            A tuple `(attention_weights, attention_context)`.
-                `attention_weights` is vector of length `time` where each
+            A tuple `(attention_weights, context_vector)`.
+                attention_weights: vector of length `T_in` where each
                     element is the normalized "score" of the corresponding
-                    `inputs` element.
-                    A tensor of shape `[batch_size, input_time]`
-                `attention_context` is the final attention layer output
+                    `inputs` element. A tensor of size `[B, T_in]`
+                context_vector: the final attention layer output
                     corresponding to the weighted inputs.
-                    A tensor of shape `[batch_size, encoder_num_units]`.
+                    A tensor of size `[B, encoder_num_units]`.
         """
-        # Compute attention scores over encoder outputs (energy: e_ij)
-        # e_ij = f(V * h_j,  W * s_{i-1}, (U * f_ij))
-        energy = self.attention_score_func(encoder_states,
-                                           current_decoder_state,
-                                           attention_weights)
+        # Compute attention scores over encoder outputs
+        energy = self._compute_attention_score(
+            attention_type=self.attention_type,
+            encoder_outputs=encoder_outputs,
+            decoder_output=decoder_output,
+            attention_weights=attention_weights)
 
         # Replace all scores for padded inputs with tf.float32.min
-        num_scores = tf.shape(energy)[1]  # max_time
+        max_time_input = tf.shape(energy)[1]
         scores_mask = tf.sequence_mask(
-            lengths=tf.to_int32(values_length),
-            maxlen=tf.to_int32(num_scores),
+            lengths=tf.to_int32(encoder_outputs_length),
+            maxlen=tf.to_int32(max_time_input),
             dtype=tf.float32)
         # ex.) tf.sequence_mask
         # tf.sequence_mask([1, 3, 2], 5) = [[True, False, False, False, False],
         #                                   [True, True, True, False, False],
         #                                   [True, True, False, False, False]]
         energy = energy * scores_mask + ((1.0 - scores_mask) * tf.float32.min)
-        # TODO: For underflow?
+        # NOTE: For underflow
 
+        # Smoothing
         energy /= self.attention_weights_tempareture
 
-        # Normalize the scores (attention_weights: α_ij (j=0,1,...))
-        if self.attention_smoothing:
-            attention_weights = tf.sigmoid(energy) / tf.reduce_sum(
-                tf.sigmoid(energy),
-                axis=-1,
-                keep_dims=True)
-        else:
-            # attention_weights = tf.nn.softmax(
-            #     scores, name="attention_weights")
-            attention_weights = tf.exp(energy) / tf.reduce_sum(
-                tf.exp(energy),
-                axis=-1,
-                keep_dims=True)
+        # Compute attention weights
+        attention_weights = tf.nn.softmax(
+            energy, name="attention_weights")
+        # attention_weights = tf.exp(energy) / tf.reduce_sum(
+        #     tf.exp(energy),
+        #     axis=-1,
+        #     keep_dims=True)
 
-        # Calculate the weighted average of the attention inputs
-        # according to the scores
-        # c_i = sum_{j}(α_ij * h_j)
-        attention_context = tf.expand_dims(
-            attention_weights, axis=2) * values
-        attention_context = tf.reduce_sum(
-            attention_context, axis=1, name="attention_context")
-        values_depth = values.get_shape().as_list()[-1]  # = encoder_num_units
-        # `[batch_size, encoder_num_units]`
-        attention_context.set_shape([None, values_depth])
+        # Compute context vector
+        context_vector = tf.expand_dims(
+            attention_weights, axis=2) * encoder_outputs
+        context_vector = tf.reduce_sum(
+            context_vector, axis=1, name="context_vector")
+        encoder_num_units = encoder_outputs.get_shape().as_list()[-1]
+        context_vector.set_shape([None, encoder_num_units])
 
-        return (attention_weights, attention_context)
+        return attention_weights, context_vector
 
-    def attention_score_func(self, encoder_states, current_decoder_state,
-                             attention_weights):
+    def _compute_attention_score(self, attention_type, encoder_outputs,
+                                 decoder_output, attention_weights):
         """An attention layer that calculates attention scores.
         Args:
-            encoder_states: The sequence of encoder outputs
-                A tensor of shape `[batch_size, input_time, encoder_num_units]`
-            current_decoder_state: The current state of the docoder
-                A tensor of shape `[batch_size, decoder_num_units]`
-            attention_weights: A tensor of size `[batch_size, input_time]`
+            attention_type (string): the type of attention
+            encoder_outputs (): The sequence of encoder outputs
+                A tensor of shape `[B, T_in, encoder_num_units]`
+            decoder_output: The current state of the docoder
+                A tensor of shape `[B, decoder_num_units]`
+            attention_weights: A tensor of size `[B, T_in]`
         Returns:
             attention_sum: The summation of attention scores
-                A tensor of shape `[batch_size, input_time]`
+                A tensor of shape `[B, T_in]`
         """
-        # with tf.variable_scope(self.attention_type):
+        if attention_type not in ATTENTION_TYPE:
+            raise ValueError(
+                "attention type should be one of [%s], you provided %s." %
+                (", ".join(ATTENTION_TYPE), attention_type))
 
-        # Fully connected layers to transform both encoder_states and
-        # current_decoder_state into a tensor with `num_unit` units
-        # W * s_{i-1} (i: output time index)
-        Ws = tf.contrib.layers.fully_connected(
-            inputs=current_decoder_state,
-            num_outputs=self.num_unit,
+        # Fully connected layers to transform both encoder_outputs and
+        # decoder_output into a tensor with `num_units` units
+        W_dec = tf.contrib.layers.fully_connected(
+            decoder_output,
+            num_outputs=self.num_units,
             activation_fn=None,
-            # reuse=True,
-            scope="Ws")
+            weights_initializer=tf.truncated_normal_initializer(
+                stddev=self.parameter_init),
+            biases_initializer=tf.zeros_initializer(),
+            scope="W_decoder")
+        # NOTE: `[B, num_units]`
 
-        if self.attention_type != 'location':
-            # V * h_j (j: input time index)
-            Vh = tf.contrib.layers.fully_connected(
-                inputs=encoder_states,
-                num_outputs=self.num_unit,
+        if attention_type == 'MLP_dot':
+            ############################################################
+            # layer-dot attention
+            # energy = dot(W_enc(hidden_enc), W_dec(hidden_dec))
+            ############################################################
+            W_enc = tf.contrib.layers.fully_connected(
+                encoder_outputs,
+                num_outputs=self.num_units,
                 activation_fn=None,
-                # reuse=True,
-                scope="Vh")
-        # NOTE: Bias terms are already included in these layers
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
+                biases_initializer=tf.zeros_initializer(),
+                scope="W_encoder")
 
-        if self.attention_type == 'content':
+            # Calculates a batch- and time-wise dot product
+            energy = W_enc * tf.expand_dims(W_dec, axis=1)
+
+        elif attention_type == 'content':
             ############################################################
             # content-based attention
-            # e_ij = wT * tanh(W * s_{i-1} + V * h_j + bias)
+            # energy = dot(v_a, tanh(W_enc(hidden_enc) + W_dec(hidden_dec)))
             ############################################################
-            w = tf.get_variable(
-                "w", shape=[self.num_unit], dtype=tf.float32)
-
-            # Calculates a batch- and time-wise dot product with a variable
-            e_ij = w * tf.tanh(tf.expand_dims(Ws, axis=1) + Vh)
-            # ex.) tf.expand_dims
-            # 't2' is a tensor of shape [2, 3, 5]
-            # tf.shape(expand_dims(t2, 0)) ==> [1, 2, 3, 5]
-            # tf.shape(expand_dims(t2, 2)) ==> [2, 3, 1, 5]
-            # tf.shape(expand_dims(t2, 3)) ==> [2, 3, 5, 1]
-
-        elif self.attention_type == 'location':
-            ############################################################
-            # location-based attention
-            # e_ij = wT * tanh(W * s_{i-1} + U * f_ij + bias)
-            ############################################################
-            with tf.control_dependencies(None):
-                F = tf.Variable(tf.truncated_normal(
-                    shape=[200, 1, 10],
-                    # shape=[100, 1, 10],
-                    stddev=0.1), name='filter')
-
-            f = tf.nn.conv1d(tf.expand_dims(attention_weights, axis=2), F,
-                             stride=1, padding='SAME',
-                             #  use_cudnn_on_gpu=None,
-                             #  data_format=None,
-                             name='conv_vectors')
-
-            # U * f_ij
-            Uf = tf.contrib.layers.fully_connected(
-                inputs=f,
-                num_outputs=self.num_unit,
+            W_enc = tf.contrib.layers.fully_connected(
+                encoder_outputs,
+                num_outputs=self.num_units,
                 activation_fn=None,
-                # reuse=True,
-                scope="Uf")
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
+                biases_initializer=tf.zeros_initializer(),
+                scope="W_encoder")
 
-            w = tf.get_variable(
-                "w", shape=[self.num_unit], dtype=tf.float32)
+            v_a = tf.get_variable(
+                "v_a", shape=[self.num_units], dtype=tf.float32)
 
             # Calculates a batch- and time-wise dot product with a variable
-            e_ij = w * tf.tanh(tf.expand_dims(Ws, axis=1) + Uf)
+            energy = v_a * tf.tanh(W_enc + tf.expand_dims(W_dec, axis=1))
 
-        elif self.attention_type == 'hybrid':
+        elif attention_type == 'hybrid':
             ############################################################
             # hybrid attention (content-based + location-based)
-            # e_ij = wT * tanh(W * s_{i-1} + V * h_j + U * f_ij + bias)
+            # f = F * α_{i-1}
+            # energy = dot(v_a, tanh(W_enc(hidden_enc) + W_dec(hidden_dec) + W_fil(f)))
+            ############################################################
+            W_enc = tf.contrib.layers.fully_connected(
+                encoder_outputs,
+                num_outputs=self.num_units,
+                activation_fn=None,
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
+                biases_initializer=tf.zeros_initializer(),
+                scope="W_encoder")
+
+            with tf.control_dependencies(None):
+                F = tf.Variable(tf.truncated_normal(
+                    shape=[200, 1, 10],
+                    # shape=[100, 1, 10],
+                    stddev=0.1), name='filter')
+            # `[B, T_in]` -> `[B, T_in, 1]`
+            attention_weights = tf.expand_dims(attention_weights, axis=2)
+            f = tf.nn.conv1d(attention_weights, F,
+                             stride=1, padding='SAME',
+                             #  use_cudnn_on_gpu=None,
+                             #  data_format=None,
+                             name='conv_features')
+            W_fil = tf.contrib.layers.fully_connected(
+                f,
+                num_outputs=self.num_units,
+                activation_fn=None,
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
+                biases_initializer=tf.zeros_initializer(),
+                scope="W_filter")
+
+            v_a = tf.get_variable(
+                "v_a", shape=[self.num_units], dtype=tf.float32)
+
+            # Calculates a batch- and time-wise dot product with a variable
+            energy = v_a * \
+                tf.tanh(W_enc + tf.expand_dims(W_dec, axis=1) + W_fil)
+
+        elif attention_type != 'location':
+            ############################################################
+            # location-based attention
+            # f = F * α_{i-1}
+            # energy = dot(v_a, tanh(W_dec(hidden_dec) + W_fil(f)))
             ############################################################
             with tf.control_dependencies(None):
                 F = tf.Variable(tf.truncated_normal(
                     shape=[200, 1, 10],
                     # shape=[100, 1, 10],
                     stddev=0.1), name='filter')
-
-            f = tf.nn.conv1d(tf.expand_dims(attention_weights, axis=2), F,
+            # `[B, T_in]` -> `[B, T_in, 1]`
+            attention_weights = tf.expand_dims(attention_weights, axis=2)
+            f = tf.nn.conv1d(attention_weights, F,
                              stride=1, padding='SAME',
                              #  use_cudnn_on_gpu=None,
                              #  data_format=None,
-                             name='conv_vectors')
-
-            # U * f_ij
-            Uf = tf.contrib.layers.fully_connected(
-                inputs=f,
-                num_outputs=self.num_unit,
+                             name='conv_features')
+            W_fil = tf.contrib.layers.fully_connected(
+                f,
+                num_outputs=self.num_units,
                 activation_fn=None,
-                # reuse=True,
-                scope="Uf")
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
+                biases_initializer=tf.zeros_initializer(),
+                scope="W_filter")
 
-            w = tf.get_variable(
-                "w", shape=[self.num_unit], dtype=tf.float32)
+            v_a = tf.get_variable(
+                "v_a", shape=[self.num_units], dtype=tf.float32)
 
             # Calculates a batch- and time-wise dot product with a variable
-            e_ij = w * tf.tanh(tf.expand_dims(Ws, axis=1) + Vh + Uf)
+            energy = v_a * tf.tanh(tf.expand_dims(W_dec, axis=1) + W_fil)
 
-        elif self.attention_type == 'layer_dot':
-            ############################################################
-            # layer_dot attention
-            # e_ij = (W * s_{i-1}) * (U * f_ij) + bias
-            ############################################################
-            # Calculates a batch- and time-wise dot product
-            e_ij = tf.expand_dims(Ws, axis=1) * Vh
+        elif attention_type == 'luong_dot':
+            raise NotImplementedError
 
-        else:
-            raise ValueError(
-                'attention_type is "content" or "location" or ' +
-                '"hybrid" or "layer_dot".')
+        elif attention_type == 'luong_general':
+            raise NotImplementedError
 
-        # Sum by num_unit axis (e_ij) (j=0,1,...)
-        attention_sum = tf.reduce_sum(e_ij, axis=2)
-        # e_ij: `[batch_size, input_time(j), num_unit]`
+        elif attention_type == 'luong_concat':
+            raise NotImplementedError
+
+        elif attention_type == 'baidu_attetion':
+            raise NotImplementedError
+
+        # Sum by ?? axis (e_ij) (j=0,1,...)
+        attention_sum = tf.reduce_sum(energy, axis=2)
+        # energy: `[B, T_in, num_units]`
+        # TODO: axis=1ではない？
 
         return attention_sum

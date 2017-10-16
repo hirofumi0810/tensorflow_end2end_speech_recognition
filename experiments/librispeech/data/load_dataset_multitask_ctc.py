@@ -3,7 +3,7 @@
 
 """Load dataset for the multitask CTC model (Librispeech corpus).
    In addition, frame stacking and skipping are used.
-      You can use the multi-GPU version.
+   You can use the multi-GPU version.
 """
 
 from __future__ import absolute_import
@@ -14,7 +14,7 @@ from os.path import join, isfile
 import pickle
 import numpy as np
 
-from utils.dataset.each_load.multitask_ctc_each_load import DatasetBase
+from utils.dataset.multitask_ctc import DatasetBase
 
 
 class Dataset(DatasetBase):
@@ -29,8 +29,7 @@ class Dataset(DatasetBase):
         Args:
             data_type (stirng): train or dev_clean or dev_other or
                 test_clean or test_other
-            train_data_size (string): train_clean100 or train_clean360 or
-                train_other500 or train_all
+            train_data_size (string): train100h or train460h or train960h
             label_type_main (stirng): word
             label_type_sub (stirng): character or character_capital_divide
             batch_size (int): the size of mini-batch
@@ -53,7 +52,7 @@ class Dataset(DatasetBase):
             raise TypeError(
                 'data_type is "train" or "dev_clean" or "dev_other" or ' +
                 '"test_clean" "test_other".')
-        assert label_type_main == 'word'
+        assert 'word' in label_type_main
         if label_type_sub not in ['character', 'character_capital_divide',
                                   'word']:
             raise TypeError(
@@ -62,7 +61,7 @@ class Dataset(DatasetBase):
         super(Dataset, self).__init__()
 
         self.is_training = True if data_type == 'train' else False
-        self.is_test = True if 'test' in data_type and label_type_main == 'word' else False
+        self.is_test = True if 'test' in data_type else False
         # TODO(hirofumi): add phone-level transcripts
 
         self.data_type = data_type
@@ -87,10 +86,10 @@ class Dataset(DatasetBase):
 
         input_path = join(dataset_root[0], 'inputs',
                           train_data_size, data_type)
-        label_main_path = join(dataset_root[0], 'labels/ctc', label_type_main,
-                               train_data_size, data_type)
-        label_sub_path = join(dataset_root[0], 'labels/ctc', label_type_sub,
-                              train_data_size, data_type)
+        label_main_path = join(dataset_root[0], 'labels',
+                               train_data_size, data_type, label_type_main)
+        label_sub_path = join(dataset_root[0], 'labels',
+                              train_data_size, data_type, label_type_sub)
 
         # Load the frame number dictionary
         if isfile(join(input_path, 'frame_num.pickle')):
@@ -100,10 +99,10 @@ class Dataset(DatasetBase):
             dataset_root.pop(0)
             input_path = join(dataset_root[0], 'inputs', train_data_size,
                               data_type)
-            label_main_path = join(dataset_root[0], 'labels/ctc', label_type_main,
-                                   train_data_size, data_type)
-            label_sub_path = join(dataset_root[0], 'labels/ctc', label_type_sub,
-                                  train_data_size, data_type)
+            label_main_path = join(dataset_root[0], 'labels',
+                                   train_data_size, data_type, label_type_main)
+            label_sub_path = join(dataset_root[0], 'labels',
+                                  train_data_size, data_type, label_type_sub)
             with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
                 self.frame_num_dict = pickle.load(f)
 

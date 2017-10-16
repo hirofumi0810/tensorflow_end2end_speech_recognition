@@ -59,5 +59,3 @@ w   w   w
 y   y   y
 z   z   z
 zh  zh  sh
-<   <   <
->   >   >

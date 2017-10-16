@@ -17,7 +17,8 @@ from utils.evaluation.edit_distance import compute_cer, compute_wer, wer_align
 
 
 def do_eval_cer(session, decode_ops, model, dataset, label_type,
-                eval_batch_size=None, progressbar=False, is_multitask=False):
+                is_test=False, eval_batch_size=None, progressbar=False,
+                is_multitask=False):
     """Evaluate trained model by Character Error Rate.
     Args:
         session: session of training model
@@ -25,7 +26,8 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
         model: the model to evaluate
         dataset: An instance of a `Dataset` class
         label_type (string): character or character_capital_divide
-        eval_batch_size (int, optional): int, the batch size when evaluating the model
+        is_test (bool, optional): set to True when evaluating by the test set
+        eval_batch_size (int, optional): the batch size when evaluating the model
         progressbar (bool, optional): if True, visualize the progressbar
         is_multitask (bool, optional): if True, evaluate the multitask model
     Return:
@@ -39,10 +41,10 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
 
     if label_type == 'character':
         idx2char = Idx2char(
-            map_file_path='../metrics/mapping_files/ctc/character.txt')
+            map_file_path='../metrics/mapping_files/character.txt')
     elif label_type == 'character_capital_divide':
         idx2char = Idx2char(
-            map_file_path='../metrics/mapping_files/ctc/character_capital_divide.txt',
+            map_file_path='../metrics/mapping_files/character_capital_divide.txt',
             capital_divide=True,
             space_mark='_')
 
@@ -63,9 +65,7 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
             feed_dict[model.inputs_pl_list[i_device]] = inputs[i_device]
             feed_dict[model.inputs_seq_len_pl_list[i_device]
                       ] = inputs_seq_len[i_device]
-            feed_dict[model.keep_prob_input_pl_list[i_device]] = 1.0
-            feed_dict[model.keep_prob_hidden_pl_list[i_device]] = 1.0
-            feed_dict[model.keep_prob_output_pl_list[i_device]] = 1.0
+            feed_dict[model.keep_prob_pl_list[i_device]] = 1.0
 
         labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
         for i_device, labels_pred_st in enumerate(labels_pred_st_list):
@@ -76,7 +76,11 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
                 for i_batch in range(batch_size_device):
 
                     # Convert from list of index to string
-                    str_true = idx2char(labels_true[i_device][i_batch])
+                    if is_test:
+                        str_true = labels_true[i_device][i_batch][0].replace(
+                            '_', ' ')
+                    else:
+                        str_true = idx2char(labels_true[i_device][i_batch])
                     str_pred = idx2char(labels_pred[i_batch])
 
                     # Remove consecutive spaces
@@ -136,9 +140,8 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
         decode_ops: list of operations for decoding
         model: the model to evaluate
         dataset: An instance of `Dataset` class
-        train_data_size (string): train_clean100 or train_clean360 or
-            train_other500 or train_all
-        is_test (bool): set to True when evaluating by the test set
+        train_data_size (string): train100h or train460h or train960h
+        is_test (bool, optional): set to True when evaluating by the test set
         eval_batch_size (int, optional): the batch size when evaluating the model
         progressbar (bool, optional): if True, visualize progressbar
         is_multitask (bool, optional): if True, evaluate the multitask model
@@ -151,7 +154,7 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
     dataset.reset()
 
     idx2word = Idx2word(
-        map_file_path='../metrics/mapping_files/ctc/word_' + train_data_size + '.txt')
+        map_file_path='../metrics/mapping_files/word_' + train_data_size + '.txt')
 
     wer_mean = 0
     skip_data_num = 0
@@ -170,9 +173,7 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
             feed_dict[model.inputs_pl_list[i_device]] = inputs[i_device]
             feed_dict[model.inputs_seq_len_pl_list[i_device]
                       ] = inputs_seq_len[i_device]
-            feed_dict[model.keep_prob_input_pl_list[i_device]] = 1.0
-            feed_dict[model.keep_prob_hidden_pl_list[i_device]] = 1.0
-            feed_dict[model.keep_prob_output_pl_list[i_device]] = 1.0
+            feed_dict[model.keep_prob_pl_list[i_device]] = 1.0
 
         labels_pred_st_list = session.run(decode_ops, feed_dict=feed_dict)
         for i_device, labels_pred_st in enumerate(labels_pred_st_list):
@@ -183,8 +184,12 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
 
                 for i_batch in range(batch_size_device):
 
-                    str_true = ' '.join(
-                        idx2word(labels_true[i_device][i_batch]))
+                    if is_test:
+                        str_true = labels_true[i_device][i_batch][0].replace(
+                            '_', ' ')
+                    else:
+                        str_true = ' '.join(
+                            idx2word(labels_true[i_device][i_batch]))
                     str_pred = ' '.join(idx2word(labels_pred[i_batch]))
 
                     # if len(str_true.split(' ')) == 0:
@@ -217,6 +222,5 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
             break
 
     wer_mean /= (len(dataset) - skip_data_num)
-    # TODO: This is just edit distance.
 
     return wer_mean
