@@ -130,6 +130,7 @@ class PyramidBLSTMEncoder(object):
                     inputs=outputs,
                     sequence_length=inputs_seq_len,
                     dtype=tf.float32,
+                    time_major=False,
                     scope=scope)
                 # NOTE: initial states are zero states by default
 

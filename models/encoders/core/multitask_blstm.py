@@ -8,35 +8,42 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from models.encoders.core.blstm import basiclstmcell, lstmcell, lstmblockcell, lstmblockfusedcell, cudnnlstm
 
 
 class MultitaskBLSTMEncoder(object):
     """Multi-task bidirectional LSTM encoder.
     Args:
         num_units (int): the number of units in each layer
+        num_proj (int): the number of nodes in recurrent projection layer
         num_layers_main (int): the number of layers of the main task
         num_layers_sub (int): the number of layers of the sub task
-        lstm_impl (string): BasicLSTMCell or LSTMCell or
-            LSTMBlockCell or LSTMBlockFusedCell or CudnnLSTM.
+        lstm_impl (string, optional): a base implementation of LSTM.
+                - BasicLSTMCell: tf.contrib.rnn.BasicLSTMCell (no peephole)
+                - LSTMCell: tf.contrib.rnn.LSTMCell
+                - LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
+                - LSTMBlockFusedCell: under implementation
+                - CudnnLSTM: under implementation
             Choose the background implementation of tensorflow.
-            Default is LSTMBlockCell.
         use_peephole (bool): if True, use peephole
         parameter_init (float): the range of uniform distribution to
             initialize weight parameters (>= 0)
         clip_activation (float): the range of activation clipping (> 0)
-        num_proj (int): the number of nodes in recurrent projection layer
+        time_major (bool, optional): if True, time-major computation will be
+            performed
         name (string, optional): the name of encoder
     """
 
     def __init__(self,
                  num_units,
+                 num_proj,
                  num_layers_main,
                  num_layers_sub,
                  lstm_impl,
                  use_peephole,
                  parameter_init,
                  clip_activation,
-                 num_proj,
+                 time_major=False,
                  name='multitask_blstm_encoder'):
         if num_proj == 0:
             raise ValueError
@@ -44,6 +51,8 @@ class MultitaskBLSTMEncoder(object):
         self.num_units = num_units
         if lstm_impl != 'LSTMCell':
             self.num_proj = None
+        else:
+            self.num_proj = num_proj
         # TODO: fix this
         self.num_layers_main = num_layers_main
         self.num_layers_sub = num_layers_sub
@@ -51,6 +60,7 @@ class MultitaskBLSTMEncoder(object):
         self.use_peephole = use_peephole
         self.parameter_init = parameter_init
         self.clip_activation = clip_activation
+        self.time_major = time_major
         self.name = name
 
         if self.num_layers_sub < 1 or self.num_layers_main < self.num_layers_sub:
@@ -73,88 +83,42 @@ class MultitaskBLSTMEncoder(object):
         initializer = tf.random_uniform_initializer(
             minval=-self.parameter_init, maxval=self.parameter_init)
 
-        # Hidden layers
-        outputs = inputs
-        if self.lstm_impl == 'CudnnLSTM':
-            raise ValueError
+        if self.lstm_impl == 'BasicLSTMCell':
+            outputs, final_state, outputs_sub, final_state_sub = basiclstmcell(
+                self.num_units, self.num_layers_main,
+                inputs, inputs_seq_len, keep_prob, initializer,
+                self.time_major, self.num_layers_sub)
+
+        elif self.lstm_impl == 'LSTMCell':
+            outputs, final_state, outputs_sub, final_state_sub = lstmcell(
+                self.num_units, self.num_proj, self.num_layers_main,
+                self.use_peephole, self.clip_activation,
+                inputs, inputs_seq_len, keep_prob, initializer,
+                self.time_major, self.num_layers_sub)
+
+        elif self.lstm_impl == 'LSTMBlockCell':
+            outputs, final_state, outputs_sub, final_state_sub = lstmblockcell(
+                self.num_units, self.num_layers_main,
+                self.use_peephole, self.clip_activation,
+                inputs, inputs_seq_len, keep_prob, initializer,
+                self.time_major, self.num_layers_sub)
+
+        elif self.lstm_impl == 'LSTMBlockFusedCell':
+            outputs, final_state, outputs_sub, final_state_sub = lstmblockfusedcell(
+                self.num_units, self.num_layers_main,
+                inputs, inputs_seq_len, keep_prob, initializer,
+                self.time_major, self.num_layers_sub)
+
+        elif self.lstm_impl == 'CudnnLSTM':
+            outputs, final_state, outputs_sub, final_state_sub = cudnnlstm(
+                self.num_units, self.num_layers_main,
+                inputs, inputs_seq_len, keep_prob, initializer,
+                self.time_major, self.num_layers_sub)
 
         else:
-            for i_layer in range(1, self.num_layers_main + 1, 1):
-                with tf.variable_scope('blstm_hidden' + str(i_layer), initializer=initializer) as scope:
+            raise IndexError(
+                'lstm_impl is "BasicLSTMCell" or "LSTMCell" or ' +
+                '"LSTMBlockCell" or "LSTMBlockFusedCell" or ' +
+                '"CudnnLSTM".')
 
-                    if self.lstm_impl == 'BasicLSTMCell':
-                        lstm_fw = tf.contrib.rnn.BasicLSTMCell(
-                            self.num_units,
-                            forget_bias=1.0,
-                            state_is_tuple=True,
-                            activation=tf.tanh)
-                        lstm_bw = tf.contrib.rnn.BasicLSTMCell(
-                            self.num_units,
-                            forget_bias=1.0,
-                            state_is_tuple=True,
-                            activation=tf.tanh)
-
-                    elif self.lstm_impl == 'LSTMCell':
-                        lstm_fw = tf.contrib.rnn.LSTMCell(
-                            self.num_units,
-                            use_peepholes=self.use_peephole,
-                            cell_clip=self.clip_activation,
-                            num_proj=self.num_proj,
-                            forget_bias=1.0,
-                            state_is_tuple=True)
-                        lstm_bw = tf.contrib.rnn.LSTMCell(
-                            self.num_units,
-                            use_peepholes=self.use_peephole,
-                            cell_clip=self.clip_activation,
-                            num_proj=self.num_proj,
-                            forget_bias=1.0,
-                            state_is_tuple=True)
-
-                    elif self.lstm_impl == 'LSTMBlockCell':
-                        # NOTE: This should be faster than
-                        # tf.contrib.rnn.LSTMCell
-                        lstm_fw = tf.contrib.rnn.LSTMBlockCell(
-                            self.num_units,
-                            forget_bias=1.0,
-                            # clip_cell=True,
-                            use_peephole=self.use_peephole)
-                        lstm_bw = tf.contrib.rnn.LSTMBlockCell(
-                            self.num_units,
-                            forget_bias=1.0,
-                            # clip_cell=True,
-                            use_peephole=self.use_peephole)
-                        # TODO: cell clipping (update for rc1.3)
-
-                    elif self.lstm_impl == 'LSTMBlockFusedCell':
-                        raise NotImplementedError
-
-                    else:
-                        raise IndexError(
-                            'lstm_impl is "BasicLSTMCell" or "LSTMCell" or ' +
-                            '"LSTMBlockCell" or "LSTMBlockFusedCell" or ' +
-                            '"CudnnLSTM".')
-
-                    # Dropout for the hidden-hidden connections
-                    lstm_fw = tf.contrib.rnn.DropoutWrapper(
-                        lstm_fw, output_keep_prob=keep_prob)
-                    lstm_bw = tf.contrib.rnn.DropoutWrapper(
-                        lstm_bw, output_keep_prob=keep_prob)
-
-                    # Ignore 2nd return (the last state)
-                    (outputs_fw, outputs_bw), final_state = tf.nn.bidirectional_dynamic_rnn(
-                        cell_fw=lstm_fw,
-                        cell_bw=lstm_bw,
-                        inputs=outputs,
-                        sequence_length=inputs_seq_len,
-                        dtype=tf.float32,
-                        scope=scope)
-                    # NOTE: initial states are zero states by default
-
-                    outputs = tf.concat(
-                        axis=2, values=[outputs_fw, outputs_bw])
-
-                    if i_layer == self.num_layers_sub:
-                        outputs_sub = outputs
-                        final_state_sub = final_state
-
-            return outputs, final_state, outputs_sub, final_state_sub
+        return outputs, final_state, outputs_sub, final_state_sub

@@ -24,10 +24,52 @@ class TestEncoder(unittest.TestCase):
         print("Encoder Working check.")
 
         # CNNs
-        self.check(encoder_type='vgg_wang')
+        # self.check(encoder_type='vgg_wang')
         # self.check(encoder_type='cnn_zhang')
         # self.check(encoder_type='resnet_wang')
 
+        ##############################
+        # time_major == True
+        ##############################
+        # BLSTM
+        self.check(encoder_type='blstm', lstm_impl='BasicLSTMCell',
+                   time_major=True)
+        self.check(encoder_type='blstm', lstm_impl='LSTMCell',
+                   time_major=True)
+        self.check(encoder_type='blstm', lstm_impl='LSTMBlockCell',
+                   time_major=True)
+
+        # LSTM
+        self.check(encoder_type='lstm', lstm_impl='BasicLSTMCell',
+                   time_major=True)
+        self.check(encoder_type='lstm', lstm_impl='LSTMCell',
+                   time_major=True)
+        self.check(encoder_type='lstm', lstm_impl='LSTMBlockCell',
+                   time_major=True)
+
+        # GRUs
+        self.check(encoder_type='bgru', time_major=True)
+        self.check(encoder_type='gru', time_major=True)
+
+        # VGG-BLSTM
+        self.check(encoder_type='vgg_blstm', lstm_impl='BasicLSTMCell',
+                   time_major=True)
+        self.check(encoder_type='vgg_blstm', lstm_impl='LSTMCell',
+                   time_major=True)
+        self.check(encoder_type='vgg_blstm', lstm_impl='LSTMBlockCell',
+                   time_major=True)
+
+        # VGG-LSTM
+        self.check(encoder_type='vgg_lstm', lstm_impl='BasicLSTMCell',
+                   time_major=True)
+        self.check(encoder_type='vgg_lstm', lstm_impl='LSTMCell',
+                   time_major=True)
+        self.check(encoder_type='vgg_lstm', lstm_impl='LSTMBlockCell',
+                   time_major=True)
+
+        ##############################
+        # time_major == False
+        ##############################
         # BLSTM
         self.check(encoder_type='blstm', lstm_impl='BasicLSTMCell')
         self.check(encoder_type='blstm', lstm_impl='LSTMCell')
@@ -70,11 +112,12 @@ class TestEncoder(unittest.TestCase):
         # self.check(encoder_type='pyramid_blstm')
         # NOTE: this is under implementation
 
-    def check(self, encoder_type, lstm_impl=None):
+    def check(self, encoder_type, lstm_impl=None, time_major=False):
 
         print('==================================================')
         print('  encoder_type: %s' % encoder_type)
         print('  lstm_impl: %s' % lstm_impl)
+        print('  time_major: %s' % time_major)
         print('==================================================')
 
         tf.reset_default_graph()
@@ -94,38 +137,42 @@ class TestEncoder(unittest.TestCase):
             if encoder_type in ['blstm', 'lstm']:
                 encoder = load(encoder_type)(
                     num_units=256,
+                    num_proj=None,
                     num_layers=5,
                     lstm_impl=lstm_impl,
                     use_peephole=True,
                     parameter_init=0.1,
                     clip_activation=5,
-                    num_proj=None)
+                    time_major=time_major)
             elif encoder_type in ['bgru', 'gru']:
                 encoder = load(encoder_type)(
                     num_units=256,
                     num_layers=5,
-                    parameter_init=0.1)
+                    parameter_init=0.1,
+                    time_major=time_major)
             elif encoder_type in ['vgg_blstm', 'vgg_lstm']:
                 encoder = load(encoder_type)(
                     input_size=input_size // 11,
                     splice=11,
                     num_units=256,
+                    num_proj=None,
                     num_layers=5,
                     lstm_impl=lstm_impl,
                     use_peephole=True,
                     parameter_init=0.1,
                     clip_activation=5,
-                    num_proj=None)
+                    time_major=time_major)
             elif encoder_type in ['multitask_blstm', 'multitask_lstm']:
                 encoder = load(encoder_type)(
                     num_units=256,
+                    num_proj=None,
                     num_layers_main=5,
                     num_layers_sub=3,
                     lstm_impl=lstm_impl,
                     use_peephole=True,
                     parameter_init=0.1,
                     clip_activation=5,
-                    num_proj=None)
+                    time_major=time_major)
             elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                 encoder = load(encoder_type)(
                     input_size=input_size // 11,
@@ -182,18 +229,25 @@ class TestEncoder(unittest.TestCase):
 
                 # Make prediction
                 if encoder_type in ['multitask_blstm', 'multitask_lstm']:
-                    hidden_states, final_state, hidden_states_sub, final_state_sub = sess.run(
-                        [hidden_states_op, final_state_op, hidden_states_sub_op, final_state_sub_op], feed_dict=feed_dict)
+                    encoder_outputs, final_state, hidden_states_sub, final_state_sub = sess.run(
+                        [hidden_states_op, final_state_op,
+                         hidden_states_sub_op, final_state_sub_op],
+                        feed_dict=feed_dict)
+                    if time_major:
+                        encoder_outputs = encoder_outputs.transpose(1, 0, 2)
                 elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
-                    hidden_states = sess.run(
+                    encoder_outputs = sess.run(
                         hidden_states_op, feed_dict=feed_dict)
                 else:
-                    hidden_states, final_state = sess.run(
-                        [hidden_states_op, final_state_op], feed_dict=feed_dict)
+                    encoder_outputs, final_state = sess.run(
+                        [hidden_states_op, final_state_op],
+                        feed_dict=feed_dict)
+                    if time_major:
+                        encoder_outputs = encoder_outputs.transpose(1, 0, 2)
 
                 if encoder_type in ['blstm', 'bgru', 'vgg_blstm', 'multitask_blstm']:
                     self.assertEqual(
-                        (batch_size, frame_num, encoder.num_units * 2), hidden_states.shape)
+                        (batch_size, frame_num, encoder.num_units * 2), encoder_outputs.shape)
 
                     if encoder_type in ['blstm', 'vgg_blstm', 'multitask_blstm']:
                         self.assertEqual(
@@ -224,7 +278,7 @@ class TestEncoder(unittest.TestCase):
 
                 elif encoder_type in ['lstm', 'gru', 'vgg_lstm']:
                     self.assertEqual(
-                        (batch_size, frame_num, encoder.num_units), hidden_states.shape)
+                        (batch_size, frame_num, encoder.num_units), encoder_outputs.shape)
 
                     if encoder_type in ['lstm', 'vgg_lstm', 'multitask_lstm']:
                         self.assertEqual(
@@ -244,9 +298,9 @@ class TestEncoder(unittest.TestCase):
                             (batch_size, encoder.num_units), final_state[0].shape)
 
                 elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
-                    self.assertEqual(3, len(hidden_states.shape))
+                    self.assertEqual(3, len(encoder_outputs.shape))
                     self.assertEqual(
-                        (frame_num, batch_size), hidden_states.shape[:2])
+                        (frame_num, batch_size), encoder_outputs.shape[:2])
 
 
 if __name__ == "__main__":
