@@ -33,7 +33,7 @@ class Bridge(object):
     Args:
         encoder_outputs (namedtuple): A namedtuple that corresponds to the the
             encoder outputs.
-            `(outputs, final_state, partial_outputs, attention_window_length)`
+            `(outputs, final_state, seq_len)`
         decoder_state_size: An integer or tuple of integers defining the
             state size of the decoder.
     """
@@ -102,17 +102,12 @@ class InitialStateBridge(Bridge):
     Args:
         encoder_outputs (namedtuple): A namedtuple that corresponds to the
             encoder outputs.
+            `(outputs, final_state, seq_len)`
         decoder_state_size: An integer or tuple of integers defining the
             state size of the decoder.
-        bridge_input: Which attribute of the `encoder_outputs` to use for the
-            initial state calculation. For example, "final_state" means that
-            `encoder_outputs.final_state` will be used.
-        activation_fn: An optional activation function for the extra
-            layer inserted between encoder and decoder. A string for a function
-            name contained in `tf.nn`, e.g. "tanh".
     """
 
-    def __init__(self, encoder_outputs, decoder_state_size):
+    def __init__(self, encoder_outputs, decoder_state_size, parameter_init):
         super(InitialStateBridge, self).__init__(encoder_outputs,
                                                  decoder_state_size)
 
@@ -121,16 +116,7 @@ class InitialStateBridge(Bridge):
 
         self._bridge_input = getattr(encoder_outputs, "final_state")
         self._activation_fn = locate("tensorflow.identity")
-
-    def __call__(self, reuse=False):
-        """Runs the bridge function.
-        Args:
-            reuse:
-        Returns:
-            An initial decoder_state tensor or tuple of tensors.
-        """
-        self.reuse = reuse
-        return self._create()
+        self.parameter_init = parameter_init
 
     @staticmethod
     def default_params():
@@ -145,21 +131,20 @@ class InitialStateBridge(Bridge):
             lambda x: tf.reshape(x, [self.batch_size, _total_tensor_depth(x)]),
             self._bridge_input)
         bridge_input_flat = nest.flatten([bridge_input])
-        bridge_input_concat = tf.concat(bridge_input_flat, 1)
+        bridge_input_concat = tf.concat(bridge_input_flat, axis=1)
 
         state_size_splits = nest.flatten(self.decoder_state_size)
         total_decoder_state_size = sum(state_size_splits)
 
         # Pass bridge inputs through a fully connected layer layer
         initial_state_flat = tf.contrib.layers.fully_connected(
-            inputs=bridge_input_concat,
+            bridge_input_concat,
             num_outputs=total_decoder_state_size,
             activation_fn=self._activation_fn,
             weights_initializer=tf.truncated_normal_initializer(
                 stddev=self.parameter_init),
             biases_initializer=tf.zeros_initializer(),
-            reuse=self.reuse,
-            scope="bridge")
+            scope=None)
 
         # Shape back into required state size
         initial_state = tf.split(initial_state_flat, state_size_splits, axis=1)

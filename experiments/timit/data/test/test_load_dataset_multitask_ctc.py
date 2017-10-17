@@ -79,7 +79,6 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
 
             if data_type != 'test':
                 str_true_char = idx2char(labels_char[0][0])
-                str_true_char = re.sub(r'_', ' ', str_true_char)
                 str_true_phone = idx2phone(labels_phone[0][0])
             else:
                 str_true_char = labels_char[0][0][0]

@@ -82,7 +82,6 @@ class TestLoadDatasetAttention(unittest.TestCase):
 
             if data_type != 'test':
                 str_true = map_fn(labels[0][0][0: labels_seq_len[0][0]])
-                str_true = re.sub(r'_', ' ', str_true)
             else:
                 str_true = labels[0][0][0]
 

@@ -69,13 +69,13 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
             model.keep_prob_pl_list[0]: 1.0
         }
 
-        batch_size_each = len(inputs[0])
+        batch_size = inputs[0].shape[0]
 
         # Evaluate by 39 phones
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
+        labels_pred = sparsetensor2list(labels_pred_st, batch_size)
 
-        for i_batch in range(batch_size_each):
+        for i_batch in range(batch_size):
             ###############
             # Hypothesis
             ###############
@@ -161,15 +161,16 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
             model.keep_prob_pl_list[0]: 1.0
         }
 
-        batch_size_each = len(inputs[0])
+        batch_size = inputs[0].shape[0]
 
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
-        labels_pred = sparsetensor2list(labels_pred_st, batch_size_each)
-        for i_batch in range(batch_size_each):
+        labels_pred = sparsetensor2list(labels_pred_st, batch_size)
+        for i_batch in range(batch_size):
 
             # Convert from list of index to string
             if is_test:
                 str_true = labels_true[0][i_batch][0]
+                # NOTE: transcript is seperated by space('_')
             else:
                 # Convert from list of index to string
                 str_true = idx2char(labels_true[0][i_batch])
@@ -189,9 +190,9 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
             # substitute, insert, delete = wer_align(
             #     ref=str_pred.split('_'),
             #     hyp=str_true.split('_'))
-            # print(substitute)
-            # print(insert)
-            # print(delete)
+            # print('SUB: %d' % substitute)
+            # print('INS: %d' % insert)
+            # print('DEL: %d' % delete)
 
             # Remove spaces
             str_pred = re.sub(r'[_]+', '', str_pred)

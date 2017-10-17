@@ -141,23 +141,20 @@ def decode(session, decode_op, model, dataset, label_type,
 
         for i_batch in range(batch_size):
             print('----- wav: %s -----' % input_names[0][i_batch])
-            if label_type == 'character':
+            if 'char' in label_type:
                 if is_test:
-                    str_true = labels_true[0][i_batch][0].replace('_', ' ')
+                    str_true = labels_true[0][i_batch][0]
                 else:
                     str_true = map_fn(
-                        labels_true[0][i_batch]).replace('_', ' ')
-                str_pred = map_fn(labels_pred[i_batch]).replace('_', ' ')
-
-            elif label_type == 'character_capital_divide':
-                raise NotImplementedError
-
+                        labels_true[0][i_batch])
+                str_pred = map_fn(labels_pred[i_batch])
             else:
                 if is_test:
                     str_true = labels_true[0][i_batch][0]
                 else:
                     str_true = map_fn(labels_true[0][i_batch])
                 str_pred = map_fn(labels_pred[i_batch])
+
             print('Ref: %s' % str_true)
             print('Hyp: %s' % str_pred)
 

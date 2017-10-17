@@ -8,28 +8,18 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from models.attention.decoders.beam_search.util import choose_top_k
-from models.attention.decoders.beam_search.beam_search_decoder import BeamSearchDecoder
 
+from models.model_base import ModelBase
 from models.encoders.load_encoder import load as load_encoder
-from models.attention.base import AttentionBase
 from models.attention.decoders.attention_layer import AttentionLayer
-from models.attention.decoders.attention_decoder import AttentionDecoder
-from models.attention.decoders.attention_decoder import AttentionDecoderOutput
+from models.attention.decoders.attention_decoder import AttentionDecoder, AttentionDecoderOutput
 from models.attention.decoders.dynamic_decoder import _transpose_batch_time as time2batch
 from models.attention.bridge import InitialStateBridge
 
-from collections import namedtuple
+# from models.attention.decoders.beam_search.util import choose_top_k
+# from models.attention.decoders.beam_search.beam_search_decoder import BeamSearchDecoder
 
-OPTIMIZER_CLS_NAMES = {
-    "adagrad": tf.train.AdagradOptimizer,
-    "adadelta": tf.train.AdadeltaOptimizer,
-    "adam": tf.train.AdamOptimizer,
-    "rmsprop": tf.train.RMSPropOptimizer,
-    "sgd": tf.train.GradientDescentOptimizer,
-    "momentum": tf.train.MomentumOptimizer,
-    "nestrov": tf.train.MomentumOptimizer
-}
+from collections import namedtuple
 
 
 HELPERS = {
@@ -44,18 +34,22 @@ class EncoderOutput(
     pass
 
 
-class AttentionSeq2Seq(AttentionBase):
+class AttentionSeq2Seq(ModelBase):
     """Attention-based model.
     Args:
         input_size (int): the dimension of input vectors
-        encoder_type (string): blstm only now
+        encoder_type (string): blstm
         encoder_num_units (int): the number of units in each layer of the
             encoder
         encoder_num_layers (int): the number of layers of the encoder
+        encoder_num_proj (int): the number of nodes in the projection layer of
+            the encoder. This is not used for GRU encoders.
+        attention_type (string): the type of attention
         attention_dim: (int) the dimension of the attention layer
-        attention_type (string): content or location or hybrid or layer_dot
-        decoder_type (string): lstm only now
+        decoder_type (string): lstm or gru
         decoder_num_units (int): the number of units in each layer of the decoder
+        # decoder_num_proj (int): the number of nodes in the projection layer of
+            the decoder. This is not used for GRU decoders.
         decoder_num_layers (int): the number of layers of the decoder
         embedding_dim (int): the dimension of the embedding in target spaces
         num_classes (int): the number of nodes in softmax layer
@@ -63,24 +57,36 @@ class AttentionSeq2Seq(AttentionBase):
         eos_index (int): index of the end of sentence tag (<EOS>)
         max_decode_length (int): the length of output sequences to stop
             prediction when EOS token have not been emitted
-        attention_smoothing (bool, optional): if True, replace exp to sigmoid
-            function in the softmax layer of computing attention weights
-        sharpening_factor (float, optional): a parameter for
-            smoothing the softmax layer in computating attention weights
-        logits_temperature (float, optional):  a parameter for smoothing the
-            softmax layer in outputing probabilities
+        lstm_impl (string): a base implementation of LSTM. This is
+            not used for GRU models.
+                - BasicLSTMCell: tf.contrib.rnn.BasicLSTMCell (no peephole)
+                - LSTMCell: tf.contrib.rnn.LSTMCell
+                - LSTMBlockCell: tf.contrib.rnn.LSTMBlockCell
+                - LSTMBlockFusedCell: under implementation
+                - CudnnLSTM: under implementation
+            Choose the background implementation of tensorflow.
+            Default is LSTMBlockCell.
+        use_peephole (bool, optional): if True, use peephole connection. This
+            is not used for GRU models.
+        splice (int, optional): the number of frames to splice. This is used
+            when using CNN-like encoder. Default is 1 frame.
         parameter_init (float, optional): the ange of uniform distribution to
             initialize weight parameters (>= 0)
-        clip_grad (float, optional): the range of gradient clipping (> 0)
-        clip_activation_encoder (float, optional): the range of activation
-            clipping in the encoder (> 0)
-        clip_activation_decoder (float, optional): the range of activation
-            clipping in the decoder (> 0)
-        beam_width (int, optional): the number of beam widths. beam width 1
-            means greedy decoding.
+        clip_grad_norm (float, optional): the range of clipping of gradient
+            norm (> 0)
+        clip_activation_encoder (float, optional): the range of clipping of
+            cell activation of the encoder (> 0). This is not used for GRU
+            encoders.
+        clip_activation_decoder (float, optional): the range of clipping of
+            cell activation of the decoder (> 0). This is not used for GRU
+            decoders.
         weight_decay (float, optional): a parameter for weight decay
         time_major (bool, optional): if True, time-major computation will be
             performed
+        sharpening_factor (float, optional): a sharpening factor in the
+            softmax layer for computing attention weights
+        logits_temperature (float, optional): a parameter for smoothing the
+            softmax layer in outputing probabilities
     """
 
     def __init__(self,
@@ -89,40 +95,37 @@ class AttentionSeq2Seq(AttentionBase):
                  encoder_num_units,
                  encoder_num_layers,
                  encoder_num_proj,
-                 encoder_dropout,
                  attention_type,
                  attention_dim,
                  decoder_type,
                  decoder_num_units,
                  #  decoder_num_proj,
                  decoder_num_layers,
-                 decoder_dropout,
                  embedding_dim,
-                 embedding_dropout,
                  num_classes,
                  sos_index,
                  eos_index,
                  max_decode_length,
+                 lstm_impl='LSTMBlockCell',
+                 use_peephole=True,
                  splice=1,
                  parameter_init=0.1,
-                 clip_grad=5.0,
+                 clip_grad_norm=5.0,
                  clip_activation_encoder=50,
                  clip_activation_decoder=50,
                  weight_decay=0.0,
-                 time_major=False,
+                 time_major=True,
                  sharpening_factor=1.0,
                  logits_temperature=1.0,
                  name='attention_seq2seq'):
 
+        super(AttentionSeq2Seq, self).__init__()
+
         assert input_size % 3 == 0, 'input_size must be divisible by 3 (+ delta, double delta features).'
         # NOTE: input features are expected to including Δ and ΔΔ features
-        # assert splice % 2 == 1, 'splice must be the odd number'
-        assert clip_grad > 0, 'clip_grad must be larger than 0.'
+        assert splice % 2 == 1, 'splice must be the odd number'
+        assert clip_grad_norm > 0, 'clip_grad_norm must be larger than 0.'
         assert weight_decay >= 0, 'weight_decay must not be a negative value.'
-
-        super(AttentionSeq2Seq, self).__init__(
-            input_size, attention_dim, embedding_dim, num_classes, sos_index,
-            eos_index, clip_grad, weight_decay)
 
         # Setting for the encoder
         self.input_size = input_size
@@ -132,7 +135,8 @@ class AttentionSeq2Seq(AttentionBase):
         self.encoder_num_proj = encoder_num_proj
         self.encoder_num_layers = encoder_num_layers
         # self.downsample_list = downsample_list
-        self.encoder_dropout = encoder_dropout
+        self.lstm_impl = lstm_impl
+        self.use_peephole = use_peephole
 
         # Setting for the attention layer
         self.attention_type = attention_type
@@ -146,9 +150,7 @@ class AttentionSeq2Seq(AttentionBase):
         self.decoder_num_units = decoder_num_units
         # self.decoder_num_proj = decoder_num_proj
         self.decdoder_num_layers = decoder_num_layers
-        self.decoder_dropout = decoder_dropout
         self.embedding_dim = embedding_dim
-        self.embedding_dropout = embedding_dropout
         self.num_classes = num_classes + 2
         # NOTE: add <SOS> and <EOS>
         self.sos_index = sos_index
@@ -156,11 +158,11 @@ class AttentionSeq2Seq(AttentionBase):
         self.max_decode_length = max_decode_length
         self.logits_temperature = logits_temperature
         # self.beam_width = beam_width
-        # self.use_beam_search = True if beam_width >= 2 else False
+        self.use_beam_search = False
 
         # Common setting
         self.parameter_init = parameter_init
-        self.clip_grad = clip_grad
+        self.clip_grad_norm = clip_grad_norm
         self.clip_activation_encoder = clip_activation_encoder
         self.clip_activation_decoder = clip_activation_decoder
         self.weight_decay = weight_decay
@@ -176,9 +178,9 @@ class AttentionSeq2Seq(AttentionBase):
         self.labels_pl_list = []
         self.inputs_seq_len_pl_list = []
         self.labels_seq_len_pl_list = []
-        self.keep_prob_input_pl_list = []
-        self.keep_prob_hidden_pl_list = []
-        self.keep_prob_output_pl_list = []
+        self.keep_prob_encoder_pl_list = []
+        self.keep_prob_decoder_pl_list = []
+        self.keep_prob_embedding_pl_list = []
 
     def _build(self, inputs, labels, inputs_seq_len, labels_seq_len,
                keep_prob_encoder, keep_prob_decoder, keep_prob_embedding):
@@ -193,29 +195,32 @@ class AttentionSeq2Seq(AttentionBase):
             keep_prob_decoder (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection of the decoder
             keep_prob_embedding (placeholder, float): A probability to keep
-                nodes in the hidden-hidden connection of the embedding
+                nodes in the embedding layer
         Returns:
-            logits ():
-            decoder_outputs_train ():
-            decoder_outputs_infer ():
+            logits: A tensor of sizse `[B, T_out, num_classes]`
+            decoder_outputs_train (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
+            decoder_outputs_infer (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
         """
-        # Encode input features
-        encoder_outputs = self._encode(
-            inputs, inputs_seq_len, keep_prob_encoder)
+        with tf.variable_scope('encoder'):
+            # Encode input features
+            encoder_outputs = self._encode(
+                inputs, inputs_seq_len, keep_prob_encoder)
 
         # Define decoder
         decoder_train = self._create_decoder(
             encoder_outputs=encoder_outputs,
             labels=labels,
-            keep_prob_decoder=keep_prob_decoder
-            reuse=False)
+            keep_prob_decoder=keep_prob_decoder,
+            mode=tf.contrib.learn.ModeKeys.TRAIN)
         decoder_infer = self._create_decoder(
             encoder_outputs=encoder_outputs,
             labels=labels,
             keep_prob_decoder=keep_prob_decoder,
-            reuse=True)
-        # NOTE: initial_state and helper will be substituted in
-        # self._decode_train() or self._decode_infer()
+            mode=tf.contrib.learn.ModeKeys.INFER)
 
         # Wrap decoder only when inference
         # decoder_infer = self._beam_search_decoder_wrapper(
@@ -224,53 +229,32 @@ class AttentionSeq2Seq(AttentionBase):
         # Connect between encoder and decoder
         bridge = InitialStateBridge(
             encoder_outputs=encoder_outputs,
-            decoder_state_size=decoder_train.cell.state_size)
+            decoder_state_size=decoder_train.rnn_cell.state_size,
+            parameter_init=self.parameter_init)
 
         # Call decoder (sharing parameters)
-        # Training state
+        # Training stage
         decoder_outputs_train, _ = self._decode_train(
             decoder=decoder_train,
             bridge=bridge,
             encoder_outputs=encoder_outputs,
             labels=labels,
-            labels_seq_len=labels_seq_len)
+            labels_seq_len=labels_seq_len,
+            keep_prob_embedding=keep_prob_embedding)
 
         # Inference stage
         decoder_outputs_infer, _ = self._decode_infer(
             decoder=decoder_infer,
             bridge=bridge,
             encoder_outputs=encoder_outputs)
-        # NOTE: decoder_outputs are time-major
+        # NOTE: decoder_outputs are time-major by default
 
-        # Transpose from time-major to batch-major
+        # Convert from time-major to batch-major
         if self.time_major:
-            logits = time2batch(decoder_outputs_train.logits)
-            predicted_ids = time2batch(decoder_outputs_train.predicted_ids)
-            cell_output = time2batch(decoder_outputs_train.cell_output)
-            attention_scores = time2batch(
-                decoder_outputs_train.attention_scores)
-            attention_context = time2batch(
-                decoder_outputs_train.attention_context)
-            decoder_outputs_train = AttentionDecoderOutput(
-                logits=logits,
-                predicted_ids=predicted_ids,
-                cell_output=cell_output,
-                attention_scores=attention_scores,
-                attention_context=attention_context)
-
-            logits = time2batch(decoder_outputs_infer.logits)
-            predicted_ids = time2batch(decoder_outputs_infer.predicted_ids)
-            cell_output = time2batch(decoder_outputs_infer.cell_output)
-            attention_scores = time2batch(
-                decoder_outputs_infer.attention_scores)
-            attention_context = time2batch(
-                decoder_outputs_infer.attention_context)
-            decoder_outputs_infer = AttentionDecoderOutput(
-                logits=logits,
-                predicted_ids=predicted_ids,
-                cell_output=cell_output,
-                attention_scores=attention_scores,
-                attention_context=attention_context)
+            decoder_outputs_train = self._convert_to_batch_major(
+                decoder_outputs_train)
+            decoder_outputs_infer = self._convert_to_batch_major(
+                decoder_outputs_infer)
 
         # Calculate loss per example
         logits = decoder_outputs_train.logits / self.logits_temperature
@@ -283,27 +267,28 @@ class AttentionSeq2Seq(AttentionBase):
 
         return logits, decoder_outputs_train, decoder_outputs_infer
 
-    def _encode(self, inputs, inputs_seq_len, keep_prob):
+    def _encode(self, inputs, inputs_seq_len, keep_prob_encoder):
         """Encode input features.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
-            keep_prob (placeholder, float): A probability to keep nodes
+            keep_prob_encoder (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
         Returns:
             encoder_outputs (namedtuple): A namedtuple of
                 `(outputs, final_state, seq_len)`
         """
         # Define encoder
-        if self.encoder_type in ['blstm']:
+        if self.encoder_type in ['blstm', 'lstm']:
             self.encoder = load_encoder(self.encoder_type)(
                 num_units=self.encoder_num_units,
                 num_proj=None,  # TODO: add the projection layer
                 num_layers=self.encoder_num_layers,
-                lstm_impl='LSTMBlockCell',
-                use_peephole=True,
+                lstm_impl=self.lstm_impl,
+                use_peephole=self.use_peephole,
                 parameter_init=self.parameter_init,
-                clip_activation=self.clip_activation_encoder)
+                clip_activation=self.clip_activation_encoder,
+                time_major=self.time_major)
         else:
             # TODO: add other encoders
             raise NotImplementedError
@@ -311,13 +296,18 @@ class AttentionSeq2Seq(AttentionBase):
         outputs, final_state = self.encoder(
             inputs=inputs,
             inputs_seq_len=inputs_seq_len,
-            keep_prob=keep_prob)
+            keep_prob=keep_prob_encoder)
+
+        if self.time_major:
+            # Convert from batch-major to time-major
+            outputs = tf.transpose(outputs, [1, 0, 2])
 
         return EncoderOutput(outputs=outputs,
                              final_state=final_state,
                              seq_len=inputs_seq_len)
 
-    def _create_decoder(self, encoder_outputs, labels, keep_prob_decoder, reuse):
+    def _create_decoder(self, encoder_outputs, labels, keep_prob_decoder,
+                        mode):
         """Create attention decoder.
         Args:
             encoder_outputs (namedtuple): A namedtuple of
@@ -325,34 +315,38 @@ class AttentionSeq2Seq(AttentionBase):
             labels (placeholder): Target labels of size `[B, T_out]`
             keep_prob_decoder (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection of the decoder
-            reuse (bool): if True, reuse parameters
+            mode: tf.contrib.learn.ModeKeys
         Returns:
-            decoder: An instance of the decoder class
+            decoder (callable): A callable function of `AttentionDecoder` class
         """
         # Define the attention layer (compute attention weights)
-        with tf.variable('attention_layer', reuse=reuse):
-            self.attention_layer = AttentionLayer(
-                attention_type=self.attention_type,
-                num_units=self.attention_dim,
-                sharpening_factor=self.sharpening_factor)
+        self.attention_layer = AttentionLayer(
+            attention_type=self.attention_type,
+            num_units=self.attention_dim,
+            parameter_init=self.parameter_init,
+            sharpening_factor=self.sharpening_factor,
+            mode=mode)
 
         # Define RNN decoder
-        decoder_initializer = tf.random_uniform_initializer(
-            minval=-self.parameter_init,
-            maxval=self.parameter_init)
-        with tf.variable_scope('rnn_decoder',
-                               initializer=decoder_initializer,
-                               reuse=reuse):
+        cell_initializer = tf.random_uniform_initializer(
+            minval=-self.parameter_init, maxval=self.parameter_init)
+        with tf.variable_scope('decoder_rnn_cell',
+                               initializer=cell_initializer,
+                               reuse=True if mode == tf.contrib.learn.ModeKeys.TRAIN else False):
             if self.decoder_type == 'lstm':
-                rnn_cell = tf.contrib.rnn.LSTMBlockCell(
-                    self.decoder_num_units,
-                    forget_bias=1.0,
-                    # clip_cell=True,
-                    use_peephole=self.use_peephole)
-                # TODO: cell clipping (update for rc1.3)
+                if tf.__version__ == '1.3.0':
+                    rnn_cell = tf.contrib.rnn.LSTMBlockCell(
+                        self.decoder_num_units,
+                        forget_bias=1.0,
+                        clip_cell=self.clip_activation_decoder,
+                        use_peephole=self.use_peephole)
+                else:
+                    rnn_cell = tf.contrib.rnn.LSTMBlockCell(
+                        self.decoder_num_units,
+                        forget_bias=1.0,
+                        use_peephole=self.use_peephole)
             elif self.decoder_type == 'gru':
                 rnn_cell = tf.contrib.rnn.GRUCell(self.num_units)
-
             else:
                 raise TypeError('decoder_type is "lstm" or "gru".')
 
@@ -361,23 +355,142 @@ class AttentionSeq2Seq(AttentionBase):
                 rnn_cell, output_keep_prob=keep_prob_decoder)
 
         # Define attention decoder
-        att_decoder_initializer = tf.random_uniform_initializer(
-            minval=-self.parameter_init,
-            maxval=self.parameter_init)
-        with tf.variable_scope('attention_decoder',
-                               initializer=att_decoder_initializer,
-                               reuse=reuse):
-            self.decoder = AttentionDecoder(
-                rnn_cell=rnn_cell,
-                parameter_init=self.parameter_init,
-                max_decode_length=self.max_decode_length,
-                num_classes=self.num_classes,
-                encoder_outputs=encoder_outputs.outputs,
-                encoder_outputs_seq_len=encoder_outputs.seq_len,
-                attention_layer=self.attention_layer,
-                time_major=self.time_major)
+        self.decoder = AttentionDecoder(
+            rnn_cell=rnn_cell,
+            parameter_init=self.parameter_init,
+            max_decode_length=self.max_decode_length,
+            num_classes=self.num_classes,
+            encoder_outputs=encoder_outputs.outputs,
+            encoder_outputs_seq_len=encoder_outputs.seq_len,
+            attention_layer=self.attention_layer,
+            time_major=self.time_major,
+            mode=mode)
 
         return self.decoder
+
+    def _convert_to_batch_major(self, decoder_outputs):
+        """
+        Args:
+            decoder_outputs (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
+        Returns:
+            decoder_outputs (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
+        """
+        logits = time2batch(decoder_outputs.logits)
+        predicted_ids = time2batch(decoder_outputs.predicted_ids)
+        decoder_output = time2batch(decoder_outputs.decoder_output)
+        attention_weights = time2batch(
+            decoder_outputs.attention_weights)
+        context_vector = time2batch(
+            decoder_outputs.context_vector)
+        decoder_outputs = AttentionDecoderOutput(
+            logits=logits,
+            predicted_ids=predicted_ids,
+            decoder_output=decoder_output,
+            attention_weights=attention_weights,
+            context_vector=context_vector)
+        return decoder_outputs
+
+    def _decode_train(self, decoder, bridge, encoder_outputs, labels,
+                      labels_seq_len, keep_prob_embedding):
+        """Runs decoding in training mode.
+        Args:
+            decoder (callable): A callable function of `AttentionDecoder` class
+            bridge (callable): A callable function to connect between the
+                encoder and decoder
+            encoder_outputs (namedtuple): A namedtuple of
+                `(outputs, final_state, seq_len)`
+            labels: A tensor of size `[B, T_out]`
+            labels_seq_len: A tensor of size `[B]`
+            keep_prob_embedding (placeholder, float): A probability to keep
+                nodes in the embedding layer
+        Returns:
+            decoder_outputs (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
+            decoder_final_state:
+        """
+        # Generate embedding of target labels
+        with tf.variable_scope("output_embedding"):
+            output_embedding = tf.get_variable(
+                name="W_embedding",
+                shape=[self.num_classes, self.embedding_dim],
+                initializer=tf.random_uniform_initializer(
+                    -self.parameter_init, self.parameter_init))
+            labels_embedded = tf.nn.embedding_lookup(output_embedding,
+                                                     labels)
+            labels_embedded = tf.nn.dropout(labels_embedded,
+                                            keep_prob=keep_prob_embedding)
+
+        helper_train = tf.contrib.seq2seq.TrainingHelper(
+            inputs=labels_embedded[:, :-1, :],  # exclude <EOS>
+            sequence_length=labels_seq_len - 1,  # exclude <EOS>
+            time_major=False)  # TODO: self.time_major??
+        # labels_embedded: `[B, T_out, embedding_dim]`
+
+        # The initial decoder state is the final encoder state
+        with tf.variable_scope("bridge"):
+            decoder_initial_state = bridge()
+
+        # Call decoder class
+        decoder_outputs, decoder_final_state = decoder(
+            initial_state=decoder_initial_state,
+            helper=helper_train)
+        # NOTE: These are time-major if self.time_major is True
+
+        return decoder_outputs, decoder_final_state
+
+    def _decode_infer(self, decoder, bridge, encoder_outputs):
+        """Runs decoding in inference mode.
+        Args:
+            decoder (callable): A callable function of `AttentionDecoder` class
+            bridge (callable): A callable function to connect between the
+                encoder and decoder
+            encoder_outputs (namedtuple): A namedtuple of
+                `(outputs, final_state, seq_len)`
+        Returns:
+            decoder_outputs (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
+            decoder_final_state:
+        """
+        batch_size = tf.shape(encoder_outputs.outputs)[0]
+
+        # if self.use_beam_search:
+        #     batch_size = self.beam_width
+        # TODO: make this batch version
+
+        with tf.variable_scope("output_embedding", reuse=True):
+            output_embedding = tf.get_variable(
+                name="W_embedding",
+                shape=[self.num_classes, self.embedding_dim],
+                initializer=tf.random_uniform_initializer(
+                    -self.parameter_init, self.parameter_init))
+            # NOTE: dropout will not be performed when inference
+
+        helper_infer = tf.contrib.seq2seq.GreedyEmbeddingHelper(
+            embedding=output_embedding,
+            start_tokens=tf.fill([batch_size], self.sos_index),
+            # start_tokens=tf.tile([self.sos_index], [batch_size]),
+            end_token=self.eos_index)
+        # ex.) Output tensor has shape [2, 3].
+        # tf.fill([2, 3], 9) ==> [[9, 9, 9]
+        #                         [9, 9, 9]]
+
+        # The initial decoder state is the final encoder state
+        with tf.variable_scope("bridge", reuse=True):
+            decoder_initial_state = bridge()
+
+        # Call decoder class
+        decoder_outputs, decoder_final_state = decoder(
+            initial_state=decoder_initial_state,
+            helper=helper_infer)
+        # NOTE: These are time-major if self.time_major is True
+
+        return decoder_outputs, decoder_final_state
 
     def create_placeholders(self):
         """Create placeholders and append them to list."""
@@ -390,12 +503,12 @@ class AttentionSeq2Seq(AttentionBase):
             tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
         self.labels_seq_len_pl_list.append(
             tf.placeholder(tf.int32, shape=[None], name='labels_seq_len'))
-        self.keep_prob_input_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_input'))
-        self.keep_prob_hidden_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_hidden'))
-        self.keep_prob_output_pl_list.append(
-            tf.placeholder(tf.float32, name='keep_prob_output'))
+        self.keep_prob_encoder_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_encoder'))
+        self.keep_prob_decoder_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_decoder'))
+        self.keep_prob_embedding_pl_list.append(
+            tf.placeholder(tf.float32, name='keep_prob_embedding'))
 
         # These are prepared for computing LER
         self.labels_st_true_pl = tf.SparseTensor(
@@ -407,147 +520,66 @@ class AttentionSeq2Seq(AttentionBase):
             tf.placeholder(tf.int32, name='values_pred'),
             tf.placeholder(tf.int64, name='shape_pred'))
 
-    def _generate_target_embedding(self, reuse):
-        """Returns the embedding used for the target sequence."""
-        with tf.variable_scope("target_embedding", reuse=reuse):
-            return tf.get_variable(
-                name="W_embedding",
-                shape=[self.num_classes, self.embedding_dim],
-                initializer=tf.random_uniform_initializer(
-                    -self.parameter_init, self.parameter_init))
-        # TODO: Consider shape of target_embedding
-
-    def _beam_search_decoder_wrapper(self, decoder, beam_width=None,
+    def _beam_search_decoder_wrapper(self, decoder, beam_width=1,
                                      length_penalty_weight=0.6):
         """Wraps a decoder into a Beam Search decoder.
         Args:
             decoder: An instance of `RNNDecoder` class
-            beam_width: int, the number of beams to use
-            length_penalty_weight: A float value, weight for the length penalty
-                factor. 0.0 disables the penalty.
+            beam_width (int): the number of beams to use
+            length_penalty_weight (float): weight for the length penalty factor.
+                0 disables the penalty.
         Returns:
             A callable BeamSearchDecoder with the same interfaces as the
                 attention decoder
         """
-        if beam_width is None or beam_width <= 1:
+        assert isinstance(beam_width, int)
+        assert beam_width >= 1
+
+        if beam_width == 1:
             # Greedy decoding
             self.use_beam_search = False
             return decoder
-
-        self.use_beam_search = True
-        return BeamSearchDecoder(
-            decoder=decoder,
-            beam_width=beam_width,
-            vocab_size=self.num_classes,
-            eos_index=self.eos_index,
-            length_penalty_weight=length_penalty_weight,
-            choose_successors_fn=choose_top_k)
-
-    def _decode_train(self, decoder, bridge, encoder_outputs, labels,
-                      labels_seq_len):
-        """Runs decoding in training mode.
-        Args:
-            decoder: An instance of the decoder class
-            bridge:
-            encoder_outputs:
-            labels: Target labels of size `[B, T_out, num_classes]`
-            labels_seq_len: The length of target labels
-        Returns:
-            decoder_outputs: A tuple of `(AttentionDecoderOutput, final_state)`
-        """
-        # Generate embedding of target labels
-        target_embedding = self._generate_target_embedding(reuse=False)
-        target_embedded = tf.nn.embedding_lookup(target_embedding,
-                                                 labels)
-        # TODO: add Dropout
-
-        helper_train = tf.contrib.seq2seq.TrainingHelper(
-            inputs=target_embedded[:, :-1, :],  # embedding of target labels
-            # inputs=labels[:, :-1, :],
-            sequence_length=labels_seq_len - 1,  # include <SOS>, exclude <EOS>
-            time_major=False)  # self.time_major??
-        # target_embedded: `[batch_size, time, embedding_dim]`
-
-        decoder_initial_state = bridge(reuse=False)
-
-        # Call decoder class
-        (decoder_outputs, final_state) = decoder(
-            initial_state=decoder_initial_state,
-            helper=helper_train,
-            mode=tf.contrib.learn.ModeKeys.TRAIN)
-        # NOTE: They are time-major if self.time_major is True
-
-        return (decoder_outputs, final_state)
-
-    def _decode_infer(self, decoder, bridge, encoder_outputs):
-        """Runs decoding in inference mode.
-        Args:
-            decoder: An instance of the decoder class
-            bridge:
-            encoder_outputs: A namedtuple of
-                outputs
-                final_state
-                attention_values
-                attention_values_length
-        Returns:
-            decoder_outputs: A tuple of `(AttentionDecoderOutput, final_state)`
-        """
-        batch_size = tf.shape(encoder_outputs.outputs)[0]
-
-        if self.use_beam_search:
-            batch_size = self.beam_width
-        # TODO: make this batch version
-
-        target_embedding = self._generate_target_embedding(reuse=True)
-
-        helper_infer = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-            # embedding=self.decoder_outputs_train.logits,
-            embedding=target_embedding,  # embedding of predicted labels
-            start_tokens=tf.fill([batch_size], self.sos_index),
-            # start_tokens=tf.tile([self.sos_index], [batch_size]),
-            end_token=self.eos_index)
-        # ex.)
-        # Output tensor has shape [2, 3].
-        # tf.fill([2, 3], 9) ==> [[9, 9, 9]
-        #                         [9, 9, 9]]
-
-        decoder_initial_state = bridge(reuse=True)
-
-        # Call decoder class
-        (decoder_outputs, final_state) = decoder(
-            initial_state=decoder_initial_state,
-            helper=helper_infer,
-            mode=tf.contrib.learn.ModeKeys.INFER)
-        # NOTE: They are time-major if self.time_major is True
-
-        return (decoder_outputs, final_state)
+        else:
+            self.use_beam_search = True
+            return BeamSearchDecoder(
+                decoder=decoder,
+                beam_width=beam_width,
+                vocab_size=self.num_classes,
+                eos_index=self.eos_index,
+                length_penalty_weight=length_penalty_weight,
+                choose_successors_fn=choose_top_k)
 
     def compute_loss(self, inputs, labels, inputs_seq_len, labels_seq_len,
-                     keep_prob_input, keep_prob_hidden, keep_prob_output,
+                     keep_prob_encoder, keep_prob_decoder, keep_prob_embedding,
                      scope=None):
         """Operation for computing cross entropy sequence loss.
         Args:
-            inputs: A tensor of `[B, T, input_size]`
-            labels: A tensor of `[B, T]`
+            inputs: A tensor of `[B, T_in, input_size]`
+            labels: A tensor of `[B, T_out]`
             inputs_seq_len: A tensor of `[B]`
             labels_seq_len: A tensor of `[B]`
-            keep_prob_input: A float value. A probability to keep nodes in
-                the input-hidden layer
-            keep_prob_hidden: A float value. A probability to keep nodes in
-                the hidden-hidden layers
-            keep_prob_output: A float value. A probability to keep nodes in
-                the hidden-output layer
+            keep_prob_encoder (placeholder, float): A probability to keep nodes
+                in the hidden-hidden connection of the encoder
+            keep_prob_decoder (placeholder, float): A probability to keep nodes
+                in the hidden-hidden connection of the decoder
+            keep_prob_embedding (placeholder, float): A probability to keep
+                nodes in the embedding layer
+            scope (optional): A scope in the model tower
         Returns:
-            loss: operation for computing total loss (cross entropy sequence
-                loss + L2). This is a single scalar tensor to minimize.
-            logits:
-            decoder_outputs_train:
-            decoder_outputs_infer:
+            total_loss: operation for computing total loss (cross entropy
+                sequence loss + L2). This is a single scalar tensor to minimize.
+            logits: A tensor of size `[ , , num_classes]`
+            decoder_outputs_train (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
+            decoder_outputs_infer (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
         """
         # Build model graph
         logits, decoder_outputs_train, decoder_outputs_infer = self._build(
             inputs, labels, inputs_seq_len, labels_seq_len,
-            keep_prob_input, keep_prob_hidden, keep_prob_output)
+            keep_prob_encoder, keep_prob_decoder, keep_prob_embedding)
 
         # For prevent 0 * log(0) in crossentropy loss
         epsilon = tf.constant(value=1e-10)
@@ -563,24 +595,25 @@ class AttentionSeq2Seq(AttentionBase):
                 tf.add_to_collection('losses', weight_sum * self.weight_decay)
 
         with tf.name_scope("sequence_loss"):
-            max_time = tf.shape(labels[:, 1:])[1]
+            # batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
+            labels_max_seq_len = tf.shape(labels[:, 1:])[1]
             loss_mask = tf.sequence_mask(tf.to_int32(labels_seq_len - 1),
-                                         maxlen=max_time,
+                                         maxlen=labels_max_seq_len,
                                          dtype=tf.float32)
-            sequence_losses = tf.contrib.seq2seq.sequence_loss(
+            sequence_loss = tf.contrib.seq2seq.sequence_loss(
                 logits=logits,
-                targets=labels[:, 1:],
+                targets=labels[:, 1:],  # exclude <SOS>
                 weights=loss_mask,
                 average_across_timesteps=True,
                 average_across_batch=True,
                 softmax_loss_function=None)
+            # sequence_loss /= batch_size
 
-            sequence_loss = tf.reduce_sum(sequence_losses,
-                                          name='sequence_loss_mean')
             tf.add_to_collection('losses', sequence_loss)
 
         # Compute total loss
-        total_loss = tf.add_n(tf.get_collection('losses'), name='total_loss')
+        total_loss = tf.add_n(tf.get_collection('losses', scope),
+                              name='total_loss')
 
         # Add a scalar summary for the snapshot of loss
         if self.weight_decay > 0:
@@ -602,110 +635,20 @@ class AttentionSeq2Seq(AttentionBase):
 
         return total_loss, logits, decoder_outputs_train, decoder_outputs_infer
 
-    def set_optimizer(self, optimizer_name, learning_rate):
-        """Set optimizer.
-        Args:
-            optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
-            learning_rate: A float value, a learning rate
-        Returns:
-            optimizer:
-        """
-        optimizer_name = optimizer_name.lower()
-        if optimizer_name not in OPTIMIZER_CLS_NAMES:
-            raise ValueError(
-                "Optimizer name should be one of [%s], you provided %s." %
-                (", ".join(OPTIMIZER_CLS_NAMES), optimizer_name))
-
-        # Select optimizer
-        if optimizer_name == 'momentum':
-            return OPTIMIZER_CLS_NAMES[optimizer_name](
-                learning_rate=learning_rate,
-                momentum=0.9)
-        else:
-            return OPTIMIZER_CLS_NAMES[optimizer_name](
-                learning_rate=learning_rate)
-
-    def train(self, loss, optimizer, learning_rate=None, clip_norm=False):
-        """Operation for training. Only the sigle GPU training is supported.
-        Args:
-            loss: An operation for computing loss
-            optimizer: string, name of the optimizer in OPTIMIZER_CLS_NAMES
-            learning_rate: A float value, a learning rate
-            clip_norm: if True, clip gradients norm by self.clip_grad
-        Returns:
-            train_op: operation for training
-        """
-        # Create a variable to track the global step
-        global_step = tf.Variable(0, name='global_step', trainable=False)
-
-        # Set optimizer
-        self.optimizer = self.set_optimizer(optimizer, learning_rate)
-
-        # TODO: Optionally wrap with SyncReplicasOptimizer
-
-        if self.clip_grad is not None:
-            # Compute gradients
-            grads_and_vars = self.optimizer.compute_gradients(loss)
-
-            # Clip gradients
-            clipped_grads_and_vars = self._clip_gradients(grads_and_vars,
-                                                          clip_norm)
-
-            # Create gradient updates
-            train_op = self.optimizer.apply_gradients(
-                clipped_grads_and_vars,
-                global_step=global_step)
-
-        else:
-            # Use the optimizer to apply the gradients that minimize the loss
-            # and also increment the global step counter as a single training
-            # step
-            train_op = self.optimizer.minimize(loss, global_step=global_step)
-
-        return train_op
-
-    def _clip_gradients(self, grads_and_vars, _clip_norm):
-        """Clip gradients.
-        Args:
-            grads_and_vars: list of (grads, vars) tuples
-            _clip_norm: if True, clip gradients norm by self.clip_grad
-        Returns:
-            clipped_grads_and_vars: list of (clipped grads, vars)
-        """
-        # TODO: Optionally add gradient noise
-
-        clipped_grads_and_vars = []
-
-        if _clip_norm:
-            # Clip gradient norm
-            for grad, var in grads_and_vars:
-                if grad is not None:
-                    clipped_grads_and_vars.append(
-                        (tf.clip_by_norm(grad, clip_norm=self.clip_grad), var))
-        else:
-            # Clip gradient
-            for grad, var in grads_and_vars:
-                if grad is not None:
-                    clipped_grads_and_vars.append(
-                        (tf.clip_by_value(grad,
-                                          clip_value_min=-self.clip_grad,
-                                          clip_value_max=self.clip_grad), var))
-
-        # TODO: Add histograms for variables, gradients (norms)
-        # self._tensorboard(trainable_vars)
-
-        return clipped_grads_and_vars
-
-    def decoder(self, decoder_outputs_train, decoder_outputs_infer):
+    def decode(self, decoder_outputs_train, decoder_outputs_infer):
         """Operation for decoding.
         Args:
-            decoder_outputs_train: An instance of ``
-            decoder_outputs_infer: An instance of ``
+            decoder_outputs_train (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
+            decoder_outputs_infer (namedtuple): A namedtuple of
+                `(logits, predicted_ids, decoder_output, attention_weights,
+                    context_vector)`
         Return:
-            decoded_train: operation for decoding in training. A tensor of
-                size `[B, ]`
-            decoded_infer: operation for decoding in inference. A tensor of
-                size `[, max_decode_length]`
+            decoded_train: operation for decoding in training.
+                A tensor of size `[B, T_out]`
+            decoded_infer: operation for decoding in inference.
+                A tensor of size `[B, max_decode_length]`
         """
         decoded_train = decoder_outputs_train.predicted_ids
 
@@ -727,22 +670,20 @@ class AttentionSeq2Seq(AttentionBase):
             # Greedy decoding
             decoded_infer = decoder_outputs_infer.predicted_ids
 
-            argmax_score = None
-
         return decoded_train, decoded_infer
 
     def compute_ler(self, labels_true, labels_pred):
         """Operation for computing LER (Label Error Rate).
         Args:
-            labels_true: A SparseTensor
-            labels_pred: A SparseTensor
+            labels_true: A SparseTensor of target labels
+            labels_pred: A SparseTensor of predicted labels
         Returns:
             ler_op: operation for computing LER
         """
         # Compute LER (normalize by label length)
         ler_op = tf.reduce_mean(tf.edit_distance(
             labels_pred, labels_true, normalize=True))
-        # TODO: パディングを考慮して計算する
+        # TODO: consider variable lengths
 
         # Add a scalar summary for the snapshot of LER
         # with tf.name_scope("ler"):

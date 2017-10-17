@@ -33,10 +33,15 @@ def do_train(model, params):
         model: the model to train
         params (dict): A dictionary of parameters
     """
+    map_file_path_train = '../metrics/mapping_files/' + \
+        params['label_type'] + '.txt'
+    map_file_path_eval = '../metrics/mapping_files/' + \
+        params['label_type'] + '.txt'
+
     # Load dataset
     train_data = Dataset(
         data_type='train', label_type=params['label_type'],
-        batch_size=params['batch_size'], eos_index=params['eos_index'],
+        batch_size=params['batch_size'], map_file_path=map_file_path_train,
         max_epoch=params['num_epoch'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
@@ -44,21 +49,21 @@ def do_train(model, params):
     # TODO: check sort_utt
     dev_data = Dataset(
         data_type='dev', label_type=params['label_type'],
-        batch_size=params['batch_size'], eos_index=params['eos_index'],
+        batch_size=params['batch_size'], map_file_path=map_file_path_train,
         splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
     if params['label_type'] in ['character', 'character_capital_divide']:
         test_data = Dataset(
             data_type='test', label_type=params['label_type'],
-            batch_size=1, eos_index=params['eos_index'],
+            batch_size=1, map_file_path=map_file_path_eval,
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             sort_utt=False)
     else:
         test_data = Dataset(
             data_type='test', label_type='phone39',
-            batch_size=1, eos_index=params['eos_index'],
+            batch_size=1, map_file_path=map_file_path_eval,
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             sort_utt=False)
@@ -79,11 +84,10 @@ def do_train(model, params):
             model.keep_prob_encoder_pl_list[0],
             model.keep_prob_decoder_pl_list[0],
             model.keep_prob_embedding_pl_list[0])
-        train_op = model.train(
-            loss_op,
-            optimizer=params['optimizer'],
-            learning_rate=learning_rate_pl)
-        _, decode_op_infer = model.decoder(
+        train_op = model.train(loss_op,
+                               optimizer=params['optimizer'],
+                               learning_rate=learning_rate_pl)
+        _, decode_op_infer = model.decode(
             decoder_outputs_train,
             decoder_outputs_infer)
         ler_op = model.compute_ler(model.labels_st_true_pl,
@@ -144,9 +148,9 @@ def do_train(model, params):
                     model.labels_pl_list[0]: labels_train[0],
                     model.inputs_seq_len_pl_list[0]: inputs_seq_len[0],
                     model.labels_seq_len_pl_list[0]: labels_seq_len[0],
-                    model.keep_prob_encoder_pl_list[0]: params['dropout_encoder'],
-                    model.keep_prob_decoder_pl_list[0]: params['dropout_decoder'],
-                    model.keep_prob_embedding_pl_list[0]: params['dropout_embedding'],
+                    model.keep_prob_encoder_pl_list[0]: 1 - float(params['dropout_encoder']),
+                    model.keep_prob_decoder_pl_list[0]: 1 - float(params['dropout_decoder']),
+                    model.keep_prob_embedding_pl_list[0]: 1 - float(params['dropout_embedding']),
                     learning_rate_pl: learning_rate
                 }
 
@@ -157,7 +161,7 @@ def do_train(model, params):
 
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels_dev, inputs_seq_len,
-                     labels_seq_len, _), _ = dev_data().next()
+                     labels_seq_len, _), _ = dev_data.next()
                     feed_dict_dev = {
                         model.inputs_pl_list[0]: inputs[0],
                         model.labels_pl_list[0]: labels_dev[0],
@@ -213,7 +217,7 @@ def do_train(model, params):
                     print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / ler = %.3f (%.3f) / lr = %.5f (%.3f min)" %
                           (step + 1, train_data.epoch_detail, loss_train, loss_dev, ler_train, ler_dev,
                            learning_rate, duration_step / 60))
-                    # sys.stdout.flush()
+                    sys.stdout.flush()
                     start_time_step = time.time()
 
                 # Save checkpoint and evaluate model per epoch
@@ -341,9 +345,6 @@ def main(config_path, model_save_path):
     elif params['label_type'] == 'character_capital_divide':
         params['num_classes'] = 72
 
-    params['sos_index'] = params['num_classes']
-    params['eos_index'] = params['num_classes'] + 1
-
     # Model setting
     model = AttentionSeq2Seq(
         input_size=params['input_size'],
@@ -358,8 +359,8 @@ def main(config_path, model_save_path):
         decoder_num_layers=params['decoder_num_layers'],
         embedding_dim=params['embedding_dim'],
         num_classes=params['num_classes'],
-        sos_index=params['sos_index'],
-        eos_index=params['eos_index'],
+        sos_index=params['num_classes'],
+        eos_index=params['num_classes'] + 1,
         max_decode_length=params['max_decode_length'],
         lstm_impl='LSTMBlockCell',
         use_peephole=params['use_peephole'],
@@ -373,19 +374,23 @@ def main(config_path, model_save_path):
         logits_temperature=params['logits_temperature'])
 
     # Set process name
-    setproctitle('tf_timit_' + model.name + '_' + params['label_type'])
+    setproctitle('tf_timit_' + model.name + '_' +
+                 params['label_type'] + '_' + params['attention_type'])
 
-    model.name = params['model']
-    model.name += '_en' + str(params['encoder_num_unit'])
-    model.name += '_' + str(params['encoder_num_layer'])
+    model.name += '_en' + str(params['encoder_num_units'])
+    model.name += '_' + str(params['encoder_num_layers'])
     model.name += '_att' + str(params['attention_dim'])
-    model.name += '_de' + str(params['decoder_num_unit'])
-    model.name += '_' + str(params['decoder_num_layer'])
+    model.name += '_de' + str(params['decoder_num_units'])
+    model.name += '_' + str(params['decoder_num_layers'])
     model.name += '_' + params['optimizer']
     model.name += '_lr' + str(params['learning_rate'])
     model.name += '_' + params['attention_type']
-    if params['dropout'] != 0:
-        model.name += '_drop' + str(params['dropout'])
+    if params['dropout_encoder'] != 0:
+        model.name += '_dropen' + str(params['dropout_encoder'])
+    if params['dropout_decoder'] != 0:
+        model.name += '_dropde' + str(params['dropout_decoder'])
+    if params['dropout_embedding'] != 0:
+        model.name += '_dropem' + str(params['dropout_embedding'])
     if params['num_stack'] != 1:
         model.name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:
@@ -418,7 +423,7 @@ def main(config_path, model_save_path):
     # Save config file
     shutil.copyfile(config_path, join(model.save_path, 'config.yml'))
 
-    # sys.stdout = open(join(model.save_path, 'train.log'), 'w')
+    sys.stdout = open(join(model.save_path, 'train.log'), 'w')
     # TODO(hirofumi): change to logger
     do_train(model=model, params=params)
 

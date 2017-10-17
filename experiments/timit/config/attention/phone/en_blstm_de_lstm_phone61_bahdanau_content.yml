@@ -15,7 +15,7 @@ param:
   encoder_num_units: 256
   encoder_num_proj: None
   encoder_num_layers: 4
-  attention_type: content
+  attention_type: bahdanau_content
   attention_dim: 128
   decoder_type: lstm
   decoder_num_units: 256
@@ -37,15 +37,15 @@ param:
   clip_activation_encoder: 50
   clip_activation_decoder: 50
   dropout_encoder: 0.5
-  dropout_decoder: 0.8
-  dropout_embedding: 0.8
+  dropout_decoder: 0.2
+  dropout_embedding: 0.2
   weight_decay: 0
   decay_start_epoch: 20
   decay_rate: 0.5
   decay_patient_epoch: 3
   # sort_stop_epoch: 20
   sharpening_factor: 1.0
-  logits_tempareture: 1.0
+  logits_temperature: 1.0
 
   eval_start_epoch: 20
   print_step: 10
