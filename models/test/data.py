@@ -96,14 +96,14 @@ def generate_data(label_type, model, batch_size=1, splice=1):
             return inputs, labels, inputs_seq_len, labels_seq_len
 
         elif label_type == 'phone':
-            trans_phone = SOS + trans_phone + EOS
+            trans_phone = SOS + ' ' + trans_phone + ' ' + EOS
             labels = [phone2idx(trans_phone.split(' '))] * batch_size
             labels_seq_len = [len(labels[0])] * batch_size
             return inputs, labels, inputs_seq_len, labels_seq_len
 
         elif label_type == 'multitask':
             trans_char = SOS + trans_char + EOS
-            trans_phone = SOS + trans_phone + EOS
+            trans_phone = SOS + ' ' + trans_phone + ' ' + EOS
             labels_char = [alpha2idx(trans_char)] * batch_size
             labels_phone = [phone2idx(trans_phone.split(' '))] * batch_size
             target_len_char = [len(labels_char[0])] * batch_size
@@ -113,18 +113,16 @@ def generate_data(label_type, model, batch_size=1, splice=1):
 
     elif model == 'joint_ctc_attention':
         if label_type == 'character':
-            att_trans = SOS + trans_char + EOS
-            att_labels = [alpha2idx(att_trans)] * batch_size
+            att_trans_char = SOS + trans_char + EOS
+            att_labels = [alpha2idx(att_trans_char)] * batch_size
             labels_seq_len = [len(att_labels[0])] * batch_size
             ctc_labels = [alpha2idx(trans_char)] * batch_size
-            return inputs, att_labels, inputs_seq_len, labels_seq_len, ctc_labels
-
         elif label_type == 'phone':
-            att_trans = SOS + trans_phone + EOS
-            att_labels = [phone2idx(att_trans.split(' '))] * batch_size
+            att_trans_phone = SOS + ' ' + trans_phone + ' ' + EOS
+            att_labels = [phone2idx(att_trans_phone.split(' '))] * batch_size
             labels_seq_len = [len(att_labels[0])] * batch_size
             ctc_labels = [phone2idx(trans_phone.split(' '))] * batch_size
-            return inputs, att_labels, inputs_seq_len, labels_seq_len, ctc_labels
+        return inputs, att_labels, ctc_labels, inputs_seq_len, labels_seq_len
 
 
 def alpha2idx(transcript):

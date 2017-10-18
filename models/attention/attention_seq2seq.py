@@ -38,7 +38,7 @@ class AttentionSeq2Seq(ModelBase):
     """Attention-based model.
     Args:
         input_size (int): the dimension of input vectors
-        encoder_type (string): blstm
+        encoder_type (string): blstm or lstm
         encoder_num_units (int): the number of units in each layer of the
             encoder
         encoder_num_layers (int): the number of layers of the encoder
@@ -117,7 +117,7 @@ class AttentionSeq2Seq(ModelBase):
                  time_major=True,
                  sharpening_factor=1.0,
                  logits_temperature=1.0,
-                 name='attention_seq2seq'):
+                 name='attention'):
 
         super(AttentionSeq2Seq, self).__init__()
 
@@ -197,13 +197,14 @@ class AttentionSeq2Seq(ModelBase):
             keep_prob_embedding (placeholder, float): A probability to keep
                 nodes in the embedding layer
         Returns:
-            logits: A tensor of sizse `[B, T_out, num_classes]`
+            logits: A tensor of size `[B, T_out, num_classes]`
             decoder_outputs_train (namedtuple): A namedtuple of
                 `(logits, predicted_ids, decoder_output, attention_weights,
                     context_vector)`
             decoder_outputs_infer (namedtuple): A namedtuple of
                 `(logits, predicted_ids, decoder_output, attention_weights,
                     context_vector)`
+            encoder_outputs.outputs: A tensor of size `[B, T_in, encoder_num_units]`
         """
         with tf.variable_scope('encoder'):
             # Encode input features
@@ -265,7 +266,7 @@ class AttentionSeq2Seq(ModelBase):
         #   "Towards better decoding and language model integration in sequence
         #    to sequence models." arXiv preprint arXiv:1612.02695 (2016).
 
-        return logits, decoder_outputs_train, decoder_outputs_infer
+        return logits, decoder_outputs_train, decoder_outputs_infer, encoder_outputs.outputs
 
     def _encode(self, inputs, inputs_seq_len, keep_prob_encoder):
         """Encode input features.
@@ -277,6 +278,10 @@ class AttentionSeq2Seq(ModelBase):
         Returns:
             encoder_outputs (namedtuple): A namedtuple of
                 `(outputs, final_state, seq_len)`
+                outputs: Encoder states, a tensor of size
+                    `[B, T, num_units (num_proj)]` (always batch-major)
+                final_state: A final hidden state of the encoder
+                seq_len: equivalent to inputs_seq_len
         """
         # Define encoder
         if self.encoder_type in ['blstm', 'lstm']:
@@ -299,7 +304,7 @@ class AttentionSeq2Seq(ModelBase):
             keep_prob=keep_prob_encoder)
 
         if self.time_major:
-            # Convert from batch-major to time-major
+            # Convert from time-major to batch-major
             outputs = tf.transpose(outputs, [1, 0, 2])
 
         return EncoderOutput(outputs=outputs,
@@ -503,6 +508,7 @@ class AttentionSeq2Seq(ModelBase):
             tf.placeholder(tf.int32, shape=[None], name='inputs_seq_len'))
         self.labels_seq_len_pl_list.append(
             tf.placeholder(tf.int32, shape=[None], name='labels_seq_len'))
+
         self.keep_prob_encoder_pl_list.append(
             tf.placeholder(tf.float32, name='keep_prob_encoder'))
         self.keep_prob_decoder_pl_list.append(
@@ -567,8 +573,9 @@ class AttentionSeq2Seq(ModelBase):
             scope (optional): A scope in the model tower
         Returns:
             total_loss: operation for computing total loss (cross entropy
-                sequence loss + L2). This is a single scalar tensor to minimize.
-            logits: A tensor of size `[ , , num_classes]`
+                sequence loss + L2).
+                This is a single scalar tensor to minimize.
+            logits: A tensor of size `[B, T_out, num_classes]`
             decoder_outputs_train (namedtuple): A namedtuple of
                 `(logits, predicted_ids, decoder_output, attention_weights,
                     context_vector)`
@@ -577,7 +584,7 @@ class AttentionSeq2Seq(ModelBase):
                     context_vector)`
         """
         # Build model graph
-        logits, decoder_outputs_train, decoder_outputs_infer = self._build(
+        logits, decoder_outputs_train, decoder_outputs_infer, _ = self._build(
             inputs, labels, inputs_seq_len, labels_seq_len,
             keep_prob_encoder, keep_prob_decoder, keep_prob_embedding)
 

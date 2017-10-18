@@ -19,12 +19,11 @@ from utils.parameter import count_total_parameters
 
 class TestEncoder(unittest.TestCase):
 
-    @measure_time
     def test(self):
         print("Encoder Working check.")
 
         # CNNs
-        # self.check(encoder_type='vgg_wang')
+        self.check(encoder_type='vgg_wang')
         # self.check(encoder_type='cnn_zhang')
         # self.check(encoder_type='resnet_wang')
 
@@ -112,6 +111,7 @@ class TestEncoder(unittest.TestCase):
         # self.check(encoder_type='pyramid_blstm')
         # NOTE: this is under implementation
 
+    @measure_time
     def check(self, encoder_type, lstm_impl=None, time_major=False):
 
         print('==================================================')

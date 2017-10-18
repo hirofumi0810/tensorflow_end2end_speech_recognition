@@ -293,8 +293,11 @@ class AttentionLayer(object):
                 # luong's content-based attention
                 # energy = dot(v_a, tanh(W_concat([h_enc;h_dec])))
                 ############################################################
+                max_time = tf.shape(encoder_outputs)[1]
                 concated_states = tf.concat(
-                    [encoder_outputs, tf.expand_dims(decoder_output, axis=1)], axis=2)
+                    [encoder_outputs,
+                     tf.tile(tf.expand_dims(decoder_output, axis=1), [1, max_time, 1])],
+                    axis=2)
 
                 # Fully connected layers to transform both concatenated
                 # encoder_outputs and decoder_output into a tensor with

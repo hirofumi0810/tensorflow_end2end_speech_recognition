@@ -23,19 +23,34 @@ from utils.training.learning_rate_controller import Controller
 
 class TestAttentionTraining(tf.test.TestCase):
 
-    def test_attention(self):
+    def test(self):
         print("Attention Working check.")
 
-        self.check(attention_type='content')
-        self.check(attention_type='MLP_dot')
+        # ok
+        # self.check(encoder_type='blstm',attention_type='dot_product')
+        # self.check(encoder_type='lstm', attention_type='dot_product')
+        # self.check(encoder_type='blstm', attention_type='bahdanau_content')
+        # self.check(encoder_type='lstm', attention_type='bahdanau_content')
+        # self.check(encoder_type='lstm', attention_type='luong_dot')
+        # self.check(encoder_type='blstm', attention_type='luong_general')
+        # self.check(encoder_type='lstm', attention_type='luong_general')
+        self.check(encoder_type='blstm', attention_type='luong_concat')
+        self.check(encoder_type='lstm', attention_type='luong_concat')
 
-        # self.check(attention_type='hybrid')
-        # self.check(attention_type='location')
+        # self.check(encoder_type='blstm',attention_type='hybrid')
+        # self.check(encoder_type='lstm',attention_type='hybrid')
+        # self.check(encoder_type='blstm',attention_type='location')
+        # self.check(encoder_type='lstm',attention_type='location')
+
+        # self.check(encoder_type='blstm',attention_type='normed_bahdanau_content')
+        # self.check(encoder_type='blstm',attention_type='scaled_luong_dot')
+        # self.check(encoder_type='blstm',attention_type='baidu_attetion')
 
     @measure_time
-    def check(self, attention_type, label_type='character'):
+    def check(self, encoder_type, attention_type, label_type='character'):
 
         print('==================================================')
+        print('  encoder_type: %s' % encoder_type)
         print('  attention_type: %s' % attention_type)
         print('  label_type: %s' % label_type)
         print('==================================================')
@@ -43,7 +58,7 @@ class TestAttentionTraining(tf.test.TestCase):
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
-            batch_size = 2
+            batch_size = 4
             inputs, labels, inputs_seq_len, labels_seq_len = generate_data(
                 label_type=label_type,
                 model='attention',
@@ -52,7 +67,7 @@ class TestAttentionTraining(tf.test.TestCase):
             # Define model graph
             num_classes = 27 if label_type == 'character' else 61
             model = AttentionSeq2Seq(input_size=inputs[0].shape[1],
-                                     encoder_type='blstm',
+                                     encoder_type=encoder_type,
                                      encoder_num_units=256,
                                      encoder_num_layers=2,
                                      encoder_num_proj=None,
@@ -73,7 +88,7 @@ class TestAttentionTraining(tf.test.TestCase):
                                      clip_activation_encoder=50,
                                      clip_activation_decoder=50,
                                      weight_decay=1e-8,
-                                     time_major=True,  # faster??
+                                     time_major=True,
                                      sharpening_factor=1.0,
                                      logits_temperature=1.0)
 
@@ -95,8 +110,8 @@ class TestAttentionTraining(tf.test.TestCase):
                                    learning_rate=learning_rate_pl)
             decode_op_train, decode_op_infer = model.decode(
                 decoder_outputs_train, decoder_outputs_infer)
-            ler_op = model.compute_ler(
-                model.labels_st_true_pl, model.labels_st_pred_pl)
+            ler_op = model.compute_ler(model.labels_st_true_pl,
+                                       model.labels_st_pred_pl)
 
             # Define learning rate controller
             learning_rate = 1e-3
@@ -125,9 +140,9 @@ class TestAttentionTraining(tf.test.TestCase):
                 model.labels_pl_list[0]: labels,
                 model.inputs_seq_len_pl_list[0]: inputs_seq_len,
                 model.labels_seq_len_pl_list[0]: labels_seq_len,
-                model.keep_prob_encoder_pl_list[0]: 0.9,
-                model.keep_prob_decoder_pl_list[0]: 0.9,
-                model.keep_prob_embedding_pl_list[0]: 0.9,
+                model.keep_prob_encoder_pl_list[0]: 0.8,
+                model.keep_prob_decoder_pl_list[0]: 1.0,
+                model.keep_prob_embedding_pl_list[0]: 1.0,
                 learning_rate_pl: learning_rate
             }
 
