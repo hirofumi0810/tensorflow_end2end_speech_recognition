@@ -20,13 +20,13 @@ param:
   decoder_type: lstm
   decoder_num_units: 256
   decoder_num_layers: 1
-  embedding_dim: 32
+  embedding_dim: 64
   max_decode_length: 100
   lstm_impl: LSTMBlockCell
   use_peephole: True
 
   # optimization
-  batch_size: 64
+  batch_size: 32
   optimizer: adam
   learning_rate: 1e-3
   num_epoch: 50

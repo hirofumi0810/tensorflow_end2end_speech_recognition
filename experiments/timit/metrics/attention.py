@@ -87,7 +87,8 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
             phone_pred_list = idx2phone_train(labels_pred[i_batch]).split(' ')
 
             # Exclude <EOS>
-            phone_pred_list.remove('>')
+            if '>' in phone_pred_list:
+                phone_pred_list.remove('>')
 
             # Mapping to 39 phones (-> list of phone strings)
             phone_pred_list = map2phone39_train(phone_pred_list)
@@ -102,6 +103,12 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
                 phone_true_list = idx2phone_eval(
                     labels_true[0][i_batch][1:-1]).split(' ')
                 # NOTE: Exclude <SOS> and <EOS>
+
+            # Exclude <SOS> & <EOS> (train or dev stage)
+            if '<' in phone_true_list:
+                phone_true_list.remove('<')
+            if '>'in phone_true_list:
+                phone_true_list.remove('>')
 
             # Mapping to 39 phones (-> list of phone strings)
             phone_true_list = map2phone39_eval(phone_true_list)

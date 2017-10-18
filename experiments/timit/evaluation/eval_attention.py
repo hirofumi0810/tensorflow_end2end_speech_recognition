@@ -16,38 +16,48 @@ import argparse
 sys.path.append(os.path.abspath('../../../'))
 from experiments.timit.data.load_dataset_attention import Dataset
 from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
-from models.attention import blstm_attention_seq2seq
+from models.attention.attention_seq2seq import AttentionSeq2Seq
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--epoch', type=int, default=-1,
                     help='the epoch to restore')
 parser.add_argument('--model_path', type=str,
                     help='path to the model to evaluate')
+parser.add_argument('--beam_width', type=int, default=20,
+                    help='beam_width (int, optional): beam width for beam search.' +
+                    ' 1 disables beam search, which mean greedy decoding.')
+parser.add_argument('--eval_batch_size', type=str, default=1,
+                    help='the size of mini-batch in evaluation')
 
 
-def do_eval(model, params, epoch=None):
+def do_eval(model, params, epoch, beam_width, eval_batch_size):
     """Evaluate the model.
     Args:
         model: the model to restore
         params (dict): A dictionary of parameters
         epoch (int): the epoch to restore
+        beam_width (int): beam_width (int, optional): beam width for beam search.
+            1 disables beam search, which mean greedy decoding.
+        eval_batch_size (int): the size of mini-batch when evaluation
     """
+    map_file_path = '../metrics/mapping_files/' + \
+        params['label_type'] + '.txt'
+
     # Load dataset
     if 'phone' in params['label_type']:
         test_data = Dataset(
             data_type='test', label_type='phone39',
-            batch_size=1, eos_index=params['eos_index'],
+            batch_size=eval_batch_size,  map_file_path=map_file_path,
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             shuffle=False, progressbar=True)
     else:
         test_data = Dataset(
             data_type='test', label_type=params['label_type'],
-            batch_size=1, eos_index=params['eos_index'],
+            batch_size=eval_batch_size,  map_file_path=map_file_path,
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             shuffle=False, progressbar=True)
-    # TODO(hirofumi): add frame_stacking and splice
 
     # Define placeholders
     model.create_placeholders()
@@ -58,10 +68,10 @@ def do_eval(model, params, epoch=None):
         model.labels_pl_list[0],
         model.inputs_seq_len_pl_list[0],
         model.labels_seq_len_pl_list[0],
-        model.keep_prob_input_pl_list[0],
-        model.keep_prob_hidden_pl_list[0],
-        model.keep_prob_output_pl_list[0])
-    _, decode_op_infer = model.decoder(
+        model.keep_prob_encoder_pl_list[0],
+        model.keep_prob_decoder_pl_list[0],
+        model.keep_prob_embedding_pl_list[0])
+    _, decode_op_infer = model.decode(
         decoder_outputs_train,
         decoder_outputs_infer)
     per_op = model.compute_ler(
@@ -75,12 +85,8 @@ def do_eval(model, params, epoch=None):
 
         # If check point exists
         if ckpt:
-            # Use last saved model
             model_path = ckpt.model_checkpoint_path
             if epoch != -1:
-                # Use the best model
-                # NOTE: In the training stage, parameters are saved only when
-                # accuracies are improved
                 model_path = model_path.split('/')[:-1]
                 model_path = '/'.join(model_path) + '/model.ckpt-' + str(epoch)
             saver.restore(sess, model_path)
@@ -96,7 +102,8 @@ def do_eval(model, params, epoch=None):
                 model=model,
                 dataset=test_data,
                 label_type=params['label_type'],
-                eval_batch_size=1,
+                is_test=True,
+                eval_batch_size=eval_batch_size,
                 progressbar=True)
             print('  CER: %f %%' % (cer_test * 100))
             print('  WER: %f %%' % (wer_test * 100))
@@ -108,7 +115,8 @@ def do_eval(model, params, epoch=None):
                 model=model,
                 dataset=test_data,
                 label_type=params['label_type'],
-                eval_batch_size=1,
+                is_test=True,
+                eval_batch_size=eval_batch_size,
                 progressbar=True)
             print('  PER: %f %%' % (per_test * 100))
 
@@ -122,46 +130,50 @@ def main():
         config = yaml.load(f)
         params = config['param']
 
-    params['sos_index'] = 0
-    params['eos_index'] = 1
+    # Except for a <SOS> and <EOS> class
     if params['label_type'] == 'phone61':
-        params['num_classes'] = 63
+        params['num_classes'] = 61
     elif params['label_type'] == 'phone48':
-        params['num_classes'] = 50
+        params['num_classes'] = 48
     elif params['label_type'] == 'phone39':
-        params['num_classes'] = 41
+        params['num_classes'] = 39
     elif params['label_type'] == 'character':
-        params['num_classes'] = 30
+        params['num_classes'] = 28
     elif params['label_type'] == 'character_capital_divide':
-        params['num_classes'] = 74
+        params['num_classes'] = 72
 
     # Model setting
-    # AttentionModel = load(model_type=params['model'])
-    model = blstm_attention_seq2seq.BLSTMAttetion(
+    model = AttentionSeq2Seq(
         input_size=params['input_size'],
-        encoder_num_unit=params['encoder_num_unit'],
-        encoder_num_layer=params['encoder_num_layer'],
-        attention_dim=params['attention_dim'],
+        encoder_type=params['encoder_type'],
+        encoder_num_units=params['encoder_num_units'],
+        encoder_num_layers=params['encoder_num_layers'],
+        encoder_num_proj=params['encoder_num_proj'],
         attention_type=params['attention_type'],
-        decoder_num_unit=params['decoder_num_unit'],
-        decoder_num_layer=params['decoder_num_layer'],
+        attention_dim=params['attention_dim'],
+        decoder_type=params['decoder_type'],
+        decoder_num_units=params['decoder_num_units'],
+        decoder_num_layers=params['decoder_num_layers'],
         embedding_dim=params['embedding_dim'],
         num_classes=params['num_classes'],
-        sos_index=params['sos_index'],
-        eos_index=params['eos_index'],
+        sos_index=params['num_classes'],
+        eos_index=params['num_classes'] + 1,
         max_decode_length=params['max_decode_length'],
-        attention_smoothing=params['attention_smoothing'],
-        attention_weights_tempareture=params['attention_weights_tempareture'],
-        logits_tempareture=params['logits_tempareture'],
+        lstm_impl='LSTMBlockCell',
+        use_peephole=params['use_peephole'],
         parameter_init=params['weight_init'],
-        clip_grad=params['clip_grad'],
+        clip_grad_norm=params['clip_grad_norm'],
         clip_activation_encoder=params['clip_activation_encoder'],
         clip_activation_decoder=params['clip_activation_decoder'],
         weight_decay=params['weight_decay'],
-        beam_width=20)
+        time_major=True,
+        sharpening_factor=params['sharpening_factor'],
+        logits_temperature=params['logits_temperature'])
 
     model.save_path = args.model_path
-    do_eval(model=model, params=params, epoch=args.epoch)
+    do_eval(model=model, params=params,
+            epoch=args.epoch, eval_batch_size=args.eval_batch_size,
+            beam_width=args.beam_width)
 
 
 if __name__ == '__main__':
