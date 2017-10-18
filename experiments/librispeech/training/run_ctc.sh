@@ -1,11 +1,11 @@
-#!/bin/zsh
+#!/bin/bash
 
 MODEL_SAVE_PATH="/n/sd8/inaguma/result/tensorflow/librispeech"
 
 # Select GPU
 if [ $# -lt 2 ]; then
   echo "Error: set GPU number & config path." 1>&2
-  echo "Usage: ./run_ctc_multigpu.sh path_to_config_file gpu_index1 gpu_index2... (arbitrary number)" 1>&2
+  echo "Usage: ./run_ctc.sh path_to_config_file gpu_index1 gpu_index2... (arbitrary number)" 1>&2
   exit 1
 fi
 
@@ -33,9 +33,9 @@ fi
 mkdir -p log
 
 # Background job version
-CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_ctc_multigpu.py \
+CUDA_VISIBLE_DEVICES=$gpu_index nohup $PYTHON train_ctc.py \
   $config_path $MODEL_SAVE_PATH $gpu_index > log/$filename".log" &
 
 # Standard output version
-# CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_ctc_multigpu.py \
+# CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON train_ctc.py \
 #   $config_path $MODEL_SAVE_PATH $gpu_index

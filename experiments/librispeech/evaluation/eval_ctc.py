@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate the trained CTC model (Librispeech corpus)."""
+"""Evaluate the CTC model (Librispeech corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -43,7 +43,7 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
     """
     # Load dataset
     test_clean_data = Dataset(
-        data_type='dev_clean', train_data_size=params['train_data_size'],
+        data_type='test_clean', train_data_size=params['train_data_size'],
         label_type=params['label_type'],
         batch_size=params['batch_size'] if eval_batch_size == -
         1 else eval_batch_size,
@@ -51,7 +51,7 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         shuffle=False)
     test_other_data = Dataset(
-        data_type='dev_other', train_data_size=params['train_data_size'],
+        data_type='test_other', train_data_size=params['train_data_size'],
         label_type=params['label_type'],
         batch_size=eval_batch_size,
         splice=params['splice'],
@@ -79,7 +79,6 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
 
         # If check point exists
         if ckpt:
-            # Use last saved model
             model_path = ckpt.model_checkpoint_path
             if epoch != -1:
                 model_path = model_path.split('/')[:-1]
@@ -97,6 +96,7 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
                 model=model,
                 dataset=test_clean_data,
                 label_type=params['label_type'],
+                is_test=True,
                 eval_batch_size=eval_batch_size,
                 progressbar=True)
             print('  CER (clean): %f %%' % (cer_clean_test * 100))
@@ -108,6 +108,7 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
                 model=model,
                 dataset=test_other_data,
                 label_type=params['label_type'],
+                is_test=True,
                 eval_batch_size=eval_batch_size,
                 progressbar=True)
             print('  CER (other): %f %%' % (cer_other_test * 100))

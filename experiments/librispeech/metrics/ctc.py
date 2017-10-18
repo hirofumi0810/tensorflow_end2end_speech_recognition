@@ -77,8 +77,8 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
 
                     # Convert from list of index to string
                     if is_test:
-                        str_true = labels_true[i_device][i_batch][0].replace(
-                            '_', ' ')
+                        str_true = labels_true[i_device][i_batch][0]
+                        # NOTE: transcript is seperated by space('_')
                     else:
                         str_true = idx2char(labels_true[i_device][i_batch])
                     str_pred = idx2char(labels_pred[i_batch])
@@ -87,8 +87,8 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
                     str_pred = re.sub(r'[_]+', '_', str_pred)
 
                     # Remove garbage labels
-                    str_true = re.sub(r'[\']+', "", str_true)
-                    str_pred = re.sub(r'[\']+', "", str_pred)
+                    str_true = re.sub(r'[\']+', '', str_true)
+                    str_pred = re.sub(r'[\']+', '', str_pred)
 
                     # Compute WER
                     wer_mean += compute_wer(ref=str_pred.split('_'),
@@ -97,13 +97,13 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
                     # substitute, insert, delete = wer_align(
                     #     ref=str_pred.split('_'),
                     #     hyp=str_true.split('_'))
-                    # print(substitute)
-                    # print(insert)
-                    # print(delete)
+                    # print('SUB: %d' % substitute)
+                    # print('INS: %d' % insert)
+                    # print('DEL: %d' % delete)
 
                     # Remove spaces
-                    str_true = re.sub(r'[_]+', "", str_true)
-                    str_pred = re.sub(r'[_]+', "", str_pred)
+                    str_true = re.sub(r'[_]+', '', str_true)
+                    str_pred = re.sub(r'[_]+', '', str_pred)
 
                     # Compute CER
                     cer_mean += compute_cer(str_pred=str_pred,
@@ -185,27 +185,27 @@ def do_eval_wer(session, decode_ops, model, dataset, train_data_size,
                 for i_batch in range(batch_size_device):
 
                     if is_test:
-                        str_true = labels_true[i_device][i_batch][0].replace(
-                            '_', ' ')
+                        str_true = labels_true[i_device][i_batch][0]
+                        # NOTE: transcript is seperated by space('_')
                     else:
-                        str_true = ' '.join(
+                        str_true = '_'.join(
                             idx2word(labels_true[i_device][i_batch]))
-                    str_pred = ' '.join(idx2word(labels_pred[i_batch]))
+                    str_pred = '_'.join(idx2word(labels_pred[i_batch]))
 
-                    # if len(str_true.split(' ')) == 0:
+                    # if len(str_true.split('_')) == 0:
                     #     print(str_true)
                     #     print(str_pred)
 
                     # Compute WER
-                    wer_mean += compute_wer(ref=str_true.split(' '),
-                                            hyp=str_pred.split(' '),
+                    wer_mean += compute_wer(ref=str_true.split('_'),
+                                            hyp=str_pred.split('_'),
                                             normalize=True)
                     # substitute, insert, delete = wer_align(
                     #     ref=str_true.split(' '),
                     #     hyp=str_pred.split(' '))
-                    # print(substitute)
-                    # print(insert)
-                    # print(delete)1
+                    # print('SUB: %d' % substitute)
+                    # print('INS: %d' % insert)
+                    # print('DEL: %d' % delete)
 
                     if progressbar:
                         pbar.update(1)

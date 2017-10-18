@@ -44,20 +44,32 @@ def do_train(model, params, gpu_indices):
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=True, sort_stop_epoch=params['sort_stop_epoch'],
         num_gpu=len(gpu_indices))
-    dev_data_clean = Dataset(
+    dev_clean_data = Dataset(
         data_type='dev_clean', train_data_size=params['train_data_size'],
         label_type_main=params['label_type_main'],
         label_type_sub=params['label_type_sub'],
         batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False, num_gpu=len(gpu_indices))
-    dev_data_other = Dataset(
+    dev_other_data = Dataset(
         data_type='dev_other', train_data_size=params['train_data_size'],
         label_type_main=params['label_type_main'],
         label_type_sub=params['label_type_sub'],
         batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False, num_gpu=len(gpu_indices))
+    test_clean_data = Dataset(
+        data_type='test_clean', train_data_size=params['train_data_size'],
+        label_type=params['label_type'],
+        batch_size=params['batch_size'], splice=params['splice'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
+    test_other_data = Dataset(
+        data_type='test_other', train_data_size=params['train_data_size'],
+        label_type=params['label_type'],
+        batch_size=params['batch_size'], splice=params['splice'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default(), tf.device('/cpu:0'):
@@ -223,15 +235,15 @@ def do_train(model, params, gpu_indices):
 
                     # Create feed dictionary for next mini batch (dev)
                     (inputs, labels_word, labels_char,
-                     inputs_seq_len, _), _ = dev_data_other.next()
+                     inputs_seq_len, _), _ = dev_other_data.next()
                     feed_dict_dev = {}
                     for i_gpu in range(len(gpu_indices)):
                         feed_dict_dev[model.inputs_pl_list[i_gpu]
                                       ] = inputs[i_gpu]
                         feed_dict_dev[model.labels_pl_list[i_gpu]] = list2sparsetensor(
-                            labels_word[i_gpu], padded_value=dev_data_other.padded_value)
+                            labels_word[i_gpu], padded_value=dev_other_data.padded_value)
                         feed_dict_dev[model.labels_sub_pl_list[i_gpu]] = list2sparsetensor(
-                            labels_char[i_gpu], padded_value=dev_data_other.padded_value)
+                            labels_char[i_gpu], padded_value=dev_other_data.padded_value)
                         feed_dict_dev[model.inputs_seq_len_pl_list[i_gpu]
                                       ] = inputs_seq_len[i_gpu]
                         feed_dict_dev[model.keep_prob_pl_list[i_gpu]] = 1.0
@@ -274,12 +286,6 @@ def do_train(model, params, gpu_indices):
                     print('-----EPOCH:%d (%.3f min)-----' %
                           (train_data.epoch, duration_epoch / 60))
 
-                    # Save model (check point)
-                    checkpoint_file = join(model.save_path, 'model.ckpt')
-                    save_path = saver.save(
-                        sess, checkpoint_file, global_step=train_data.epoch)
-                    print("Model saved in file: %s" % save_path)
-
                     # Save fugure of loss & ler
                     plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
                               save_path=model.save_path)
@@ -293,12 +299,12 @@ def do_train(model, params, gpu_indices):
                     if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
                         print('=== Dev Data Evaluation ===')
-                        # Dev-clean
+                        # dev-clean
                         wer_main_dev_clean_epoch = do_eval_wer(
                             session=sess,
                             decode_ops=decode_ops_word,
                             model=model,
-                            dataset=dev_data_clean,
+                            dataset=dev_clean_data,
                             train_data_size=params['train_data_size'],
                             eval_batch_size=params['batch_size'],
                             is_multitask=True)
@@ -308,7 +314,7 @@ def do_train(model, params, gpu_indices):
                             session=sess,
                             decode_ops=decode_ops_char,
                             model=model,
-                            dataset=dev_data_clean,
+                            dataset=dev_clean_data,
                             label_type=params['label_type_sub'],
                             eval_batch_size=params['batch_size'],
                             is_multitask=True)
@@ -317,12 +323,12 @@ def do_train(model, params, gpu_indices):
                         print('  CER (clean, sub): %f %%' %
                               (cer_sub_dev_clean_epoch * 100))
 
-                        # Dev-other
+                        # dev-other
                         wer_main_dev_other_epoch = do_eval_wer(
                             session=sess,
                             decode_ops=decode_ops_word,
                             model=model,
-                            dataset=dev_data_other,
+                            dataset=dev_other_data,
                             train_data_size=params['train_data_size'],
                             eval_batch_size=params['batch_size'],
                             is_multitask=True)
@@ -332,7 +338,7 @@ def do_train(model, params, gpu_indices):
                             session=sess,
                             decode_ops=decode_ops_char,
                             model=model,
-                            dataset=dev_data_other,
+                            dataset=dev_other_data,
                             label_type=params['label_type_sub'],
                             eval_batch_size=params['batch_size'],
                             is_multitask=True)
@@ -344,6 +350,66 @@ def do_train(model, params, gpu_indices):
                         if wer_main_dev_other_epoch < wer_dev_best:
                             wer_dev_best = wer_main_dev_other_epoch
                             print('■■■ ↑Best Score (WER)↑ ■■■')
+
+                            # Save model (check point)
+                            checkpoint_file = join(
+                                model.save_path, 'model.ckpt')
+                            save_path = saver.save(
+                                sess, checkpoint_file, global_step=train_data.epoch)
+                            print("Model saved in file: %s" % save_path)
+
+                            print('=== Test Data Evaluation ===')
+                            # test-clean
+                            wer_main_test_clean_epoch = do_eval_wer(
+                                session=sess,
+                                decode_ops=decode_ops_word,
+                                model=model,
+                                dataset=test_clean_data,
+                                train_data_size=params['train_data_size'],
+                                is_test=True,
+                                eval_batch_size=params['batch_size'],
+                                is_multitask=True)
+                            print('  WER (clean, main): %f %%' %
+                                  (wer_main_test_clean_epoch * 100))
+                            cer_sub_test_clean_epoch, wer_sub_test_clean_epoch = do_eval_cer(
+                                session=sess,
+                                decode_ops=decode_ops_char,
+                                model=model,
+                                dataset=test_clean_data,
+                                label_type=params['label_type_sub'],
+                                is_test=True,
+                                eval_batch_size=params['batch_size'],
+                                is_multitask=True)
+                            print('  WER (clean, sub): %f %%' %
+                                  (wer_sub_test_clean_epoch * 100))
+                            print('  CER (clean, sub): %f %%' %
+                                  (cer_sub_test_clean_epoch * 100))
+
+                            # test-other
+                            wer_main_test_other_epoch = do_eval_wer(
+                                session=sess,
+                                decode_ops=decode_ops_word,
+                                model=model,
+                                dataset=test_other_data,
+                                train_data_size=params['train_data_size'],
+                                is_test=True,
+                                eval_batch_size=params['batch_size'],
+                                is_multitask=True)
+                            print('  WER (other, main): %f %%' %
+                                  (wer_main_test_other_epoch * 100))
+                            cer_sub_test_other_epoch, wer_sub_test_other_epoch = do_eval_cer(
+                                session=sess,
+                                decode_ops=decode_ops_char,
+                                model=model,
+                                dataset=test_other_data,
+                                label_type=params['label_type_sub'],
+                                is_test=True,
+                                eval_batch_size=params['batch_size'],
+                                is_multitask=True)
+                            print('  WER (other, sub): %f %%' %
+                                  (wer_sub_test_other_epoch * 100))
+                            print('  CER (other, sub): %f %%' %
+                                  (cer_sub_test_other_epoch * 100))
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
@@ -380,7 +446,6 @@ def main(config_path, model_save_path, gpu_indices):
             params['num_classes_main'] = 18641
         elif params['train_data_size'] == 'train960h':
             params['num_classes_main'] = 26642
-
     if params['label_type_sub'] == 'character':
         params['num_classes_sub'] = 28
     elif params['label_type_sub'] == 'character_capital_divide':
