@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import join, isfile, isdir, abspath
+from os.path import join, isfile, abspath
 import sys
 import time
 import tensorflow as tf
@@ -16,7 +16,7 @@ import yaml
 import shutil
 
 sys.path.append(abspath('../../../'))
-from experiments.timit.data.load_dataset_joint_ctc_attention import Dataset
+from experiments.timit.data.load_dataset_attention import Dataset
 from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
 from utils.io.labels.sparsetensor import list2sparsetensor
 from utils.training.learning_rate_controller import Controller
@@ -33,34 +33,40 @@ def do_train(model, params):
         model: the model to train
         params (dict): A dictionary of parameters
     """
+    map_file_path_train = '../metrics/mapping_files/' + \
+        params['label_type'] + '.txt'
+    map_file_path_eval = '../metrics/mapping_files/' + \
+        params['label_type'] + '.txt'
+
     # Load dataset
     train_data = Dataset(
         data_type='train', label_type=params['label_type'],
-        batch_size=params['batch_size'], eos_index=params['eos_index'],
+        batch_size=params['batch_size'], map_file_path=map_file_path_train,
         max_epoch=params['num_epoch'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=True)
+        sort_utt=False)
+    # sort_stop_epoch=params['sort_stop_epoch']
+    # TODO: check sort_utt
     dev_data = Dataset(
         data_type='dev', label_type=params['label_type'],
-        batch_size=params['batch_size'], eos_index=params['eos_index'],
+        batch_size=params['batch_size'], map_file_path=map_file_path_train,
         splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False)
-    if 'char' in params['label_type']:
+    if params['label_type'] in ['character', 'character_capital_divide']:
         test_data = Dataset(
             data_type='test', label_type=params['label_type'],
-            batch_size=1, eos_index=params['eos_index'],
+            batch_size=1, map_file_path=map_file_path_eval,
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             sort_utt=False)
     else:
         test_data = Dataset(
             data_type='test', label_type='phone39',
-            batch_size=1, eos_index=params['eos_index'],
+            batch_size=1, map_file_path=map_file_path_eval,
             splice=params['splice'],
             num_stack=params['num_stack'], num_skip=params['num_skip'],
             sort_utt=False)
-    # TODO(hirofumi): add frame_stacking and splice
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default():
@@ -70,26 +76,23 @@ def do_train(model, params):
         learning_rate_pl = tf.placeholder(tf.float32, name='learning_rate')
 
         # Add to the graph each operation (including model definition)
-        loss_op, att_logits, ctc_logits, decoder_outputs_train, decoder_outputs_infer = model.compute_loss(
+        loss_op, logits, ctc_logits, decoder_outputs_train, decoder_outputs_infer = model.compute_loss(
             model.inputs_pl_list[0],
-            model.att_labels_pl_list[0],
-            model.inputs_seq_len_pl_list[0],
-            model.att_labels_seq_len_pl_list[0],
+            model.labels_pl_list[0],
             model.ctc_labels_pl_list[0],
-            model.keep_prob_input_pl_list[0],
-            model.keep_prob_hidden_pl_list[0],
-            model.keep_prob_output_pl_list[0])
-        train_op = model.train(
-            loss_op,
-            optimizer=params['optimizer'],
-            learning_rate=learning_rate_pl)
-        _, decode_op_infer = model.decoder(
+            model.inputs_seq_len_pl_list[0],
+            model.labels_seq_len_pl_list[0],
+            model.keep_prob_encoder_pl_list[0],
+            model.keep_prob_decoder_pl_list[0],
+            model.keep_prob_embedding_pl_list[0])
+        train_op = model.train(loss_op,
+                               optimizer=params['optimizer'],
+                               learning_rate=learning_rate_pl)
+        _, decode_op_infer = model.decode(
             decoder_outputs_train,
-            decoder_outputs_infer,
-            decode_type='greedy',
-            beam_width=20)
-        ler_op = model.compute_ler(
-            model.att_labels_st_true_pl, model.att_labels_st_pred_pl)
+            decoder_outputs_infer)
+        ler_op = model.compute_ler(model.labels_st_true_pl,
+                                   model.labels_st_pred_pl)
 
         # Define learning rate controller
         lr_controller = Controller(
@@ -140,38 +143,38 @@ def do_train(model, params):
             for step, (data, is_new_epoch) in enumerate(train_data):
 
                 # Create feed dictionary for next mini batch (train)
-                inputs, att_labels_train, ctc_labels, inputs_seq_len, att_labels_seq_len, _ = data
+                inputs, labels_train, ctc_labels, inputs_seq_len, labels_seq_len, _ = data
                 feed_dict_train = {
-                    model.inputs_pl_list[0]: inputs,
-                    model.att_labels_pl_list[0]: att_labels_train,
-                    model.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                    model.att_labels_seq_len_pl_list[0]: att_labels_seq_len,
+                    model.inputs_pl_list[0]: inputs[0],
+                    model.labels_pl_list[0]: labels_train[0],
                     model.ctc_labels_pl_list[0]: list2sparsetensor(
                         ctc_labels, padded_value=train_data.ctc_padded_value),
-                    model.keep_prob_input_pl_list[0]: params['dropout_input'],
-                    model.keep_prob_hidden_pl_list[0]: params['dropout_hidden'],
-                    model.keep_prob_output_pl_list[0]: params['dropout_output'],
+                    model.inputs_seq_len_pl_list[0]: inputs_seq_len[0],
+                    model.labels_seq_len_pl_list[0]: labels_seq_len[0],
+                    model.keep_prob_encoder_pl_list[0]: 1 - float(params['dropout_encoder']),
+                    model.keep_prob_decoder_pl_list[0]: 1 - float(params['dropout_decoder']),
+                    model.keep_prob_embedding_pl_list[0]: 1 - float(params['dropout_embedding']),
                     learning_rate_pl: learning_rate
                 }
 
-                # Update param
+                # Update parameters
                 sess.run(train_op, feed_dict=feed_dict_train)
 
                 if (step + 1) % params['print_step'] == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    (inputs, att_labels_dev, ctc_labels, inputs_seq_len,
-                     att_labels_seq_len, _), _ = dev_data().next()
+                    (inputs, labels_dev, ctc_labels, inputs_seq_len,
+                     labels_seq_len, _), _ = dev_data.next()
                     feed_dict_dev = {
-                        model.inputs_pl_list[0]: inputs,
-                        model.att_labels_pl_list[0]: att_labels_dev,
-                        model.inputs_seq_len_pl_list[0]: inputs_seq_len,
-                        model.att_labels_seq_len_pl_list[0]: att_labels_seq_len,
+                        model.inputs_pl_list[0]: inputs[0],
+                        model.labels_pl_list[0]: labels_dev[0],
                         model.ctc_labels_pl_list[0]: list2sparsetensor(
-                            ctc_labels, padded_value=dev_data.ctc_padded_value),
-                        model.keep_prob_input_pl_list[0]: 1.0,
-                        model.keep_prob_hidden_pl_list[0]: 1.0,
-                        model.keep_prob_output_pl_list[0]: 1.0
+                            ctc_labels, padded_value=train_data.ctc_padded_value),
+                        model.inputs_seq_len_pl_list[0]: inputs_seq_len[0],
+                        model.labels_seq_len_pl_list[0]: labels_seq_len[0],
+                        model.keep_prob_encoder_pl_list[0]: 1.0,
+                        model.keep_prob_decoder_pl_list[0]: 1.0,
+                        model.keep_prob_embedding_pl_list[0]: 1.0
                     }
 
                     # Compute loss
@@ -182,11 +185,11 @@ def do_train(model, params):
                     csv_loss_dev.append(loss_dev)
 
                     # Change to evaluation mode
-                    feed_dict_train[model.keep_prob_input_pl_list[0]] = 1.0
-                    feed_dict_train[model.keep_prob_hidden_pl_list[0]] = 1.0
-                    feed_dict_train[model.keep_prob_output_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_encoder_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_decoder_pl_list[0]] = 1.0
+                    feed_dict_train[model.keep_prob_embedding_pl_list[0]] = 1.0
 
-                    # Predict class ids & update event files
+                    # Predict class ids & update even files
                     predicted_ids_train, summary_str_train = sess.run(
                         [decode_op_infer, summary_train], feed_dict=feed_dict_train)
                     predicted_ids_dev, summary_str_dev = sess.run(
@@ -197,16 +200,16 @@ def do_train(model, params):
 
                     # Convert to sparsetensor to compute LER
                     feed_dict_ler_train = {
-                        model.att_labels_true_st: list2sparsetensor(
-                            att_labels_train, padded_value=params['eos_index']),
-                        model.att_labels_st_pred_pl: list2sparsetensor(
-                            predicted_ids_train, padded_value=params['eos_index'])
+                        model.labels_st_true_pl: list2sparsetensor(
+                            labels_train[0], padded_value=train_data.padded_value),
+                        model.labels_st_pred_pl: list2sparsetensor(
+                            predicted_ids_train, padded_value=train_data.padded_value)
                     }
                     feed_dict_ler_dev = {
-                        model.att_labels_true_st: list2sparsetensor(
-                            att_labels_dev, padded_value=params['eos_index']),
-                        model.att_labels_st_pred_pl: list2sparsetensor(
-                            predicted_ids_dev, padded_value=params['eos_index'])
+                        model.labels_st_true_pl: list2sparsetensor(
+                            labels_dev[0], padded_value=dev_data.padded_value),
+                        model.labels_st_pred_pl: list2sparsetensor(
+                            predicted_ids_dev, padded_value=dev_data.padded_value)
                     }
 
                     # Compute accuracy
@@ -219,7 +222,7 @@ def do_train(model, params):
                     print("Step %d (epoch: %.3f): loss = %.3f (%.3f) / ler = %.3f (%.3f) / lr = %.5f (%.3f min)" %
                           (step + 1, train_data.epoch_detail, loss_train, loss_dev, ler_train, ler_dev,
                            learning_rate, duration_step / 60))
-                    # sys.stdout.flush()
+                    sys.stdout.flush()
                     start_time_step = time.time()
 
                 # Save checkpoint and evaluate model per epoch
@@ -228,6 +231,12 @@ def do_train(model, params):
                     print('-----EPOCH:%d (%.3f min)-----' %
                           (train_data.epoch, duration_epoch / 60))
 
+                    checkpoint_file = join(
+                        model.save_path, 'model.ckpt')
+                    save_path = saver.save(
+                        sess, checkpoint_file, global_step=train_data.epoch)
+                    print("Model saved in file: %s" % save_path)
+
                     # Save fugure of loss & ler
                     plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
                               save_path=model.save_path)
@@ -235,17 +244,21 @@ def do_train(model, params):
                              label_type=params['label_type'],
                              save_path=model.save_path)
 
-                    if train_data.epoch >= params['eval_start_epoch']:
+                    # if train_data.epoch >= params['eval_start_epoch']:
+                    if train_data.epoch >= 5:
                         start_time_eval = time.time()
                         if 'char' in params['label_type']:
                             print('=== Dev Data Evaluation ===')
-                            ler_dev_epoch = do_eval_cer(
+                            ler_dev_epoch, wer_dev_epoch = do_eval_cer(
                                 session=sess,
                                 decode_op=decode_op_infer,
                                 model=model,
                                 dataset=dev_data,
-                                eval_batch_size=1)
+                                label_type=params['label_type'],
+                                eval_batch_size=1,
+                                is_jointctcatt=True)
                             print('  CER: %f %%' % (ler_dev_epoch * 100))
+                            print('  WER: %f %%' % (wer_dev_epoch * 100))
 
                             if ler_dev_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_epoch
@@ -260,14 +273,16 @@ def do_train(model, params):
                                 print("Model saved in file: %s" % save_path)
 
                                 print('=== Test Data Evaluation ===')
-                                ler_test = do_eval_cer(
+                                ler_test, wer_test = do_eval_cer(
                                     session=sess,
                                     decode_op=decode_op_infer,
                                     model=model,
                                     dataset=test_data,
-                                    eval_batch_size=1)
-                                print('  CER: %f %%' %
-                                      (ler_test * 100))
+                                    label_type=params['label_type'],
+                                    eval_batch_size=1,
+                                    is_jointctcatt=True)
+                                print('  CER: %f %%' % (ler_test * 100))
+                                print('  WER: %f %%' % (wer_test * 100))
 
                         else:
                             print('=== Dev Data Evaluation ===')
@@ -278,7 +293,8 @@ def do_train(model, params):
                                 model=model,
                                 dataset=dev_data,
                                 label_type=params['label_type'],
-                                eval_batch_size=1)
+                                eval_batch_size=1,
+                                is_jointctcatt=True)
                             print('  PER: %f %%' % (ler_dev_epoch * 100))
 
                             if ler_dev_epoch < ler_dev_best:
@@ -287,11 +303,11 @@ def do_train(model, params):
 
                                 # Save model only when best accuracy is
                                 # obtained (check point)
-                                checkpoint_file = join(
-                                    model.save_path, 'model.ckpt')
-                                save_path = saver.save(
-                                    sess, checkpoint_file, global_step=train_data.epoch)
-                                print("Model saved in file: %s" % save_path)
+                                # checkpoint_file = join(
+                                #     model.save_path, 'model.ckpt')
+                                # save_path = saver.save(
+                                #     sess, checkpoint_file, global_step=train_data.epoch)
+                                # print("Model saved in file: %s" % save_path)
 
                                 print('=== Test Data Evaluation ===')
                                 ler_test = do_eval_per(
@@ -301,7 +317,8 @@ def do_train(model, params):
                                     model=model,
                                     dataset=test_data,
                                     label_type=params['label_type'],
-                                    eval_batch_size=1)
+                                    eval_batch_size=1,
+                                    is_jointctcatt=True)
                                 print('  PER: %f %%' % (ler_test * 100))
 
                         duration_eval = time.time() - start_time_eval
@@ -331,70 +348,78 @@ def main(config_path, model_save_path):
         config = yaml.load(f)
         params = config['param']
 
-    params['sos_index'] = 0
-    params['eos_index'] = 1
+    # Except for a <SOS> and <EOS> class
     if params['label_type'] == 'phone61':
-        params['att_num_classes'] = 63
-        params['ctc_num_classes'] = 61
+        params['num_classes'] = 61
     elif params['label_type'] == 'phone48':
-        params['att_num_classes'] = 50
-        params['ctc_num_classes'] = 48
+        params['num_classes'] = 48
     elif params['label_type'] == 'phone39':
-        params['att_num_classes'] = 41
-        params['ctc_num_classes'] = 39
+        params['num_classes'] = 39
     elif params['label_type'] == 'character':
-        params['att_num_classes'] = 30
-        params['ctc_num_classes'] = 28
+        params['num_classes'] = 28
+    elif params['label_type'] == 'character_capital_divide':
+        params['num_classes'] = 72
 
     # Model setting
-    # AttentionModel = load(model_type=config['model_name'])
     model = JointCTCAttention(
         input_size=params['input_size'],
-        encoder_num_unit=params['encoder_num_unit'],
-        encoder_num_layer=params['encoder_num_layer'],
-        attention_dim=params['attention_dim'],
+        encoder_type=params['encoder_type'],
+        encoder_num_units=params['encoder_num_units'],
+        encoder_num_layers=params['encoder_num_layers'],
+        encoder_num_proj=params['encoder_num_proj'],
         attention_type=params['attention_type'],
-        decoder_num_unit=params['decoder_num_unit'],
-        decoder_num_layer=params['decoder_num_layer'],
+        attention_dim=params['attention_dim'],
+        decoder_type=params['decoder_type'],
+        decoder_num_units=params['decoder_num_units'],
+        decoder_num_layers=params['decoder_num_layers'],
         embedding_dim=params['embedding_dim'],
-        att_num_classes=params['att_num_classes'],
-        ctc_num_classes=params['ctc_num_classes'],
-        att_task_weight=params['att_task_weight'],
-        sos_index=params['sos_index'],
-        eos_index=params['eos_index'],
+        lambda_weight=params['lambda_weight'],
+        num_classes=params['num_classes'],
+        sos_index=params['num_classes'],
+        eos_index=params['num_classes'] + 1,
         max_decode_length=params['max_decode_length'],
-        # attention_smoothing=params['attention_smoothing'],
-        attention_weights_tempareture=params['attention_weights_tempareture'],
-        logits_tempareture=params['logits_tempareture'],
+        lstm_impl='LSTMBlockCell',
+        use_peephole=params['use_peephole'],
         parameter_init=params['weight_init'],
-        clip_grad=params['clip_grad'],
+        clip_grad_norm=params['clip_grad_norm'],
         clip_activation_encoder=params['clip_activation_encoder'],
         clip_activation_decoder=params['clip_activation_decoder'],
-        weight_decay=params['weight_decay'])
+        weight_decay=params['weight_decay'],
+        time_major=True,
+        sharpening_factor=params['sharpening_factor'],
+        logits_temperature=params['logits_temperature'])
 
     # Set process name
-    setproctitle('timit_' + model.name + '_' + params['label_type'])
+    setproctitle('tf_timit_' + model.name + '_' +
+                 params['label_type'] + '_' + params['attention_type'])
 
-    model.name = params['model']
-    model.name += '_encoder' + str(params['encoder_num_unit'])
-    model.name += '_' + str(params['encoder_num_layer'])
-    model.name += '_attdim' + str(params['attention_dim'])
-    model.name += '_decoder' + str(params['decoder_num_unit'])
-    model.name += '_' + str(params['decoder_num_layer'])
+    model.name += '_en' + str(params['encoder_num_units'])
+    model.name += '_' + str(params['encoder_num_layers'])
+    model.name += '_att' + str(params['attention_dim'])
+    model.name += '_de' + str(params['decoder_num_units'])
+    model.name += '_' + str(params['decoder_num_layers'])
     model.name += '_' + params['optimizer']
     model.name += '_lr' + str(params['learning_rate'])
     model.name += '_' + params['attention_type']
-    # if bool(params['attention_smoothing']):
-    #     model.name += '_smoothing'
-    if params['attention_weights_tempareture'] != 1:
-        model.name += '_sharpening' + \
-            str(params['attention_weights_tempareture'])
+    if params['dropout_encoder'] != 0:
+        model.name += '_dropen' + str(params['dropout_encoder'])
+    if params['dropout_decoder'] != 0:
+        model.name += '_dropde' + str(params['dropout_decoder'])
+    if params['dropout_embedding'] != 0:
+        model.name += '_dropem' + str(params['dropout_embedding'])
+    if params['num_stack'] != 1:
+        model.name += '_stack' + str(params['num_stack'])
     if params['weight_decay'] != 0:
-        model.name += '_weightdecay' + str(params['weight_decay'])
+        model.name += 'wd' + str(params['weight_decay'])
+    if params['sharpening_factor'] != 1:
+        model.name += '_sharp' + str(params['sharpening_factor'])
+    if params['logits_temperature'] != 1:
+        model.name += '_temp' + str(params['logits_temperature'])
+    model.name += '_lambda' + str(params['lambda_weight'])
 
     # Set save path
     model.save_path = mkdir_join(
-        model_save_path, 'attention', params['label_type'], model.name)
+        model_save_path, 'joint_ctc_attention', params['label_type'], model.name)
 
     # Reset model directory
     model_index = 0
@@ -406,9 +431,6 @@ def main(config_path, model_save_path):
             new_model_path = model.save_path + '_' + str(model_index)
         elif isfile(join(new_model_path, 'config.yml')):
             # Training of the first model have not been finished yet
-            # tf.gfile.DeleteRecursively(new_model_path)
-            # tf.gfile.MakeDirs(new_model_path)
-            # break
             model_index += 1
             new_model_path = model.save_path + '_' + str(model_index)
         else:
@@ -418,7 +440,7 @@ def main(config_path, model_save_path):
     # Save config file
     shutil.copyfile(config_path, join(model.save_path, 'config.yml'))
 
-    # sys.stdout = open(join(model.save_path, 'train.log'), 'w')
+    sys.stdout = open(join(model.save_path, 'train.log'), 'w')
     # TODO(hirofumi): change to logger
     do_train(model=model, params=params)
 

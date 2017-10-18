@@ -149,23 +149,16 @@ def decode(session, decode_op_main, decode_op_sub, model,
 
         for i_batch in range(batch_size):
             print('----- wav: %s -----' % input_names[0][i_batch])
-            if label_type_main == 'character':
-                if is_test:
-                    str_true_char = labels_true_char[0][i_batch][0].replace(
-                        '_', ' ')
-                else:
-                    str_true_char = idx2char(
-                        labels_true_char[0][i_batch]).replace('_', ' ')
-                str_pred_char = idx2char(
-                    labels_pred_char[i_batch]).replace('_', ' ')
-
-            elif label_type_main == 'character_capital_divide':
-                raise NotImplementedError
 
             if is_test:
+                str_true_char = labels_true_char[0][i_batch][0].replace(
+                    '_', ' ')
                 str_true_phone = labels_true_phone[0][i_batch][0]
             else:
+                str_true_char = idx2char(labels_true_char[0][i_batch])
                 str_true_phone = idx2phone(labels_true_phone[0][i_batch])
+
+            str_pred_char = idx2char(labels_pred_char[i_batch])
             str_pred_phone = idx2phone(labels_pred_phone[i_batch])
 
             print('Ref (char): %s' % str_true_char)
@@ -191,7 +184,6 @@ def main():
         params['num_classes_main'] = 28
     elif params['label_type_main'] == 'character_capital_divide':
         params['num_classes_main'] = 72
-
     if params['label_type_sub'] == 'phone61':
         params['num_classes_sub'] = 61
     elif params['label_type_sub'] == 'phone48':

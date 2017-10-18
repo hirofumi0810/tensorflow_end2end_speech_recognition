@@ -83,9 +83,7 @@ class TestLoadDatasetJointCTCAttention(unittest.TestCase):
             if data_type != 'test':
                 att_str_true = map_fn(
                     att_labels[0][0][0: att_labels_seq_len[0][0]])
-                att_str_true = re.sub(r'_', ' ', att_str_true)
                 ctc_str_true = map_fn(ctc_labels[0][0])
-                ctc_str_true = re.sub(r'_', ' ', ctc_str_true)
             else:
                 att_str_true = att_labels[0][0][0]
                 ctc_str_true = ctc_labels[0][0][0]

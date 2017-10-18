@@ -43,7 +43,9 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         attention_layer: The attention function to use. This function map from
             `(state, inputs)` to `(attention_weights, context_vector)`.
             For an example, see `decoders.attention_layer.AttentionLayer`.
-        time-major (bool): if True,
+        time_major (bool): if True, time-major computation will be performed
+            in the dynamic decoder.
+        mode: tf.contrib.learn.ModeKeys
     """
 
     def __init__(self,
@@ -55,6 +57,7 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
                  encoder_outputs_seq_len,
                  attention_layer,
                  time_major,
+                 mode,
                  name='attention_decoder'):
 
         super(AttentionDecoder, self).__init__()
@@ -67,15 +70,13 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
         self.encoder_outputs_seq_len = encoder_outputs_seq_len
         self.attention_layer = attention_layer  # AttentionLayer class
         self.time_major = time_major
+        self.mode = mode
+        self.reuse = False if mode == tf.contrib.learn.ModeKeys.TRAIN else True
         self.name = name
 
         # NOTE: Not initialized yet
         self.initial_state = None
         self.helper = None
-
-        self.reuse = True
-        # NOTE: This is for beam search decoder
-        # When training mode, this will be overwritten in self._build()
 
     @property
     def output_size(self):
@@ -99,68 +100,64 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
     def batch_size(self):
         return tf.shape(nest.flatten([self.initial_state])[0])[0]
 
-    def __call__(self, initial_state, helper, mode):
+    def __call__(self, initial_state, helper):
         """
         Args:
             initial_state: A tensor or tuple of tensors used as the initial
                 rnn_cell state. Set to the final state of the encoder by default.
             helper: An instance of `tf.contrib.seq2seq.Helper` to assist
                 decoding
-            mode:
         Returns:
             A tuple of `(outputs, final_state)`
                 outputs: A tensor of `[T_out, B, num_classes]`
                 final_state: A tensor of `[T_out, B, decoder_num_units]`
         """
-        # Initialize
-        if self.initial_state is None:
-            self._setup(initial_state, helper)
-        # NOTE: ignore when attention_decoder is wrapped by beam_search_decoder
+        with tf.variable_scope('attention_decoder', reuse=self.reuse):
+            # Initialize
+            if self.initial_state is None:
+                self._setup(initial_state, helper)
+            # NOTE: ignore when attention_decoder is wrapped by
+            # beam_search_decoder
 
-        # scope = tf.get_variable_scope()
-        # scope.set_initializer(tf.random_uniform_initializer(
-        #     minval=-self.parameter_init,
-        #     maxval=self.parameter_init))
+            if self.mode == tf.contrib.learn.ModeKeys.TRAIN:
+                maximum_iterations = None
+            else:
+                maximum_iterations = self.max_decode_length
 
-        if mode == tf.contrib.learn.ModeKeys.TRAIN:
-            self.reuse = False
-            maximum_iterations = None
-        else:
-            self.reuse = True
-            maximum_iterations = self.max_decode_length
+            # outputs, final_state, final_seq_len =
+            # tf.contrib.seq2seq.dynamic_decode(
+            outputs, final_state = dynamic_decode(
+                decoder=self,
+                output_time_major=self.time_major,
+                impute_finished=True,
+                maximum_iterations=maximum_iterations,
+                scope=None)
 
-        # outputs, final_state, final_seq_len =
-        # tf.contrib.seq2seq.dynamic_decode(
-        outputs, final_state = dynamic_decode(
-            decoder=self,
-            output_time_major=self.time_major,
-            impute_finished=True,
-            maximum_iterations=maximum_iterations,
-            scope='dynamic_decoder')
+            # tf.contrib.seq2seq.dynamic_decode
+            # return self.finalize(outputs, final_state, final_seq_len)
 
-        # tf.contrib.seq2seq.dynamic_decode
-        # return self.finalize(outputs, final_state, final_seq_len)
-
-        # ./dynamic_decoder.py
-        return self.finalize(outputs, final_state, None)
+            # ./dynamic_decoder.py
+            return self.finalize(outputs, final_state, None)
 
     def initialize(self):
         """Initialize the decoder.
         Returns:
-            finished: A tensor of size `[]`
-            first_inputs: A tensor of size `[B, embedding_dim]`
-            initial_state: A tensor of size `[]`
+            finished: A tensor of size `[B, ]`
+            first_inputs: The first inputs to the decoder. A tensor of size
+                `[B, embedding_dim]`
+            initial_state: The initial decoder state. A tensor of size
+                `[B, ]`
         """
         # Create inputs for the first time step
         finished, first_inputs = self.helper.initialize()
-        # TODO: 最初のshapeをcheck
+        # finished: `[1]`
+        # first_inputs: `[B]`
 
-        # Concat empty attention context
+        # Concat empty attention context (Input-feeding approach)
         batch_size = tf.shape(first_inputs)[0]
         encoder_num_units = self.encoder_outputs.get_shape().as_list()[-1]
         context_vector = tf.zeros(shape=[batch_size, encoder_num_units])
         first_inputs = tf.concat([first_inputs, context_vector], axis=1)
-        # TODO: これconcatしたらおかしくない？
 
         # Initialize attention weights
         self.attention_weights = tf.zeros(
@@ -169,6 +166,133 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
 
         return finished, first_inputs, self.initial_state
         # TODO: self.initial_stateはこの時点ではNone??
+
+    def _compute_output(self, decoder_output, attention_weights):
+        """Computes the decoder outputs at each time.
+        Args:
+            decoder_output: The previous state of the decoder
+            attention_weights: A tensor of size `[B, ]`
+        Returns:
+            attentional_vector: A tensors of size `[B, ]`
+            logits: A tensor of size `[B, ]`
+            attention_weights: A tensor of size `[B, ]`
+            context_vector: A tensor of szie `[B, ]`
+        """
+        # Compute attention weights & context vector
+        attention_weights, context_vector = self.attention_layer(
+            encoder_outputs=self.encoder_outputs,
+            decoder_output=decoder_output,
+            encoder_outputs_length=self.encoder_outputs_seq_len,
+            attention_weights=attention_weights)
+
+        # Input-feeding approach, this is used as inputs for the decoder
+        attentional_vector = tf.contrib.layers.fully_connected(
+            tf.concat([decoder_output, context_vector], axis=1),
+            num_outputs=self.rnn_cell.output_size,
+            activation_fn=tf.nn.tanh,
+            weights_initializer=tf.truncated_normal_initializer(
+                stddev=self.parameter_init),
+            biases_initializer=None,  # no bias
+            scope="attentional_vector")
+        # NOTE: This makes the softmax smaller and allows us to synthesize
+        # information between decoder state and attention context
+        # see https://arxiv.org/abs/1508.04025v5
+
+        # Softmax computation
+        logits = tf.contrib.layers.fully_connected(
+            attentional_vector,
+            num_outputs=self.num_classes,
+            activation_fn=None,
+            weights_initializer=tf.truncated_normal_initializer(
+                stddev=self.parameter_init),
+            biases_initializer=tf.zeros_initializer(),
+            scope="output_layer")
+
+        return attentional_vector, logits, attention_weights, context_vector
+
+    def _setup(self, initial_state, helper):
+        """Sets the initial state and helper for the decoder.
+        Args:
+            initial_state:
+            helper:
+        """
+        self.initial_state = initial_state
+        self.helper = helper
+
+        def _att_next_inputs(time, outputs, state, sample_ids, name=None):
+            """Wraps the original decoder helper function to append the
+               attention context.
+            Args:
+                time:
+                outputs:
+                state:
+                sample_ids:
+                name (string, optional): Name scope for any created operations
+            Returs:
+                Returns:
+                    finished: A tensor of size `[B, ]`
+                    next_inputs: A tensor of size `[B, ]`
+                    next_state: A tensor of size `[B, ]`
+            """
+            finished, next_inputs, next_state = helper.next_inputs(
+                time=time,
+                outputs=outputs,
+                state=state,
+                sample_ids=sample_ids,
+                name=name)
+
+            # Input-feeding approach
+            next_inputs = tf.concat(
+                [next_inputs, outputs.context_vector], axis=1)
+
+            return finished, next_inputs, next_state
+
+        # Wrap helper function for the attention mechanism
+        self.helper = tf.contrib.seq2seq.CustomHelper(
+            initialize_fn=helper.initialize,
+            sample_fn=helper.sample,
+            next_inputs_fn=_att_next_inputs)
+
+    def step(self, time, inputs, state, name=None):
+        """Perform a decoding step.
+        Args:
+           time:
+           inputs:
+           state:
+           name (string, optional): Name scope for any created operations
+        Returns:
+            outputs: An instance of AttentionDecoderOutput
+            next_state: A state tensors and TensorArrays
+            next_inputs: The tensor that should be used as input for the
+                next step
+            finished: A boolean tensor telling whether the sequence is
+                complete, for each sequence in the batch
+        """
+        cell_output, cell_state = self.rnn_cell(inputs, state)
+        attentional_vector, logits, attention_weights, context_vector = self._compute_output(
+            decoder_output=cell_output,
+            attention_weights=self.attention_weights)
+
+        # Update attention weights
+        self.attention_weights = attention_weights
+
+        sample_ids = self.helper.sample(time=time,
+                                        outputs=logits,
+                                        state=cell_state)
+
+        outputs = AttentionDecoderOutput(logits=logits,
+                                         predicted_ids=sample_ids,
+                                         decoder_output=attentional_vector,
+                                         attention_weights=attention_weights,
+                                         context_vector=context_vector)
+
+        finished, next_inputs, next_state = self.helper.next_inputs(
+            time=time,
+            outputs=outputs,
+            state=cell_state,
+            sample_ids=sample_ids)
+
+        return outputs, next_state, next_inputs, finished
 
     def finalize(self, outputs, final_state, final_seq_len):
         """Applies final transformation to the decoder output once decoding is
@@ -182,127 +306,3 @@ class AttentionDecoder(tf.contrib.seq2seq.Decoder):
             final_state:
         """
         return outputs, final_state
-
-    def compute_output(self, decoder_output, attention_weights):
-        """Computes the decoder outputs at each time.
-        Args:
-            decoder_output: The previous state of the decoder
-            attention_weights:
-        Returns:
-            softmax_input: A tensor of size `[]`
-            logits: A tensor of size `[]`
-            attention_weights: A tensor of size `[]`
-            context_vector: A tensor of szie `[]`
-        """
-        # Compute attention weights & context
-        attention_weights, context_vector = self.attention_layer(
-            encoder_outputs=self.encoder_outputs,
-            decoder_output=decoder_output,
-            encoder_outputs_length=self.encoder_outputs_seq_len,
-            attention_weights=attention_weights)
-
-        # TODO: Make this a parameter: We may or may not want this.
-        # Transform attention context.
-        # This makes the softmax smaller and allows us to synthesize
-        # information between decoder state and attention context
-        # see https://arxiv.org/abs/1508.04025v5
-        proj = tf.contrib.layers.fully_connected(
-            tf.concat([decoder_output, context_vector], axis=1),
-            num_outputs=self.rnn_cell.output_size,
-            activation_fn=tf.nn.tanh,
-            weights_initializer=tf.truncated_normal_initializer(
-                stddev=self.parameter_init),
-            biases_initializer=tf.zeros_initializer(),
-            scope="output_proj")
-
-        # Softmax computation
-        logits = tf.contrib.layers.fully_connected(
-            proj,
-            num_outputs=self.num_classes,
-            activation_fn=None,
-            weights_initializer=tf.truncated_normal_initializer(
-                stddev=self.parameter_init),
-            biases_initializer=tf.zeros_initializer(),
-            scope="output_layer")
-        self.logits = logits
-        # 何に使う？
-
-        return proj, logits, attention_weights, context_vector
-
-    def _setup(self, initial_state, helper):
-        """Define original helper function."""
-        self.initial_state = initial_state
-        self.helper = helper
-        # これいらんくない？
-
-        def att_next_inputs(time, outputs, state, sample_ids, name=None):
-            """Wraps the original decoder helper function to append the
-               attention context.
-            Args:
-                time:
-                outputs:
-                state:
-                sample_ids:
-                name:
-            Returs:
-                A tuple of `(finished, next_inputs, next_state)`
-            """
-            finished, next_inputs, next_state = helper.next_inputs(
-                time=time,
-                outputs=outputs,
-                state=state,
-                sample_ids=sample_ids,
-                name=name)
-
-            next_inputs = tf.concat(
-                [next_inputs, outputs.context_vector], axis=1)
-
-            return finished, next_inputs, next_state
-
-        self.helper = tf.contrib.seq2seq.CustomHelper(
-            initialize_fn=helper.initialize,
-            sample_fn=helper.sample,
-            next_inputs_fn=att_next_inputs)
-
-    def step(self, time, inputs, state, name=None):
-        """Perform a decoding step.
-        Args:
-           time: scalar `int32` tensor
-           inputs: A input tensors
-           state: A state tensors and TensorArrays
-           name (string): Name scope for any created operations
-        Returns:
-            outputs: An instance of AttentionDecoderOutput
-            next_state: A state tensors and TensorArrays
-            next_inputs: The tensor that should be used as input for the
-                next step
-            finished: A boolean tensor telling whether the sequence is
-                complete, for each sequence in the batch
-        """
-        # このreuseいらない
-        with tf.variable_scope("step", reuse=self.reuse):
-            # Call LSTMCell
-            cell_output_prev, cell_state_prev = self.rnn_cell(inputs, state)
-            attention_weights_prev = self.attention_weights
-            decoder_output, logits, attention_weights, context_vector = self.compute_output(
-                cell_output_prev, attention_weights_prev)
-            self.attention_weights = attention_weights
-
-            sample_ids = self.helper.sample(time=time,
-                                            outputs=logits,
-                                            state=cell_state_prev)
-            # TODO: Trainingのときlogitsの値はone-hotまたは一意のベクトルに変換されているか？
-
-            outputs = AttentionDecoderOutput(logits=logits,
-                                             predicted_ids=sample_ids,
-                                             decoder_output=decoder_output,
-                                             attention_weights=attention_weights,
-                                             context_vector=context_vector)
-
-            finished, next_inputs, next_state = self.helper.next_inputs(
-                time=time,
-                outputs=outputs,
-                state=cell_state_prev,
-                sample_ids=sample_ids)
-
-            return outputs, next_state, next_inputs, finished

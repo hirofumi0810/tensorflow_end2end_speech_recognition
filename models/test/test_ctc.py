@@ -27,7 +27,7 @@ class TestCTCTraining(tf.test.TestCase):
         print("CTC Working check.")
 
         # VGG-CTC
-        # self.check(encoder_type='vgg_wang')
+        self.check(encoder_type='vgg_wang')
 
         # GRU-CTC
         self.check(encoder_type='bgru')
@@ -83,6 +83,8 @@ class TestCTCTraining(tf.test.TestCase):
                 batch_size=batch_size,
                 splice=splice)
             # NOTE: input_size must be even number when using CudnnLSTM
+
+            print(inputs.shape)
 
             # Define model graph
             num_classes = 27 if label_type == 'character' else 61
