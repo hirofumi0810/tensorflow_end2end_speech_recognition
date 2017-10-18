@@ -226,6 +226,12 @@ def do_train(model, params):
                     print('-----EPOCH:%d (%.3f min)-----' %
                           (train_data.epoch, duration_epoch / 60))
 
+                    checkpoint_file = join(
+                        model.save_path, 'model.ckpt')
+                    save_path = saver.save(
+                        sess, checkpoint_file, global_step=train_data.epoch)
+                    print("Model saved in file: %s" % save_path)
+
                     # Save fugure of loss & ler
                     plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
                               save_path=model.save_path)
@@ -289,11 +295,11 @@ def do_train(model, params):
 
                                 # Save model only when best accuracy is
                                 # obtained (check point)
-                                checkpoint_file = join(
-                                    model.save_path, 'model.ckpt')
-                                save_path = saver.save(
-                                    sess, checkpoint_file, global_step=train_data.epoch)
-                                print("Model saved in file: %s" % save_path)
+                                # checkpoint_file = join(
+                                #     model.save_path, 'model.ckpt')
+                                # save_path = saver.save(
+                                #     sess, checkpoint_file, global_step=train_data.epoch)
+                                # print("Model saved in file: %s" % save_path)
 
                                 print('=== Test Data Evaluation ===')
                                 ler_test = do_eval_per(
