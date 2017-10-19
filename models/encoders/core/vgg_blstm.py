@@ -10,14 +10,15 @@ from __future__ import print_function
 import math
 import tensorflow as tf
 
-from models.encoders.core.cnn_util import conv_layer, max_pool
+from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalization
 from models.encoders.core.blstm import basiclstmcell, lstmcell, lstmblockcell, lstmblockfusedcell, cudnnlstm
 
 
 class VGGBLSTMEncoder(object):
     """VGG + bidirectional LSTM encoder.
     Args:
-        input_size (int): the dimensions of input vectors
+        input_size (int): the dimensions of input vectors．
+            This is expected to be num_channels * 3 (static + Δ + ΔΔ)
         splice (int): frames to splice
         num_units (int): the number of units in each layer
         num_proj (int): the number of nodes in the projection layer
@@ -50,10 +51,12 @@ class VGGBLSTMEncoder(object):
                  clip_activation,
                  time_major=False,
                  name='vgg_blstm_encoder'):
-        if num_proj == 0:
-            raise ValueError
+
+        assert num_proj != 0
+        assert input_size % 3 == 0
 
         self.input_size = input_size
+        self.num_channels = input_size // 3
         self.splice = splice
         self.num_units = num_units
         if lstm_impl != 'LSTMCell':
@@ -72,7 +75,8 @@ class VGGBLSTMEncoder(object):
     def __call__(self, inputs, inputs_seq_len, keep_prob):
         """Construct model graph.
         Args:
-            inputs (placeholder): A tensor of size`[B, T, input_size]`
+            inputs (placeholder): A tensor of size
+                `[B, T, input_size (num_channels * splice * 3)]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
@@ -81,57 +85,66 @@ class VGGBLSTMEncoder(object):
                 `[T, B, num_units (num_proj)]`
             final_state: A final hidden state of the encoder
         """
-        # inputs: `[B, T, input_size * splice]`
+        # inputs: 3D tensor `[B, T, input_size (num_channels * splice * 3)]`
         batch_size = tf.shape(inputs)[0]
         max_time = tf.shape(inputs)[1]
 
-        # Reshape to 4D tensor `[B * T, input_size / 3, splice, 3(+Δ, ΔΔ)]`
+        # Reshape to 4D tensor `[B * T, num_channels, splice, 3]`
         inputs = tf.reshape(
             inputs,
-            shape=[batch_size * max_time, int(self.input_size / 3), 3, self.splice])
-        inputs = tf.transpose(inputs, (0, 1, 3, 2))
+            shape=[batch_size * max_time, self.num_channels, self.splice, 3])
 
+        # NOTE: filter_size: `[H, W, C_in, C_out]`
         with tf.variable_scope('VGG1'):
             inputs = conv_layer(inputs,
-                                filter_shape=[3, 3, 3, 64],
+                                filter_size=[3, 3, 3, 64],
+                                stride=[1, 1],
                                 parameter_init=self.parameter_init,
-                                relu=True,
+                                activation='relu',
                                 name='conv1')
             inputs = conv_layer(inputs,
-                                filter_shape=[3, 3, 64, 64],
+                                filter_size=[3, 3, 64, 64],
+                                stride=[1, 1],
                                 parameter_init=self.parameter_init,
-                                relu=True,
+                                activation='relu',
                                 name='conv2')
+            inputs = batch_normalization(inputs, is_training=True)
             inputs = max_pool(inputs, name='max_pool')
-            # TODO(hirofumi): try batch normalization
+            # TODO: try dropout
 
         with tf.variable_scope('VGG2'):
             inputs = conv_layer(inputs,
-                                filter_shape=[3, 3, 64, 128],
+                                filter_size=[3, 3, 64, 128],
+                                stride=[1, 1],
                                 parameter_init=self.parameter_init,
-                                relu=True,
+                                activation='relu',
                                 name='conv1')
             inputs = conv_layer(inputs,
-                                filter_shape=[3, 3, 128, 128],
+                                filter_size=[3, 3, 128, 128],
+                                stride=[1, 1],
                                 parameter_init=self.parameter_init,
-                                relu=True,
+                                activation='relu',
                                 name='conv2')
+            inputs = batch_normalization(inputs, is_training=True)
             inputs = max_pool(inputs, name='max_pool')
-            # TODO(hirofumi): try batch normalization
+            # TODO: try dropout
 
         # Reshape to 2D tensor `[B * T, new_h * new_w * 128]`
-        new_h = math.ceil(self.input_size / 3 / 4)  # expected to be 11 ro 10
+        new_h = math.ceil(self.num_channels / 4)  # expected to be 11 ro 10
         new_w = math.ceil(self.splice / 4)  # expected to be 3
         inputs = tf.reshape(
             inputs, shape=[batch_size * max_time, new_h * new_w * 128])
 
         # Insert linear layer to recude CNN's output demention
         # from (new_h * new_w * 128) to 256
-        with tf.variable_scope('vgg_blsm_pipe') as scope:
+        with tf.variable_scope('bridge') as scope:
             inputs = tf.contrib.layers.fully_connected(
                 inputs=inputs,
                 num_outputs=256,
                 activation_fn=tf.nn.relu,
+                weights_initializer=tf.truncated_normal_initializer(
+                    stddev=self.parameter_init),
+                biases_initializer=tf.zeros_initializer(),
                 scope=scope)
 
         # Dropout for the VGG-output-hidden connection

@@ -176,13 +176,15 @@ class CTC(ModelBase):
         encoder_outputs, final_state = self.encoder(
             inputs, inputs_seq_len, keep_prob)
 
+        # for debug
+        self.encoder_outputs = encoder_outputs
+
         # Reshape to apply the same weights over the timesteps
         if final_state is None:
             # CNN-like topology such as VGG and ResNet
-            output_dim = tf.shape(
-                encoder_outputs).get_shape().as_list()[-1]
+            output_dim = encoder_outputs.shape.as_list()[-1]
             outputs_2d = tf.reshape(
-                encoder_outputs, shape=[-1, output_dim])
+                encoder_outputs, shape=[batch_size * max_time, output_dim])
         elif 'lstm' not in self.encoder_type or self.num_proj is None:
             if 'b' in self.encoder_type:
                 # bidirectional
@@ -287,8 +289,8 @@ class CTC(ModelBase):
             ctc_losses = tf.nn.ctc_loss(
                 labels,
                 logits,
-                # tf.cast(inputs_seq_len, tf.int32),
-                inputs_seq_len,
+                tf.cast(inputs_seq_len, tf.int32),
+                # inputs_seq_len,
                 preprocess_collapse_repeated=False,
                 ctc_merge_repeated=True,
                 ignore_longer_outputs_than_inputs=False,
@@ -344,6 +346,8 @@ class CTC(ModelBase):
                 beam_width=beam_width)
 
         decode_op = tf.to_int32(decoded[0])
+
+        # TODO: chnage function name to `decode`
 
         return decode_op
 
