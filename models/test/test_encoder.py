@@ -23,8 +23,8 @@ class TestEncoder(unittest.TestCase):
         print("Encoder Working check.")
 
         # CNNs
-        self.check(encoder_type='vgg_wang')
-        # self.check(encoder_type='cnn_zhang')
+        self.check(encoder_type='vgg_wang', time_major=True)
+        self.check(encoder_type='cnn_zhang', time_major=True)
         # self.check(encoder_type='resnet_wang')
 
         ##############################
@@ -177,7 +177,8 @@ class TestEncoder(unittest.TestCase):
                 encoder = load(encoder_type)(
                     input_size=input_size // 11,
                     splice=11,
-                    parameter_init=0.1)
+                    parameter_init=0.1,
+                    time_major=time_major)
                 # NOTE: topology is pre-defined
             else:
                 raise NotImplementedError
@@ -242,8 +243,10 @@ class TestEncoder(unittest.TestCase):
                     encoder_outputs, final_state = sess.run(
                         [hidden_states_op, final_state_op],
                         feed_dict=feed_dict)
-                    if time_major:
-                        encoder_outputs = encoder_outputs.transpose(1, 0, 2)
+
+                # Convert always to batch-major
+                if time_major:
+                    encoder_outputs = encoder_outputs.transpose(1, 0, 2)
 
                 if encoder_type in ['blstm', 'bgru', 'vgg_blstm', 'multitask_blstm']:
                     self.assertEqual(
@@ -300,7 +303,7 @@ class TestEncoder(unittest.TestCase):
                 elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                     self.assertEqual(3, len(encoder_outputs.shape))
                     self.assertEqual(
-                        (frame_num, batch_size), encoder_outputs.shape[:2])
+                        (batch_size, frame_num), encoder_outputs.shape[:2])
 
 
 if __name__ == "__main__":

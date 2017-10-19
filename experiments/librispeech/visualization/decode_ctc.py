@@ -168,20 +168,21 @@ def decode(session, decode_op, model, dataset, label_type,
 
         # Visualize
         for i_batch in range(batch_size):
+            print(labels_true[0][i_batch][0])
+
             print('----- wav: %s -----' % input_names[0][i_batch])
             if 'char' in label_type:
                 if is_test:
-                    str_true = labels_true[0][i_batch][0].replace('_', ' ')
+                    str_true = labels_true[0][i_batch][0]
                 else:
-                    str_true = map_fn(
-                        labels_true[0][i_batch]).replace('_', ' ')
-                str_pred = map_fn(labels_pred[i_batch]).replace('_', ' ')
+                    str_true = map_fn(labels_true[0][i_batch])
+                str_pred = map_fn(labels_pred[i_batch])
             else:
                 if is_test:
                     str_true = labels_true[0][i_batch][0]
                 else:
-                    str_true = ' '.join(map_fn(labels_true[0][i_batch]))
-                str_pred = ' '.join(map_fn(labels_pred[i_batch]))
+                    str_true = '_'.join(map_fn(labels_true[0][i_batch]))
+                str_pred = '_'.join(map_fn(labels_pred[i_batch]))
 
             print('Ref: %s' % str_true)
             print('Hyp: %s' % str_pred)

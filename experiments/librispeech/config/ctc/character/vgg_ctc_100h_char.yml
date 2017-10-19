@@ -18,7 +18,7 @@ param:
   num_units: 0  # not used
   num_proj: 0  # not used
   num_layers: 0   # not used
-  num_units: 320
+  num_units: 320  # not used
   bottleneck_dim: 0
 
   # optimization
@@ -39,5 +39,7 @@ param:
   sort_stop_epoch: 1
 
   eval_start_epoch: 1
-  print_step: 50
+  print_step: 200
   beam_width: 20
+
+  softmax_temperature: 1

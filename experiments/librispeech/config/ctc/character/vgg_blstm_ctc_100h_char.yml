@@ -1,10 +1,10 @@
 param:
   # corpus
-  corpus: timit
-  label_type: phone61
+  corpus: librispeech
+  label_type: character
+  train_data_size: train100h
 
   # features
-  encoder_type: vgg_lstm
   feature: fbank
   input_size: 120
   splice: 11
@@ -12,30 +12,33 @@ param:
   num_skip: 1
 
   # topology
+  encoder_type: vgg_blstm
   lstm_impl: LSTMBlockCell
   use_peephole: True
-  num_units: 256
+  num_units: 320
   num_proj: 0
   num_layers: 5
   bottleneck_dim: 0
 
   # optimization
-  batch_size: 20
-  optimizer: adam
+  batch_size: 10
+  optimizer: rmsprop
   learning_rate: 1e-3
-  num_epoch: 50
+  num_epoch: 20
 
   # regularization
   weight_init: 0.1
   clip_grad_norm: 5.0
   clip_activation: 50
-  dropout: 0.5
+  dropout: 0.2
   weight_decay: 0
-  decay_start_epoch: 20
+  decay_start_epoch: 5
   decay_rate: 0.5
-  decay_patient_epoch: 5
-  sort_stop_epoch: 20
+  decay_patient_epoch: 3
+  sort_stop_epoch: 1
 
-  eval_start_epoch: 10
-  print_step: 10
+  eval_start_epoch: 1
+  print_step: 50
   beam_width: 20
+
+  softmax_temperature: 1

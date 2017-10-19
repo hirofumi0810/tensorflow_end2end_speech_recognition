@@ -43,18 +43,30 @@ def do_train(model, params, gpu_indices):
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=True, sort_stop_epoch=params['sort_stop_epoch'],
         num_gpu=len(gpu_indices))
-    dev_data_clean = Dataset(
+    dev_clean_data = Dataset(
         data_type='dev_clean', train_data_size=params['train_data_size'],
         label_type=params['label_type'],
         batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False, num_gpu=len(gpu_indices))
-    dev_data_other = Dataset(
+    dev_other_data = Dataset(
         data_type='dev_other', train_data_size=params['train_data_size'],
         label_type=params['label_type'],
         batch_size=params['batch_size'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         sort_utt=False, num_gpu=len(gpu_indices))
+    test_clean_data = Dataset(
+        data_type='test_clean', train_data_size=params['train_data_size'],
+        label_type=params['label_type'],
+        batch_size=params['batch_size'], splice=params['splice'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
+    test_other_data = Dataset(
+        data_type='test_other', train_data_size=params['train_data_size'],
+        label_type=params['label_type'],
+        batch_size=params['batch_size'], splice=params['splice'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        sort_utt=False)
 
     # Tell TensorFlow that the model will be built into the default graph
     with tf.Graph().as_default(), tf.device('/cpu:0'):
@@ -206,13 +218,13 @@ def do_train(model, params, gpu_indices):
                 if (step + 1) % int(params['print_step'] / len(gpu_indices)) == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    (inputs, labels, inputs_seq_len,  _), _ = dev_data_other.next()
+                    (inputs, labels, inputs_seq_len,  _), _ = dev_other_data.next()
                     feed_dict_dev = {}
                     for i_gpu in range(len(gpu_indices)):
                         feed_dict_dev[model.inputs_pl_list[i_gpu]
                                       ] = inputs[i_gpu]
                         feed_dict_dev[model.labels_pl_list[i_gpu]] = list2sparsetensor(
-                            labels[i_gpu], padded_value=dev_data_other.padded_value)
+                            labels[i_gpu], padded_value=dev_other_data.padded_value)
                         feed_dict_dev[model.inputs_seq_len_pl_list[i_gpu]
                                       ] = inputs_seq_len[i_gpu]
                         feed_dict_dev[model.keep_prob_pl_list[i_gpu]] = 1.0
@@ -259,36 +271,29 @@ def do_train(model, params, gpu_indices):
                              label_type=params['label_type'],
                              save_path=model.save_path)
 
-                    # Save model (check point)
-                    checkpoint_file = join(
-                        model.save_path, 'model.ckpt')
-                    save_path = saver.save(
-                        sess, checkpoint_file, global_step=train_data.epoch)
-                    print("Model saved in file: %s" % save_path)
-
                     if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
                         if params['label_type'] != 'word':
                             print('=== Dev Data Evaluation ===')
-                            # Dev-clean
-                            ler_dev_clean_epoch, wer_dev_clean_epoch = do_eval_cer(
+                            # dev-clean
+                            cer_dev_clean_epoch, wer_dev_clean_epoch = do_eval_cer(
                                 session=sess,
                                 decode_ops=decode_ops,
                                 model=model,
-                                dataset=dev_data_clean,
+                                dataset=dev_clean_data,
                                 label_type=params['label_type'],
                                 eval_batch_size=params['batch_size'])
                             print('  CER (clean): %f %%' %
-                                  (ler_dev_clean_epoch * 100))
+                                  (cer_dev_clean_epoch * 100))
                             print('  WER (clean): %f %%' %
                                   (wer_dev_clean_epoch * 100))
 
-                            # Dev-other
+                            # dev-other
                             ler_dev_other_epoch, wer_dev_other_epoch = do_eval_cer(
                                 session=sess,
                                 decode_ops=decode_ops,
                                 model=model,
-                                dataset=dev_data_other,
+                                dataset=dev_other_data,
                                 label_type=params['label_type'],
                                 eval_batch_size=params['batch_size'])
                             print('  CER (other): %f %%' %
@@ -300,25 +305,61 @@ def do_train(model, params, gpu_indices):
                                 ler_dev_best = ler_dev_other_epoch
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
+                                # Save model (check point)
+                                checkpoint_file = join(
+                                    model.save_path, 'model.ckpt')
+                                save_path = saver.save(
+                                    sess, checkpoint_file, global_step=train_data.epoch)
+                                print("Model saved in file: %s" % save_path)
+
+                                print('=== Test Data Evaluation ===')
+                                # test-clean
+                                cer_test_clean_epoch, wer_test_clean_epoch = do_eval_cer(
+                                    session=sess,
+                                    decode_ops=decode_ops,
+                                    model=model,
+                                    dataset=test_clean_data,
+                                    label_type=params['label_type'],
+                                    is_test=True,
+                                    eval_batch_size=params['batch_size'])
+                                print('  CER (clean): %f %%' %
+                                      (cer_test_clean_epoch * 100))
+                                print('  WER (clean): %f %%' %
+                                      (wer_test_clean_epoch * 100))
+
+                                # test-other
+                                cer_test_other_epoch, wer_test_other_epoch = do_eval_cer(
+                                    session=sess,
+                                    decode_ops=decode_ops,
+                                    model=model,
+                                    dataset=test_other_data,
+                                    label_type=params['label_type'],
+                                    is_test=True,
+                                    eval_batch_size=params['batch_size'])
+                                print('  CER (other): %f %%' %
+                                      (cer_test_other_epoch * 100))
+                                print('  WER (other): %f %%' %
+                                      (wer_test_other_epoch * 100))
+
                         else:
                             print('=== Dev Data Evaluation ===')
-                            # Dev-clean
-                            ler_dev_clean_epoch = do_eval_wer(
+                            # dev-clean
+                            cer_dev_clean_epoch = do_eval_wer(
                                 session=sess,
                                 decode_ops=decode_ops,
                                 model=model,
-                                dataset=dev_data_clean,
+                                dataset=dev_clean_data,
                                 train_data_size=params['train_data_size'],
                                 eval_batch_size=params['batch_size'])
                             print('  WER (clean): %f %%' %
-                                  (ler_dev_clean_epoch * 100))
+                                  (cer_dev_clean_epoch * 100))
 
-                            # Dev-other
+                            # dev-other
                             ler_dev_other_epoch = do_eval_wer(
                                 session=sess,
                                 decode_ops=decode_ops,
                                 model=model,
-                                dataset=dev_data_other,
+                                dataset=dev_other_data,
                                 train_data_size=params['train_data_size'],
                                 eval_batch_size=params['batch_size'])
                             print('  WER (other): %f %%' %
@@ -327,6 +368,38 @@ def do_train(model, params, gpu_indices):
                             if ler_dev_other_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_other_epoch
                                 print('■■■ ↑Best Score (WER)↑ ■■■')
+
+                                # Save model (check point)
+                                checkpoint_file = join(
+                                    model.save_path, 'model.ckpt')
+                                save_path = saver.save(
+                                    sess, checkpoint_file, global_step=train_data.epoch)
+                                print("Model saved in file: %s" % save_path)
+
+                                print('=== Test Data Evaluation ===')
+                                # test-clean
+                                cer_test_clean_epoch = do_eval_wer(
+                                    session=sess,
+                                    decode_ops=decode_ops,
+                                    model=model,
+                                    dataset=test_clean_data,
+                                    train_data_size=params['train_data_size'],
+                                    is_test=True,
+                                    eval_batch_size=params['batch_size'])
+                                print('  WER (clean): %f %%' %
+                                      (cer_test_clean_epoch * 100))
+
+                                # test-other
+                                ler_test_other_epoch = do_eval_wer(
+                                    session=sess,
+                                    decode_ops=decode_ops,
+                                    model=model,
+                                    dataset=test_other_data,
+                                    train_data_size=params['train_data_size'],
+                                    is_test=True,
+                                    eval_batch_size=params['batch_size'])
+                                print('  WER (other): %f %%' %
+                                      (ler_test_other_epoch * 100))
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %

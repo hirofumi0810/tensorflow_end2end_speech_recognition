@@ -33,7 +33,7 @@ param:
   weight_decay: 0
   decay_start_epoch: 20
   decay_rate: 0.5
-  decay_patient_epoch: 3
+  decay_patient_epoch: 5
   sort_stop_epoch: 20
 
   eval_start_epoch: 10

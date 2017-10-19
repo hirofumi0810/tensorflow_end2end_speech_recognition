@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate the trained multi-task CTC model (Librispeech corpus)."""
+"""Evaluate the multi-task CTC model (Librispeech corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -85,7 +85,6 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
 
         # If check point exists
         if ckpt:
-            # Use last saved model
             model_path = ckpt.model_checkpoint_path
             if epoch != -1:
                 model_path = model_path.split('/')[:-1]
@@ -126,6 +125,7 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
             model=model,
             dataset=test_clean_data,
             label_type=params['label_type'],
+            is_test=True,
             eval_batch_size=eval_batch_size,
             is_multitask=True,
             progressbar=True)
@@ -138,6 +138,7 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
             model=model,
             dataset=test_other_data,
             label_type=params['label_type'],
+            is_test=True,
             eval_batch_size=eval_batch_size,
             is_multitask=True,
             progressbar=True)
@@ -162,7 +163,6 @@ def main():
             params['num_classes_main'] = 18641
         elif params['train_data_size'] == 'train960h':
             params['num_classes_main'] = 26642
-
     if params['label_type_sub'] == 'character':
         params['num_classes_sub'] = 28
     elif params['label_type_sub'] == 'character_capital_divide':

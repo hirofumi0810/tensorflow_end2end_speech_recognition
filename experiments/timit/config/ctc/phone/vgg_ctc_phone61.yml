@@ -4,7 +4,6 @@ param:
   label_type: phone61
 
   # features
-  encoder_type: vgg_lstm
   feature: fbank
   input_size: 120
   splice: 11
@@ -12,11 +11,12 @@ param:
   num_skip: 1
 
   # topology
-  lstm_impl: LSTMBlockCell
-  use_peephole: True
-  num_units: 256
-  num_proj: 0
-  num_layers: 5
+  encoder_type: vgg_wang
+  lstm_impl: None
+  use_peephole: False  # not used
+  num_units: 0  # not used
+  num_proj: 0  # not used
+  num_layers: 0  # not used
   bottleneck_dim: 0
 
   # optimization

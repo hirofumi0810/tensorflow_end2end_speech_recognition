@@ -7,28 +7,32 @@ import numpy as np
 
 
 def do_splice(inputs, splice=1, batch_size=1):
-    """Splice input data. This is expected to be used for DNNs or RNNs.
+    """Splice input data. This is expected to be used for CNN-like models.
     Args:
-        inputs (np.ndarray): list of size `[B, T, input_size]'
+        inputs (np.ndarray): list of size `[B, T, input_size (num_channels * 3)]'
         splice (int): frames to splice. Default is 1 frame.
-            ex.) splice == 11
+            ex.) if splice == 11
                 [t-5, ..., t-1, t, t+1, ..., t+5] (total 11 frames)
-        batch_size: int,
+        batch_size (int): the size of mini-batch
     Returns:
         data_spliced (np.ndarray): A tensor of size
-            `[B, T, input_size * splice]`
+            `[B, T, num_channels * splice * 3 (static + Δ + ΔΔ)]`
     """
     assert isinstance(inputs, np.ndarray), 'inputs should be np.ndarray.'
-    # assert len(inputs.shape) == 3, 'inputs must be 3 demension.'
+    assert len(inputs.shape) == 3, 'inputs must be 3 demension.'
+    assert inputs.shape[-1] % 3 == 0
 
     if splice == 1:
         return inputs
 
     batch_size, max_time, input_size = inputs.shape
-    input_data_spliced = np.zeros((batch_size, max_time, input_size * splice))
+    num_channels = input_size // 3
+    input_data_spliced = np.zeros(
+        (batch_size, max_time, num_channels * splice * 3))
 
     for i_batch in range(batch_size):
         for i_time in range(max_time):
+            spliced_frames = np.zeros((splice, num_channels, 3))
             for i_splice in range(0, splice, 1):
                 #########################
                 # padding left frames
@@ -50,8 +54,16 @@ def do_splice(inputs, splice=1, batch_size=1):
                 else:
                     copy_frame = inputs[i_batch][i_time + (i_splice - splice)]
 
-                input_data_spliced[i_batch][i_time][input_size *
-                                                    i_splice: input_size * (i_splice + 1)] = copy_frame
+                # `[num_channels * 3]` -> `[num_channels, 3]`
+                copy_frame = copy_frame.reshape((num_channels, 3))
+
+                spliced_frames[i_splice] = copy_frame
+
+            # `[splice, num_channels, 3] -> `[num_channels, splice, 3]`
+            spliced_frames = np.transpose(spliced_frames, (1, 0, 2))
+
+            input_data_spliced[i_batch][i_time] = spliced_frames.reshape(
+                (num_channels * splice * 3))
 
     return input_data_spliced
 

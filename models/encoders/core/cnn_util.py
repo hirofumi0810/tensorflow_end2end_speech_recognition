@@ -14,7 +14,7 @@ def max_pool(bottom, name='max_pool'):
     """A max pooling layer.
     Args:
         bottom: A tensor of size `[B * T, H, W, C]`
-        name (string): A layer name
+        name (string, optional): A layer name
     Returns:
         A tensor of size `[B * T, H / 2, W / 2, C]`
     """
@@ -30,7 +30,7 @@ def avg_pool(bottom, name='avg_pool'):
     """An average pooling layer.
     Args:
         bottom: A tensor of size `[B * T, H, W, C]`
-        name (string): A layer name
+        name (string, optional): A layer name
     Returns:
         A tensor of size `[B * T, H / 2, W / 2, C]`
     """
@@ -43,31 +43,42 @@ def avg_pool(bottom, name='avg_pool'):
         name=name)
 
 
-def conv_layer(bottom, filter_shape, parameter_init,
-               relu=True, name='conv'):
+def conv_layer(bottom, filter_size, stride=[1, 1], parameter_init=0.1,
+               activation=None, name='conv'):
     """A convolutional layer
     Args:
-        bottom: A tensor of size `[B * T, H, W, C]`
-        filter_shape (list): A list of
-            `[height, width, input_channel, output_channel]`
-        name (string): A layer name
+        bottom: A tensor of size `[B * T, H, W, C_in]`
+        filter_size (list): A list of `[H, W, C_in, C_out]`
+        stride (list, optional): A list of `[stride_H, stride_W]`
+        parameter_init (float, optional):
+        activation (string, optional): relu
+        name (string, optional): A layer name
     Returns:
-        outputs: A tensor of size `[B * T, H, W, output_channel]`
+        outputs: A tensor of size `[B * T, H, W, C_out]`
     """
+    assert len(filter_size) == 4
+    assert len(stride) == 2
+
     with tf.variable_scope(name):
-        W = tf.Variable(tf.truncated_normal(shape=filter_shape,
+        W = tf.Variable(tf.truncated_normal(shape=filter_size,
                                             stddev=parameter_init),
                         name='weight')
-        b = tf.Variable(tf.zeros(shape=filter_shape[-1]), name='bias')
+        b = tf.Variable(tf.zeros(shape=filter_size[-1]), name='bias')
         conv_bottom = tf.nn.conv2d(bottom, W,
-                                   strides=[1, 1, 1, 1],
+                                   strides=[1, stride[0], stride[1], 1],
                                    padding='SAME')
         outputs = tf.nn.bias_add(conv_bottom, b)
 
-        if not relu:
+        if activation is None:
             return outputs
-
-        return tf.nn.relu(outputs)
+        elif activation == 'relu':
+            return tf.nn.relu(outputs)
+        elif activation == 'prelu':
+            raise NotImplementedError
+        elif activation == 'maxout':
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
 
 
 def batch_normalization(tensor, is_training=False, epsilon=0.001, momentum=0.9,

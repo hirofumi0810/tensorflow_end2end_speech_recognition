@@ -18,8 +18,8 @@ model_path=$1
 gpu_index=$2
 
 epoch=-1
-beam_width=20
-eval_batch_size=20
+beam_width=100
+eval_batch_size=-1
 
 CUDA_VISIBLE_DEVICES=$gpu_index $PYTHON eval_ctc.py \
   --model_path $model_path \

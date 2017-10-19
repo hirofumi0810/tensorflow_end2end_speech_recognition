@@ -26,8 +26,9 @@ class TestCTCTraining(tf.test.TestCase):
     def test(self):
         print("CTC Working check.")
 
-        # VGG-CTC
+        # CNN-like-CTC
         self.check(encoder_type='vgg_wang')
+        # self.check(encoder_type='cnn_zhang')
 
         # GRU-CTC
         self.check(encoder_type='bgru')
@@ -56,9 +57,6 @@ class TestCTCTraining(tf.test.TestCase):
         self.check(encoder_type='vgg_blstm', lstm_impl='LSTMCell')
         self.check(encoder_type='vgg_blstm', lstm_impl='LSTMBlockCell')
 
-        # CNN-CTC
-        # self.check(encoder_type='cnn_zhang')
-
     @measure_time
     def check(self, encoder_type, label_type='character',
               lstm_impl=None, time_major=False, save_params=False):
@@ -83,8 +81,6 @@ class TestCTCTraining(tf.test.TestCase):
                 batch_size=batch_size,
                 splice=splice)
             # NOTE: input_size must be even number when using CudnnLSTM
-
-            print(inputs.shape)
 
             # Define model graph
             num_classes = 27 if label_type == 'character' else 61
@@ -171,6 +167,11 @@ class TestCTCTraining(tf.test.TestCase):
                 max_steps = 1000
                 start_time_step = time.time()
                 for step in range(max_steps):
+
+                    # for debug
+                    # encoder_outputs = sess.run(
+                    #     model.encoder_outputs, feed_dict)
+                    # print(encoder_outputs.shape)
 
                     # Compute loss
                     _, loss_train = sess.run(
