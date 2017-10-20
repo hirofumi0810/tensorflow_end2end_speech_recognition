@@ -10,7 +10,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import join
+from os.path import join, isfile
 import pickle
 import numpy as np
 
@@ -70,19 +70,32 @@ class Dataset(DatasetBase):
         self.progressbar = progressbar
         self.num_gpu = 1
 
-        input_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset', 'inputs', data_type)
+        # paths where datasets exist
+        dataset_root = ['/data/inaguma/timit',
+                        '/n/sd8/inaguma/corpus/timit/dataset']
+
+        input_path = join(dataset_root[0], 'inputs', data_type)
         # NOTE: ex.) save_path: timit_dataset_path/inputs/data_type/***.npy
         label_main_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset', 'labels', data_type, label_type_main)
+            dataset_root[0], 'labels', data_type, label_type_main)
         label_sub_path = join(
-            '/n/sd8/inaguma/corpus/timit/dataset', 'labels', data_type, label_type_sub)
+            dataset_root[0], 'labels', data_type, label_type_sub)
         # NOTE: ex.) save_path:
-        # timit_dataset_path/labels/data_type/character*/***.npy
+        # timit_dataset_path/labels/data_type/label_type/***.npy
 
         # Load the frame number dictionary
-        with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
-            self.frame_num_dict = pickle.load(f)
+        if isfile(join(input_path, 'frame_num.pickle')):
+            with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
+                self.frame_num_dict = pickle.load(f)
+        else:
+            dataset_root.pop(0)
+            input_path = join(dataset_root[0], 'inputs', data_type)
+            label_main_path = join(
+                dataset_root[0], 'labels', data_type, label_type_main)
+            label_sub_path = join(
+                dataset_root[0], 'labels', data_type, label_type_sub)
+            with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
+                self.frame_num_dict = pickle.load(f)
 
         # Sort paths to input & label
         axis = 1 if sort_utt else 0
