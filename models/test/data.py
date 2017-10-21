@@ -6,6 +6,8 @@ from __future__ import division
 from __future__ import print_function
 
 from utils.io.inputs.splicing import do_splice
+from utils.io.inputs.frame_stacking import stack_frame
+
 from utils.io.inputs.feature_extraction import wav2feature
 from utils.io.labels.phone import Phone2idx
 
@@ -45,12 +47,14 @@ def _read_phone(text_path):
     return transcript
 
 
-def generate_data(label_type, model, batch_size=1, splice=1):
+def generate_data(label_type, model, batch_size=1,
+                  num_stack=1, splice=1):
     """
     Args:
         label_type (string): character or phone or multitask
         model (string): ctc or attention or joint_ctc_attention
         batch_size (int, optional): the size of mini-batch
+        num_stack (int, optional) the number of frames to stack
         splice (int, optional): frames to splice. Default is 1 frame.
     Returns:
         inputs: `[B, T, input_size]`
@@ -63,6 +67,22 @@ def generate_data(label_type, model, batch_size=1, splice=1):
         ['./sample/LDC93S1.wav'] * batch_size,
         feature_type='logfbank', feature_dim=40,
         energy=False, delta1=True, delta2=True)
+
+    input_paths = ['./sample/LDC93S1.wav'] * batch_size
+    frame_num_dict = {}
+    for i in range(batch_size):
+        frame_num_dict['LDC93S1'] = inputs[0].shape[0]
+
+    # # Frame stacking
+    inputs = stack_frame(inputs,
+                         input_paths,
+                         frame_num_dict,
+                         num_stack=num_stack,
+                         num_skip=num_stack,
+                         progressbar=False)
+    if num_stack != 1:
+        for i in range(len(inputs_seq_len)):
+            inputs_seq_len[i] = len(inputs[i])
 
     # Splice
     inputs = do_splice(inputs, splice=splice)

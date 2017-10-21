@@ -1,6 +1,6 @@
 ## TensorFlow Implementation of End-to-End Speech Recognition
 ### Requirements
-- TensorFlow >= 1.2.0
+- TensorFlow >= 1.3.0
 - tqdm >= 4.14.0
 - python-Levenshtein >= 0.12.0
 - setproctitle >= 1.1.10
@@ -8,19 +8,23 @@
 
 
 ### Corpus
-#### TIMIT
-- phone-level (39, 48, 61 phones)
-- character-level
+#### [TIMIT](https://catalog.ldc.upenn.edu/LDC93S1)
+- Phone (39, 48, 61 phones)
+- character
 
-#### CSJ (Corpus of Spontaneous Japanese)
-- phone-level
-- Japanese kana character-level
-- Japanese grapheme-level (including kanji characters)
+#### [LibriSpeech](http://www.openslr.org/12/)
+- Phone (under implementation)
+- Character
+- Word
+
+#### [CSJ (Corpus of Spontaneous Japanese)](http://pj.ninjal.ac.jp/corpus_center/csj/en/)
+- Phone (under implementation)
+- Japanese kana character (about 150 classes)
+- Japanese kanji characters (about 3000 classes)
 
 These corpuses will be added in the future.
 - Switchboard
 - WSJ
-- [LibriSpeech](http://www.openslr.org/12/)
 - [AMI](http://groups.inf.ed.ac.uk/ami/corpus/)
 
 This repository does'nt include pre-processing and pre-processing is based on [this repo](https://github.com/hirofumi0810/asr_preprocessing).
@@ -28,52 +32,59 @@ If you want to do pre-processing, please look at this repo.
 
 
 ### Model
+#### Encoder
+- BLSTM
+- LSTM
+- BGRU
+- GRU
+- VGG-BLSTM
+- VGG-LSTM
+- Multi-task BLSTM
+  - you can set another CTC layer to the aubitrary layer.
+- Multi-task LSTM
+- VGG
+
+
 #### Connectionist Temporal Classification (CTC) [\[Graves+ 2006\]](http://dl.acm.org/citation.cfm?id=1143891)
-- LSTM-CTC
-- GRU-CTC
-- Bidirectional LSTM-CTC (BLSTM-CTC)
-- Bidirectional GRU-CTC (BGRU-CTC)
-- Multitask CTC (you can set another CTC layer to the aubitrary layer.)
+- Greedy decoder
+- Beam Search decoder
+- Beam Search decoder w/ CharLM (under implementation)
 
 ##### Options
-###### General technique
-- weight decay
-- dropout
-- gradient clipping
-- activation clipping
-- multitask learning
-
-###### Awesome technique
-- projection layer [\[Sak+ 2014\]](https://arxiv.org/abs/1402.1128)
-- frame-stacking [\[Sak+ 2015\]](https://arxiv.org/abs/1507.06947)
+- Frame-stacking [\[Sak+ 2015\]](https://arxiv.org/abs/1507.06947)
+- Multi-GPUs training (synchronous)
+- Splicing
+- Down sampling (under implementation)
 
 
 #### Attention Mechanism
-##### Encoder
-- LSTM encoder
-- BLSTM encoder
-- GRU encoder
-- BGRU encoder
-
 ##### Decoder
+- Greedy decoder
+- Beam search decoder (under implementation)
 
 ##### Attention type
-Under implementation
+- Bahdanau's content-based attention
+- Bahdanau's normed content-based attention (under implementation)
+- location-based attention
+- Hybrid attention
+- Luong's dot attention
+- Luong's scaled dot attention (under implementation)
+- Luong's general attention
+- Luong's concat attention
+- Baidu's attention (under implementation)
 
 ###### Options
-###### General technique
-
-##### Awesome technique
-- temperature in the softmax layer (Compute attention weights)
-- temperature in the softmax layer (Output posteriors)
-
-
-#### Joint CTC-Attention
-Under implementation
+- Sharpning
+- Temperature regularization in the softmax layer (Output posteriors)
+- Joint CTC-Attention [\[Kim 2016\]](https://arxiv.org/abs/1609.06773.)
+- Coverage (under implementation)
 
 
 ### Usage
-Comming soon
+Please refer to docs in each corpuse
+- TIMIT
+- LibriSpeech
+- CSJ
 
 
 ### Lisense
