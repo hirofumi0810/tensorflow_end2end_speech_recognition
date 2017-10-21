@@ -87,6 +87,8 @@ class AttentionSeq2Seq(ModelBase):
             softmax layer for computing attention weights
         logits_temperature (float, optional): a parameter for smoothing the
             softmax layer in outputing probabilities
+        sigmoid_smoothing (bool, optional): if True, replace softmax function
+            in computing attention weights with sigmoid function for smoothing
     """
 
     def __init__(self,
@@ -117,6 +119,7 @@ class AttentionSeq2Seq(ModelBase):
                  time_major=True,
                  sharpening_factor=1.0,
                  logits_temperature=1.0,
+                 sigmoid_smoothing=False,
                  name='attention'):
 
         super(AttentionSeq2Seq, self).__init__()
@@ -144,6 +147,8 @@ class AttentionSeq2Seq(ModelBase):
         self.sharpening_factor = sharpening_factor
         # NOTE: sharpening_factor is good for narrow focus.
         # 2 is recommended.
+        self.sigmoid_smoothing = sigmoid_smoothing
+        # NOTE: this alleviate sharp distribution
 
         # Setting for the decoder
         self.decoder_type = decoder_type
@@ -259,7 +264,7 @@ class AttentionSeq2Seq(ModelBase):
 
         # Calculate loss per example
         logits = decoder_outputs_train.logits / self.logits_temperature
-        # NOTE: This is for better decoding.
+        # NOTE: This is for better decoding. (T = 2 is recommended)
         # See details in
         #   https://arxiv.org/abs/1612.02695.
         #   Chorowski, Jan, and Navdeep Jaitly.
@@ -330,6 +335,7 @@ class AttentionSeq2Seq(ModelBase):
             num_units=self.attention_dim,
             parameter_init=self.parameter_init,
             sharpening_factor=self.sharpening_factor,
+            sigmoid_smoothing=self.sigmoid_smoothing,
             mode=mode)
 
         # Define RNN decoder
