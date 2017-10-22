@@ -5,13 +5,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from os.path import basename
 import numpy as np
+import math
+
 from utils.progressbar import wrap_iterator
 
 
-def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
-                progressbar=False):
+def stack_frame(input_list, num_stack, num_skip, progressbar=False):
     """Stack & skip some frames. This implementation is based on
        https://arxiv.org/abs/1507.06947.
            Sak, Haşim, et al.
@@ -19,16 +19,11 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
            arXiv preprint arXiv:1507.06947 (2015).
     Args:
         input_list (list): list of input data
-        input_paths (list): paths to input data. This is used to get the
-            number of frames from frame_num_dict.
-        frame_num_dict (dict):
-            key (string) => utterance index
-            value (int) => the number of frames
         num_stack (int): the number of frames to stack
         num_skip (int): the number of frames to skip
         progressbar (bool, optional): if True, visualize progressbar
     Returns:
-        stacked_input_list (list): list of frame-stacked inputs
+        input_list_new (list): list of frame-stacked inputs
     """
     if num_stack == 1 and num_stack == 1:
         return input_list
@@ -36,32 +31,26 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
     if num_stack < num_skip:
         raise ValueError('num_skip must be less than num_stack.')
 
-    input_size = input_list[0].shape[1]
-    utt_num = len(input_paths)
+    batch_size = len(input_list)
 
-    stacked_input_list = []
-    for i_utt in wrap_iterator(range(utt_num), progressbar):
-        # Per utterance
-        input_name = basename(input_paths[i_utt]).split('.')[0]
-        frame_num = frame_num_dict[input_name]
-        frame_num_decimated = frame_num / num_skip
-        if frame_num_decimated != int(frame_num_decimated):
-            frame_num_decimated += 1
-        frame_num_decimated = int(frame_num_decimated)
+    input_list_new = []
+    for i_batch in wrap_iterator(range(batch_size), progressbar):
 
-        stacked_frames = np.zeros(
-            (frame_num_decimated, input_size * num_stack))
-        stack_count = 0  # counter for stacked_frames
+        frame_num, input_size = input_list[i_batch].shape
+        frame_num_new = math.ceil(frame_num / num_skip)
+
+        stacked_frames = np.zeros((frame_num_new, input_size * num_stack))
+        stack_count = 0  # counter
         stack = []
-        for i_frame, frame in enumerate(input_list[i_utt]):
+        for t, frame_t in enumerate(input_list[i_batch]):
             #####################
             # final frame
             #####################
-            if i_frame == len(input_list[i_utt]) - 1:
+            if t == len(input_list[i_batch]) - 1:
                 # Stack the final frame
-                stack.append(frame)
+                stack.append(frame_t)
 
-                while stack_count != int(frame_num_decimated):
+                while stack_count != int(frame_num_new):
                     # Concatenate stacked frames
                     for i_stack in range(len(stack)):
                         stacked_frames[stack_count][input_size *
@@ -78,7 +67,7 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
             ########################
             elif len(stack) < num_stack:
                 # Stack some frames until stack is filled
-                stack.append(frame)
+                stack.append(frame_t)
 
                 if len(stack) == num_stack:
                     # Concatenate stacked frames
@@ -91,6 +80,6 @@ def stack_frame(input_list, input_paths, frame_num_dict, num_stack, num_skip,
                     for _ in range(num_skip):
                         stack.pop(0)
 
-        stacked_input_list.append(stacked_frames)
+        input_list_new.append(stacked_frames)
 
-    return np.array(stacked_input_list)
+    return np.array(input_list_new)

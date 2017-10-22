@@ -47,8 +47,7 @@ def _read_phone(text_path):
     return transcript
 
 
-def generate_data(label_type, model, batch_size=1,
-                  num_stack=1, splice=1):
+def generate_data(label_type, model, batch_size=1, num_stack=1, splice=1):
     """
     Args:
         label_type (string): character or phone or multitask
@@ -68,15 +67,8 @@ def generate_data(label_type, model, batch_size=1,
         feature_type='logfbank', feature_dim=40,
         energy=False, delta1=True, delta2=True)
 
-    input_paths = ['./sample/LDC93S1.wav'] * batch_size
-    frame_num_dict = {}
-    for i in range(batch_size):
-        frame_num_dict['LDC93S1'] = inputs[0].shape[0]
-
-    # # Frame stacking
+    # Frame stacking
     inputs = stack_frame(inputs,
-                         input_paths,
-                         frame_num_dict,
                          num_stack=num_stack,
                          num_skip=num_stack,
                          progressbar=False)
@@ -85,7 +77,10 @@ def generate_data(label_type, model, batch_size=1,
             inputs_seq_len[i] = len(inputs[i])
 
     # Splice
-    inputs = do_splice(inputs, splice=splice)
+    inputs = do_splice(inputs,
+                       splice=splice,
+                       batch_size=batch_size,
+                       num_stack=num_stack)
 
     phone2idx = Phone2idx(map_file_path='./phone61.txt')
 
