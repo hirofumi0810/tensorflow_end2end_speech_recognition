@@ -123,8 +123,6 @@ class DatasetBase(Base):
 
         # Frame stacking
         input_list = stack_frame(input_list,
-                                 self.input_paths[data_indices],
-                                 self.frame_num_dict,
                                  self.num_stack,
                                  self.num_skip,
                                  progressbar=False)
