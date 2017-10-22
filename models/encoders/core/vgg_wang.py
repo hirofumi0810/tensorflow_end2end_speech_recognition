@@ -42,6 +42,7 @@ class VGGEncoder(object):
         input_size (int): the dimensions of input vectors.
             This is expected to be num_channels * 3 (static + Δ + ΔΔ)
         splice (int): frames to splice
+        num_stack (int): the number of frames to stack
         parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
         time_major (bool, optional): if True, time-major computation will be
@@ -52,15 +53,16 @@ class VGGEncoder(object):
     def __init__(self,
                  input_size,
                  splice,
+                 num_stack,
                  parameter_init,
                  time_major,
                  name='vgg_encoder'):
 
         assert input_size % 3 == 0
 
-        self.input_size = input_size
-        self.num_channels = input_size // 3
+        self.num_channels = (input_size // 3) // num_stack
         self.splice = splice
+        self.num_stack = num_stack
         self.parameter_init = parameter_init
         self.time_major = time_major
         self.name = name
@@ -69,7 +71,7 @@ class VGGEncoder(object):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size
-                `[B, T, input_size (num_channels * splice * 3)]`
+                `[B, T, input_size (num_channels * (splice * num_stack) * 3)]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
@@ -79,14 +81,24 @@ class VGGEncoder(object):
                 otherwise, `[B, T, output_dim]`
             final_state: None
         """
-        # inputs: 3D tensor `[B, T, input_size (num_channels * splice * 3)]`
+        # inputs: 3D tensor `[B, T, input_dim]`
         batch_size = tf.shape(inputs)[0]
         max_time = tf.shape(inputs)[1]
+        input_dim = inputs.shape.as_list()[-1]
+        # NOTE: input_dim: num_channels * splice * num_stack * 3
 
-        # Reshape to 4D tensor `[B * T, num_channels, splice, 3]`
+        assert input_dim == self.num_channels * self.splice * self.num_stack * 3
+
+        # for debug
+        # print(input_dim)
+        # print(self.num_channels)
+        # print(self.splice)
+        # print(self.num_stack)
+
+        # Reshape to 4D tensor `[B * T, num_channels, splice * num_stack, 3]`
         inputs = tf.reshape(
             inputs,
-            shape=[batch_size * max_time, self.num_channels, self.splice, 3])
+            shape=[batch_size * max_time, self.num_channels, self.splice * self.num_stack, 3])
 
         # NOTE: filter_size: `[H, W, C_in, C_out]`
         with tf.variable_scope('VGG1'):
@@ -111,7 +123,10 @@ class VGGEncoder(object):
                                 activation='relu',
                                 name='conv3')
             inputs = batch_normalization(inputs, is_training=True)
-            inputs = max_pool(inputs, name='max_pool')
+            inputs = max_pool(inputs,
+                              pooling_size=[2, 2],
+                              stride=[2, 2],
+                              name='max_pool')
 
         with tf.variable_scope('VGG2'):
             inputs = conv_layer(inputs,
@@ -142,7 +157,10 @@ class VGGEncoder(object):
                                 activation='relu',
                                 name='conv4')
             inputs = batch_normalization(inputs, is_training=True)
-            inputs = max_pool(inputs, name='max_pool')
+            inputs = max_pool(inputs,
+                              pooling_size=[2, 2],
+                              stride=[2, 2],
+                              name='max_pool')
 
         with tf.variable_scope('VGG3'):
             inputs = conv_layer(inputs,
@@ -169,27 +187,33 @@ class VGGEncoder(object):
                                 activation='relu',
                                 name='conv4')
             inputs = batch_normalization(inputs, is_training=True)
-            inputs = max_pool(inputs, name='max_pool')
+            inputs = max_pool(inputs,
+                              pooling_size=[2, 2],
+                              stride=[2, 2],
+                              name='max_pool')
 
-        # Reshape to 2D tensor `[B * T, new_h * new_w * 384]`
-        new_h = math.ceil(self.num_channels / (2**3))  # 5 or 6
-        new_w = math.ceil(self.splice / (2**3))  # 2
+        # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
+        new_h = math.ceil(self.num_channels / (2**3))
+        new_w = math.ceil((self.splice * self.num_stack) / (2**3))
+        channel_out = inputs.shape.as_list()[-1]
         outputs = tf.reshape(
-            inputs, shape=[batch_size * max_time, new_h * new_w * 384])
+            inputs, shape=[batch_size * max_time, new_h * new_w * channel_out])
 
-        with tf.variable_scope('fc') as scope:
-            outputs = tf.contrib.layers.fully_connected(
-                inputs=outputs,
-                num_outputs=1024,
-                activation_fn=tf.nn.relu,
-                weights_initializer=tf.truncated_normal_initializer(
-                    stddev=self.parameter_init),
-                biases_initializer=tf.zeros_initializer(),
-                scope=scope)
+        for i in range(1, 2, 1):
+            with tf.variable_scope('fc%d' % i) as scope:
+                outputs = tf.contrib.layers.fully_connected(
+                    inputs=outputs,
+                    num_outputs=1024,
+                    activation_fn=tf.nn.relu,
+                    weights_initializer=tf.truncated_normal_initializer(
+                        stddev=self.parameter_init),
+                    biases_initializer=tf.zeros_initializer(),
+                    scope=scope)
 
         # Reshape back to 3D tensor `[B, T, 1024]`
+        output_dim = outputs.shape.as_list()[-1]
         outputs = tf.reshape(
-            outputs, shape=[batch_size, max_time, 1024])
+            outputs, shape=[batch_size, max_time, output_dim])
 
         if self.time_major:
             # Convert to time-major: `[T, B, num_classes]'
