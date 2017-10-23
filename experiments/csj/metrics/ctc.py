@@ -49,10 +49,10 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
         dataset.batch_size = eval_batch_size
 
     if label_type == 'kanji':
-        map_file_path = '../metrics/mapping_files/' + label_type + '.txt'
-    elif label_type == 'kana':
-        map_file_path = '../metrics/mapping_files' + \
+        map_file_path = '../metrics/mapping_files/' + \
             label_type + '_' + train_data_size + '.txt'
+    elif label_type == 'kana':
+        map_file_path = '../metrics/mapping_files/' + label_type + '.txt'
 
     idx2char = Idx2char(map_file_path=map_file_path)
 

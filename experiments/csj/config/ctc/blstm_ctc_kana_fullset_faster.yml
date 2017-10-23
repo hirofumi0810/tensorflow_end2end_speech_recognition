@@ -18,7 +18,7 @@ param:
   use_peephole: True
   num_units: 320
   num_proj: 0
-  num_layers: 5
+  num_layers: 6
   bottleneck_dim: 0
 
   # optimization
@@ -40,5 +40,5 @@ param:
   not_improved_patient_epoch: 3
 
   eval_start_epoch: 1
-  print_step: 400
+  print_step: 800
   beam_width: 100
