@@ -30,7 +30,7 @@ def do_splice(inputs, splice=1, batch_size=1, num_stack=1):
     batch_size, max_time, input_size = inputs.shape
     num_channels = (input_size // 3) // num_stack
     input_data_spliced = np.zeros(
-        (batch_size, max_time, num_channels * splice * num_stack * 3))
+        (batch_size, max_time, num_channels * (splice * num_stack) * 3))
 
     for i_batch in range(batch_size):
         for i_time in range(max_time):
@@ -68,7 +68,7 @@ def do_splice(inputs, splice=1, batch_size=1, num_stack=1):
             spliced_frames = np.transpose(spliced_frames, (1, 0, 2))
 
             input_data_spliced[i_batch][i_time] = spliced_frames.reshape(
-                (num_channels * splice * num_stack * 3))
+                (num_channels * (splice * num_stack) * 3))
 
     return input_data_spliced
 
