@@ -22,6 +22,9 @@ class TestEncoder(unittest.TestCase):
     def test(self):
         print("Encoder Working check.")
 
+        self.check(encoder_type='blstm', lstm_impl='LSTMBlockFusedCell',
+                   time_major=True)
+
         # CNNs
         self.check(encoder_type='vgg_wang', time_major=True)
         self.check(encoder_type='cnn_zhang', time_major=True)
@@ -130,6 +133,7 @@ class TestEncoder(unittest.TestCase):
                 label_type='character',
                 model='ctc',
                 batch_size=batch_size,
+                num_stack=3,
                 splice=splice)
             frame_num, input_size = inputs[0].shape
 
@@ -152,8 +156,8 @@ class TestEncoder(unittest.TestCase):
                     time_major=time_major)
             elif encoder_type in ['vgg_blstm', 'vgg_lstm']:
                 encoder = load(encoder_type)(
-                    input_size=input_size // 11,
-                    splice=11,
+                    input_size=input_size // splice,
+                    splice=splice,
                     num_units=256,
                     num_proj=None,
                     num_layers=5,
@@ -175,8 +179,8 @@ class TestEncoder(unittest.TestCase):
                     time_major=time_major)
             elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                 encoder = load(encoder_type)(
-                    input_size=input_size // 11,
-                    splice=11,
+                    input_size=input_size // splice,
+                    splice=splice,
                     parameter_init=0.1,
                     time_major=time_major)
                 # NOTE: topology is pre-defined
@@ -234,8 +238,6 @@ class TestEncoder(unittest.TestCase):
                         [hidden_states_op, final_state_op,
                          hidden_states_sub_op, final_state_sub_op],
                         feed_dict=feed_dict)
-                    if time_major:
-                        encoder_outputs = encoder_outputs.transpose(1, 0, 2)
                 elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                     encoder_outputs = sess.run(
                         hidden_states_op, feed_dict=feed_dict)

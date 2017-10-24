@@ -42,8 +42,8 @@ class LSTMEncoder(object):
                  clip_activation,
                  time_major=False,
                  name='lstm_encoder'):
-        if num_proj == 0:
-            raise ValueError
+
+        assert num_proj != 0
 
         self.num_units = num_units
         if lstm_impl != 'LSTMCell':
@@ -59,13 +59,14 @@ class LSTMEncoder(object):
         self.time_major = time_major
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob):
+    def __call__(self, inputs, inputs_seq_len, keep_prob, is_training):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
+            is_training (bool):
         Returns:
             outputs: Encoder states.
                 if time_major is True, a tensor of size

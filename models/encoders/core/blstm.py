@@ -42,8 +42,8 @@ class BLSTMEncoder(object):
                  clip_activation,
                  time_major=True,
                  name='lstm_encoder'):
-        if num_proj == 0:
-            raise ValueError
+
+        assert num_proj != 0
 
         self.num_units = num_units
         if lstm_impl != 'LSTMCell':
@@ -59,13 +59,14 @@ class BLSTMEncoder(object):
         self.time_major = time_major
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob):
+    def __call__(self, inputs, inputs_seq_len, keep_prob, is_training):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
+            is_training (bool):
         Returns:
             outputs: Encoder states.
                 if time_major is True, a tensor of size
@@ -288,9 +289,8 @@ def lstmblockcell(num_units, num_layers, use_peephole, clip_activation,
 
 
 def lstmblockfusedcell(num_units, num_layers, use_peephole, clip_activation,
-                       inputs, inputs_seq_len, keep_prob, initializer,
-                       time_major, num_layers_sub=None):
-
+                       inputs, inputs_seq_len, keep_prob, initializer, time_major,
+                       num_layers_sub=None):
     # TODO: add time-major
 
     outputs = inputs
@@ -302,12 +302,12 @@ def lstmblockfusedcell(num_units, num_layers, use_peephole, clip_activation,
                 lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
                     num_units,
                     forget_bias=1.0,
-                    clip_cell=clip_activation,
+                    cell_clip=clip_activation,
                     use_peephole=use_peephole)
                 lstm_bw = tf.contrib.rnn.LSTMBlockFusedCell(
                     num_units,
                     forget_bias=1.0,
-                    clip_cell=clip_activation,
+                    cell_clip=clip_activation,
                     use_peephole=use_peephole)
             else:
                 lstm_fw = tf.contrib.rnn.LSTMBlockFusedCell(
@@ -334,9 +334,7 @@ def lstmblockfusedcell(num_units, num_layers, use_peephole, clip_activation,
 
             # TODO: add dropout
 
-            # outputs = tf.concat_v2([outputs_fw, outputs_bw], 2, name="output")
-            outputs = tf.concat(
-                axis=2, values=[outputs_fw, outputs_bw])
+            outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
 
             # if self.num_proj > 0:
             #     outputs = tf.contrib.layers.fully_connected(
