@@ -78,6 +78,7 @@ class DatasetBase(Base):
                 self.epoch += 1
                 if self.epoch == self.sort_stop_epoch:
                     self.sort_utt = False
+                    self.shuffle = True
 
             # Shuffle data in the mini-batch
             random.shuffle(data_indices)
@@ -191,6 +192,10 @@ class DatasetBase(Base):
             input_names = np.array(input_names)[np.newaxis, :]
 
         self.iteration += len(data_indices)
+
+        # Clean up
+        del input_list
+        del label_list
 
         return (inputs, labels, inputs_seq_len, labels_seq_len,
                 input_names), self.is_new_epoch

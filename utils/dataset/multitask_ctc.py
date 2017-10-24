@@ -35,7 +35,7 @@ class DatasetBase(Base):
         Args:
             batch_size (int, optional): the size of mini-batch
         Returns:
-            A tuple of `(inputs, labels, inputs_seq_len, labels_seq_len, input_names)`
+            A tuple of `(inputs, labels_main, labels_sub, inputs_seq_len, input_names)`
                 inputs: list of input data of size
                     `[num_gpu, B, T_in, input_size]`
                 labels_main: list of target labels in the main task, of size
@@ -79,6 +79,7 @@ class DatasetBase(Base):
                 self.epoch += 1
                 if self.epoch == self.sort_stop_epoch:
                     self.sort_utt = False
+                    self.shuffle = True
 
             # Shuffle data in the mini-batch
             random.shuffle(data_indices)
@@ -193,6 +194,11 @@ class DatasetBase(Base):
             input_names = np.array(input_names)[np.newaxis, :]
 
         self.iteration += len(data_indices)
+
+        # Clean up
+        del input_list
+        del label_main_list
+        del label_sub_list
 
         return (inputs, labels_main, labels_sub, inputs_seq_len,
                 input_names), self.is_new_epoch

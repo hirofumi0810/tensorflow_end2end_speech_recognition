@@ -3,7 +3,7 @@
 
 """Base class for laoding dataset for the Jont CTC-Attention model.
    In this class, all data will be loaded at once.
-   You can use only the single GPU version.
+   You can use the multi-GPU version.
 """
 
 from __future__ import absolute_import
@@ -77,6 +77,7 @@ class DatasetBase(Base):
                 self.epoch += 1
                 if self.epoch == self.sort_stop_epoch:
                     self.sort_utt = False
+                    self.shuffle = True
 
             # Shuffle data in the mini-batch
             random.shuffle(data_indices)
@@ -197,6 +198,10 @@ class DatasetBase(Base):
             input_names = np.array(input_names)[np.newaxis, :]
 
         self.iteration += len(data_indices)
+
+        # Clean up
+        del input_list
+        del label_list
 
         return (inputs, att_labels, ctc_labels, inputs_seq_len,
                 att_labels_seq_len, input_names), self.is_new_epoch
