@@ -20,9 +20,9 @@ orange = '#D2691E'
 def plot_loss(train_losses, dev_losses, steps, save_path):
     """Save history of training & dev loss as figure.
     Args:
-        train_losses: list of train losses
-        dev_losses: list of dev losses
-        steps: list of steps
+        train_losses (list): train losses
+        dev_losses (list): dev losses
+        steps (list): steps
     """
     # Save as csv file
     loss_graph = np.column_stack((steps, train_losses, dev_losses))
@@ -47,18 +47,18 @@ def plot_loss(train_losses, dev_losses, steps, save_path):
 def plot_ler(train_lers, dev_lers, steps, label_type, save_path):
     """Save history of training & dev LERs as figure.
     Args:
-        train_lers: list of train losses
-        dev_lers: list of dev losses
-        steps: list of steps
+        train_lers (list): train losses
+        dev_lers (list): dev losses
+        steps (list): steps
     """
     if 'word' in label_type:
         name = 'WER'
-    elif 'char' in label_type:
+    elif 'char' in label_type or 'kana' in label_type or 'kanji' in label_type:
         name = 'CER'
     elif 'phone' in label_type:
         name = 'PER'
     else:
-        raise ValueError
+        name = 'LER'
 
     # Save as csv file
     loss_graph = np.column_stack((steps, train_lers, dev_lers))

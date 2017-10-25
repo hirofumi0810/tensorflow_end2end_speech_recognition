@@ -45,8 +45,8 @@ class MultitaskLSTMEncoder(object):
                  clip_activation,
                  time_major=False,
                  name='multitask_lstm_encoder'):
-        if num_proj == 0:
-            raise ValueError
+
+        assert num_proj != 0
 
         self.num_units = num_units
         if lstm_impl != 'LSTMCell':
@@ -67,13 +67,14 @@ class MultitaskLSTMEncoder(object):
             raise ValueError(
                 'Set num_layers_sub between 1 to num_layers_main.')
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob):
+    def __call__(self, inputs, inputs_seq_len, keep_prob, is_training):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
+            is_training (bool):
         Returns:
             outputs: A tensor of size `[T, B, input_size]` in the main task
             final_state: A final hidden state of the encoder in the main task

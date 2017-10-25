@@ -36,8 +36,14 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
     Returns:
         per_mean (float): An average of PER
     """
+    batch_size_original = dataset.batch_size
+
     # Reset data counter
     dataset.reset()
+
+    # Set batch size in the evaluation
+    if eval_batch_size is not None:
+        dataset.batch_size = eval_batch_size
 
     train_label_type = label_type
     eval_label_type = dataset.label_type_sub if is_multitask else dataset.label_type
@@ -60,11 +66,11 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
 
         # Create feed dictionary for next mini-batch
         if is_multitask:
-            inputs, _, labels_true, inputs_seq_len, _, _ = data
+            inputs, _, labels_true, inputs_seq_len, labels_seq_len, _ = data
         elif is_jointctcatt:
-            inputs, labels_true, _, inputs_seq_len, _, _ = data
+            inputs, labels_true, _, inputs_seq_len, labels_seq_len, _ = data
         else:
-            inputs, labels_true, inputs_seq_len, _, _ = data
+            inputs, labels_true, inputs_seq_len, labels_seq_len, _ = data
 
         feed_dict = {
             model.inputs_pl_list[0]: inputs[0],
@@ -83,15 +89,15 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
             ###############
             # Hypothesis
             ###############
-            # Convert from num to phone (-> list of phone strings)
-            phone_pred_list = idx2phone_train(labels_pred[i_batch]).split(' ')
+            # Convert from index to phone (-> list of phone strings)
+            str_pred = idx2phone_train(labels_pred[i_batch]).split('>')[0]
+            # NOTE: Trancate by <EOS>
 
-            # Exclude <EOS>
-            if '>' in phone_pred_list:
-                phone_pred_list.remove('>')
+            # Remove the last space
+            if str_pred[-1] == ' ':
+                str_pred = str_pred[:-1]
 
-            # Mapping to 39 phones (-> list of phone strings)
-            phone_pred_list = map2phone39_train(phone_pred_list)
+            phone_pred_list = str_pred.split(' ')
 
             ###############
             # Reference
@@ -101,16 +107,11 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
             else:
                 # Convert from index to phone (-> list of phone strings)
                 phone_true_list = idx2phone_eval(
-                    labels_true[0][i_batch][1:-1]).split(' ')
+                    labels_true[0][i_batch][1:labels_seq_len[0][i_batch] - 1]).split(' ')
                 # NOTE: Exclude <SOS> and <EOS>
 
-            # Exclude <SOS> & <EOS> (train or dev stage)
-            if '<' in phone_true_list:
-                phone_true_list.remove('<')
-            if '>'in phone_true_list:
-                phone_true_list.remove('>')
-
             # Mapping to 39 phones (-> list of phone strings)
+            phone_pred_list = map2phone39_train(phone_pred_list)
             phone_true_list = map2phone39_eval(phone_true_list)
 
             # Compute PER
@@ -125,6 +126,10 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
             break
 
     per_mean /= len(dataset)
+
+    # Register original batch size
+    if eval_batch_size is not None:
+        dataset.batch_size = batch_size_original
 
     return per_mean
 
@@ -149,8 +154,14 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
         cer_mean (float): An average of CER
         wer_mean (float): An average of WER
     """
+    batch_size_original = dataset.batch_size
+
     # Reset data counter
     dataset.reset()
+
+    # Set batch size in the evaluation
+    if eval_batch_size is not None:
+        dataset.batch_size = eval_batch_size
 
     idx2char = Idx2char(
         map_file_path='../metrics/mapping_files/' + label_type + '.txt')
@@ -162,11 +173,11 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
 
         # Create feed dictionary for next mini-batch
         if is_multitask:
-            inputs, labels_true, _, inputs_seq_len, _, _ = data
+            inputs, labels_true, _, inputs_seq_len, labels_seq_len, _ = data
         elif is_jointctcatt:
-            inputs, labels_true, _, inputs_seq_len, _, _ = data
+            inputs, labels_true, _, inputs_seq_len, labels_seq_len, _ = data
         else:
-            inputs, labels_true, inputs_seq_len, _, _ = data
+            inputs, labels_true, inputs_seq_len, labels_seq_len, _ = data
 
         feed_dict = {
             model.inputs_pl_list[0]: inputs[0],
@@ -187,8 +198,11 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
                 # NOTE: transcript is seperated by space('_')
             else:
                 # Convert from list of index to string
-                str_true = idx2char(labels_true[0][i_batch])
-            str_pred = idx2char(labels_pred[i_batch])
+                str_true = idx2char(
+                    labels_true[0][i_batch][1:labels_seq_len[0][i_batch] - 1],
+                    padded_value=dataset.padded_value)
+            str_pred = idx2char(labels_pred[i_batch]).split('>')[0]
+            # NOTE: Trancate by <EOS>
 
             # Remove consecutive spaces
             str_pred = re.sub(r'[_]+', '_', str_pred)
@@ -225,5 +239,9 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
 
     cer_mean /= len(dataset)
     wer_mean /= len(dataset)
+
+    # Register original batch size
+    if eval_batch_size is not None:
+        dataset.batch_size = batch_size_original
 
     return cer_mean, wer_mean

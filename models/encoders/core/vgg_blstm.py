@@ -20,6 +20,7 @@ class VGGBLSTMEncoder(object):
         input_size (int): the dimensions of input vectors．
             This is expected to be num_channels * 3 (static + Δ + ΔΔ)
         splice (int): frames to splice
+        num_stack (int): the number of frames to stack
         num_units (int): the number of units in each layer
         num_proj (int): the number of nodes in the projection layer
         num_layers (int): the number of layers
@@ -42,6 +43,7 @@ class VGGBLSTMEncoder(object):
     def __init__(self,
                  input_size,
                  splice,
+                 num_stack,
                  num_units,
                  num_proj,
                  num_layers,
@@ -55,9 +57,9 @@ class VGGBLSTMEncoder(object):
         assert num_proj != 0
         assert input_size % 3 == 0
 
-        self.input_size = input_size
-        self.num_channels = input_size // 3
+        self.num_channels = (input_size // 3) // num_stack
         self.splice = splice
+        self.num_stack = num_stack
         self.num_units = num_units
         if lstm_impl != 'LSTMCell':
             self.num_proj = None
@@ -72,27 +74,32 @@ class VGGBLSTMEncoder(object):
         self.time_major = time_major
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob):
+    def __call__(self, inputs, inputs_seq_len, keep_prob, is_training):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size
-                `[B, T, input_size (num_channels * splice * 3)]`
+                `[B, T, input_size (num_channels * (splice * num_stack) * 3)]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
+            is_training (bool):
         Returns:
             outputs: Encoder states, a tensor of size
                 `[T, B, num_units (num_proj)]`
             final_state: A final hidden state of the encoder
         """
-        # inputs: 3D tensor `[B, T, input_size (num_channels * splice * 3)]`
+        # inputs: 3D tensor `[B, T, input_dim]`
         batch_size = tf.shape(inputs)[0]
         max_time = tf.shape(inputs)[1]
+        input_dim = inputs.shape.as_list()[-1]
+        # NOTE: input_dim: num_channels * splice * num_stack * 3
 
-        # Reshape to 4D tensor `[B * T, num_channels, splice, 3]`
+        assert input_dim == self.num_channels * self.splice * self.num_stack * 3
+
+        # Reshape to 4D tensor `[B * T, num_channels, splice * num_stack, 3]`
         inputs = tf.reshape(
             inputs,
-            shape=[batch_size * max_time, self.num_channels, self.splice, 3])
+            shape=[batch_size * max_time, self.num_channels, self.splice * self.num_stack, 3])
 
         # NOTE: filter_size: `[H, W, C_in, C_out]`
         with tf.variable_scope('VGG1'):
@@ -108,8 +115,11 @@ class VGGBLSTMEncoder(object):
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv2')
-            inputs = batch_normalization(inputs, is_training=True)
-            inputs = max_pool(inputs, name='max_pool')
+            inputs = batch_normalization(inputs, is_training=is_training)
+            inputs = max_pool(inputs,
+                              pooling_size=[2, 2],
+                              stride=[2, 2],
+                              name='max_pool')
             # TODO: try dropout
 
         with tf.variable_scope('VGG2'):
@@ -125,18 +135,22 @@ class VGGBLSTMEncoder(object):
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv2')
-            inputs = batch_normalization(inputs, is_training=True)
-            inputs = max_pool(inputs, name='max_pool')
+            inputs = batch_normalization(inputs, is_training=is_training)
+            inputs = max_pool(inputs,
+                              pooling_size=[2, 2],
+                              stride=[2, 2],
+                              name='max_pool')
             # TODO: try dropout
 
-        # Reshape to 2D tensor `[B * T, new_h * new_w * 128]`
-        new_h = math.ceil(self.num_channels / 4)  # expected to be 11 ro 10
-        new_w = math.ceil(self.splice / 4)  # expected to be 3
+        # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
+        new_h = math.ceil(self.num_channels / 4)
+        new_w = math.ceil(self.splice * self.num_stack / 4)
+        channel_out = inputs.shape.as_list()[-1]
         inputs = tf.reshape(
-            inputs, shape=[batch_size * max_time, new_h * new_w * 128])
+            inputs, shape=[batch_size * max_time, new_h * new_w * channel_out])
 
         # Insert linear layer to recude CNN's output demention
-        # from (new_h * new_w * 128) to 256
+        # from (new_h * new_w * C_out) to 256
         with tf.variable_scope('bridge') as scope:
             inputs = tf.contrib.layers.fully_connected(
                 inputs=inputs,

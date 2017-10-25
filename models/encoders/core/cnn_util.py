@@ -10,35 +10,38 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-def max_pool(bottom, name='max_pool'):
+def max_pool(bottom, pooling_size, stride=[2, 2], name='max_pool'):
     """A max pooling layer.
     Args:
-        bottom: A tensor of size `[B * T, H, W, C]`
+        bottom: A tensor of size `[B (* T), H, W, C_in]`
+        pooling_size (list): A list of `[pool_H, pool_w]`
+        stride (list, optional): A list of `[stride_H, stride_W]`
         name (string, optional): A layer name
     Returns:
-        A tensor of size `[B * T, H / 2, W / 2, C]`
+        outputs: A tensor of size `[B * T, H, W, C_out]`
     """
     return tf.nn.max_pool(
         bottom,
-        ksize=[1, 2, 2, 1],  # original
-        # ksize=[1, 3, 3, 1],
-        strides=[1, 2, 2, 1],
-        padding='SAME', name=name)
+        ksize=[1, pooling_size[0], pooling_size[1], 1],
+        strides=[1, stride[0], stride[1], 1],
+        padding='SAME',
+        name=name)
 
 
-def avg_pool(bottom, name='avg_pool'):
+def avg_pool(bottom, pooling_size, stride=[2, 2], name='avg_pool'):
     """An average pooling layer.
     Args:
-        bottom: A tensor of size `[B * T, H, W, C]`
+        bottom: A tensor of size `[B (* T), H, W, C_in]`
+        pooling_size (list): A list of `[pool_H, pool_w]`
+        stride (list, optional): A list of `[stride_H, stride_W]`
         name (string, optional): A layer name
     Returns:
-        A tensor of size `[B * T, H / 2, W / 2, C]`
+        outputs: A tensor of size `[B * T, H, W, C_out]`
     """
     return tf.nn.avg_pool(
         bottom,
-        ksize=[1, 2, 2, 1],  # original
-        # ksize=[1, 3, 3, 1],
-        strides=[1, 2, 2, 1],
+        ksize=[1, pooling_size[0], pooling_size[1], 1],
+        strides=[1, stride[0], stride[1], 1],
         padding='SAME',
         name=name)
 
@@ -47,7 +50,7 @@ def conv_layer(bottom, filter_size, stride=[1, 1], parameter_init=0.1,
                activation=None, name='conv'):
     """A convolutional layer
     Args:
-        bottom: A tensor of size `[B * T, H, W, C_in]`
+        bottom: A tensor of size `[B (* T), H, W, C_in]`
         filter_size (list): A list of `[H, W, C_in, C_out]`
         stride (list, optional): A list of `[stride_H, stride_W]`
         parameter_init (float, optional):
@@ -81,11 +84,15 @@ def conv_layer(bottom, filter_size, stride=[1, 1], parameter_init=0.1,
             raise NotImplementedError
 
 
-def batch_normalization(tensor, is_training=False, epsilon=0.001, momentum=0.9,
+def batch_normalization(tensor, is_training=True, epsilon=0.001, momentum=0.9,
                         fused_batch_norm=False, name=None):
     """Performs batch normalization on given 4-D tensor.
     Args:
         tensor:
+        epsilon:
+        momentum:
+        fused_batch_norm:
+        name:
     Returns:
 
     The features are assumed to be in NHWC format. Noe that you need to
@@ -104,7 +111,7 @@ def batch_normalization(tensor, is_training=False, epsilon=0.001, momentum=0.9,
             'beta', channels, initializer=tf.zeros_initializer())
         gamma = tf.get_variable(
             'gamma', channels, initializer=tf.ones_initializer())
-        # NOTE: these are trainable
+        # NOTE: these are trainable parameters
 
         avg_mean = tf.get_variable(
             "avg_mean", channels, initializer=tf.zeros_initializer(),

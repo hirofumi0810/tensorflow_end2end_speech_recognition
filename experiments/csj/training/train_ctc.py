@@ -297,13 +297,16 @@ def do_train(model, params, gpu_indices):
                             save_path = saver.save(
                                 sess, checkpoint_file, global_step=train_data.epoch)
                             print("Model saved in file: %s" % save_path)
-
                         else:
                             not_improved_epoch += 1
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
                               (duration_eval / 60))
+
+                        # Early stopping
+                        if not_improved_epoch == params['not_improved_patient_epoch']:
+                            break
 
                         # Update learning rate
                         learning_rate = lr_controller.decay_lr(
@@ -343,6 +346,8 @@ def main(config_path, model_save_path, gpu_indices):
             params['num_classes'] = 2982
         elif params['train_data_size'] == 'train_fullset':
             params['num_classes'] = 3386
+    else:
+        raise TypeError
 
     # Model setting
     model = CTC(encoder_type=params['encoder_type'],
@@ -361,7 +366,7 @@ def main(config_path, model_save_path, gpu_indices):
 
     # Set process name
     setproctitle(
-        'tf_libri_' + model.name + '_' + params['train_data_size'] + '_' + params['label_type'])
+        'tf_csj_' + model.name + '_' + params['train_data_size'] + '_' + params['label_type'])
 
     model.name += '_' + str(params['num_units'])
     model.name += '_' + str(params['num_layers'])

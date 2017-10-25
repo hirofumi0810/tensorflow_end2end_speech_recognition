@@ -40,5 +40,5 @@ param:
   not_improved_patient_epoch: 3
 
   eval_start_epoch: 1
-  print_step: 200
+  print_step: 400
   beam_width: 100

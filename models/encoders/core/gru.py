@@ -31,13 +31,14 @@ class GRUEncoder(object):
         self.time_major = time_major
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob):
+    def __call__(self, inputs, inputs_seq_len, keep_prob, is_training):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
+            is_training (bool):
         Returns:
             outputs: Encoder states, a tensor of size `[T, B, num_units]`
             final_state: A final hidden state of the encoder
@@ -103,13 +104,14 @@ class BGRUEncoder(object):
         self.time_major = time_major
         self.name = name
 
-    def __call__(self, inputs, inputs_seq_len, keep_prob):
+    def __call__(self, inputs, inputs_seq_len, keep_prob, is_training):
         """Construct model graph.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
+            is_training (bool):
         Returns:
             outputs: Encoder states, a tensor of size　`[T, B, num_units]`
             final_state: A final hidden state of the encoder

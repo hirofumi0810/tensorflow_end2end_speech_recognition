@@ -7,8 +7,8 @@ param:
   feature: fbank
   input_size: 120
   splice: 1
-  num_stack: 1
-  num_skip: 1
+  num_stack: 3
+  num_skip: 3
 
   # topology
   encoder_type: lstm
@@ -27,9 +27,9 @@ param:
 
   # optimization
   batch_size: 64
-  optimizer: adam
+  optimizer: rmsprop
   learning_rate: 1e-3
-  num_epoch: 50
+  num_epoch: 100
 
   # regularization
   weight_init: 0.1
@@ -37,15 +37,16 @@ param:
   clip_activation_encoder: 50
   clip_activation_decoder: 50
   dropout_encoder: 0.5
-  dropout_decoder: 0.2
-  dropout_embedding: 0.2
+  dropout_decoder: 0.1
+  dropout_embedding: 0.1
   weight_decay: 0
   decay_start_epoch: 20
   decay_rate: 0.5
-  decay_patient_epoch: 3
-  # sort_stop_epoch: 20
+  decay_patient_epoch: 5
+  sort_stop_epoch: 20
   sharpening_factor: 1.0
   logits_temperature: 1.0
+  sigmoid_smoothing: False
 
   eval_start_epoch: 20
   print_step: 10

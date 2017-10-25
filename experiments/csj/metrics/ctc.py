@@ -48,11 +48,13 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
     if eval_batch_size is not None:
         dataset.batch_size = eval_batch_size
 
-    if label_type == 'kanji':
-        map_file_path = '../metrics/mapping_files/' + label_type + '.txt'
-    elif label_type == 'kana':
-        map_file_path = '../metrics/mapping_files' + \
+    if 'kanji' in label_type:
+        map_file_path = '../metrics/mapping_files/' + \
             label_type + '_' + train_data_size + '.txt'
+    elif 'kana' in label_type:
+        map_file_path = '../metrics/mapping_files/' + label_type + '.txt'
+    else:
+        raise TypeError
 
     idx2char = Idx2char(map_file_path=map_file_path)
 
@@ -100,6 +102,7 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
                     if progressbar:
                         pbar.update(1)
             except:
+                print('skipped')
                 skip_data_num += batch_size_device
                 # TODO: Conduct decoding again with batch size 1
 

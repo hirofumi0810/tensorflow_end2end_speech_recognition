@@ -129,7 +129,7 @@ def decode(session, decode_op, model, dataset, label_type,
     for data, is_new_epoch in dataset:
 
         # Create feed dictionary for next mini batch
-        inputs, labels_true, inputs_seq_len, _, input_names = data
+        inputs, labels_true, inputs_seq_len, labels_seq_len, input_names = data
 
         feed_dict = {
             model.inputs_pl_list[0]: inputs[0],
@@ -143,20 +143,19 @@ def decode(session, decode_op, model, dataset, label_type,
         labels_pred = session.run(decode_op, feed_dict=feed_dict)
         for i_batch in range(batch_size):
             print('----- wav: %s -----' % input_names[0][i_batch])
-            if 'char' in label_type:
-                if is_test:
-                    str_true = labels_true[0][i_batch][0]
-                else:
-                    str_true = map_fn(
-                        labels_true[0][i_batch][1:-1])
-                str_pred = map_fn(labels_pred[i_batch]).replace('>', '')
+            if is_test:
+                str_true = labels_true[0][i_batch][0]
             else:
-                if is_test:
-                    str_true = labels_true[0][i_batch][0]
-                else:
-                    str_true = map_fn(labels_true[0][i_batch][1:-1])
+                str_true = map_fn(
+                    labels_true[0][i_batch][1:labels_seq_len[0][i_batch] - 1])
+                # NOTE: Exclude <SOS> and <EOS>
+            str_pred = map_fn(labels_pred[i_batch]).split('>')[0]
+            # NOTE: Trancate by <EOS>
 
-                str_pred = map_fn(labels_pred[i_batch]).replace('>', '')
+            if 'phone' in label_type:
+                # Remove the last space
+                if str_pred[-1] == ' ':
+                    str_pred = str_pred[:-1]
 
             print('Ref: %s' % str_true)
             print('Hyp: %s' % str_pred)
@@ -185,10 +184,12 @@ def main():
         params['num_classes'] = 28
     elif params['label_type'] == 'character_capital_divide':
         params['num_classes'] = 72
+    else:
+        TypeError
 
     # Model setting
     model = AttentionSeq2Seq(
-        input_size=params['input_size'],
+        input_size=params['input_size'] * params['num_stack'],
         encoder_type=params['encoder_type'],
         encoder_num_units=params['encoder_num_units'],
         encoder_num_layers=params['encoder_num_layers'],

@@ -49,7 +49,7 @@ def wav2feature(wav_paths, feature_type='logfbank', feature_dim=40,
         input_size *= 2
 
     inputs = None
-    inputs_seq_len = np.zeros((batch_size,))
+    inputs_seq_len = np.zeros((batch_size,), dtype=np.int32)
     for i, wav_path in enumerate(wav_paths):
         if feature_type == 'mfcc':
             feat = mfcc(audio, samplerate=fs, numcep=feature_dim)

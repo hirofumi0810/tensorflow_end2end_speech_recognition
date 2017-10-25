@@ -12,9 +12,13 @@ class Char2idx(object):
     """Convert from character to index.
     Args:
         map_file_path (string): path to the mapping file
+        double_letter (bool, optional): if True, group repeated letters
     """
 
-    def __init__(self, str_char, map_file_path):
+    def __init__(self, map_file_path, double_letter=False):
+
+        self.double_letter = double_letter
+
         # Read the mapping file
         self.map_dict = {}
         with open(map_file_path, 'r') as f:
@@ -25,62 +29,42 @@ class Char2idx(object):
     def __call__(self, str_char):
         """
         Args:
-            str_char (string): a sequence of characters
+            str_char (string): string of characters
         Returns:
-            index_list (list): character indices
+            char_list (list): character indices
         """
         char_list = list(str_char)
 
         # Convert from character to index
-        index_list = list(map(lambda x: self.map_dict[x], char_list))
+        if self.double_letter:
+            skip_flag = False
+            for i in range(len(char_list) - 1):
+                if skip_flag:
+                    char_list[i] = ''
+                    skip_flag = False
+                    continue
 
-        return np.array(index_list)
-
-
-class Kana2idx(object):
-    """Convert from kana character to index.
-    Args:
-        map_file_path (string): path to the mapping file
-    """
-
-    def __init__(self, map_file_path):
-        # Read the mapping file
-        self.map_dict = {}
-        with open(map_file_path, 'r') as f:
-            for line in f:
-                line = line.strip().split()
-                self.map_dict[line[0]] = int(line[1])
-
-    def __call__(self, str_char):
-        """
-        Args:
-            str_char (string): a sequence of kana characters
-        Returns:
-            index_list (list): kana character indices
-        """
-        kana_list = list(str_char)
-        index_list = []
-
-        for i in range(len(kana_list)):
-            # Check whether next kana character is a double consonant
-            if i != len(kana_list) - 1:
-                if kana_list[i] + kana_list[i + 1] in self.map_dict.keys():
-                    index_list.append(
-                        int(self.map_dict[kana_list[i] + kana_list[i + 1]]))
-                    i += 1
-                elif kana_list[i] in self.map_dict.keys():
-                    index_list.append(int(self.map_dict[kana_list[i]]))
+                if char_list[i] + char_list[i + 1] in self.map_dict.keys():
+                    char_list[i] = self.map_dict[char_list[i] +
+                                                 char_list[i + 1]]
+                    skip_flag = True
                 else:
-                    raise ValueError(
-                        'There are no kana character such as %s' % kana_list[i])
+                    char_list[i] = self.map_dict[char_list[i]]
+
+            # Final character
+            if skip_flag:
+                char_list[-1] = ''
             else:
-                if kana_list[i] in self.map_dict.keys():
-                    index_list.append(int(self.map_dict[kana_list[i]]))
-                else:
-                    raise ValueError(
-                        'There are no kana character such as %s' % kana_list[i])
+                char_list[-1] = self.map_dict[char_list[-1]]
 
-        return np.array(index_list)
+            # Remove skipped characters
+            while '' in char_list:
+                char_list.remove('')
+        else:
+            for i in range(len(char_list)):
+                char_list[i] = self.map_dict[char_list[i]]
+
+        return char_list
 
 
 class Idx2char(object):
@@ -113,7 +97,8 @@ class Idx2char(object):
             str_char (string): a sequence of characters
         """
         # Remove padded values
-        assert type(index_list) == np.ndarray, 'index_list should be np.ndarray.'
+        assert type(
+            index_list) == np.ndarray, 'index_list should be np.ndarray.'
         index_list = np.delete(index_list, np.where(
             index_list == padded_value), axis=0)
 

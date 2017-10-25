@@ -5,7 +5,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import re
 import os
 import sys
 import unittest
@@ -17,6 +16,7 @@ from utils.measure_time_func import measure_time
 
 
 class TestLoadDatasetCTC(unittest.TestCase):
+
     def test(self):
 
         self.length_check = False
@@ -33,7 +33,6 @@ class TestLoadDatasetCTC(unittest.TestCase):
         self.check(label_type='kanji_divide')
         self.check(label_type='kana')
         self.check(label_type='kana_divide')
-        self.check(label_type='phone')
 
         # sort
         self.check(label_type='kanji', sort_utt=True)
@@ -81,8 +80,8 @@ class TestLoadDatasetCTC(unittest.TestCase):
         if 'kana' in label_type:
             map_file_path = '../../metrics/mapping_files/' + label_type + '.txt'
         elif 'kanji' in label_type:
-            map_file_path = '../../metrics/mapping_files/' + label_type + '_' + \
-                dataset.train_data_size + '.txt'
+            map_file_path = '../../metrics/mapping_files/' + \
+                label_type + '_train_subset.txt'
 
         idx2char = Idx2char(map_file_path)
         # idx2word = Idx2word(map_file_path)
