@@ -7,13 +7,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+from os.path import join, abspath
 import sys
 import tensorflow as tf
 import yaml
 import argparse
 
-sys.path.append(os.path.abspath('../../../'))
+sys.path.append(abspath('../../../'))
 from experiments.timit.data.load_dataset_attention import Dataset
 from experiments.timit.metrics.attention import do_eval_per, do_eval_cer
 from models.attention.attention_seq2seq import AttentionSeq2Seq
@@ -26,7 +26,7 @@ parser.add_argument('--model_path', type=str,
 parser.add_argument('--beam_width', type=int, default=20,
                     help='beam_width (int, optional): beam width for beam search.' +
                     ' 1 disables beam search, which mean greedy decoding.')
-parser.add_argument('--eval_batch_size', type=str, default=1,
+parser.add_argument('--eval_batch_size', type=str, default=5,
                     help='the size of mini-batch in evaluation')
 
 
@@ -42,6 +42,13 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
     """
     map_file_path = '../metrics/mapping_files/' + \
         params['label_type'] + '.txt'
+
+    dev_data = Dataset(
+        data_type='dev', label_type='phone61',
+        batch_size=eval_batch_size,  map_file_path=map_file_path,
+        splice=params['splice'],
+        num_stack=params['num_stack'], num_skip=params['num_skip'],
+        shuffle=False, progressbar=True)
 
     # Load dataset
     if 'phone' in params['label_type']:
@@ -126,7 +133,7 @@ def main():
     args = parser.parse_args()
 
     # Load config file
-    with open(os.path.join(args.model_path, 'config.yml'), "r") as f:
+    with open(join(args.model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
         params = config['param']
 
@@ -144,7 +151,7 @@ def main():
 
     # Model setting
     model = AttentionSeq2Seq(
-        input_size=params['input_size'],
+        input_size=params['input_size'] * params['num_stack'],
         encoder_type=params['encoder_type'],
         encoder_num_units=params['encoder_num_units'],
         encoder_num_layers=params['encoder_num_layers'],

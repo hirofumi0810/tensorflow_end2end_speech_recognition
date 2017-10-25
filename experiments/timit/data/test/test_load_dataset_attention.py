@@ -80,7 +80,7 @@ class TestLoadDatasetAttention(unittest.TestCase):
             inputs, labels, inputs_seq_len, labels_seq_len, input_names = data
 
             if data_type != 'test':
-                str_true = map_fn(labels[0][0][0: labels_seq_len[0][0]])
+                str_true = map_fn(labels[0][0][:labels_seq_len[0][0]])
             else:
                 str_true = labels[0][0][0]
 

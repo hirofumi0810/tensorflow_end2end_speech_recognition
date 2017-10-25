@@ -35,8 +35,11 @@ def do_train(model, params):
     """
     map_file_path_train = '../metrics/mapping_files/' + \
         params['label_type'] + '.txt'
-    map_file_path_eval = '../metrics/mapping_files/' + \
-        params['label_type'] + '.txt'
+    if 'phone' in params['label_type']:
+        map_file_path_eval = '../metrics/mapping_files/phone39.txt'
+    else:
+        map_file_path_eval = '../metrics/mapping_files/' + \
+            params['label_type'] + '.txt'
 
     # Load dataset
     train_data = Dataset(
@@ -44,9 +47,7 @@ def do_train(model, params):
         batch_size=params['batch_size'], map_file_path=map_file_path_train,
         max_epoch=params['num_epoch'], splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
-        sort_utt=False)
-    # sort_stop_epoch=params['sort_stop_epoch']
-    # TODO: check sort_utt
+        sort_utt=True, sort_stop_epoch=params['sort_stop_epoch'])
     dev_data = Dataset(
         data_type='dev', label_type=params['label_type'],
         batch_size=params['batch_size'], map_file_path=map_file_path_train,
@@ -226,12 +227,6 @@ def do_train(model, params):
                     print('-----EPOCH:%d (%.3f min)-----' %
                           (train_data.epoch, duration_epoch / 60))
 
-                    checkpoint_file = join(
-                        model.save_path, 'model.ckpt')
-                    save_path = saver.save(
-                        sess, checkpoint_file, global_step=train_data.epoch)
-                    print("Model saved in file: %s" % save_path)
-
                     # Save fugure of loss & ler
                     plot_loss(csv_loss_train, csv_loss_dev, csv_steps,
                               save_path=model.save_path)
@@ -239,8 +234,7 @@ def do_train(model, params):
                              label_type=params['label_type'],
                              save_path=model.save_path)
 
-                    # if train_data.epoch >= params['eval_start_epoch']:
-                    if train_data.epoch >= 5:
+                    if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
                         if 'char' in params['label_type']:
                             print('=== Dev Data Evaluation ===')
@@ -273,6 +267,7 @@ def do_train(model, params):
                                     model=model,
                                     dataset=test_data,
                                     label_type=params['label_type'],
+                                    is_test=True,
                                     eval_batch_size=1)
                                 print('  CER: %f %%' % (ler_test * 100))
                                 print('  WER: %f %%' % (wer_test * 100))
@@ -295,11 +290,11 @@ def do_train(model, params):
 
                                 # Save model only when best accuracy is
                                 # obtained (check point)
-                                # checkpoint_file = join(
-                                #     model.save_path, 'model.ckpt')
-                                # save_path = saver.save(
-                                #     sess, checkpoint_file, global_step=train_data.epoch)
-                                # print("Model saved in file: %s" % save_path)
+                                checkpoint_file = join(
+                                    model.save_path, 'model.ckpt')
+                                save_path = saver.save(
+                                    sess, checkpoint_file, global_step=train_data.epoch)
+                                print("Model saved in file: %s" % save_path)
 
                                 print('=== Test Data Evaluation ===')
                                 ler_test = do_eval_per(
@@ -309,6 +304,7 @@ def do_train(model, params):
                                     model=model,
                                     dataset=test_data,
                                     label_type=params['label_type'],
+                                    is_test=True,
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (ler_test * 100))
 
@@ -353,7 +349,7 @@ def main(config_path, model_save_path):
 
     # Model setting
     model = AttentionSeq2Seq(
-        input_size=params['input_size'],
+        input_size=params['input_size'] * params['num_stack'],
         encoder_type=params['encoder_type'],
         encoder_num_units=params['encoder_num_units'],
         encoder_num_layers=params['encoder_num_layers'],
@@ -377,7 +373,8 @@ def main(config_path, model_save_path):
         weight_decay=params['weight_decay'],
         time_major=True,
         sharpening_factor=params['sharpening_factor'],
-        logits_temperature=params['logits_temperature'])
+        logits_temperature=params['logits_temperature'],
+        sigmoid_smoothing=params['sigmoid_smoothing'])
 
     # Set process name
     setproctitle('tf_timit_' + model.name + '_' +
@@ -405,6 +402,8 @@ def main(config_path, model_save_path):
         model.name += '_sharp' + str(params['sharpening_factor'])
     if params['logits_temperature'] != 1:
         model.name += '_temp' + str(params['logits_temperature'])
+    if bool(params['sigmoid_smoothing']):
+        model.name += '_smoothing'
 
     # Set save path
     model.save_path = mkdir_join(
