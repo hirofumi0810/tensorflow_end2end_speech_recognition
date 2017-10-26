@@ -7,27 +7,32 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
-# import numpy as np
+import numpy as np
 import tensorflow as tf
 
 from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalization
 
 ############################################################
 # Architecture: (feature map, kernel, stride)
+
 # VGG1: (96, 3*3, (1,1))  * 3 layers
 # Batch normalization
 # ReLU
 # Max pool
+
 # VGG2: (192, 3*3, (1,1)) * 4 layers
 # Batch normalization
 # ReLU
 # Max pool
+
 # VGG3: (384, 3*3, (1,1)) * 4 layers
 # Batch normalization
 # ReLU
 # Max pool
-# (fc: 1024 * 2 layers) ??
+
+# fc: 1024 * 2 layers
+
+# softmax
 ############################################################
 
 
@@ -197,17 +202,8 @@ class VGGEncoder(object):
             # TODO: add dropout
 
         # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
-        new_h = math.ceil(self.num_channels / (2**3))
-        new_w = math.ceil((self.splice * self.num_stack) / (2**3))
-        channel_out = inputs.shape.as_list()[-1]
         outputs = tf.reshape(
-            inputs, shape=[batch_size * max_time, new_h * new_w * channel_out])
-
-        # For debug
-        # print(outputs.shape.as_list())
-        # print(new_h)
-        # print(new_w)
-        # print(channel_out)
+            inputs, shape=[batch_size, max_time, np.prod(inputs.shape.as_list()[-3:])])
 
         for i in range(1, 3, 1):
             with tf.variable_scope('fc%d' % i) as scope:
@@ -219,7 +215,7 @@ class VGGEncoder(object):
                         stddev=self.parameter_init),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
-                # TODO: add dropout
+                outputs = tf.nn.dropout(outputs, keep_prob)
 
         # Reshape back to 3D tensor `[B, T, 1024]`
         output_dim = outputs.shape.as_list()[-1]

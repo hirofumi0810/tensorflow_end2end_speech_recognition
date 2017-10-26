@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
+import numpy as np
 import tensorflow as tf
 
 from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalization
@@ -106,7 +106,7 @@ class CNNEncoder(object):
 
                 inputs = batch_normalization(inputs, is_training=is_training)
                 # inputs = tf.nn.dropout(inputs, keep_prob)
-                # TODO: try Weight decay
+                # TODO: try weight decay
 
         # 5-10th layers
         with tf.variable_scope('CNN2'):
@@ -130,14 +130,11 @@ class CNNEncoder(object):
 
                 inputs = batch_normalization(inputs, is_training=is_training)
                 # inputs = tf.nn.dropout(inputs, keep_prob)
-                # TODO: try Weight decay
+                # TODO: try weight decay
 
         # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
-        new_h = math.ceil(self.num_channels / 3)
-        new_w = self.splice * self.num_stack
-        channel_out = inputs.shape.as_list()[-1]
         outputs = tf.reshape(
-            inputs, shape=[batch_size * max_time, new_h * new_w * channel_out])
+            inputs, shape=[batch_size, max_time, np.prod(inputs.shape.as_list()[-3:])])
 
         # 11-14th layers
         for i in range(1, 4, 1):
@@ -152,7 +149,7 @@ class CNNEncoder(object):
                     scope=scope)
             outputs = batch_normalization(outputs, is_training=is_training)
             outputs = tf.nn.dropout(outputs, keep_prob)
-            # TODO: try Weight decay
+            # TODO: try weight decay
 
         # Reshape back to 3D tensor `[B, T, 1024]`
         logits = tf.reshape(

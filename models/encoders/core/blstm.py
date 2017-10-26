@@ -74,6 +74,8 @@ class BLSTMEncoder(object):
                 otherwise, `[B, T, num_units (num_proj)]`
             final_state: A final hidden state of the encoder
         """
+        # inputs = tf.nn.dropout(inputs, keep_prob)
+
         initializer = tf.random_uniform_initializer(
             minval=-self.parameter_init, maxval=self.parameter_init)
 
@@ -119,9 +121,21 @@ class BLSTMEncoder(object):
         return outputs, final_state
 
 
-def basiclstmcell(num_units, num_layers, inputs, inputs_seq_len, keep_prob,
+def basiclstmcell(num_units, num_layers,
+                  inputs, inputs_seq_len, keep_prob,
                   initializer, time_major, num_layers_sub=None):
-
+    """
+    Args:
+        num_units (int): the number of units in each layer
+        num_layers (int): the number of layers
+        inputs (placeholder): A tensor of size`[B, T, input_dim]`
+        inputs_seq_len (placeholder): A tensor of size` [B]`
+        keep_prob (placeholder, float): A probability to keep nodes
+            in the hidden-hidden connection
+        initializer ():
+        time_major (bool): if True, time-major computation will be performed
+        num_layers_sub (int, optional): the number of layers of the sub task
+    """
     if time_major:
         # Convert form batch-major to time-major
         inputs = tf.transpose(inputs, [1, 0, 2])
@@ -171,9 +185,24 @@ def basiclstmcell(num_units, num_layers, inputs, inputs_seq_len, keep_prob,
 
 
 def lstmcell(num_units, num_proj, num_layers, use_peephole, clip_activation,
-             inputs, inputs_seq_len, keep_prob, initializer, time_major,
+             inputs, inputs_seq_len, keep_prob,
+             initializer, time_major,
              num_layers_sub=None):
-
+    """
+    Args:
+        num_units (int): the number of units in each layer
+        num_proj (int):
+        num_layers (int): the number of layers
+        use_peephole (bool):
+        clip_activation (float):
+        inputs (placeholder): A tensor of size`[B, T, input_dim]`
+        inputs_seq_len (placeholder): A tensor of size` [B]`
+        keep_prob (placeholder, float): A probability to keep nodes
+            in the hidden-hidden connection
+        initializer ():
+        time_major (bool): if True, time-major computation will be performed
+        num_layers_sub (int, optional): the number of layers of the sub task
+    """
     if time_major:
         # Convert form batch-major to time-major
         inputs = tf.transpose(inputs, [1, 0, 2])
@@ -227,9 +256,24 @@ def lstmcell(num_units, num_proj, num_layers, use_peephole, clip_activation,
 
 
 def lstmblockcell(num_units, num_layers, use_peephole, clip_activation,
-                  inputs, inputs_seq_len, keep_prob, initializer, time_major,
+                  inputs, inputs_seq_len, keep_prob,
+                  initializer, time_major,
                   num_layers_sub=None):
-
+    """
+    Args:
+        num_units (int): the number of units in each layer
+        num_proj (int):
+        num_layers (int): the number of layers
+        use_peephole (bool):
+        clip_activation (float):
+        inputs (placeholder): A tensor of size`[B, T, input_dim]`
+        inputs_seq_len (placeholder): A tensor of size` [B]`
+        keep_prob (placeholder, float): A probability to keep nodes
+            in the hidden-hidden connection
+        initializer ():
+        time_major (bool): if True, time-major computation will be performed
+        num_layers_sub (int, optional): the number of layers of the sub task
+    """
     if time_major:
         # Convert form batch-major to time-major
         inputs = tf.transpose(inputs, [1, 0, 2])
@@ -289,8 +333,24 @@ def lstmblockcell(num_units, num_layers, use_peephole, clip_activation,
 
 
 def lstmblockfusedcell(num_units, num_layers, use_peephole, clip_activation,
-                       inputs, inputs_seq_len, keep_prob, initializer, time_major,
+                       inputs, inputs_seq_len, keep_prob,
+                       initializer, time_major,
                        num_layers_sub=None):
+    """
+    Args:
+        num_units (int): the number of units in each layer
+        num_proj (int):
+        num_layers (int): the number of layers
+        use_peephole (bool):
+        clip_activation (float):
+        inputs (placeholder): A tensor of size`[B, T, input_dim]`
+        inputs_seq_len (placeholder): A tensor of size` [B]`
+        keep_prob (placeholder, float): A probability to keep nodes
+            in the hidden-hidden connection
+        initializer ():
+        time_major (bool): if True, time-major computation will be performed
+        num_layers_sub (int, optional): the number of layers of the sub task
+    """
     # TODO: add time-major
 
     outputs = inputs
@@ -346,9 +406,22 @@ def lstmblockfusedcell(num_units, num_layers, use_peephole, clip_activation,
 
 
 def cudnnlstm(num_units, num_layers, parameter_init,
-              inputs, inputs_seq_len, keep_prob, initializer, time_major,
+              inputs, inputs_seq_len, keep_prob,
+              initializer, time_major,
               num_layers_sub=None):
-
+    """
+    Args:
+        num_units (int): the number of units in each layer
+        num_layers (int): the number of layers
+        parameter_init (float):
+        inputs (placeholder): A tensor of size`[B, T, input_dim]`
+        inputs_seq_len (placeholder): A tensor of size` [B]`
+        keep_prob (placeholder, float): A probability to keep nodes
+            in the hidden-hidden connection
+        initializer ():
+        time_major (bool): if True, time-major computation will be performed
+        num_layers_sub (int, optional): the number of layers of the sub task
+    """
     batch_size = tf.shape(inputs)[0]
     input_size = tf.shape(inputs)[2]
 

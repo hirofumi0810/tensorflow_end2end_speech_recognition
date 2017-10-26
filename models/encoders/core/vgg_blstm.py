@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
+import numpy as np
 import tensorflow as tf
 
 from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalization
@@ -84,8 +84,10 @@ class VGGBLSTMEncoder(object):
                 in the hidden-hidden connection
             is_training (bool):
         Returns:
-            outputs: Encoder states, a tensor of size
-                `[T, B, num_units (num_proj)]`
+            outputs: Encoder states.
+                if time_major is True, a tensor of size
+                    `[T, B, num_units (num_proj)]`
+                otherwise, `[B, T, num_units (num_proj)]`
             final_state: A final hidden state of the encoder
         """
         # inputs: 3D tensor `[B, T, input_dim]`
@@ -120,7 +122,7 @@ class VGGBLSTMEncoder(object):
                               pooling_size=[2, 2],
                               stride=[2, 2],
                               name='max_pool')
-            # TODO: try dropout
+            # TODO(hirofumi): try dropout
 
         with tf.variable_scope('VGG2'):
             inputs = conv_layer(inputs,
@@ -140,14 +142,11 @@ class VGGBLSTMEncoder(object):
                               pooling_size=[2, 2],
                               stride=[2, 2],
                               name='max_pool')
-            # TODO: try dropout
+            # TODO(hirofumi): try dropout
 
         # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
-        new_h = math.ceil(self.num_channels / 4)
-        new_w = math.ceil(self.splice * self.num_stack / 4)
-        channel_out = inputs.shape.as_list()[-1]
         inputs = tf.reshape(
-            inputs, shape=[batch_size * max_time, new_h * new_w * channel_out])
+            inputs, shape=[batch_size * max_time, np.prod(inputs.shape.as_list()[-3:])])
 
         # Insert linear layer to recude CNN's output demention
         # from (new_h * new_w * C_out) to 256
