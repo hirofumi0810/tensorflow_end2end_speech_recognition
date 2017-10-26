@@ -29,7 +29,7 @@ parser.add_argument('--model_path', type=str,
 parser.add_argument('--beam_width', type=int, default=20,
                     help='beam_width (int, optional): beam width for beam search.' +
                     ' 1 disables beam search, which mean greedy decoding.')
-parser.add_argument('--eval_batch_size', type=int, default=-1,
+parser.add_argument('--eval_batch_size', type=int, default=1,
                     help='the size of mini-batch when evaluation. ' +
                     'If you set -1, batch size is the same as that when training.')
 
@@ -85,7 +85,6 @@ def do_decode(model, params, epoch, beam_width, eval_batch_size):
 
         # If check point exists
         if ckpt:
-            # Use last saved model
             model_path = ckpt.model_checkpoint_path
             if epoch != -1:
                 model_path = model_path.split('/')[:-1]
@@ -125,7 +124,7 @@ def decode(session, decode_op, model, dataset, label_type,
         decode_op: operation for decoding
         model: the model to evaluate
         dataset: An instance of a `Dataset` class
-        label_type (string):  character or character_capital_divide or word
+        label_type (string): character or character_capital_divide or word
         train_data_size (string, optional): train100h or train460h or
             train960h
         is_test (bool, optional): set to True when evaluating by the test set
@@ -159,16 +158,16 @@ def decode(session, decode_op, model, dataset, label_type,
         # Decode
         batch_size = inputs[0].shape[0]
         labels_pred_st = session.run(decode_op, feed_dict=feed_dict)
+        no_output_flag = False
         try:
             labels_pred = sparsetensor2list(
                 labels_pred_st, batch_size=batch_size)
         except IndexError:
             # no output
-            labels_pred = ['']
+            no_output_flag = True
 
         # Visualize
         for i_batch in range(batch_size):
-            print(labels_true[0][i_batch][0])
 
             print('----- wav: %s -----' % input_names[0][i_batch])
             if 'char' in label_type:
@@ -176,13 +175,19 @@ def decode(session, decode_op, model, dataset, label_type,
                     str_true = labels_true[0][i_batch][0]
                 else:
                     str_true = map_fn(labels_true[0][i_batch])
-                str_pred = map_fn(labels_pred[i_batch])
+                if no_output_flag:
+                    str_pred = ''
+                else:
+                    str_pred = map_fn(labels_pred[i_batch])
             else:
                 if is_test:
                     str_true = labels_true[0][i_batch][0]
                 else:
                     str_true = '_'.join(map_fn(labels_true[0][i_batch]))
-                str_pred = '_'.join(map_fn(labels_pred[i_batch]))
+                if no_output_flag:
+                    str_pred = ''
+                else:
+                    str_pred = '_'.join(map_fn(labels_pred[i_batch]))
 
             print('Ref: %s' % str_true)
             print('Hyp: %s' % str_pred)
@@ -218,10 +223,14 @@ def main():
             params['num_classes'] = 18641
         elif params['train_data_size'] == 'train960h':
             params['num_classes'] = 26642
+    else:
+        raise TypeError
+
     # Model setting
     model = CTC(
         encoder_type=params['encoder_type'],
         input_size=params['input_size'] * params['num_stack'],
+        splice=params['splice'],
         num_units=params['num_units'],
         num_layers=params['num_layers'],
         num_classes=params['num_classes'],

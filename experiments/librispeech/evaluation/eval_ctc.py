@@ -1,21 +1,21 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Evaluate the CTC model (Librispeech corpus)."""
+"""Evaluate the trained CTC model (Librispeech corpus)."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+from os.path import join, abspath
 import sys
 import tensorflow as tf
 import yaml
 import argparse
 
-sys.path.append(os.path.abspath('../../../'))
+sys.path.append(abspath('../../../'))
 from experiments.librispeech.data.load_dataset_ctc import Dataset
-from experiments.librispeech.metrics.ctc import do_eval_cer, do_eval_wer
+from experiments.librispeech.metrics.ctc import do_eval_cer, do_eval_cer2, do_eval_wer
 from models.ctc.ctc import CTC
 
 parser = argparse.ArgumentParser()
@@ -30,16 +30,21 @@ parser.add_argument('--eval_batch_size', type=int, default=-1,
                     help='the size of mini-batch when evaluation. ' +
                     'If you set -1, batch size is the same as that when training.')
 
+DECODER_TYPE = 2
+# NOTE:
+# DECODER_TYPE == 1: tensorflow native beam search decoder
+# DECODER_TYPE == 2: numpy implementation of beam search decoder
 
-def do_eval(model, params, epoch, beam_width, eval_batch_size):
+
+def do_eval(model, params, epoch, eval_batch_size, beam_width):
     """Evaluate the model.
     Args:
         model: the model to restore
         params (dict): A dictionary of parameters
         epoch (int): the epoch to restore
-        beam_width (int): beam width for beam search.
-            1 disables beam search, which mean greedy decoding.
         eval_batch_size (int): the size of mini-batch when evaluation
+        beam_width (int): beam_width (int, optional): beam width for beam search.
+            1 disables beam search, which mean greedy decoding.
     """
     # Load dataset
     test_clean_data = Dataset(
@@ -53,7 +58,8 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
     test_other_data = Dataset(
         data_type='test_other', train_data_size=params['train_data_size'],
         label_type=params['label_type'],
-        batch_size=eval_batch_size,
+        batch_size=params['batch_size'] if eval_batch_size == -
+        1 else eval_batch_size,
         splice=params['splice'],
         num_stack=params['num_stack'], num_skip=params['num_skip'],
         shuffle=False)
@@ -66,10 +72,12 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
         _, logits = model.compute_loss(model.inputs_pl_list[0],
                                        model.labels_pl_list[0],
                                        model.inputs_seq_len_pl_list[0],
-                                       model.keep_prob_pl_list[0])
+                                       model.keep_prob_pl_list[0],
+                                       is_training=False)
         decode_op = model.decoder(logits,
                                   model.inputs_seq_len_pl_list[0],
                                   beam_width=beam_width)
+        posteriors_op = model.posteriors(logits)
 
     # Create a saver for writing training checkpoints
     saver = tf.train.Saver()
@@ -90,29 +98,61 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
 
         print('Test Data Evaluation:')
         if 'char' in params['label_type']:
-            cer_clean_test, wer_clean_test = do_eval_cer(
-                session=sess,
-                decode_ops=[decode_op],
-                model=model,
-                dataset=test_clean_data,
-                label_type=params['label_type'],
-                is_test=True,
-                eval_batch_size=eval_batch_size,
-                progressbar=True)
-            print('  CER (clean): %f %%' % (cer_clean_test * 100))
-            print('  WER (clean): %f %%' % (wer_clean_test * 100))
+            if DECODER_TYPE == 1:
+                cer_clean_test, wer_clean_test = do_eval_cer(
+                    session=sess,
+                    decode_ops=[decode_op],
+                    model=model,
+                    dataset=test_clean_data,
+                    label_type=params['label_type'],
+                    is_test=True,
+                    # eval_batch_size=eval_batch_size,
+                    progressbar=True)
+                print('  WER (clean): %f %%' % (wer_clean_test * 100))
+                print('  CER (clean): %f %%' % (cer_clean_test * 100))
 
-            cer_other_test, wer_other_test = do_eval_cer(
-                session=sess,
-                decode_ops=[decode_op],
-                model=model,
-                dataset=test_other_data,
-                label_type=params['label_type'],
-                is_test=True,
-                eval_batch_size=eval_batch_size,
-                progressbar=True)
-            print('  CER (other): %f %%' % (cer_other_test * 100))
-            print('  WER (other): %f %%' % (wer_other_test * 100))
+                cer_other_test, wer_other_test = do_eval_cer(
+                    session=sess,
+                    decode_ops=[decode_op],
+                    model=model,
+                    dataset=test_other_data,
+                    label_type=params['label_type'],
+                    is_test=True,
+                    # eval_batch_size=eval_batch_size,
+                    progressbar=True)
+                print('  WER (other): %f %%' % (wer_other_test * 100))
+                print('  CER (other): %f %%' % (cer_other_test * 100))
+
+            elif DECODER_TYPE == 2:
+                cer_clean_test, wer_clean_test = do_eval_cer2(
+                    session=sess,
+                    # beam_width=beam_width,
+                    beam_width=20,
+                    posteriors_ops=[posteriors_op],
+                    model=model,
+                    dataset=test_clean_data,
+                    label_type=params['label_type'],
+                    is_test=True,
+                    eval_batch_size=20,
+                    # eval_batch_size=eval_batch_size,
+                    progressbar=True)
+                print('  WER (clean): %f %%' % (wer_clean_test * 100))
+                print('  CER (clean): %f %%' % (cer_clean_test * 100))
+
+                cer_other_test, wer_other_test = do_eval_cer2(
+                    session=sess,
+                    # beam_width=beam_width,
+                    beam_width=20,
+                    posteriors_ops=[posteriors_op],
+                    model=model,
+                    dataset=test_other_data,
+                    label_type=params['label_type'],
+                    is_test=True,
+                    eval_batch_size=20,
+                    # eval_batch_size=eval_batch_size,
+                    progressbar=True)
+                print('  WER (other): %f %%' % (wer_other_test * 100))
+                print('  CER (other): %f %%' % (cer_other_test * 100))
 
         else:
             wer_clean_test = do_eval_wer(
@@ -122,7 +162,7 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
                 dataset=test_clean_data,
                 train_data_size=params['train_data_size'],
                 is_test=True,
-                eval_batch_size=eval_batch_size,
+                # eval_batch_size=eval_batch_size,
                 progressbar=True)
             print('  WER (clean): %f %%' % (wer_clean_test * 100))
 
@@ -133,7 +173,7 @@ def do_eval(model, params, epoch, beam_width, eval_batch_size):
                 dataset=test_other_data,
                 train_data_size=params['train_data_size'],
                 is_test=True,
-                eval_batch_size=eval_batch_size,
+                # eval_batch_size=eval_batch_size,
                 progressbar=True)
             print('  WER (other): %f %%' % (wer_other_test * 100))
 
@@ -143,7 +183,7 @@ def main():
     args = parser.parse_args()
 
     # Load config file
-    with open(os.path.join(args.model_path, 'config.yml'), "r") as f:
+    with open(join(args.model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
         params = config['param']
 
@@ -169,6 +209,7 @@ def main():
     model = CTC(
         encoder_type=params['encoder_type'],
         input_size=params['input_size'] * params['num_stack'],
+        splice=params['splice'],
         num_units=params['num_units'],
         num_layers=params['num_layers'],
         num_classes=params['num_classes'],
@@ -182,8 +223,8 @@ def main():
 
     model.save_path = args.model_path
     do_eval(model=model, params=params,
-            epoch=args.epoch, beam_width=args.beam_width,
-            eval_batch_size=args.eval_batch_size)
+            epoch=args.epoch, eval_batch_size=args.eval_batch_size,
+            beam_width=args.beam_width)
 
 
 if __name__ == '__main__':

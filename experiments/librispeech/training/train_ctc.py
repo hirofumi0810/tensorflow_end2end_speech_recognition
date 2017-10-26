@@ -195,6 +195,7 @@ def do_train(model, params, gpu_indices):
             start_time_epoch = time.time()
             start_time_step = time.time()
             ler_dev_best = 1
+            not_improved_epoch = 0
             learning_rate = float(params['learning_rate'])
             for step, (data, is_new_epoch) in enumerate(train_data):
 
@@ -273,7 +274,7 @@ def do_train(model, params, gpu_indices):
 
                     if train_data.epoch >= params['eval_start_epoch']:
                         start_time_eval = time.time()
-                        if params['label_type'] != 'word':
+                        if 'char' in params['label_type']:
                             print('=== Dev Data Evaluation ===')
                             # dev-clean
                             cer_dev_clean_epoch, wer_dev_clean_epoch = do_eval_cer(
@@ -289,7 +290,7 @@ def do_train(model, params, gpu_indices):
                                   (wer_dev_clean_epoch * 100))
 
                             # dev-other
-                            ler_dev_other_epoch, wer_dev_other_epoch = do_eval_cer(
+                            cer_dev_other_epoch, wer_dev_other_epoch = do_eval_cer(
                                 session=sess,
                                 decode_ops=decode_ops,
                                 model=model,
@@ -297,12 +298,18 @@ def do_train(model, params, gpu_indices):
                                 label_type=params['label_type'],
                                 eval_batch_size=params['batch_size'])
                             print('  CER (other): %f %%' %
-                                  (ler_dev_other_epoch * 100))
+                                  (cer_dev_other_epoch * 100))
                             print('  WER (other): %f %%' %
                                   (wer_dev_other_epoch * 100))
 
-                            if ler_dev_other_epoch < ler_dev_best:
-                                ler_dev_best = ler_dev_other_epoch
+                            if params['train_data_size'] in ['train100h', 'train460h']:
+                                metric_epoch = cer_dev_clean_epoch
+                            else:
+                                metric_epoch = cer_dev_other_epoch
+
+                            if metric_epoch < ler_dev_best:
+                                ler_dev_best = metric_epoch
+                                not_improved_epoch = 0
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
                                 # Save model (check point)
@@ -340,11 +347,13 @@ def do_train(model, params, gpu_indices):
                                       (cer_test_other_epoch * 100))
                                 print('  WER (other): %f %%' %
                                       (wer_test_other_epoch * 100))
+                            else:
+                                not_improved_epoch += 1
 
                         else:
                             print('=== Dev Data Evaluation ===')
                             # dev-clean
-                            cer_dev_clean_epoch = do_eval_wer(
+                            wer_dev_clean_epoch = do_eval_wer(
                                 session=sess,
                                 decode_ops=decode_ops,
                                 model=model,
@@ -352,10 +361,10 @@ def do_train(model, params, gpu_indices):
                                 train_data_size=params['train_data_size'],
                                 eval_batch_size=params['batch_size'])
                             print('  WER (clean): %f %%' %
-                                  (cer_dev_clean_epoch * 100))
+                                  (wer_dev_clean_epoch * 100))
 
                             # dev-other
-                            ler_dev_other_epoch = do_eval_wer(
+                            wer_dev_other_epoch = do_eval_wer(
                                 session=sess,
                                 decode_ops=decode_ops,
                                 model=model,
@@ -363,10 +372,16 @@ def do_train(model, params, gpu_indices):
                                 train_data_size=params['train_data_size'],
                                 eval_batch_size=params['batch_size'])
                             print('  WER (other): %f %%' %
-                                  (ler_dev_other_epoch * 100))
+                                  (wer_dev_other_epoch * 100))
 
-                            if ler_dev_other_epoch < ler_dev_best:
-                                ler_dev_best = ler_dev_other_epoch
+                            if params['train_data_size'] in ['train100h', 'train460h']:
+                                metric_epoch = wer_dev_clean_epoch
+                            else:
+                                metric_epoch = wer_dev_other_epoch
+
+                            if metric_epoch < ler_dev_best:
+                                ler_dev_best = metric_epoch
+                                not_improved_epoch = 0
                                 print('■■■ ↑Best Score (WER)↑ ■■■')
 
                                 # Save model (check point)
@@ -400,16 +415,22 @@ def do_train(model, params, gpu_indices):
                                     eval_batch_size=params['batch_size'])
                                 print('  WER (other): %f %%' %
                                       (ler_test_other_epoch * 100))
+                            else:
+                                not_improved_epoch += 1
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
                               (duration_eval / 60))
 
+                        # Early stopping
+                        if not_improved_epoch == params['not_improved_patient_epoch']:
+                            break
+
                         # Update learning rate
                         learning_rate = lr_controller.decay_lr(
                             learning_rate=learning_rate,
                             epoch=train_data.epoch,
-                            value=ler_dev_other_epoch)
+                            value=metric_epoch)
 
                     start_time_epoch = time.time()
 
@@ -445,6 +466,8 @@ def main(config_path, model_save_path, gpu_indices):
             params['num_classes'] = 18641
         elif params['train_data_size'] == 'train960h':
             params['num_classes'] = 26642
+    else:
+        raise TypeError
 
     # Model setting
     model = CTC(encoder_type=params['encoder_type'],

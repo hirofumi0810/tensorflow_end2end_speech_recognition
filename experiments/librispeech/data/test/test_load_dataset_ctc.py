@@ -23,11 +23,6 @@ class TestLoadDatasetCTC(unittest.TestCase):
     def test(self):
 
         # data_type
-        self.check(label_type='word_freq10', data_type='train')
-        self.check(label_type='word_freq10', data_type='dev_clean')
-        self.check(label_type='word_freq10', data_type='dev_other')
-        self.check(label_type='word_freq10', data_type='test_clean')
-        self.check(label_type='word_freq10', data_type='test_other')
         self.check(label_type='character', data_type='train')
         self.check(label_type='character', data_type='dev_clean')
         self.check(label_type='character', data_type='dev_other')
@@ -42,11 +37,16 @@ class TestLoadDatasetCTC(unittest.TestCase):
                    data_type='test_clean')
         self.check(label_type='character_capital_divide',
                    data_type='test_other')
+        self.check(label_type='word_freq10', data_type='train')
+        self.check(label_type='word_freq10', data_type='dev_clean')
+        self.check(label_type='word_freq10', data_type='dev_other')
+        self.check(label_type='word_freq10', data_type='test_clean')
+        self.check(label_type='word_freq10', data_type='test_other')
 
         # sort
         self.check(label_type='character', sort_utt=True)
         self.check(label_type='character', sort_utt=True,
-                   sort_stop_epoch=2)
+                   sort_stop_epoch=1)
         self.check(label_type='character', shuffle=True)
 
         # frame stacking
@@ -79,7 +79,7 @@ class TestLoadDatasetCTC(unittest.TestCase):
         dataset = Dataset(
             data_type=data_type, train_data_size='train100h',
             label_type=label_type,
-            batch_size=64, max_epoch=1, splice=splice,
+            batch_size=64, max_epoch=2, splice=splice,
             num_stack=num_stack, num_skip=num_skip,
             shuffle=shuffle, sort_utt=sort_utt, sort_stop_epoch=sort_stop_epoch,
             progressbar=True, num_gpu=num_gpu)
@@ -107,19 +107,13 @@ class TestLoadDatasetCTC(unittest.TestCase):
                 for inputs_gpu in inputs:
                     print(inputs_gpu.shape)
 
-            if 'word' in label_type:
-                if 'test' not in data_type:
-                    str_true = ' '.join(idx2word(labels[0][0]))
-                else:
-                    word_list = np.delete(labels[0][0], np.where(
-                        labels[0][0] == None), axis=0)
-                    str_true = ' '.join(word_list)
+            if 'test' in data_type:
+                str_true = labels[0][0][0]
             else:
-                if 'test' not in data_type:
-                    str_true = idx2char(labels[0][0])
-                    str_true = re.sub(r'_', ' ', str_true)
+                if 'word' in label_type:
+                    str_true = '_'.join(idx2word(labels[0][0]))
                 else:
-                    str_true = labels[0][0][0]
+                    str_true = idx2char(labels[0][0])
 
             print('----- %s (epoch: %.3f) -----' %
                   (input_names[0][0], dataset.epoch_detail))
