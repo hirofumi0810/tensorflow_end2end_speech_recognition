@@ -20,7 +20,7 @@ from utils.dataset.attention import DatasetBase
 class Dataset(DatasetBase):
 
     def __init__(self, data_type, train_data_size, label_type, batch_size,
-                 map_file_path, max_epoch=1, splice=1,
+                 map_file_path, max_epoch=None, splice=1,
                  num_stack=None, num_skip=None,
                  shuffle=False, sort_utt=True, sort_stop_epoch=None,
                  progressbar=False, num_gpu=1):
