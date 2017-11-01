@@ -101,8 +101,8 @@ def do_eval_cer(session, decode_ops, model, dataset, label_type,
                     str_pred = re.sub(r'[\']+', '', str_pred)
 
                     # Compute WER
-                    wer_mean += compute_wer(ref=str_pred.split('_'),
-                                            hyp=str_true.split('_'),
+                    wer_mean += compute_wer(ref=str_true.split('_'),
+                                            hyp=str_pred.split('_'),
                                             normalize=True)
                     # substitute, insert, delete = wer_align(
                     #     ref=str_pred.split('_'),
@@ -239,8 +239,8 @@ def do_eval_cer2(session, posteriors_ops, beam_width, model, dataset,
                 str_pred = re.sub(r'[\']+', '', str_pred)
 
                 # Compute WER
-                wer_mean += compute_wer(ref=str_pred.split('_'),
-                                        hyp=str_true.split('_'),
+                wer_mean += compute_wer(ref=str_true.split('_'),
+                                        hyp=str_pred.split('_'),
                                         normalize=True)
                 # substitute, insert, delete = wer_align(
                 #     ref=str_pred.split('_'),

@@ -8,8 +8,9 @@ param:
   feature: fbank
   input_size: 120
   splice: 1
-  num_stack: 3
-  num_skip: 3
+  num_stack: 2
+  num_skip: 2
+  # NOTE: per 20ms
 
   # topology
   encoder_type: blstm
@@ -24,7 +25,7 @@ param:
   batch_size: 32
   optimizer: rmsprop
   learning_rate: 1e-3
-  num_epoch: 20
+  num_epoch: 15
 
   # regularization
   weight_init: 0.1
@@ -35,8 +36,9 @@ param:
   decay_start_epoch: 5
   decay_rate: 0.5
   decay_patient_epoch: 3
-  sort_stop_epoch: 1
+  sort_stop_epoch: 6
+  not_improved_patient_epoch: 3
 
   eval_start_epoch: 1
-  print_step: 100
-  beam_width: 20
+  print_step: 200
+  beam_width: 100

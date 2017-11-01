@@ -14,7 +14,7 @@ from os.path import join, isfile
 import pickle
 import numpy as np
 
-from utils.dataset.each_load.ctc_each_load import DatasetBase
+from utils.dataset.ctc import DatasetBase
 
 
 class Dataset(DatasetBase):
@@ -23,13 +23,12 @@ class Dataset(DatasetBase):
                  max_epoch=None, splice=1,
                  num_stack=1, num_skip=1,
                  shuffle=False, sort_utt=False, sort_stop_epoch=None,
-                 progressbar=False, num_gpu=1, is_gpu=False):
+                 progressbar=False, num_gpu=1):
         """A class for loading dataset.
         Args:
             data_type (stirng): train or dev_clean or dev_other or
                 test_clean or test_other
-            train_data_size (string): train_clean100 or train_clean360 or
-                train_other500 or train_all
+            train_data_size (string): train100h or train460h or train960h
             label_type (stirng): character or character_capital_divide or word
             batch_size (int): the size of mini-batch
             max_epoch (int, optional): the max epoch. None means infinite loop.
@@ -44,12 +43,11 @@ class Dataset(DatasetBase):
             sort_stop_epoch (int, optional): After sort_stop_epoch, training
                 will revert back to a random order
             progressbar (bool, optional): if True, visualize progressbar
-            num_gpu (int): if more than 1, divide batch_size by num_gpu
+            num_gpu (int, optional): if more than 1, divide batch_size by num_gpu
         """
         super(Dataset, self).__init__()
 
-        self.is_training = True if data_type == 'train' else False
-        self.is_test = True if 'test' in data_type and label_type == 'word' else False
+        self.is_test = True if 'test' in data_type else False
         # TODO(hirofumi): add phone-level transcripts
 
         self.data_type = data_type
@@ -65,16 +63,19 @@ class Dataset(DatasetBase):
         self.sort_stop_epoch = sort_stop_epoch
         self.progressbar = progressbar
         self.num_gpu = num_gpu
-        self.padded_value = -1
 
         # paths where datasets exist
         dataset_root = ['/data/inaguma/librispeech',
                         '/n/sd8/inaguma/corpus/librispeech/dataset']
 
-        input_path = join(dataset_root[0], 'inputs', train_data_size,
-                          data_type)
-        label_path = join(dataset_root[0], 'labels/ctc', label_type,
+        input_path = join(dataset_root[0], 'inputs',
                           train_data_size, data_type)
+        # NOTE: ex.) save_path:
+        # librispeech_dataset_path/inputs/train_data_size/data_type/speaker/***.npy
+        label_path = join(dataset_root[0], 'labels',
+                          train_data_size, data_type, label_type)
+        # NOTE: ex.) save_path:
+        # librispeech_dataset_path/labels/train_data_size/data_type/label_type/speaker/***.npy
 
         # Load the frame number dictionary
         if isfile(join(input_path, 'frame_num.pickle')):
@@ -82,10 +83,10 @@ class Dataset(DatasetBase):
                 self.frame_num_dict = pickle.load(f)
         else:
             dataset_root.pop(0)
-            input_path = join(dataset_root[0], 'inputs', train_data_size,
-                              data_type)
-            label_path = join(dataset_root[0], 'labels/ctc', label_type,
+            input_path = join(dataset_root[0], 'inputs',
                               train_data_size, data_type)
+            label_path = join(dataset_root[0], 'labels',
+                              train_data_size, data_type, label_type)
             with open(join(input_path, 'frame_num.pickle'), 'rb') as f:
                 self.frame_num_dict = pickle.load(f)
 

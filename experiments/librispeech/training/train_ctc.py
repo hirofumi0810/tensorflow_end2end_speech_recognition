@@ -219,7 +219,12 @@ def do_train(model, params, gpu_indices):
                 if (step + 1) % int(params['print_step'] / len(gpu_indices)) == 0:
 
                     # Create feed dictionary for next mini batch (dev)
-                    (inputs, labels, inputs_seq_len,  _), _ = dev_other_data.next()
+                    if params['train_data_size'] in ['train100h', 'train460h']:
+                        inputs, labels, inputs_seq_len, _ = dev_clean_data.next()[
+                            0]
+                    else:
+                        inputs, labels, inputs_seq_len, _ = dev_other_data.next()[
+                            0]
                     feed_dict_dev = {}
                     for i_gpu in range(len(gpu_indices)):
                         feed_dict_dev[model.inputs_pl_list[i_gpu]
@@ -471,8 +476,9 @@ def main(config_path, model_save_path, gpu_indices):
 
     # Model setting
     model = CTC(encoder_type=params['encoder_type'],
-                input_size=params['input_size'] * params['num_stack'],
+                input_size=params['input_size'],
                 splice=params['splice'],
+                num_stack=params['num_stack'],
                 num_units=params['num_units'],
                 num_layers=params['num_layers'],
                 num_classes=params['num_classes'],

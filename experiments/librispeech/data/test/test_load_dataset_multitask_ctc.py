@@ -60,7 +60,7 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
               frame_stacking=False, splice=1, num_gpu=1):
 
         print('========================================')
-        print('  label_type_main: %s' % 'word')
+        print('  label_type_main: %s' % 'word_freq10')
         print('  label_type_sub: %s' % label_type_sub)
         print('  data_type: %s' % data_type)
         print('  shuffle: %s' % str(shuffle))
@@ -86,7 +86,7 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
             map_file_path_char = '../../metrics/mapping_files/character.txt'
         elif label_type_sub == 'character_capital_divide':
             map_file_path_char = '../../metrics/mapping_files/character_capital.txt'
-        map_file_path_word = '../../metrics/mapping_files/word_' + \
+        map_file_path_word = '../../metrics/mapping_files/word_freq10_' + \
             dataset.train_data_size + '.txt'
 
         idx2char = Idx2char(map_file_path=map_file_path_char)
@@ -105,16 +105,13 @@ class TestLoadDatasetMultitaskCTC(unittest.TestCase):
                 for inputs_gpu in inputs:
                     print(inputs_gpu.shape)
 
-            if 'test' not in data_type:
-                word_list = idx2word(labels_word[0][0])
-                str_true_char = idx2char(labels_char[0][0],
-                                         padded_value=dataset.padded_value)
-                str_true_char = re.sub(r'_', ' ', str_true_char)
-            else:
-                word_list = np.delete(labels_word[0][0], np.where(
-                    labels_word[0][0] == None), axis=0)
+            if 'test' in data_type:
+                str_true_word = labels_word[0][0][0]
                 str_true_char = labels_char[0][0][0]
-            str_true_word = ' '.join(word_list)
+            else:
+                word_list = idx2word(labels_word[0][0])
+                str_true_word = '_'.join(word_list)
+                str_true_char = idx2char(labels_char[0][0])
 
             print('----- %s (epoch: %.3f) -----' %
                   (input_names[0][0], dataset.epoch_detail))

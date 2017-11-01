@@ -227,20 +227,20 @@ def main():
         raise TypeError
 
     # Model setting
-    model = CTC(
-        encoder_type=params['encoder_type'],
-        input_size=params['input_size'] * params['num_stack'],
-        splice=params['splice'],
-        num_units=params['num_units'],
-        num_layers=params['num_layers'],
-        num_classes=params['num_classes'],
-        lstm_impl=params['lstm_impl'],
-        use_peephole=params['use_peephole'],
-        parameter_init=params['weight_init'],
-        clip_grad_norm=params['clip_grad_norm'],
-        clip_activation=params['clip_activation'],
-        num_proj=params['num_proj'],
-        weight_decay=params['weight_decay'])
+    model = CTC(encoder_type=params['encoder_type'],
+                input_size=params['input_size']
+                splice=params['splice'],
+                num_stack=params['num_stack'],
+                num_units=params['num_units'],
+                num_layers=params['num_layers'],
+                num_classes=params['num_classes'],
+                lstm_impl=params['lstm_impl'],
+                use_peephole=params['use_peephole'],
+                parameter_init=params['weight_init'],
+                clip_grad_norm=params['clip_grad_norm'],
+                clip_activation=params['clip_activation'],
+                num_proj=params['num_proj'],
+                weight_decay=params['weight_decay'])
 
     model.save_path = args.model_path
     do_decode(model=model, params=params,

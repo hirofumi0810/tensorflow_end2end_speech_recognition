@@ -45,7 +45,7 @@ class Dataset(DatasetBase):
             sort_stop_epoch (int, optional): After sort_stop_epoch, training
                 will revert back to a random order
             progressbar (bool, optional): if True, visualize progressbar
-            num_gpu: int, if more than 1, divide batch_size by num_gpu
+            num_gpu (int, optional): if more than 1, divide batch_size by num_gpu
         """
         if data_type not in ['train', 'dev_clean', 'dev_other',
                              'test_clean', 'test_other']:
