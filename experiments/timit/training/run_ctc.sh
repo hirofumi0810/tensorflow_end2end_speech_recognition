@@ -1,11 +1,11 @@
-#!/bin/zsh
+#!/bin/bash
 
 MODEL_SAVE_PATH="/n/sd8/inaguma/result/tensorflow/timit"
 
 # Select GPU
 if [ $# -ne 2 ]; then
   echo "Error: set GPU number & config path." 1>&2
-  echo "Usage: ./run_attention.sh path_to_config_file gpu_index" 1>&2
+  echo "Usage: ./run_ctc.sh path_to_config_file gpu_index" 1>&2
   exit 1
 fi
 

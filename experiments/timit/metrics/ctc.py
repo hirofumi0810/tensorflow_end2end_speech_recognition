@@ -35,8 +35,14 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
     Returns:
         per_mean (float): An average of PER
     """
+    batch_size_original = dataset.batch_size
+
     # Reset data counter
     dataset.reset()
+
+    # Set batch size in the evaluation
+    if eval_batch_size is not None:
+        dataset.batch_size = eval_batch_size
 
     train_label_type = label_type
     eval_label_type = dataset.label_type_sub if is_multitask else dataset.label_type
@@ -111,6 +117,10 @@ def do_eval_per(session, decode_op, per_op, model, dataset, label_type,
 
     per_mean /= len(dataset)
 
+    # Register original batch size
+    if eval_batch_size is not None:
+        dataset.batch_size = batch_size_original
+
     return per_mean
 
 
@@ -132,8 +142,14 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
         cer_mean (float): An average of CER
         wer_mean (float): An average of WER
     """
+    batch_size_original = dataset.batch_size
+
     # Reset data counter
     dataset.reset()
+
+    # Set batch size in the evaluation
+    if eval_batch_size is not None:
+        dataset.batch_size = eval_batch_size
 
     if label_type == 'character':
         idx2char = Idx2char(
@@ -173,7 +189,8 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
                 # NOTE: transcript is seperated by space('_')
             else:
                 # Convert from list of index to string
-                str_true = idx2char(labels_true[0][i_batch])
+                str_true = idx2char(labels_true[0][i_batch],
+                                    padded_value=dataset.padded_value)
             str_pred = idx2char(labels_pred[i_batch])
 
             # Remove consecutive spaces
@@ -211,5 +228,9 @@ def do_eval_cer(session, decode_op, model, dataset, label_type,
 
     cer_mean /= len(dataset)
     wer_mean /= len(dataset)
+
+    # Register original batch size
+    if eval_batch_size is not None:
+        dataset.batch_size = batch_size_original
 
     return cer_mean, wer_mean

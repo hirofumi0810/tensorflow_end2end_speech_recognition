@@ -7,13 +7,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
+from os.path import join, abspath
 import sys
 import tensorflow as tf
 import yaml
 import argparse
 
-sys.path.append(os.path.abspath('../../../'))
+sys.path.append(abspath('../../../'))
 from experiments.timit.data.load_dataset_ctc import Dataset
 from experiments.timit.metrics.ctc import do_eval_per, do_eval_cer
 from models.ctc.ctc import CTC
@@ -120,7 +120,7 @@ def main():
     args = parser.parse_args()
 
     # Load config file
-    with open(os.path.join(args.model_path, 'config.yml'), "r") as f:
+    with open(join(args.model_path, 'config.yml'), "r") as f:
         config = yaml.load(f)
         params = config['param']
 
@@ -135,21 +135,24 @@ def main():
         params['num_classes'] = 28
     elif params['label_type'] == 'character_capital_divide':
         params['num_classes'] = 72
+    else:
+        raise TypeError
 
     # Model setting
-    model = CTC(
-        encoder_type=params['encoder_type'],
-        input_size=params['input_size'] * params['num_stack'],
-        num_units=params['num_units'],
-        num_layers=params['num_layers'],
-        num_classes=params['num_classes'],
-        lstm_impl=params['lstm_impl'],
-        use_peephole=params['use_peephole'],
-        parameter_init=params['weight_init'],
-        clip_grad_norm=params['clip_grad_norm'],
-        clip_activation=params['clip_activation'],
-        num_proj=params['num_proj'],
-        weight_decay=params['weight_decay'])
+    model = CTC(encoder_type=params['encoder_type'],
+                input_size=params['input_size'],
+                splice=params['splice'],
+                num_stack=params['num_stack'],
+                num_units=params['num_units'],
+                num_layers=params['num_layers'],
+                num_classes=params['num_classes'],
+                lstm_impl=params['lstm_impl'],
+                use_peephole=params['use_peephole'],
+                parameter_init=params['weight_init'],
+                clip_grad_norm=params['clip_grad_norm'],
+                clip_activation=params['clip_activation'],
+                num_proj=params['num_proj'],
+                weight_decay=params['weight_decay'])
 
     model.save_path = args.model_path
     do_eval(model=model, params=params,

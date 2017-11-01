@@ -125,6 +125,7 @@ def do_train(model, params):
             start_time_epoch = time.time()
             start_time_step = time.time()
             ler_dev_best = 1
+            not_improved_epoch = 0
             learning_rate = float(params['learning_rate'])
             for step, (data, is_new_epoch) in enumerate(train_data):
 
@@ -211,6 +212,7 @@ def do_train(model, params):
 
                             if ler_dev_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_epoch
+                                not_improved_epoch = 0
                                 print('■■■ ↑Best Score (CER)↑ ■■■')
 
                                 # Save model only when best accuracy is
@@ -232,6 +234,8 @@ def do_train(model, params):
                                     eval_batch_size=1)
                                 print('  CER: %f %%' % (ler_test * 100))
                                 print('  WER: %f %%' % (wer_test * 100))
+                            else:
+                                not_improved_epoch += 1
 
                         else:
                             print('=== Dev Data Evaluation ===')
@@ -247,6 +251,7 @@ def do_train(model, params):
 
                             if ler_dev_epoch < ler_dev_best:
                                 ler_dev_best = ler_dev_epoch
+                                not_improved_epoch = 0
                                 print('■■■ ↑Best Score (PER)↑ ■■■')
 
                                 # Save model only when best accuracy is
@@ -268,10 +273,16 @@ def do_train(model, params):
                                     is_test=True,
                                     eval_batch_size=1)
                                 print('  PER: %f %%' % (ler_test * 100))
+                            else:
+                                not_improved_epoch += 1
 
                         duration_eval = time.time() - start_time_eval
                         print('Evaluation time: %.3f min' %
                               (duration_eval / 60))
+
+                        # Early stopping
+                        if not_improved_epoch == params['not_improved_patient_epoch']:
+                            break
 
                         # Update learning rate
                         learning_rate = lr_controller.decay_lr(
@@ -307,11 +318,14 @@ def main(config_path, model_save_path):
         params['num_classes'] = 28
     elif params['label_type'] == 'character_capital_divide':
         params['num_classes'] = 72
+    else:
+        raise TypeError
 
     # Model setting
     model = CTC(encoder_type=params['encoder_type'],
-                input_size=params['input_size'] * params['num_stack'],
+                input_size=params['input_size'],
                 splice=params['splice'],
+                num_stack=params['num_stack'],
                 num_units=params['num_units'],
                 num_layers=params['num_layers'],
                 num_classes=params['num_classes'],
