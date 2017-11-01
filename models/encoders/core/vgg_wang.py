@@ -15,22 +15,26 @@ from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalizat
 ############################################################
 # Architecture: (feature map, kernel, stride)
 
-# VGG1: (96, 3*3, (1,1))  * 3 layers
-# Batch normalization
+# VGG1: (96, 3*3, (1,1)) * 3 layers
+# (Batch normalization)
 # ReLU
 # Max pool
+# (dropout)
 
 # VGG2: (192, 3*3, (1,1)) * 4 layers
-# Batch normalization
+# (Batch normalization)
 # ReLU
 # Max pool
+# (dropout)
 
 # VGG3: (384, 3*3, (1,1)) * 4 layers
-# Batch normalization
+# (Batch normalization)
 # ReLU
 # Max pool
+# (dropout)
 
 # fc: 1024 * 2 layers
+# (dropout, first layer only)
 
 # softmax
 ############################################################
@@ -61,11 +65,11 @@ class VGGEncoder(object):
                  num_stack,
                  parameter_init,
                  time_major,
-                 name='vgg_encoder'):
+                 name='vgg_wang_encoder'):
 
         assert input_size % 3 == 0
 
-        self.num_channels = (input_size // 3) // num_stack
+        self.num_channels = input_size // 3
         self.splice = splice
         self.num_stack = num_stack
         self.parameter_init = parameter_init
@@ -108,105 +112,61 @@ class VGGEncoder(object):
 
         # NOTE: filter_size: `[H, W, C_in, C_out]`
         with tf.variable_scope('VGG1'):
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 3, 96],
-                                stride=[1, 1],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv1')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 96, 96],
-                                stride=[1, 1],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv2')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 96, 96],
-                                stride=[1, 1],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv3')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = max_pool(inputs,
-                              pooling_size=[2, 2],
-                              stride=[2, 2],
-                              name='max_pool')
-            # TODO: add dropout
+            for i_layer in range(1, 4, 1):
+                input_channels = inputs.shape.as_list()[-1]
+                inputs = conv_layer(inputs,
+                                    filter_size=[3, 3, input_channels, 96],
+                                    stride=[1, 1],
+                                    parameter_init=self.parameter_init,
+                                    activation='relu',
+                                    name='conv1')
+                # inputs = batch_normalization(inputs, is_training=is_training)
+                if i_layer == 3:
+                    inputs = max_pool(inputs,
+                                      pooling_size=[2, 2],
+                                      stride=[2, 2],
+                                      name='max_pool')
+                inputs = tf.nn.dropout(inputs, keep_prob)
 
         with tf.variable_scope('VGG2'):
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 96, 192],
-                                stride=[1, 1],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv1')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 192, 192],
-                                stride=[1, 1],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv2')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 192, 192],
-                                stride=[1, 1],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv3')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 192, 192],
-                                stride=[1, 1],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv4')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = max_pool(inputs,
-                              pooling_size=[2, 2],
-                              stride=[2, 2],
-                              name='max_pool')
-            # TODO: add dropout
+            for i_layer in range(1, 5, 1):
+                input_channels = inputs.shape.as_list()[-1]
+                inputs = conv_layer(inputs,
+                                    filter_size=[3, 3, input_channels, 192],
+                                    stride=[1, 1],
+                                    parameter_init=self.parameter_init,
+                                    activation='relu',
+                                    name='conv%d' % i_layer)
+                # inputs = batch_normalization(inputs, is_training=is_training)
+                if i_layer == 4:
+                    inputs = max_pool(inputs,
+                                      pooling_size=[2, 2],
+                                      stride=[2, 2],
+                                      name='max_pool')
+                inputs = tf.nn.dropout(inputs, keep_prob)
 
         with tf.variable_scope('VGG3'):
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 192, 384],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv1')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 384, 384],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv2')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 384, 384],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv3')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = conv_layer(inputs,
-                                filter_size=[3, 3, 384, 384],
-                                parameter_init=self.parameter_init,
-                                activation='relu',
-                                name='conv4')
-            inputs = batch_normalization(inputs, is_training=is_training)
-            inputs = max_pool(inputs,
-                              pooling_size=[2, 2],
-                              stride=[2, 2],
-                              name='max_pool')
-            # TODO: add dropout
+            for i_layer in range(1, 5, 1):
+                input_channels = inputs.shape.as_list()[-1]
+                inputs = conv_layer(inputs,
+                                    filter_size=[3, 3, input_channels, 384],
+                                    parameter_init=self.parameter_init,
+                                    activation='relu',
+                                    name='conv%d' % i_layer)
+                # inputs = batch_normalization(inputs, is_training=is_training)
+                if i_layer == 4:
+                    inputs = max_pool(inputs,
+                                      pooling_size=[2, 2],
+                                      stride=[2, 2],
+                                      name='max_pool')
+                inputs = tf.nn.dropout(inputs, keep_prob)
 
         # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
         outputs = tf.reshape(
-            inputs, shape=[batch_size, max_time, np.prod(inputs.shape.as_list()[-3:])])
+            inputs, shape=[batch_size * max_time, np.prod(inputs.shape.as_list()[-3:])])
 
-        for i in range(1, 3, 1):
-            with tf.variable_scope('fc%d' % i) as scope:
+        for i_layer in range(1, 3, 1):
+            with tf.variable_scope('fc%d' % i_layer) as scope:
                 outputs = tf.contrib.layers.fully_connected(
                     inputs=outputs,
                     num_outputs=1024,
@@ -215,7 +175,8 @@ class VGGEncoder(object):
                         stddev=self.parameter_init),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
-                outputs = tf.nn.dropout(outputs, keep_prob)
+                if i_layer == 1:
+                    outputs = tf.nn.dropout(outputs, keep_prob)
 
         # Reshape back to 3D tensor `[B, T, 1024]`
         output_dim = outputs.shape.as_list()[-1]

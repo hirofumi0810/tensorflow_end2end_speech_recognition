@@ -57,7 +57,7 @@ class VGGBLSTMEncoder(object):
         assert num_proj != 0
         assert input_size % 3 == 0
 
-        self.num_channels = (input_size // 3) // num_stack
+        self.num_channels = input_size // 3
         self.splice = splice
         self.num_stack = num_stack
         self.num_units = num_units
@@ -96,6 +96,12 @@ class VGGBLSTMEncoder(object):
         input_dim = inputs.shape.as_list()[-1]
         # NOTE: input_dim: num_channels * splice * num_stack * 3
 
+        # For debug
+        # print(input_dim)
+        # print(self.num_channels)
+        # print(self.splice)
+        # print(self.num_stack)
+
         assert input_dim == self.num_channels * self.splice * self.num_stack * 3
 
         # Reshape to 4D tensor `[B * T, num_channels, splice * num_stack, 3]`
@@ -111,18 +117,21 @@ class VGGBLSTMEncoder(object):
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv1')
+            # inputs = batch_normalization(inputs, is_training=is_training)
+            inputs = tf.nn.dropout(inputs, keep_prob)
+
             inputs = conv_layer(inputs,
                                 filter_size=[3, 3, 64, 64],
                                 stride=[1, 1],
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv2')
-            inputs = batch_normalization(inputs, is_training=is_training)
+            # inputs = batch_normalization(inputs, is_training=is_training)
             inputs = max_pool(inputs,
                               pooling_size=[2, 2],
                               stride=[2, 2],
                               name='max_pool')
-            # TODO(hirofumi): try dropout
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         with tf.variable_scope('VGG2'):
             inputs = conv_layer(inputs,
@@ -131,18 +140,21 @@ class VGGBLSTMEncoder(object):
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv1')
+            # inputs = batch_normalization(inputs, is_training=is_training)
+            inputs = tf.nn.dropout(inputs, keep_prob)
+
             inputs = conv_layer(inputs,
                                 filter_size=[3, 3, 128, 128],
                                 stride=[1, 1],
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv2')
-            inputs = batch_normalization(inputs, is_training=is_training)
+            # inputs = batch_normalization(inputs, is_training=is_training)
             inputs = max_pool(inputs,
                               pooling_size=[2, 2],
                               stride=[2, 2],
                               name='max_pool')
-            # TODO(hirofumi): try dropout
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
         inputs = tf.reshape(
@@ -159,9 +171,7 @@ class VGGBLSTMEncoder(object):
                     stddev=self.parameter_init),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
-
-        # Dropout for the VGG-output-hidden connection
-        inputs = tf.nn.dropout(inputs, keep_prob, name='dropout_pipe')
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         # Reshape back to 3D tensor `[B, T, 256]`
         inputs = tf.reshape(inputs, shape=[batch_size, max_time, 256])

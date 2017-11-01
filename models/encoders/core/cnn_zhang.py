@@ -12,6 +12,31 @@ import tensorflow as tf
 
 from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalization
 
+############################################################
+# Architecture: (feature map, kernel, stride)
+
+# CNN1: (128, 3*5, (1,1)) * 1 layer
+# ReLU
+# (Batch normalization)
+# max pooling
+# (dropout)
+
+# CNN2-5: (128, 3*5, (1,1)) * 4 layer
+# ReLU
+# (Batch normalization)
+# (dropout)
+
+# CNN6-10: (256, 3*5, (1,1)) * 5 layer
+# ReLU
+# (Batch normalization)
+# (dropout)
+
+# fc: 1024 * 3 layer
+# (dropout, except for the last layer)
+
+# softmax
+############################################################
+
 
 class CNNEncoder(object):
     """CNN encoder.
@@ -38,9 +63,9 @@ class CNNEncoder(object):
                  num_stack,
                  parameter_init,
                  time_major,
-                 name='cnn_encoder'):
+                 name='cnn_zhang_encoder'):
 
-        self.num_channels = (input_size // 3) // num_stack
+        self.num_channels = input_size // 3
         self.splice = splice
         self.num_stack = num_stack
         self.parameter_init = parameter_init
@@ -68,6 +93,12 @@ class CNNEncoder(object):
         input_dim = inputs.shape.as_list()[-1]
         # NOTE: input_dim: num_channels * splice * num_stack * 3
 
+        # For debug
+        # print(input_dim)
+        # print(self.num_channels)
+        # print(self.splice)
+        # print(self.num_stack)
+
         assert input_dim == self.num_channels * self.splice * self.num_stack * 3
 
         # Reshape to 4D tensor `[B * T, num_channels, splice * num_stack, 3]`
@@ -81,64 +112,46 @@ class CNNEncoder(object):
         # activation = 'maxout'
         # TODO: add prelu and maxout layers
 
+        # NOTE: filter_size: `[H, W, C_in, C_out]`
         # 1-4th layers
-        with tf.variable_scope('CNN1'):
-            for i_layer in range(1, 5, 1):
+        for i_layer in range(1, 5, 1):
+            with tf.variable_scope('CNN%d' % i_layer):
+                input_channels = inputs.shape.as_list()[-1]
+                inputs = conv_layer(inputs,
+                                    filter_size=[3, 5, input_channels, 128],
+                                    stride=[1, 1],
+                                    parameter_init=self.parameter_init,
+                                    activation=activation,
+                                    name='conv')
+                # inputs = batch_normalization(inputs, is_training=is_training)
                 if i_layer == 1:
-                    inputs = conv_layer(inputs,
-                                        filter_size=[3, 5, 3, 128],
-                                        stride=[1, 1],
-                                        parameter_init=self.parameter_init,
-                                        activation=activation,
-                                        name='conv1')
                     inputs = max_pool(inputs,
                                       pooling_size=[3, 1],
                                       stride=[3, 1],
                                       name='pool')
-                else:
-                    inputs = conv_layer(inputs,
-                                        filter_size=[3, 5, 128, 128],
-                                        stride=[1, 1],
-                                        parameter_init=self.parameter_init,
-                                        activation=activation,
-                                        name='conv%d' % i_layer)
-                    # NOTE: No poling
-
-                inputs = batch_normalization(inputs, is_training=is_training)
-                # inputs = tf.nn.dropout(inputs, keep_prob)
-                # TODO: try weight decay
+                inputs = tf.nn.dropout(inputs, keep_prob)
 
         # 5-10th layers
-        with tf.variable_scope('CNN2'):
-            for i_layer in range(5, 11, 1):
-                if i_layer == 5:
-                    inputs = conv_layer(inputs,
-                                        filter_size=[3, 5, 128, 256],
-                                        stride=[1, 1],
-                                        parameter_init=self.parameter_init,
-                                        activation=activation,
-                                        name='conv1')
-                    # NOTE: No poling
-                else:
-                    inputs = conv_layer(inputs,
-                                        filter_size=[3, 5, 256, 256],
-                                        stride=[1, 1],
-                                        parameter_init=self.parameter_init,
-                                        activation=activation,
-                                        name='conv%d' % i_layer)
-                    # NOTE: No poling
-
-                inputs = batch_normalization(inputs, is_training=is_training)
-                # inputs = tf.nn.dropout(inputs, keep_prob)
-                # TODO: try weight decay
+        for i_layer in range(5, 11, 1):
+            with tf.variable_scope('CNN%d' % i_layer):
+                input_channels = inputs.shape.as_list()[-1]
+                inputs = conv_layer(inputs,
+                                    filter_size=[3, 5, input_channels, 256],
+                                    stride=[1, 1],
+                                    parameter_init=self.parameter_init,
+                                    activation=activation,
+                                    name='conv')
+                # inputs = batch_normalization(inputs, is_training=is_training)
+                # NOTE: No poling
+                inputs = tf.nn.dropout(inputs, keep_prob)
 
         # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
         outputs = tf.reshape(
-            inputs, shape=[batch_size, max_time, np.prod(inputs.shape.as_list()[-3:])])
+            inputs, shape=[batch_size * max_time, np.prod(inputs.shape.as_list()[-3:])])
 
         # 11-14th layers
-        for i in range(1, 4, 1):
-            with tf.variable_scope('fc%d' % i) as scope:
+        for i_layer in range(1, 4, 1):
+            with tf.variable_scope('fc%d' % i_layer) as scope:
                 outputs = tf.contrib.layers.fully_connected(
                     inputs=outputs,
                     num_outputs=1024,
@@ -147,9 +160,8 @@ class CNNEncoder(object):
                         stddev=self.parameter_init),
                     biases_initializer=tf.zeros_initializer(),
                     scope=scope)
-            outputs = batch_normalization(outputs, is_training=is_training)
-            outputs = tf.nn.dropout(outputs, keep_prob)
-            # TODO: try weight decay
+                if i_layer != 3:
+                    outputs = tf.nn.dropout(outputs, keep_prob)
 
         # Reshape back to 3D tensor `[B, T, 1024]`
         logits = tf.reshape(

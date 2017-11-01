@@ -22,12 +22,11 @@ class TestEncoder(unittest.TestCase):
     def test(self):
         print("Encoder Working check.")
 
-        self.check(encoder_type='cldnn_wang', lstm_impl='LSTMBlockCell',
-                   time_major=True)
-
         # CNNs
         self.check(encoder_type='vgg_wang', time_major=True)
         self.check(encoder_type='cnn_zhang', time_major=True)
+        self.check(encoder_type='cldnn_wang', lstm_impl='LSTMBlockCell',
+                   time_major=True)
         # self.check(encoder_type='resnet_wang')
 
         ##############################
@@ -158,7 +157,7 @@ class TestEncoder(unittest.TestCase):
                     time_major=time_major)
             elif encoder_type in ['vgg_blstm', 'vgg_lstm', 'cldnn_wang']:
                 encoder = load(encoder_type)(
-                    input_size=input_size // splice,
+                    input_size=input_size // splice // num_stack,
                     splice=splice,
                     num_stack=num_stack,
                     num_units=256,
@@ -182,7 +181,7 @@ class TestEncoder(unittest.TestCase):
                     time_major=time_major)
             elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                 encoder = load(encoder_type)(
-                    input_size=input_size // splice,
+                    input_size=input_size // splice // num_stack,
                     splice=splice,
                     num_stack=num_stack,
                     parameter_init=0.1,

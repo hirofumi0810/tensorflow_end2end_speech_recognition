@@ -17,21 +17,28 @@ from models.encoders.core.blstm import basiclstmcell, lstmcell, lstmblockcell, l
 # Architecture: (feature map, kernel, stride)
 
 # CNN1: (32, 11*21, (3,2)) * 1 layer
-# Batch normalization
 # ReLU
+# (Batch normalization)
+# max pooling
+# (dropout)
 
 # CNN2: (32, 11*11, (1,2)) * 1 layer
-# Batch normalization
 # ReLU
+# (Batch normalization)
+# max pooling
+# (dropout)
 
 # CNN3:(96, 3*3, (1,1)) * 1 layer
-# Batch normalization
 # ReLU
+# (Batch normalization)
+# max pooling
+# (dropout)
 
 # BLSTM: 896 * 2 layers
 
 # fc: 896 * 1 layer
-# fc: 74 * 1 layers
+# (dropout)
+# fc: 74 * 1 layer
 
 # softmax
 ############################################################
@@ -80,12 +87,12 @@ class CLDNNEncoder(object):
                  parameter_init,
                  clip_activation,
                  time_major=False,
-                 name='cldnn_encoder'):
+                 name='cldnn_wang_encoder'):
 
         assert num_proj != 0
         assert input_size % 3 == 0
 
-        self.num_channels = (input_size // 3) // num_stack
+        self.num_channels = input_size // 3
         self.splice = splice
         self.num_stack = num_stack
         self.num_units = num_units
@@ -144,12 +151,12 @@ class CLDNNEncoder(object):
                                 stride=[3, 2],
                                 parameter_init=self.parameter_init,
                                 activation='relu')
-            inputs = batch_normalization(inputs, is_training=is_training)
+            # inputs = batch_normalization(inputs, is_training=is_training)
             inputs = max_pool(inputs,
                               pooling_size=[1, 1],
                               stride=[1, 1],
                               name='max_pool')
-            # TODO(hirofumi): try dropout
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         with tf.variable_scope('CNN2'):
             inputs = conv_layer(inputs,
@@ -157,12 +164,12 @@ class CLDNNEncoder(object):
                                 stride=[1, 2],
                                 parameter_init=self.parameter_init,
                                 activation='relu')
-            inputs = batch_normalization(inputs, is_training=is_training)
+            # inputs = batch_normalization(inputs, is_training=is_training)
             inputs = max_pool(inputs,
                               pooling_size=[1, 1],
                               stride=[1, 1],
                               name='max_pool')
-            # TODO(hirofumi): try dropout
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         with tf.variable_scope('CNN3'):
             inputs = conv_layer(inputs,
@@ -170,12 +177,12 @@ class CLDNNEncoder(object):
                                 stride=[1, 1],
                                 parameter_init=self.parameter_init,
                                 activation='relu')
-            inputs = batch_normalization(inputs, is_training=is_training)
+            # inputs = batch_normalization(inputs, is_training=is_training)
             inputs = max_pool(inputs,
                               pooling_size=[1, 1],
                               stride=[1, 1],
                               name='max_pool')
-            # TODO(hirofumi): try dropout
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         # Reshape to 3D tensor `[B, T, new_h * new_w * C_out]`
         inputs = tf.reshape(
@@ -246,7 +253,6 @@ class CLDNNEncoder(object):
                     stddev=self.parameter_init),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
-            outputs = tf.nn.dropout(outputs, keep_prob)
 
         output_dim = outputs.shape.as_list()[-1]
         if self.time_major:
