@@ -13,12 +13,12 @@ import tensorflow as tf
 
 sys.path.append(os.path.abspath('../../'))
 from models.attention.attention_seq2seq import AttentionSeq2Seq
-from models.test.util import measure_time
 from models.test.data import generate_data, idx2alpha
 from utils.io.labels.phone import Idx2phone
 from utils.io.labels.sparsetensor import list2sparsetensor
 from utils.parameter import count_total_parameters
 from utils.training.learning_rate_controller import Controller
+from utils.measure_time_func import measure_time
 
 
 class TestAttentionTraining(tf.test.TestCase):

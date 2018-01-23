@@ -1,0 +1,8 @@
+parent: ../config/ctc/blstm_ctc_baseline.yml
+param:
+  # framework
+  backend: pytorch
+  # backend: chainer
+
+  # regularization
+  weight_noise_std: 1e-5

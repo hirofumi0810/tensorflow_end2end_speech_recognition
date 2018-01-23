@@ -16,22 +16,22 @@ from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalizat
 # Architecture: (feature map, kernel, stride)
 
 # VGG1: (96, 3*3, (1,1)) * 3 layers
-# (Batch normalization)
+# Batch normalization
 # ReLU
 # Max pool
-# (dropout)
+# dropout
 
 # VGG2: (192, 3*3, (1,1)) * 4 layers
-# (Batch normalization)
+# Batch normalization
 # ReLU
 # Max pool
-# (dropout)
+# dropout
 
 # VGG3: (384, 3*3, (1,1)) * 4 layers
-# (Batch normalization)
+# Batch normalization
 # ReLU
 # Max pool
-# (dropout)
+# dropout
 
 # fc: 1024 * 2 layers
 # (dropout, first layer only)
@@ -120,7 +120,7 @@ class VGGEncoder(object):
                                     parameter_init=self.parameter_init,
                                     activation='relu',
                                     name='conv1')
-                # inputs = batch_normalization(inputs, is_training=is_training)
+                inputs = batch_normalization(inputs, is_training=is_training)
                 if i_layer == 3:
                     inputs = max_pool(inputs,
                                       pooling_size=[2, 2],
@@ -137,7 +137,7 @@ class VGGEncoder(object):
                                     parameter_init=self.parameter_init,
                                     activation='relu',
                                     name='conv%d' % i_layer)
-                # inputs = batch_normalization(inputs, is_training=is_training)
+                inputs = batch_normalization(inputs, is_training=is_training)
                 if i_layer == 4:
                     inputs = max_pool(inputs,
                                       pooling_size=[2, 2],
@@ -153,7 +153,7 @@ class VGGEncoder(object):
                                     parameter_init=self.parameter_init,
                                     activation='relu',
                                     name='conv%d' % i_layer)
-                # inputs = batch_normalization(inputs, is_training=is_training)
+                inputs = batch_normalization(inputs, is_training=is_training)
                 if i_layer == 4:
                     inputs = max_pool(inputs,
                                       pooling_size=[2, 2],

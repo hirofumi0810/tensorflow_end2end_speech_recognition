@@ -19,17 +19,17 @@ from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalizat
 # ReLU
 # (Batch normalization)
 # max pooling
-# (dropout)
+# dropout
 
 # CNN2-5: (128, 3*5, (1,1)) * 4 layer
 # ReLU
 # (Batch normalization)
-# (dropout)
+# dropout
 
 # CNN6-10: (256, 3*5, (1,1)) * 5 layer
 # ReLU
 # (Batch normalization)
-# (dropout)
+# dropout
 
 # fc: 1024 * 3 layer
 # (dropout, except for the last layer)

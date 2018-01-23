@@ -20,24 +20,24 @@ from models.encoders.core.blstm import basiclstmcell, lstmcell, lstmblockcell, l
 # ReLU
 # (Batch normalization)
 # max pooling
-# (dropout)
+# dropout
 
 # CNN2: (32, 11*11, (1,2)) * 1 layer
 # ReLU
 # (Batch normalization)
 # max pooling
-# (dropout)
+# dropout
 
 # CNN3:(96, 3*3, (1,1)) * 1 layer
 # ReLU
 # (Batch normalization)
 # max pooling
-# (dropout)
+# dropout
 
 # BLSTM: 896 * 2 layers
 
 # fc: 896 * 1 layer
-# (dropout)
+# dropout
 # fc: 74 * 1 layer
 
 # softmax

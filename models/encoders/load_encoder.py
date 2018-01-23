@@ -18,6 +18,10 @@ from models.encoders.core.vgg_wang import VGGEncoder
 from models.encoders.core.multitask_blstm import MultitaskBLSTMEncoder
 from models.encoders.core.multitask_lstm import MultitaskLSTMEncoder
 from models.encoders.core.pyramidal_blstm import PyramidBLSTMEncoder
+from models.encoders.core.cldnn_wang import CLDNNEncoder
+
+from models.encoders.core.student_cnn_ctc import StudentCNNCTCEncoder
+from models.encoders.core.student_cnn_compact_ctc import StudentCNNCompactCTCEncoder
 
 ENCODERS = {
     "blstm": BLSTMEncoder,
@@ -32,6 +36,10 @@ ENCODERS = {
     "multitask_blstm": MultitaskBLSTMEncoder,
     "multitask_lstm": MultitaskLSTMEncoder,
     "pyramid_blstm": PyramidBLSTMEncoder,
+    "cldnn_wang": CLDNNEncoder,
+
+    "student_cnn_ctc": StudentCNNCTCEncoder,
+    "student_cnn_compact_ctc": StudentCNNCompactCTCEncoder
 }
 
 

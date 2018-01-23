@@ -10,12 +10,21 @@ __pycache__
 model.*
 checkpoint
 *temp
-
-# librispeech
-*_multitask*
+log
 
 # csj
-*_ss*
+*ss*
 csj/fine_tuning
 
+# under implementation
 bn_blstm_ctc.py
+deepspeech*
+wav2letter*
+resnet*
+
+# temp
+*ccc*
+*wrapper*
+
+
+QUESTION.md
