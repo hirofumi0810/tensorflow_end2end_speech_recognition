@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import math
+import numpy as np
 import tensorflow as tf
 
 from models.encoders.core.cnn_util import conv_layer, max_pool, batch_normalization
@@ -57,7 +57,7 @@ class VGGLSTMEncoder(object):
         assert num_proj != 0
         assert input_size % 3 == 0
 
-        self.num_channels = (input_size // 3) // num_stack
+        self.num_channels = input_size // 3
         self.splice = splice
         self.num_stack = num_stack
         self.num_units = num_units
@@ -84,8 +84,10 @@ class VGGLSTMEncoder(object):
                 in the hidden-hidden connection
             is_training (bool):
         Returns:
-            outputs: Encoder states, a tensor of size
-                `[T, B, num_units (num_proj)]`
+            outputs: Encoder states.
+                if time_major is True, a tensor of size
+                    `[T, B, num_units (num_proj)]`
+                otherwise, `[B, T, num_units (num_proj)]`
             final_state: A final hidden state of the encoder
         """
         # inputs: 3D tensor `[B, T, input_dim]`
@@ -93,6 +95,12 @@ class VGGLSTMEncoder(object):
         max_time = tf.shape(inputs)[1]
         input_dim = inputs.shape.as_list()[-1]
         # NOTE: input_dim: num_channels * splice * num_stack * 3
+
+        # For debug
+        # print(input_dim)
+        # print(self.num_channels)
+        # print(self.splice)
+        # print(self.num_stack)
 
         assert input_dim == self.num_channels * self.splice * self.num_stack * 3
 
@@ -109,18 +117,21 @@ class VGGLSTMEncoder(object):
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv1')
+            # inputs = batch_normalization(inputs, is_training=is_training)
+            inputs = tf.nn.dropout(inputs, keep_prob)
+
             inputs = conv_layer(inputs,
                                 filter_size=[3, 3, 64, 64],
                                 stride=[1, 1],
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv2')
-            inputs = batch_normalization(inputs, is_training=is_training)
+            # inputs = batch_normalization(inputs, is_training=is_training)
             inputs = max_pool(inputs,
                               pooling_size=[2, 2],
                               stride=[2, 2],
                               name='max_pool')
-            # TODO(hirofumi): try dropout
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         with tf.variable_scope('VGG2'):
             inputs = conv_layer(inputs,
@@ -129,25 +140,25 @@ class VGGLSTMEncoder(object):
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv1')
+            # inputs = batch_normalization(inputs, is_training=is_training)
+            inputs = tf.nn.dropout(inputs, keep_prob)
+
             inputs = conv_layer(inputs,
                                 filter_size=[3, 3, 128, 128],
                                 stride=[1, 1],
                                 parameter_init=self.parameter_init,
                                 activation='relu',
                                 name='conv2')
-            inputs = batch_normalization(inputs, is_training=is_training)
+            # inputs = batch_normalization(inputs, is_training=is_training)
             inputs = max_pool(inputs,
                               pooling_size=[2, 2],
                               stride=[2, 2],
                               name='max_pool')
-            # TODO(hirofumi): try dropout
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         # Reshape to 2D tensor `[B * T, new_h * new_w * C_out]`
-        new_h = math.ceil(self.num_channels / 4)
-        new_w = math.ceil(self.splice * self.num_stack / 4)
-        channel_out = inputs.shape.as_list()[-1]
         inputs = tf.reshape(
-            inputs, shape=[batch_size * max_time, new_h * new_w * channel_out])
+            inputs, shape=[batch_size * max_time, np.prod(inputs.shape.as_list()[-3:])])
 
         # Insert linear layer to recude CNN's output demention
         # from (new_h * new_w * C_out) to 256
@@ -160,9 +171,7 @@ class VGGLSTMEncoder(object):
                     stddev=self.parameter_init),
                 biases_initializer=tf.zeros_initializer(),
                 scope=scope)
-
-        # Dropout for the VGG-output-hidden connection
-        inputs = tf.nn.dropout(inputs, keep_prob, name='dropout_pipe')
+            inputs = tf.nn.dropout(inputs, keep_prob)
 
         # Reshape back to 3D tensor `[B, T, 256]`
         inputs = tf.reshape(inputs, shape=[batch_size, max_time, 256])

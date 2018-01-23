@@ -1,0 +1,5 @@
+GARBAGE  0
+LAUGHTER  1
+FILLER  2
+<  3
+>  4

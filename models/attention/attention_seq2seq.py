@@ -47,7 +47,8 @@ class AttentionSeq2Seq(ModelBase):
         attention_type (string): the type of attention
         attention_dim: (int) the dimension of the attention layer
         decoder_type (string): lstm or gru
-        decoder_num_units (int): the number of units in each layer of the decoder
+        decoder_num_units (int): the number of units in each layer of the
+            decoder
         # decoder_num_proj (int): the number of nodes in the projection layer of
             the decoder. This is not used for GRU decoders.
         decoder_num_layers (int): the number of layers of the decoder
@@ -70,7 +71,7 @@ class AttentionSeq2Seq(ModelBase):
             is not used for GRU models.
         splice (int, optional): the number of frames to splice. This is used
             when using CNN-like encoder. Default is 1 frame.
-        parameter_init (float, optional): the ange of uniform distribution to
+        parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
         clip_grad_norm (float, optional): the range of clipping of gradient
             norm (> 0)
@@ -186,6 +187,8 @@ class AttentionSeq2Seq(ModelBase):
         self.keep_prob_encoder_pl_list = []
         self.keep_prob_decoder_pl_list = []
         self.keep_prob_embedding_pl_list = []
+        self.labels_st_true_pl_list = []
+        self.labels_st_pred_pl_list = []
 
     def _build(self, inputs, labels, inputs_seq_len, labels_seq_len,
                keep_prob_encoder, keep_prob_decoder, keep_prob_embedding):
@@ -306,7 +309,9 @@ class AttentionSeq2Seq(ModelBase):
         outputs, final_state = self.encoder(
             inputs=inputs,
             inputs_seq_len=inputs_seq_len,
-            keep_prob=keep_prob_encoder)
+            keep_prob=keep_prob_encoder,
+            is_training=True)
+        # TODO: fix this
 
         if self.time_major:
             # Convert from time-major to batch-major
@@ -531,6 +536,16 @@ class AttentionSeq2Seq(ModelBase):
             tf.placeholder(tf.int64, name='indices_pred'),
             tf.placeholder(tf.int32, name='values_pred'),
             tf.placeholder(tf.int64, name='shape_pred'))
+        # TODO: remove this
+
+        self.labels_st_true_pl_list.append(tf.SparseTensor(
+            tf.placeholder(tf.int64, name='indices_true'),
+            tf.placeholder(tf.int32, name='values_true'),
+            tf.placeholder(tf.int64, name='shape_true')))
+        self.labels_st_pred_pl_list.append(tf.SparseTensor(
+            tf.placeholder(tf.int64, name='indices_pred'),
+            tf.placeholder(tf.int32, name='values_pred'),
+            tf.placeholder(tf.int64, name='shape_pred')))
 
     def _beam_search_decoder_wrapper(self, decoder, beam_width=1,
                                      length_penalty_weight=0.6):
@@ -596,7 +611,7 @@ class AttentionSeq2Seq(ModelBase):
 
         # For prevent 0 * log(0) in crossentropy loss
         epsilon = tf.constant(value=1e-10)
-        logits = logits + epsilon
+        logits += epsilon
 
         # Weight decay
         if self.weight_decay > 0:
@@ -696,7 +711,7 @@ class AttentionSeq2Seq(ModelBase):
         # Compute LER (normalize by label length)
         ler_op = tf.reduce_mean(tf.edit_distance(
             labels_pred, labels_true, normalize=True))
-        # TODO: consider variable lengths
+        # TODO: consider <EOS>
 
         # Add a scalar summary for the snapshot of LER
         # with tf.name_scope("ler"):
@@ -705,5 +720,6 @@ class AttentionSeq2Seq(ModelBase):
         #     self.summaries_dev.append(tf.summary.scalar(
         #         'ler_dev', ler_op))
         # TODO: feed_dictのタイミング違うからエラーになる
+        # global_stepをupdateする前にする？
 
         return ler_op

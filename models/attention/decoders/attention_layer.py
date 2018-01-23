@@ -25,16 +25,20 @@ class AttentionLayer(object):
             initialize weight parameters (>= 0)
         sharpening_factor (float): a sharpening factor in the
             softmax layer for computing attention weights
+        sigmoid_smoothing (bool, optional): if True, replace softmax function
+            in computing attention weights with sigmoid function for smoothing
         mode: tf.contrib.learn.ModeKeys
         name (string): the name of the attention layer
     """
 
     def __init__(self, attention_type, num_units, parameter_init,
-                 sharpening_factor, mode, name='attention_layer'):
+                 sharpening_factor, sigmoid_smoothing,
+                 mode, name='attention_layer'):
         self.attention_type = attention_type
         self.num_units = num_units
         self.parameter_init = parameter_init
         self.sharpening_factor = sharpening_factor
+        self.sigmoid_smoothing = sigmoid_smoothing
         self.reuse = False if mode == tf.contrib.learn.ModeKeys.TRAIN else True
         self.name = name
 
@@ -85,8 +89,18 @@ class AttentionLayer(object):
             energy *= self.sharpening_factor
 
             # Compute attention weights
-            attention_weights = tf.nn.softmax(
-                energy, name="attention_weights")
+            if self.sigmoid_smoothing:
+                attention_weights = tf.sigmoid(energy) / tf.reduce_sum(
+                    tf.sigmoid(energy),
+                    axis=-1,
+                    keep_dims=True)
+            else:
+                attention_weights = tf.nn.softmax(
+                    energy, name="attention_weights")
+                # attention_weights = tf.exp(energy) / tf.reduce_sum(
+                #     tf.exp(energy),
+                #     axis=-1,
+                #     keep_dims=True)
 
             # Compute context vector
             context_vector = tf.expand_dims(
@@ -184,11 +198,14 @@ class AttentionLayer(object):
                     F = tf.Variable(tf.truncated_normal(
                         shape=[200, 1, 10],
                         # shape=[100, 1, 10],
-                        stddev=0.1), name='filter')
+                        stddev=self.parameter_init),
+                        name='filter')
                 # `[B, T_in]` -> `[B, T_in, 1]`
                 attention_weights = tf.expand_dims(attention_weights, axis=2)
-                f = tf.nn.conv1d(attention_weights, F,
-                                 stride=1, padding='SAME',
+                f = tf.nn.conv1d(attention_weights,
+                                 F,
+                                 stride=1,
+                                 padding='SAME',
                                  #  use_cudnn_on_gpu=None,
                                  #  data_format=None,
                                  name='conv_features')
@@ -208,7 +225,10 @@ class AttentionLayer(object):
                 energy = v_a * \
                     tf.tanh(W_keys + tf.expand_dims(W_query, axis=1) + W_fil)
 
-            elif attention_type != 'location':
+                # `[B, T_in, num_units]` -> `[B, T_in]`
+                energy = tf.reduce_sum(energy, axis=2)
+
+            elif attention_type == 'location':
                 ############################################################
                 # location-based attention
                 # f = F * α_{i-1}
@@ -216,7 +236,7 @@ class AttentionLayer(object):
                 ############################################################
                 with tf.control_dependencies(None):
                     F = tf.Variable(tf.truncated_normal(
-                        shape=[200, 1, 10],
+                        shape=[201, 1, 10],
                         # shape=[100, 1, 10],
                         stddev=0.1), name='filter')
                 # `[B, T_in]` -> `[B, T_in, 1]`
@@ -240,6 +260,9 @@ class AttentionLayer(object):
 
                 # Calculates a batch- and time-wise dot product with a variable
                 energy = v_a * tf.tanh(tf.expand_dims(W_query, axis=1) + W_fil)
+
+                # `[B, T_in, num_units]` -> `[B, T_in]`
+                energy = tf.reduce_sum(energy, axis=2)
 
             elif attention_type == 'baidu_attetion':
                 raise NotImplementedError

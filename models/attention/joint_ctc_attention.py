@@ -135,7 +135,8 @@ class JointCTCAttention(AttentionSeq2Seq):
             weight_decay=0.0,
             time_major=True,
             sharpening_factor=1.0,
-            logits_temperature=1.0)
+            logits_temperature=1.0,
+            name=name)
 
         # Setting for multi-task training
         self.ctc_num_classes = num_classes + 1
@@ -174,9 +175,9 @@ class JointCTCAttention(AttentionSeq2Seq):
 
         # Placeholder for multi-task training
         self.ctc_labels_pl_list.append(tf.SparseTensor(
-            tf.placeholder(tf.int64, name='ctc_indices'),
-            tf.placeholder(tf.int32, name='ctc_values'),
-            tf.placeholder(tf.int64, name='ctc_shape')))
+            tf.placeholder(tf.int64, name='indices'),
+            tf.placeholder(tf.int32, name='values'),
+            tf.placeholder(tf.int64, name='shape')))
 
     def ctc_logits(self, encoder_outputs):
         """

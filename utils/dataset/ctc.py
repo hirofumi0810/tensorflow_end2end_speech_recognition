@@ -153,7 +153,9 @@ class DatasetBase(Base):
             data_i = data_i.reshape(1, frame_num, input_size)
             data_i = do_splice(data_i,
                                splice=self.splice,
-                               batch_size=1).reshape(frame_num, -1)
+                               batch_size=1,
+                               num_stack=self.num_stack)
+            data_i = data_i.reshape(frame_num, -1)
 
             inputs[i_batch, :frame_num, :] = data_i
             if self.is_test:

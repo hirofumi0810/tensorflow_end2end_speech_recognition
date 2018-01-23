@@ -39,8 +39,8 @@ class PyramidBLSTMEncoder(object):
                  concat=False,
                  name='pblstm_encoder'):
 
-        if num_units % 2 != 0:
-            raise ValueError('num_unit should be even number.')
+        assert num_proj != 0
+        assert num_units % 2 == 0, 'num_unit should be even number.'
 
         self.num_units = num_units
         self.num_proj = None
@@ -51,14 +51,14 @@ class PyramidBLSTMEncoder(object):
         self.clip_activation = clip_activation
         self.name = name
 
-    def _build(self, inputs, inputs_seq_len,
-               keep_prob):
+    def _build(self, inputs, inputs_seq_len, keep_prob, is_training):
         """Construct Pyramidal Bidirectional LSTM encoder.
         Args:
             inputs (placeholder): A tensor of size`[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
+            is_training (bool):
         Returns:
             outputs: Encoder states, a tensor of size
                 `[T, B, num_units (num_proj)]`

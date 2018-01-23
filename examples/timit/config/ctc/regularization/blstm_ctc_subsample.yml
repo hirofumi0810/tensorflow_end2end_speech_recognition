@@ -1,0 +1,14 @@
+parent: ../config/ctc/blstm_ctc_baseline.yml
+param:
+  # framework
+  backend: pytorch
+  # backend: chainer
+
+  # topology
+  num_layers: 5
+  subsample_list:
+    - False
+    - True
+    - False
+    - False
+    - False

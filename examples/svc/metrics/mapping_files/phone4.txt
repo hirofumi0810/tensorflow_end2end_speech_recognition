@@ -1,0 +1,6 @@
+SIL  0
+LAUGHTER  1
+FILLER  2
+SPEECH  3
+<  4
+>  5

@@ -12,9 +12,9 @@ import tensorflow as tf
 
 sys.path.append(os.path.abspath('../../'))
 from models.encoders.load_encoder import load
-from models.test.util import measure_time
 from models.test.data import generate_data
 from utils.parameter import count_total_parameters
+from utils.measure_time_func import measure_time
 
 
 class TestEncoder(unittest.TestCase):
@@ -22,12 +22,11 @@ class TestEncoder(unittest.TestCase):
     def test(self):
         print("Encoder Working check.")
 
-        self.check(encoder_type='blstm', lstm_impl='LSTMBlockFusedCell',
-                   time_major=True)
-
         # CNNs
         self.check(encoder_type='vgg_wang', time_major=True)
         self.check(encoder_type='cnn_zhang', time_major=True)
+        self.check(encoder_type='cldnn_wang', lstm_impl='LSTMBlockCell',
+                   time_major=True)
         # self.check(encoder_type='resnet_wang')
 
         ##############################
@@ -127,13 +126,15 @@ class TestEncoder(unittest.TestCase):
         with tf.Graph().as_default():
             # Load batch data
             batch_size = 4
-            splice = 11 if encoder_type in ['vgg_blstm', 'vgg_lstm', 'vgg_wang',
-                                            'resnet_wang', 'cnn_zhang'] else 1
+            splice = 5 if encoder_type in ['vgg_blstm', 'vgg_lstm',
+                                           'vgg_wang', 'resnet_wang', 'cldnn_wang',
+                                           'cnn_zhang'] else 1
+            num_stack = 2
             inputs, _, inputs_seq_len = generate_data(
                 label_type='character',
                 model='ctc',
                 batch_size=batch_size,
-                num_stack=3,
+                num_stack=num_stack,
                 splice=splice)
             frame_num, input_size = inputs[0].shape
 
@@ -154,10 +155,11 @@ class TestEncoder(unittest.TestCase):
                     num_layers=5,
                     parameter_init=0.1,
                     time_major=time_major)
-            elif encoder_type in ['vgg_blstm', 'vgg_lstm']:
+            elif encoder_type in ['vgg_blstm', 'vgg_lstm', 'cldnn_wang']:
                 encoder = load(encoder_type)(
-                    input_size=input_size // splice,
+                    input_size=input_size // splice // num_stack,
                     splice=splice,
+                    num_stack=num_stack,
                     num_units=256,
                     num_proj=None,
                     num_layers=5,
@@ -179,8 +181,9 @@ class TestEncoder(unittest.TestCase):
                     time_major=time_major)
             elif encoder_type in ['vgg_wang', 'resnet_wang', 'cnn_zhang']:
                 encoder = load(encoder_type)(
-                    input_size=input_size // splice,
+                    input_size=input_size // splice // num_stack,
                     splice=splice,
+                    num_stack=num_stack,
                     parameter_init=0.1,
                     time_major=time_major)
                 # NOTE: topology is pre-defined
@@ -201,12 +204,14 @@ class TestEncoder(unittest.TestCase):
                 hidden_states_op, final_state_op, hidden_states_sub_op, final_state_sub_op = encoder(
                     inputs=inputs_pl,
                     inputs_seq_len=inputs_seq_len_pl,
-                    keep_prob=keep_prob_pl)
+                    keep_prob=keep_prob_pl,
+                    is_training=True)
             else:
                 hidden_states_op, final_state_op = encoder(
                     inputs=inputs_pl,
                     inputs_seq_len=inputs_seq_len_pl,
-                    keep_prob=keep_prob_pl)
+                    keep_prob=keep_prob_pl,
+                    is_training=True)
 
             # Add the variable initializer operation
             init_op = tf.global_variables_initializer()
@@ -250,11 +255,12 @@ class TestEncoder(unittest.TestCase):
                 if time_major:
                     encoder_outputs = encoder_outputs.transpose(1, 0, 2)
 
-                if encoder_type in ['blstm', 'bgru', 'vgg_blstm', 'multitask_blstm']:
-                    self.assertEqual(
-                        (batch_size, frame_num, encoder.num_units * 2), encoder_outputs.shape)
+                if encoder_type in ['blstm', 'bgru', 'vgg_blstm', 'multitask_blstm', 'cldnn_wang']:
+                    if encoder_type != 'cldnn_wang':
+                        self.assertEqual(
+                            (batch_size, frame_num, encoder.num_units * 2), encoder_outputs.shape)
 
-                    if encoder_type in ['blstm', 'vgg_blstm', 'multitask_blstm']:
+                    if encoder_type != 'bgru':
                         self.assertEqual(
                             (batch_size, encoder.num_units), final_state[0].c.shape)
                         self.assertEqual(
@@ -281,11 +287,11 @@ class TestEncoder(unittest.TestCase):
                         self.assertEqual(
                             (batch_size, encoder.num_units), final_state[1].shape)
 
-                elif encoder_type in ['lstm', 'gru', 'vgg_lstm']:
+                elif encoder_type in ['lstm', 'gru', 'vgg_lstm', 'multitask_lstm']:
                     self.assertEqual(
                         (batch_size, frame_num, encoder.num_units), encoder_outputs.shape)
 
-                    if encoder_type in ['lstm', 'vgg_lstm', 'multitask_lstm']:
+                    if encoder_type != 'gru':
                         self.assertEqual(
                             (batch_size, encoder.num_units), final_state[0].c.shape)
                         self.assertEqual(

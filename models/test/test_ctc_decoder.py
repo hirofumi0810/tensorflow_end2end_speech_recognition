@@ -12,12 +12,12 @@ import tensorflow as tf
 
 sys.path.append(os.path.abspath('../../'))
 from models.ctc.ctc import CTC
-from models.test.util import measure_time
 from models.test.data import generate_data, idx2alpha
 from utils.io.labels.sparsetensor import list2sparsetensor, sparsetensor2list
 from utils.evaluation.edit_distance import compute_cer
 from models.ctc.decoders.greedy_decoder import GreedyDecoder
 from models.ctc.decoders.beam_search_decoder import BeamSearchDecoder
+from utils.measure_time_func import measure_time
 
 
 class TestCTCDecoder(tf.test.TestCase):

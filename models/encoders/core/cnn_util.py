@@ -18,7 +18,7 @@ def max_pool(bottom, pooling_size, stride=[2, 2], name='max_pool'):
         stride (list, optional): A list of `[stride_H, stride_W]`
         name (string, optional): A layer name
     Returns:
-        outputs: A tensor of size `[B * T, H, W, C_out]`
+        outputs: A tensor of size `[B (* T), H, W, C_out]`
     """
     return tf.nn.max_pool(
         bottom,
@@ -36,7 +36,7 @@ def avg_pool(bottom, pooling_size, stride=[2, 2], name='avg_pool'):
         stride (list, optional): A list of `[stride_H, stride_W]`
         name (string, optional): A layer name
     Returns:
-        outputs: A tensor of size `[B * T, H, W, C_out]`
+        outputs: A tensor of size `[B (* T), H, W, C_out]`
     """
     return tf.nn.avg_pool(
         bottom,
@@ -57,7 +57,7 @@ def conv_layer(bottom, filter_size, stride=[1, 1], parameter_init=0.1,
         activation (string, optional): relu
         name (string, optional): A layer name
     Returns:
-        outputs: A tensor of size `[B * T, H, W, C_out]`
+        outputs: A tensor of size `[B (* T), H, W, C_out]`
     """
     assert len(filter_size) == 4
     assert len(stride) == 2

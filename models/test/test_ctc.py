@@ -13,12 +13,12 @@ import tensorflow as tf
 
 sys.path.append(os.path.abspath('../../'))
 from models.ctc.ctc import CTC
-from models.test.util import measure_time
 from models.test.data import generate_data, idx2alpha
 from utils.io.labels.phone import Idx2phone
 from utils.io.labels.sparsetensor import list2sparsetensor, sparsetensor2list
 from utils.parameter import count_total_parameters
 from utils.training.learning_rate_controller import Controller
+from utils.measure_time_func import measure_time
 
 
 class TestCTCTraining(tf.test.TestCase):
@@ -27,39 +27,39 @@ class TestCTCTraining(tf.test.TestCase):
         print("CTC Working check.")
 
         # CNN-like-CTC
-        self.check(encoder_type='vgg_wang')
-        # self.check(encoder_type='cnn_zhang')
+        # self.check(encoder_type='cnn_zhang', label_type='phone')
+        # self.check(encoder_type='vgg_wang')
+        self.check(encoder_type='cldnn_wang', lstm_impl='LSTMBlockCell')
 
-        # GRU-CTC
-        self.check(encoder_type='bgru')
-        self.check(encoder_type='gru')
+        # BLSTM-CTC
+        self.check(encoder_type='blstm', lstm_impl='BasicLSTMCell')
+        self.check(encoder_type='blstm', lstm_impl='LSTMCell')
+        self.check(encoder_type='blstm', lstm_impl='LSTMBlockCell')
+        self.check(encoder_type='blstm', lstm_impl='LSTMBlockCell',
+                   time_major=False)
 
         # LSTM-CTC
         self.check(encoder_type='lstm', lstm_impl='BasicLSTMCell')
         self.check(encoder_type='lstm', lstm_impl='LSTMCell')
         self.check(encoder_type='lstm', lstm_impl='LSTMBlockCell')
 
-        # BLSTM-CTC
-        self.check(encoder_type='blstm', lstm_impl='BasicLSTMCell')
-        self.check(encoder_type='blstm', lstm_impl='LSTMCell')
-        self.check(encoder_type='blstm', lstm_impl='LSTMBlockCell',
-                   time_major=True)
-        self.check(encoder_type='blstm', lstm_impl='LSTMBlockCell',
-                   save_params=False)
-
-        # VGG-LSTM-CTC
-        self.check(encoder_type='vgg_lstm', lstm_impl='BasicLSTMCell')
-        self.check(encoder_type='vgg_lstm', lstm_impl='LSTMCell')
-        self.check(encoder_type='vgg_lstm', lstm_impl='LSTMBlockCell')
+        # GRU-CTC
+        self.check(encoder_type='bgru')
+        self.check(encoder_type='gru')
 
         # VGG-BLSTM-CTC
         self.check(encoder_type='vgg_blstm', lstm_impl='BasicLSTMCell')
         self.check(encoder_type='vgg_blstm', lstm_impl='LSTMCell')
         self.check(encoder_type='vgg_blstm', lstm_impl='LSTMBlockCell')
 
+        # VGG-LSTM-CTC
+        self.check(encoder_type='vgg_lstm', lstm_impl='BasicLSTMCell')
+        self.check(encoder_type='vgg_lstm', lstm_impl='LSTMCell')
+        self.check(encoder_type='vgg_lstm', lstm_impl='LSTMBlockCell')
+
     @measure_time
     def check(self, encoder_type, label_type='character',
-              lstm_impl=None, time_major=False, save_params=False):
+              lstm_impl=None, time_major=True, save_params=False):
 
         print('==================================================')
         print('  encoder_type: %s' % encoder_type)
@@ -72,21 +72,24 @@ class TestCTCTraining(tf.test.TestCase):
         tf.reset_default_graph()
         with tf.Graph().as_default():
             # Load batch data
-            batch_size = 1
-            splice = 11 if encoder_type in ['vgg_blstm', 'vgg_lstm', 'vgg_wang',
-                                            'resnet_wang', 'cnn_zhang'] else 1
+            batch_size = 2
+            splice = 11 if encoder_type in ['vgg_blstm', 'vgg_lstm', 'cnn_zhang',
+                                            'vgg_wang', 'resnet_wang', 'cldnn_wang'] else 1
+            num_stack = 2
             inputs, labels, inputs_seq_len = generate_data(
                 label_type=label_type,
                 model='ctc',
                 batch_size=batch_size,
+                num_stack=num_stack,
                 splice=splice)
             # NOTE: input_size must be even number when using CudnnLSTM
 
             # Define model graph
             num_classes = 27 if label_type == 'character' else 61
             model = CTC(encoder_type=encoder_type,
-                        input_size=inputs[0].shape[-1] // splice,
+                        input_size=inputs[0].shape[-1] // splice // num_stack,
                         splice=splice,
+                        num_stack=num_stack,
                         num_units=256,
                         num_layers=2,
                         num_classes=num_classes,
@@ -95,7 +98,7 @@ class TestCTCTraining(tf.test.TestCase):
                         clip_grad_norm=5.0,
                         clip_activation=50,
                         num_proj=256,
-                        weight_decay=1e-8,
+                        weight_decay=1e-10,
                         # bottleneck_dim=50,
                         bottleneck_dim=None,
                         time_major=time_major)
@@ -111,7 +114,7 @@ class TestCTCTraining(tf.test.TestCase):
                 model.inputs_seq_len_pl_list[0],
                 model.keep_prob_pl_list[0])
             train_op = model.train(loss_op,
-                                   optimizer='adam',
+                                   optimizer='nestrov',
                                    learning_rate=learning_rate_pl)
             # NOTE: Adam does not run on CudnnLSTM
             decode_op = model.decoder(logits,
@@ -120,11 +123,11 @@ class TestCTCTraining(tf.test.TestCase):
             ler_op = model.compute_ler(decode_op, model.labels_pl_list[0])
 
             # Define learning rate controller
-            learning_rate = 1e-3
+            learning_rate = 1e-4
             lr_controller = Controller(learning_rate_init=learning_rate,
-                                       decay_start_epoch=20,
+                                       decay_start_epoch=50,
                                        decay_rate=0.9,
-                                       decay_patient_epoch=5,
+                                       decay_patient_epoch=10,
                                        lower_better=True)
 
             if save_params:
