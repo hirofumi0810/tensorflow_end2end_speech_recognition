@@ -11,6 +11,7 @@ from __future__ import print_function
 class Base(object):
 
     def __init__(self, *args, **kwargs):
+
         self.epoch = 0
         self.iteration = 0
         self.is_new_epoch = False

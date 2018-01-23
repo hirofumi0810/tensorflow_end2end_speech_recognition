@@ -1,0 +1,15 @@
+parent: ../config/ctc/blstm_ctc_baseline.yml
+param:
+  # framework
+  backend: pytorch
+  # backend: chainer
+
+  # topology
+  encoder_dense_residual: True
+
+  # optimization
+  batch_size: 64
+  convert_to_sgd_epoch: 100
+
+  # annealing
+  print_step: 10

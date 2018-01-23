@@ -41,6 +41,7 @@ class CTC(ModelBase):
             is not used for GRU models.
         splice (int, optional): the number of frames to splice. This is used
             when using CNN-like encoder. Default is 1 frame.
+        num_stack (int, optional): the number of frames to stack
         parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
         clip_grad_norm (float, optional): the range of clipping of gradient
@@ -64,6 +65,7 @@ class CTC(ModelBase):
                  lstm_impl='LSTMBlockCell',
                  use_peephole=True,
                  splice=1,
+                 num_stack=1,
                  parameter_init=0.1,
                  clip_grad_norm=None,
                  clip_activation=None,
@@ -74,7 +76,7 @@ class CTC(ModelBase):
 
         super(CTC, self).__init__()
 
-        assert input_size % 3 == 0, 'input_size must be divisible by 3 (+ delta, double delta features).'
+        assert input_size % 3 == 0, 'input_size must be divisible by 3 (+ delta, acceleration coefficients).'
         assert splice % 2 == 1, 'splice must be the odd number'
         if clip_grad_norm is not None:
             assert float(
@@ -86,6 +88,7 @@ class CTC(ModelBase):
         self.encoder_type = encoder_type
         self.input_size = input_size
         self.splice = splice
+        self.num_stack = num_stack
         self.num_units = num_units
         if int(num_proj) == 0:
             self.num_proj = None
@@ -129,10 +132,11 @@ class CTC(ModelBase):
                 clip_activation=clip_activation,
                 time_major=time_major)
 
-        elif encoder_type in ['vgg_blstm', 'vgg_lstm']:
+        elif encoder_type in ['vgg_blstm', 'vgg_lstm', 'cldnn_wang']:
             self.encoder = load(encoder_type)(
                 input_size=input_size,
                 splice=splice,
+                num_stack=num_stack,
                 num_units=num_units,
                 num_proj=self.num_proj,
                 num_layers=num_layers,
@@ -153,19 +157,29 @@ class CTC(ModelBase):
             self.encoder = load(encoder_type)(
                 input_size=input_size,
                 splice=splice,
+                num_stack=num_stack,
+                parameter_init=parameter_init,
+                time_major=time_major)
+
+        elif encoder_type in ['student_cnn_ctc', 'student_cnn_compact_ctc']:
+            self.encoder = load(encoder_type)(
+                input_size=input_size,
+                splice=splice,
+                num_stack=num_stack,
                 parameter_init=parameter_init,
                 time_major=time_major)
 
         else:
-            self.encoder = None
+            raise NotImplementedError
 
-    def _build(self, inputs, inputs_seq_len, keep_prob):
+    def _build(self, inputs, inputs_seq_len, keep_prob, is_training):
         """Construct model graph.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
             inputs_seq_len (placeholder): A tensor of size` [B]`
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
+            is_training (bool):
         Returns:
             logits: A tensor of size `[T, B, num_classes]`
         """
@@ -174,35 +188,15 @@ class CTC(ModelBase):
         max_time = tf.shape(inputs)[1]
 
         encoder_outputs, final_state = self.encoder(
-            inputs, inputs_seq_len, keep_prob)
+            inputs, inputs_seq_len, keep_prob, is_training)
 
         # for debug
         self.encoder_outputs = encoder_outputs
 
         # Reshape to apply the same weights over the timesteps
-        if final_state is None:
-            # CNN-like topology such as VGG and ResNet
-            output_dim = encoder_outputs.shape.as_list()[-1]
-            outputs_2d = tf.reshape(
-                encoder_outputs, shape=[batch_size * max_time, output_dim])
-        elif 'lstm' not in self.encoder_type or self.num_proj is None:
-            if 'b' in self.encoder_type:
-                # bidirectional
-                outputs_2d = tf.reshape(
-                    encoder_outputs, shape=[-1, self.num_units * 2])
-            else:
-                # unidirectional
-                outputs_2d = tf.reshape(
-                    encoder_outputs, shape=[-1, self.num_units])
-        else:
-            if 'b' in self.encoder_type:
-                # bidirectional
-                outputs_2d = tf.reshape(
-                    encoder_outputs, shape=[-1, self.num_proj * 2])
-            else:
-                # unidirectional
-                outputs_2d = tf.reshape(
-                    encoder_outputs, shape=[-1, self.num_proj])
+        output_dim = encoder_outputs.shape.as_list()[-1]
+        outputs_2d = tf.reshape(
+            encoder_outputs, shape=[batch_size * max_time, output_dim])
 
         if self.bottleneck_dim is not None and self.bottleneck_dim != 0:
             with tf.variable_scope('bottleneck') as scope:
@@ -247,7 +241,8 @@ class CTC(ModelBase):
         """Create placeholders and append them to list."""
         self.inputs_pl_list.append(
             tf.placeholder(tf.float32,
-                           shape=[None, None, self.input_size * self.splice],
+                           shape=[None, None, self.input_size *
+                                  self.num_stack * self.splice],
                            name='input'))
         self.labels_pl_list.append(
             tf.SparseTensor(tf.placeholder(tf.int64, name='indices'),
@@ -259,8 +254,9 @@ class CTC(ModelBase):
             tf.placeholder(tf.float32, name='keep_prob'))
 
     def compute_loss(self, inputs, labels, inputs_seq_len,
-                     keep_prob, scope=None):
-        """Operation for computing ctc loss.
+                     keep_prob, scope=None, softmax_temperature=1,
+                     is_training=True):
+        """Operation for computing CTC loss.
         Args:
             inputs: A tensor of size `[B, T, input_size]`
             labels: A SparseTensor of target labels
@@ -268,13 +264,17 @@ class CTC(ModelBase):
             keep_prob (placeholder, float): A probability to keep nodes
                 in the hidden-hidden connection
             scope (optional): A scope in the model tower
+            softmax_temperature (int, optional): temperature parameter for
+                ths softmax layer
+            is_training (bool, optional):
         Returns:
             total_loss: operation for computing total ctc loss (ctc loss + L2).
                  This is a single scalar tensor to minimize.
             logits: A tensor of size `[T, B, num_classes]`
         """
         # Build model graph
-        logits = self._build(inputs, inputs_seq_len, keep_prob)
+        logits = self._build(inputs, inputs_seq_len, keep_prob,
+                             is_training=is_training)
 
         # Weight decay
         if self.weight_decay > 0:
@@ -288,12 +288,12 @@ class CTC(ModelBase):
         with tf.name_scope("ctc_loss"):
             ctc_losses = tf.nn.ctc_loss(
                 labels,
-                logits,
+                logits / softmax_temperature,
                 tf.cast(inputs_seq_len, tf.int32),
                 # inputs_seq_len,
                 preprocess_collapse_repeated=False,
                 ctc_merge_repeated=True,
-                ignore_longer_outputs_than_inputs=False,
+                ignore_longer_outputs_than_inputs=True,
                 time_major=True)
             ctc_loss = tf.reduce_mean(ctc_losses, name='ctc_loss_mean')
             tf.add_to_collection('losses', ctc_loss)

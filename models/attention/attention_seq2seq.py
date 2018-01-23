@@ -47,7 +47,8 @@ class AttentionSeq2Seq(ModelBase):
         attention_type (string): the type of attention
         attention_dim: (int) the dimension of the attention layer
         decoder_type (string): lstm or gru
-        decoder_num_units (int): the number of units in each layer of the decoder
+        decoder_num_units (int): the number of units in each layer of the
+            decoder
         # decoder_num_proj (int): the number of nodes in the projection layer of
             the decoder. This is not used for GRU decoders.
         decoder_num_layers (int): the number of layers of the decoder
@@ -70,7 +71,7 @@ class AttentionSeq2Seq(ModelBase):
             is not used for GRU models.
         splice (int, optional): the number of frames to splice. This is used
             when using CNN-like encoder. Default is 1 frame.
-        parameter_init (float, optional): the ange of uniform distribution to
+        parameter_init (float, optional): the range of uniform distribution to
             initialize weight parameters (>= 0)
         clip_grad_norm (float, optional): the range of clipping of gradient
             norm (> 0)

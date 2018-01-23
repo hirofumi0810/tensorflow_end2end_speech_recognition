@@ -12,9 +12,9 @@ import tensorflow as tf
 
 sys.path.append(os.path.abspath('../../'))
 from models.encoders.load_encoder import load
-from models.test.util import measure_time
 from models.test.data import generate_data
 from utils.parameter import count_total_parameters
+from utils.measure_time_func import measure_time
 
 
 class TestEncoder(unittest.TestCase):
